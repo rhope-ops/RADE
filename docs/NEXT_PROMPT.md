@@ -11,7 +11,8 @@ Updated: 2026-11-14 by Claude. Keep this file at 40 lines or fewer. The current 
 
 1. After R17 confirms the window: move the engine here, with the manifest schema as its input contract.
 2. With the engine move, build docs/engine.md (modes, two check stages, fallback result, fresh fast checks) and the drift check (docs/drift-check.md).
-3. Before the first drift run: a one-page report field list for the ISSM (Administrator hands it over).
+3. Build the window as layout B (DECISIONS 14 Nov; preview https://claude.ai/artifact/SU4ghsQWy7EBzaLiZWNEMy); logo K as a PNG in WinForms.
+4. Before the first drift run: a one-page report field list for the ISSM (Administrator hands it over).
 
 ## Needs the Administrator
 
