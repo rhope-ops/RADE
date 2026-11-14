@@ -18,7 +18,7 @@ SW, GAP = 8.0, 1.6         # stroke width; clear space each side of the over-str
 H = SW / 2 * math.sqrt(2) + SW / 2 + GAP + 0.5   # half-length of each cut: clears the whole under-stroke
 DISC_R = 58                # white disc
 RING_R, RING_W = 58, 6     # blue ring (outer edge 61)
-EDGE_R, EDGE_W = 61.8, 1.6 # yellow line on the outside of the ring (edge 61.0 to 62.6)
+EDGE_R, EDGE_W = 62.4, 2.8 # yellow line on the outside of the ring (edge 61.0 to 63.8; the Administrator 2026-11-14: K+2, was 1.6)
 
 
 def rot(p, k):             # rotate (x, y) by k * 90 degrees
