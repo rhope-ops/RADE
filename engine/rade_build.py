@@ -382,7 +382,7 @@ function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]
     # Lines that may name a unit or a file (for example seal details) never reach the report (data boundary).
     if ($Step.ScreenOnly -and $line -match $Step.ScreenOnly) { $line = ($line -replace '^(\S+).*$', '$1') + ' (detail hidden: it may hold a name; run the step script by hand to see it)' }
     if ($line -match '(^|\s)PASS(\s|$)') { $r.Pass++ }
-    if ($line -match '(^|\s)SKIP(\s|$)') { $r.Skip++ }
+    if ($line -cmatch '(^|\s)SKIP(\s|$)') { $r.Skip++ }   # upper case only: prose such as "skip this" is not a result
     if ($line -match '(^|\s)(FAIL|FORMAT-FAIL|RENDER-ERROR|MEASURE-ERROR|STOPPED:)(\s|$)') { $r.Fail++ }
     if ($line.Trim()) { & $Say ('    ' + $line) }   # step output, indented under its step heading
     $lineTask = $p.StandardOutput.ReadLineAsync()
@@ -665,7 +665,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     $ans = ''; if ($Answers -and $Answers.Count -gt $k) { $ans = [string]$Answers[$k] }
     if ($steps[$k].Kind -eq 'guide') { $r = Invoke-GuideStep $base $steps[$k] $speak }
     else { $r = Invoke-RoundStep $base $steps[$k] $speak $Tick $ans }
-    if (-not $r.Skipped -and -not ($r.Skip -gt 0 -and $r.Pass -eq 0 -and $r.Fail -eq 0)) { $script:ranSteps += $steps[$k].Name }   # a step you skip, or one that only printed SKIP, expects no result files
+    if ((Get-StepState $r) -ne 'SKIPPED') { $script:ranSteps += $steps[$k].Name }   # a step you skip, or one that only printed SKIP, expects no result files
     $secs = ((Get-Date) - $t0).TotalSeconds
     $state = Get-StepState $r
     if ($state -eq 'NEEDS REVIEW') { $script:roundBad = $true }
