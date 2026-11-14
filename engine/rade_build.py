@@ -720,7 +720,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
 # in another program and answers (button). Advisory: a problem is a WARNING, never a FAILED.
 $checkDefs = @(
   @{ Id = 'ps'; Group = 'Local'; Name = 'PowerShell is version 5.1 or newer'; Kind = 'auto' },
-  @{ Id = 'lang'; Group = 'Local'; Name = 'PowerShell is not limited'; Kind = 'auto' },
+  @{ Id = 'lang'; Group = 'Local'; Name = 'PowerShell is not restricted'; Kind = 'auto' },
   @{ Id = 'onedrive'; Group = 'Local'; Name = 'Your OneDrive folder is set up'; Kind = 'auto' },
   @{ Id = 'disk'; Group = 'Local'; Name = 'There is enough free disk space'; Kind = 'auto' },
   @{ Id = 'write'; Group = 'Local'; Name = 'Files can be saved in OneDrive'; Kind = 'auto' },
@@ -761,7 +761,7 @@ function Get-FlowPortal([string]$Base) {
   return @{ Url = ''; Config = '' }
 }
 function Test-WebReach([string]$Url) {
-  # TLS 1.2 first (R19: Windows PowerShell 5.1 starts with TLS 1.0, which GitHub closes: [ReceiveFailure]; Edge uses 1.2).
+  # TLS 1.2 first (found in R19, fixed for R20: Windows PowerShell 5.1 starts with TLS 1.0, which GitHub closes: [ReceiveFailure]; Edge uses 1.2).
   try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { $null = $_ }
   # Does the host answer? Any HTTP answer counts (401 or 403 = it answers but wants a sign-in). Windows sign-in for the proxy.
   # Returns no address and no message text (they can hold the site or tenant name): only the code or the error kind.
@@ -780,7 +780,7 @@ function Test-WebReach([string]$Url) {
     while ($e -and -not ($e -is [System.Net.WebException]) -and $e.InnerException) { $e = $e.InnerException }
     if ($e -is [System.Net.WebException] -and $e.Response) {
       $code = 0; try { $code = [int]$e.Response.StatusCode } catch { $null = $_ }
-      if ($code -eq 407) { return @{ Ok = $false; Why = 'the network asked you to sign in, code [407]' } }
+      if ($code -eq 407) { return @{ Ok = $false; Why = 'Network sign-in required, code [407]' } }
       return @{ Ok = $true; Code = $code }
     }
     if ($e -is [System.Net.WebException]) {
@@ -1065,7 +1065,7 @@ function Get-SavedCheck($Cache, [string]$Id, [string]$Scope) {
   if ($age -gt $checkMaxDays) { $script:savedWhy[$Id] = ('Last check ' + [int][math]::Floor([math]::Max(0, $age)) + ' days ago, older than ' + $checkMaxDays + ' days'); return $null }
   # Two lines (the Administrator, 2026-11-14): "Last check: DD-MM-YY", then what that check found; no full stops.
   $d0 = [datetime]::ParseExact($c.At, 'yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
-  $found = ([string]$c.Detail) -replace '\.$', ''
+  $found = ([string]$c.Detail) -replace '\.$', ''; if ($found) { $found = $found.Substring(0, 1).ToUpper() + $found.Substring(1) }
   return @{ State = 'PASSED'; Detail = ('Last check: ' + $d0.ToString('dd-MM-yy', [System.Globalization.CultureInfo]::InvariantCulture)); Fix = $found; Saved = $true; Found = $found }
 }
 function Save-CheckCache($Results, [string]$Base, [string]$Site) {
@@ -1761,7 +1761,7 @@ try {
     $r = Get-CheckToRun $d $cache (Get-BasePath) $site0 $false
     if (-not $r) { $r = Invoke-Check $d (Get-BasePath) $site0 $null }
     $script:checkResults[$id] = $r
-    Write-Host ('  ' + $r.State + ': ' + $d.Name + '. ' + $r.Detail + $(if ($r.Fix -and ($r.State -ne 'PASSED' -or $r.Saved)) { '. ' + $r.Fix + '.' } else { '.' }))
+    Write-Host ('  ' + $r.State + ': ' + $d.Name + '. ' + $r.Detail + $(if ($r.Fix -and ($r.State -ne 'PASSED' -or $r.Saved)) { ' | ' + $r.Fix } else { '' }))
   }
   Save-CheckCache $script:checkResults (Get-BasePath) $site0
   if ($checkGate -and (Get-CheckBlock $script:checkResults)) {
