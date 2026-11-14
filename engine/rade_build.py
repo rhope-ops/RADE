@@ -508,8 +508,8 @@ function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
   $ok = ($res -eq 'OK')
   if ($res -eq 'Abort') {
     $t = ((ConvertTo-Masked ([string]$script:guideError)) -replace '\s+', ' ').Trim()
+    $t = $t -replace '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', '<EMAIL>'   # e-mail first: the site rule would leave the name before @
     $t = $t -replace 'https?://\S+', '<SITE>' -replace '[A-Za-z0-9.-]+\.(sharepoint|sharepoint-mil|onmicrosoft)\.[A-Za-z.]+\S*', '<SITE>'   # no address reaches the e-mail
-    $t = $t -replace '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', '<EMAIL>'
     if ($t.Length -gt 600) { $t = $t.Substring(0, 600) + ' ...' }
     if (-not $t) { $t = 'no error text given' }
     $r.Fail = 1; $r.FailText = $t
