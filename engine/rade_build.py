@@ -1390,7 +1390,7 @@ if ($gui) {
     $bar = & $mkBar 'all' 20 'Overall progress' $afBlue
     $stepLabel = & $mkFixed 'This step: none running' 2
     $stepLabel.Margin = New-Object System.Windows.Forms.Padding(3, 6, 3, 0)
-    $stepBar = & $mkBar 'step' 14 'Progress of this step' $gold
+    $stepBar = & $mkBar 'step' 14 'Progress of this step' ([System.Drawing.Color]::FromArgb(46, 133, 64))   # green #2E8540, 4.1:1 on the track (the Administrator, 14 Nov 26); overall bar stays blue
     $log = New-Object System.Windows.Forms.TextBox
     $log.Dock = 'Fill'; $log.Multiline = $true; $log.ScrollBars = 'Both'; $log.WordWrap = $false; $log.ReadOnly = $true; $log.AccessibleName = 'Log'
     $log.Font = New-Object System.Drawing.Font('Consolas', 9)
@@ -1442,7 +1442,7 @@ if ($gui) {
       try { $word.Font = New-Object System.Drawing.Font($form.Font.FontFamily, [single]20, $bold) } catch { $null = $_ }
       $lock.Controls.Add($logoBox, 0, 0); $lock.Controls.Add($word, 1, 0)
       $tag = New-Object System.Windows.Forms.Label
-      $tag.AutoSize = $true; $tag.MaximumSize = New-Object System.Drawing.Size(180, 0); $tag.Text = 'Test and deploy apps for your organization'
+      $tag.AutoSize = $true; $tag.MaximumSize = New-Object System.Drawing.Size(180, 0); $tag.Text = 'Test and deploy apps for your DoD organization'
       $tag.ForeColor = $mist; $tag.BackColor = [System.Drawing.Color]::Transparent; $tag.Margin = New-Object System.Windows.Forms.Padding(0, 10, 0, 16)
       $rule = New-Object System.Windows.Forms.Panel
       $rule.Height = 1; $rule.Width = 178; $rule.BackColor = [System.Drawing.Color]::FromArgb(70, 105, 150); $rule.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 14)
