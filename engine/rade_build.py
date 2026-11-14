@@ -1229,7 +1229,7 @@ if ($gui) {
     $subFont = $form.Font; try { $subFont = New-Object System.Drawing.Font($form.Font.FontFamily, [single]9.5) } catch { $null = $_ }
     # Chip tints; text colors from Get-CheckColor (contrast on the tint: green 6.8, brown 6.0, red 8.6, gray 4.9, navy 13 to 1).
     $chipTint = @{ PASSED = @(230, 242, 234); WARNING = @(248, 237, 227); FAILED = @(248, 230, 230); 'NEEDS REVIEW' = @(248, 230, 230); RUNNING = @(227, 236, 246) }
-    $chipInk = @{ 'NEEDS REVIEW' = 'FAILED'; WAITING = 'NOT RUN'; SKIPPED = 'NOT RUN' }
+    $chipInk = @{ 'NEEDS REVIEW' = 'FAILED'; WAITING = 'NOT RUN'; SKIPPED = 'NOT RUN'; OFF = 'NOT RUN' }
     $flags1 = [System.Windows.Forms.TextFormatFlags]'Left, Top, NoPrefix, SingleLine'
     $paintCell = { param($V, $E)
       try {
@@ -1242,6 +1242,8 @@ if ($gui) {
           $E.Handled = $true; return }
         if (-not $kind) { return }   # the check box column paints itself
         $E.Paint($r, [System.Windows.Forms.DataGridViewPaintParts]'Background, Border')
+        if ($V.Focused -and $V.CurrentCell -and $V.CurrentCell.RowIndex -eq $E.RowIndex) {   # keyboard users see the current row
+          $fb = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(231, 241, 251)); $g.FillRectangle($fb, $r.Left, $r.Top, $r.Width, $r.Height - 1); $fb.Dispose() }
         $cell = $V.Rows[$E.RowIndex].Cells[$E.ColumnIndex]
         if ($kind -eq 'chip') {
           $st = [string]$cell.Value
@@ -1270,7 +1272,8 @@ if ($gui) {
         }
         $E.Handled = $true
       } catch { $null = $_ } }   # cosmetics never stop the window: on an error the cell paints as plain text
-    $styleSecondary = { param($B) try { $B.FlatStyle = 'Flat'; $B.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(201, 210, 220); $B.BackColor = [System.Drawing.Color]::White; $B.ForeColor = $ink } catch { $null = $_ } }
+    $paintSecondary = { param($X) if ($X.Enabled) { $X.BackColor = [System.Drawing.Color]::White; $X.ForeColor = $ink } else { $X.BackColor = [System.Drawing.Color]::FromArgb(233, 236, 240); $X.ForeColor = [System.Drawing.Color]::FromArgb(85, 85, 85) } }   # form scope: handlers run later
+    $styleSecondary = { param($B) try { $B.FlatStyle = 'Flat'; $B.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(201, 210, 220); & $paintSecondary $B; $B.Add_EnabledChanged({ try { & $paintSecondary $this } catch { $null = $_ } }) } catch { $null = $_ } }
     $styleLink = { param($B) try { $B.FlatStyle = 'Flat'; $B.FlatAppearance.BorderSize = 0; $B.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb(238, 244, 250); $B.BackColor = [System.Drawing.Color]::White; $B.ForeColor = [System.Drawing.Color]::FromArgb(0, 83, 159) } catch { $null = $_ } }
     $mkTitle = { param([string]$Text) $l = & $mkLabel $Text; $l.Margin = New-Object System.Windows.Forms.Padding(3, 14, 3, 2); try { $l.Font = $titleFont; $l.ForeColor = [System.Drawing.Color]::FromArgb(11, 37, 69) } catch { $null = $_ }; $l }
     $mkSub = { param([string]$Text) $l = & $mkLabel $Text; $l.Margin = New-Object System.Windows.Forms.Padding(3, 0, 3, 12); try { $l.Font = $subFont; $l.ForeColor = $soft } catch { $null = $_ }; $l }
@@ -1283,6 +1286,7 @@ if ($gui) {
       $v.RowTemplate.Height = 2 * $lineH + 10
       try { $v.BorderStyle = 'None'; $v.CellBorderStyle = 'SingleHorizontal'; $v.GridColor = [System.Drawing.Color]::FromArgb(238, 241, 244); $v.EnableHeadersVisualStyles = $false; $v.ColumnHeadersBorderStyle = 'None' } catch { $null = $_ }
       $v.Add_CellPainting({ & $paintCell $this $_ })
+      $v.Add_GotFocus({ $this.Invalidate() }); $v.Add_LostFocus({ $this.Invalidate() }); $v.Add_CurrentCellChanged({ $this.Invalidate() })
       try { $v.BackgroundColor = [System.Drawing.SystemColors]::Window; $v.DefaultCellStyle.WrapMode = 'True'; $v.DefaultCellStyle.Alignment = 'MiddleLeft'
         $v.DefaultCellStyle.Padding = New-Object System.Windows.Forms.Padding(4, 2, 4, 2)
         $v.DefaultCellStyle.SelectionBackColor = [System.Drawing.SystemColors]::Window; $v.DefaultCellStyle.SelectionForeColor = [System.Drawing.SystemColors]::WindowText } catch { $null = $_ }
@@ -1465,7 +1469,7 @@ if ($gui) {
     try { $where.Font = New-Object System.Drawing.Font($form.Font.FontFamily, [single]10, $bold) } catch { $null = $_ }
     $warn = & $mkLabel ''
     try { $warn.ForeColor = Get-CheckColor 'FAILED' } catch { $null = $_ }
-    # Steps: a grid of two-line rows (R17): a check box to run it, then the step name / its note, "Running now" or its result.
+    # Steps: a grid of two-line rows (R17): a check box to run it, then the step name / its note or result, then a status chip.
     # Click the box or press Space to tick or clear a step; Enter runs.
     $stepView = & $mkGrid 'Steps to run'
     $stepView.Anchor = 'Left, Right'; $stepView.TabStop = $true
@@ -1479,11 +1483,12 @@ if ($gui) {
     $stepOn = { param([int]$I) [bool]$stepView.Rows[$I].Cells[0].Value }
     $stepSay = { param([int]$I, [string]$Status, [string]$State)
       # The chip shows the state word; line 2 the rest ("PASSED (1 passed, 0 failed) in 0m 02s" -> "1 passed, 0 failed, in 0m 02s").
-      if (-not $State) { $State = 'WAITING'; foreach ($w in 'NEEDS REVIEW', 'FAILED', 'SKIPPED', 'PASSED') { if ($Status.StartsWith($w)) { $State = $w; $Status = $Status.Substring($w.Length).Trim(); break } } }
+      if (-not $State) { $State = 'WAITING'; foreach ($w in 'NEEDS REVIEW', 'FAILED', 'SKIPPED', 'PASSED') { if ($Status.StartsWith($w, [System.StringComparison]::Ordinal)) { $State = $w; $Status = $Status.Substring($w.Length).Trim(); break } } }
+      if ($State -eq 'SKIPPED' -and $Status -match '^by ') { $Status = 'Skipped ' + $Status }
       if ($Status -match '^\((.*)\) in (.+)$') { $Status = $Matches[1] + ', in ' + $Matches[2] }
       if ($Status) { $Status = $Status.Substring(0, 1).ToUpperInvariant() + $Status.Substring(1) }
       $c = $stepView.Rows[$I].Cells[1]; & $setCell $c ([string]$c.Tag[0]) $Status; $stepView.Rows[$I].Cells[2].Value = $State; $stepView.InvalidateRow($I) }
-    $stepToggle = { param([int]$I) if (-not $script:running -and $I -ge 0) { $c = $stepView.Rows[$I].Cells[0]; $c.Value = -not [bool]$c.Value } }
+    $stepToggle = { param([int]$I) if (-not $script:running -and $I -ge 0) { $c = $stepView.Rows[$I].Cells[0]; $c.Value = -not [bool]$c.Value; $stepView.Rows[$I].Cells[2].Value = $(if ($c.Value) { 'WAITING' } else { 'OFF' }); $stepView.InvalidateRow($I) } }
     $stepView.Add_CellClick({ if ($_.ColumnIndex -eq 0) { & $stepToggle $_.RowIndex } })
     $stepView.Add_PreviewKeyDown({ if ($_.KeyCode -eq 'Return') { $_.IsInputKey = $true } })   # Enter reaches KeyDown (runs), not the grid's next-row move
     $stepView.Add_KeyDown({
@@ -1509,7 +1514,9 @@ if ($gui) {
     $logLink = New-Object System.Windows.Forms.LinkLabel
     $logLink.AutoSize = $true; $logLink.Text = 'Hide log'; $logLink.Margin = New-Object System.Windows.Forms.Padding(16, 7, 3, 3); $logLink.AccessibleName = 'Show or hide the log'
     try { $logLink.LinkColor = $afBlue; $logLink.ActiveLinkColor = $navy } catch { $null = $_ }
-    $logLink.Add_LinkClicked({ $log.Visible = -not $log.Visible; $logLink.Text = $(if ($log.Visible) { 'Hide log' } else { 'Show log' }) })
+    $logLink.Add_LinkClicked({
+      $log.Visible = -not $log.Visible; $logLink.Text = $(if ($log.Visible) { 'Hide log' } else { 'Show log' })
+      try { $pDeploy.RowStyles[8].SizeType = $(if ($log.Visible) { 'Percent' } else { 'AutoSize' }) } catch { $null = $_ } })   # no gap above "Results to" when hidden
     $toPanel.Controls.AddRange(@($toLabel, $toBox, $logLink))
     $okBox = New-Object System.Windows.Forms.CheckBox
     $okBox.AutoSize = $true; $okBox.Checked = $true; $okBox.MaximumSize = $wrap
@@ -1770,6 +1777,7 @@ if ($gui) {
     $toFront = { $form.TopMost = $true; $form.Activate(); $form.TopMost = $false }
     $run.Add_Click({
       $run.Enabled = $false; $draft.Enabled = $false; $copy.Enabled = $false; $open.Enabled = $false; $back.Enabled = $false; $script:running = $true
+      foreach ($sr in $stepView.Rows) { $sr.Cells[2].Value = $(if ([bool]$sr.Cells[0].Value) { 'WAITING' } else { 'OFF' }) }; $stepView.Invalidate()   # a second run starts clean
       $to = $toBox.Text.Trim()
       if ($to -and -not (Test-MailTo $to)) {
         $script:helped = @{}; & $say 'The e-mail address does not look right.'; & $say (Get-WhatToDo 'e-mail address does not look right')
