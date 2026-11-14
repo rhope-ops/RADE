@@ -270,7 +270,8 @@ function Move-ToRecycleBin([string]$Path, [switch]$Folder) {
 function Invoke-Cleanup([string]$Base, [scriptblock]$Say) {
   $plan = Get-CleanupPlan $Base
   $done = 0; $gone = 0; $failed = 0
-  foreach ($f in $plan.Files) {
+  foreach ($f in @($plan.Files | Select-Object -Unique)) {   # a folder item and a file pattern can name the same file (R18: failed 1)
+    if (-not (Test-Path -LiteralPath $f -PathType Leaf)) { continue }   # already gone: nothing to do
     try { Move-ToRecycleBin $f; $done++ } catch { $failed++; & $Say ('Clean-up could not recycle ' + (ConvertTo-Masked $f) + ': ' + (ConvertTo-Masked $_.Exception.Message)) }
   }
   foreach ($d in @($plan.Dirs | Sort-Object Length -Descending)) {
@@ -357,7 +358,7 @@ function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]
   $psi.WorkingDirectory = $dir
   $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true
   $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
-  $r = @{ Pass = 0; Fail = 0; Exit = $null }
+  $r = @{ Pass = 0; Fail = 0; Skip = 0; Exit = $null }
   $p = [System.Diagnostics.Process]::Start($psi)
   $script:child = $p
   $limit = $stepMinutes; if ($Step.Minutes) { $limit = [int]$Step.Minutes }   # a step that waits for a person sets its own limit
@@ -381,6 +382,7 @@ function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]
     # Lines that may name a unit or a file (for example seal details) never reach the report (data boundary).
     if ($Step.ScreenOnly -and $line -match $Step.ScreenOnly) { $line = ($line -replace '^(\S+).*$', '$1') + ' (detail hidden: it may hold a name; run the step script by hand to see it)' }
     if ($line -match '(^|\s)PASS(\s|$)') { $r.Pass++ }
+    if ($line -cmatch '(^|\s)SKIP(\s|$)') { $r.Skip++ }   # upper case only: prose such as "skip this" is not a result
     if ($line -match '(^|\s)(FAIL|FORMAT-FAIL|RENDER-ERROR|MEASURE-ERROR|STOPPED:)(\s|$)') { $r.Fail++ }
     if ($line.Trim()) { & $Say ('    ' + $line) }   # step output, indented under its step heading
     $lineTask = $p.StandardOutput.ReadLineAsync()
@@ -394,6 +396,7 @@ function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]
 function Get-StepState($R) {
   if ($R.Skipped) { return 'SKIPPED' }
   if ($R.Fail -gt 0 -or $R.Exit -ne 0) { return 'NEEDS REVIEW' }
+  if ($R.Pass -eq 0 -and $R.Skip -gt 0) { return 'SKIPPED' }   # the step found nothing to do (R18: was PASSED with 0 passed)
   return 'PASSED'
 }
 function Get-StepLine($Step, $R, [double]$Seconds) {
@@ -402,7 +405,7 @@ function Get-StepLine($Step, $R, [double]$Seconds) {
   if ($R.Skipped) { return ($Step.Name + ': SKIPPED by you') }
   if ($Step.Kind -eq 'guide' -and $R.FailText) { return ($Step.Name + ': FAILED (reported by you) in ' + (Format-Duration $Seconds) + ': ' + $R.FailText) }
   if ($Step.Kind -eq 'guide') { return ($Step.Name + ': ' + $state + ' (confirmed by you) in ' + (Format-Duration $Seconds)) }
-  return ($Step.Name + ': ' + $state + ' (' + $R.Pass + ' passed, ' + $R.Fail + ' failed, exit code ' + $R.Exit + ') in ' + (Format-Duration $Seconds))
+  return ($Step.Name + ': ' + $state + ' (' + $R.Pass + ' passed, ' + $R.Fail + ' failed' + $(if ($R.Skip) { ', ' + $R.Skip + ' skipped' } else { '' }) + ', exit code ' + $R.Exit + ') in ' + (Format-Duration $Seconds))
 }
 function Copy-TextToClipboard([string]$Text) {
   try { [System.Windows.Forms.Clipboard]::SetText($Text); return $true } catch { $null = $_ }
@@ -662,7 +665,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     $ans = ''; if ($Answers -and $Answers.Count -gt $k) { $ans = [string]$Answers[$k] }
     if ($steps[$k].Kind -eq 'guide') { $r = Invoke-GuideStep $base $steps[$k] $speak }
     else { $r = Invoke-RoundStep $base $steps[$k] $speak $Tick $ans }
-    if (-not $r.Skipped) { $script:ranSteps += $steps[$k].Name }   # R18: a step you skip expects no result files
+    if ((Get-StepState $r) -ne 'SKIPPED') { $script:ranSteps += $steps[$k].Name }   # a step you skip, or one that only printed SKIP, expects no result files
     $secs = ((Get-Date) - $t0).TotalSeconds
     $state = Get-StepState $r
     if ($state -eq 'NEEDS REVIEW') { $script:roundBad = $true }
