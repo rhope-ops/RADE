@@ -35,7 +35,7 @@ Find changes on the work computer, in PowerShell, SharePoint or Power Automate t
 
 Network or port scanning; scheduled runs (Task Scheduler on a locked device looks like persistence and needs its own approval); automatic sending.
 
-## Open (agent REC, not decided)
+## When and approval (the Administrator, 2026-11-14)
 
-- When: compare at every round's checks, plus "Drift check" on demand (REC).
-- ISSM: show the ISSM the report field list once before the first run (REC).
+- Drift is compared at every round's checks, plus "Drift check" on demand (engine.md "Check stages").
+- The ISSM sees the report field list once before the first run; the first run waits for the ISSM's OK.

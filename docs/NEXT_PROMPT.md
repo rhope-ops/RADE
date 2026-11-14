@@ -10,7 +10,8 @@ Updated: 2026-11-14 by Claude. Keep this file at 40 lines or fewer. The current 
 ## Open (in order)
 
 1. After R17 confirms the window: move the engine here, with the manifest schema as its input contract.
-2. Build the drift check (docs/drift-check.md) with the engine move. Open: when it runs, and the ISSM field list (agent RECs in that file).
+2. With the engine move, build docs/engine.md (modes, two check stages, fallback result, fresh fast checks) and the drift check (docs/drift-check.md).
+3. Before the first drift run: a one-page report field list for the ISSM (Administrator hands it over).
 
 ## Needs the Administrator
 
