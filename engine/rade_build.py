@@ -1065,7 +1065,7 @@ function Get-SavedCheck($Cache, [string]$Id, [string]$Scope) {
   if ($age -gt $checkMaxDays) { $script:savedWhy[$Id] = ('Last check ' + [int][math]::Floor([math]::Max(0, $age)) + ' days ago, older than ' + $checkMaxDays + ' days'); return $null }
   # Two lines (the Administrator, 2026-11-14): "Last check: DD-MM-YY", then what that check found; no full stops.
   $d0 = [datetime]::ParseExact($c.At, 'yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
-  $found = ([string]$c.Detail) -replace '\.$', ''; if ($found) { $found = $found.Substring(0, 1).ToUpper() + $found.Substring(1) }
+  $found = ([string]$c.Detail) -replace '\.$', ''; if ($found) { $found = $found.Substring(0, 1).ToUpperInvariant() + $found.Substring(1) }
   return @{ State = 'PASSED'; Detail = ('Last check: ' + $d0.ToString('dd-MM-yy', [System.Globalization.CultureInfo]::InvariantCulture)); Fix = $found; Saved = $true; Found = $found }
 }
 function Save-CheckCache($Results, [string]$Base, [string]$Site) {
@@ -1218,6 +1218,62 @@ if ($gui) {
       $Cell.ToolTipText = ((@($A, $B) | Where-Object { $_ }) -join "`r`n") }
     $refit = { param($View, [int]$Col)
       foreach ($r in $View.Rows) { $c = $r.Cells[$Col]; if ($c.Tag -is [array]) { & $setCell $c $c.Tag[0] $c.Tag[1] } } }
+    # Layout A "Quiet table" (the Administrator, 2026-11-14; docs/window-design.md): white main area, borderless grids with
+    # row lines only, two-line cells drawn in two styles, results as tinted chips (the word always shown).
+    $ink = [System.Drawing.Color]::FromArgb(27, 36, 48); $soft = [System.Drawing.Color]::FromArgb(90, 101, 115)   # 15.6 and 5.9 to 1 on white
+    $hairline = [System.Drawing.Color]::FromArgb(227, 232, 238)
+    $smallFont = $form.Font; try { $smallFont = New-Object System.Drawing.Font($form.Font.FontFamily, [single]8.5) } catch { $null = $_ }
+    $semiFont = $form.Font; try { $semiFont = New-Object System.Drawing.Font($form.Font.FontFamily, [single]10, $bold) } catch { $null = $_ }
+    $chipFont = $smallFont; try { $chipFont = New-Object System.Drawing.Font($form.Font.FontFamily, [single]8, $bold) } catch { $null = $_ }
+    $titleFont = $form.Font; try { $titleFont = New-Object System.Drawing.Font('Segoe UI Semibold', [single]15) } catch { $null = $_ }
+    $subFont = $form.Font; try { $subFont = New-Object System.Drawing.Font($form.Font.FontFamily, [single]9.5) } catch { $null = $_ }
+    # Chip tints; text colors from Get-CheckColor (contrast on the tint: green 6.8, brown 6.0, red 8.6, gray 4.9, navy 13 to 1).
+    $chipTint = @{ PASSED = @(230, 242, 234); WARNING = @(248, 237, 227); FAILED = @(248, 230, 230); 'NEEDS REVIEW' = @(248, 230, 230); RUNNING = @(227, 236, 246) }
+    $chipInk = @{ 'NEEDS REVIEW' = 'FAILED'; WAITING = 'NOT RUN'; SKIPPED = 'NOT RUN' }
+    $flags1 = [System.Windows.Forms.TextFormatFlags]'Left, Top, NoPrefix, SingleLine'
+    $paintCell = { param($V, $E)
+      try {
+        if ($E.ColumnIndex -lt 0) { return }
+        $col = $V.Columns[$E.ColumnIndex]; $kind = [string]$col.Tag; $g = $E.Graphics; $r = $E.CellBounds
+        if ($E.RowIndex -lt 0) {   # header: white, bold gray words, one hairline under it
+          $g.FillRectangle([System.Drawing.Brushes]::White, $r)
+          $hp = New-Object System.Drawing.Pen($hairline); $g.DrawLine($hp, $r.Left, $r.Bottom - 1, $r.Right, $r.Bottom - 1); $hp.Dispose()
+          [System.Windows.Forms.TextRenderer]::DrawText($g, [string]$col.HeaderText, $V.ColumnHeadersDefaultCellStyle.Font, (New-Object System.Drawing.Rectangle(($r.Left + 6), $r.Top, [math]::Max(1, $r.Width - 8), $r.Height)), $soft, [System.Windows.Forms.TextFormatFlags]'Left, VerticalCenter, EndEllipsis, NoPrefix')
+          $E.Handled = $true; return }
+        if (-not $kind) { return }   # the check box column paints itself
+        $E.Paint($r, [System.Windows.Forms.DataGridViewPaintParts]'Background, Border')
+        $cell = $V.Rows[$E.RowIndex].Cells[$E.ColumnIndex]
+        if ($kind -eq 'chip') {
+          $st = [string]$cell.Value
+          if ($st) {
+            $tc = $chipTint[$st]; if (-not $tc) { $tc = @(238, 241, 244) }
+            $ik = $chipInk[$st]; if (-not $ik) { $ik = $st }
+            $sz = [System.Windows.Forms.TextRenderer]::MeasureText($st, $chipFont)
+            $ch = $sz.Height + 4; $cw = [math]::Max($ch, $sz.Width + 10); $x = $r.Left + 6; $y = $r.Top + [int](($r.Height - $ch) / 2)
+            $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+            $path.AddArc($x, $y, $ch, $ch, 90, 180); $path.AddArc($x + $cw - $ch, $y, $ch, $ch, 270, 180); $path.CloseFigure()
+            $old = $g.SmoothingMode; $g.SmoothingMode = 'AntiAlias'
+            $br = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb($tc[0], $tc[1], $tc[2])); $g.FillPath($br, $path); $br.Dispose(); $path.Dispose()
+            $g.SmoothingMode = $old
+            [System.Windows.Forms.TextRenderer]::DrawText($g, $st, $chipFont, (New-Object System.Drawing.Rectangle($x, $y, $cw, $ch)), (Get-CheckColor $ik), [System.Windows.Forms.TextFormatFlags]'HorizontalCenter, VerticalCenter, NoPrefix, SingleLine')
+          }
+        } else {
+          # 'over': small gray line 1 over the main line 2 (Check: group, then name). 'title': semibold line 1. Else plain line 1.
+          $t = $cell.Tag; if (-not ($t -is [array])) { $t = @([string]$cell.Value, '') }
+          $f1 = $(if ($kind -eq 'over') { $smallFont } elseif ($kind -eq 'title') { $semiFont } else { $V.Font }); $c1 = $(if ($kind -eq 'over') { $soft } else { $ink })
+          $f2 = $(if ($kind -eq 'over') { $V.Font } else { $smallFont }); $c2 = $(if ($kind -eq 'over') { $ink } else { $soft })
+          $w = [math]::Max(1, $r.Width - 12)
+          $h1 = [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $f1).Height; $h2 = $(if ($t[1]) { [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $f2).Height } else { 0 })
+          $y = $r.Top + [int](($r.Height - $h1 - $h2) / 2)
+          [System.Windows.Forms.TextRenderer]::DrawText($g, (& $fitText ([string]$t[0]) $f1 $w), $f1, (New-Object System.Drawing.Rectangle(($r.Left + 6), $y, $w, $h1)), $c1, $flags1)
+          if ($t[1]) { [System.Windows.Forms.TextRenderer]::DrawText($g, (& $fitText ([string]$t[1]) $f2 $w), $f2, (New-Object System.Drawing.Rectangle(($r.Left + 6), ($y + $h1), $w, $h2)), $c2, $flags1) }
+        }
+        $E.Handled = $true
+      } catch { $null = $_ } }   # cosmetics never stop the window: on an error the cell paints as plain text
+    $styleSecondary = { param($B) try { $B.FlatStyle = 'Flat'; $B.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(201, 210, 220); $B.BackColor = [System.Drawing.Color]::White; $B.ForeColor = $ink } catch { $null = $_ } }
+    $styleLink = { param($B) try { $B.FlatStyle = 'Flat'; $B.FlatAppearance.BorderSize = 0; $B.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb(238, 244, 250); $B.BackColor = [System.Drawing.Color]::White; $B.ForeColor = [System.Drawing.Color]::FromArgb(0, 83, 159) } catch { $null = $_ } }
+    $mkTitle = { param([string]$Text) $l = & $mkLabel $Text; $l.Margin = New-Object System.Windows.Forms.Padding(3, 14, 3, 2); try { $l.Font = $titleFont; $l.ForeColor = [System.Drawing.Color]::FromArgb(11, 37, 69) } catch { $null = $_ }; $l }
+    $mkSub = { param([string]$Text) $l = & $mkLabel $Text; $l.Margin = New-Object System.Windows.Forms.Padding(3, 0, 3, 12); try { $l.Font = $subFont; $l.ForeColor = $soft } catch { $null = $_ }; $l }
     $mkGrid = { param([string]$Name)
       $v = New-Object System.Windows.Forms.DataGridView
       $v.ReadOnly = $true; $v.AllowUserToAddRows = $false; $v.AllowUserToDeleteRows = $false; $v.AllowUserToResizeRows = $false
@@ -1225,6 +1281,8 @@ if ($gui) {
       $v.AutoSizeRowsMode = 'None'; $v.ColumnHeadersHeightSizeMode = 'AutoSize'; $v.AccessibleName = $Name
       try { $v.ColumnHeadersDefaultCellStyle.Font = New-Object System.Drawing.Font($form.Font.FontFamily, [single]10, $bold) } catch { $null = $_ }   # bold headers (the Administrator, 2026-11-14)
       $v.RowTemplate.Height = 2 * $lineH + 10
+      try { $v.BorderStyle = 'None'; $v.CellBorderStyle = 'SingleHorizontal'; $v.GridColor = [System.Drawing.Color]::FromArgb(238, 241, 244); $v.EnableHeadersVisualStyles = $false; $v.ColumnHeadersBorderStyle = 'None' } catch { $null = $_ }
+      $v.Add_CellPainting({ & $paintCell $this $_ })
       try { $v.BackgroundColor = [System.Drawing.SystemColors]::Window; $v.DefaultCellStyle.WrapMode = 'True'; $v.DefaultCellStyle.Alignment = 'MiddleLeft'
         $v.DefaultCellStyle.Padding = New-Object System.Windows.Forms.Padding(4, 2, 4, 2)
         $v.DefaultCellStyle.SelectionBackColor = [System.Drawing.SystemColors]::Window; $v.DefaultCellStyle.SelectionForeColor = [System.Drawing.SystemColors]::WindowText } catch { $null = $_ }
@@ -1291,7 +1349,8 @@ if ($gui) {
         if ($dirty) { $b.Panel.Invalidate() }
       } })
     $grid = & $mkRows @('AutoSize', 'AutoSize', 'Percent', 'AutoSize')
-    $grid.Padding = New-Object System.Windows.Forms.Padding(10)
+    $grid.Padding = New-Object System.Windows.Forms.Padding(26, 10, 26, 14)
+    try { $grid.BackColor = [System.Drawing.Color]::White } catch { $null = $_ }   # layout A: a white main area
     # Header on every screen: where you are (screen k of 3), last round, newer round.
     $crumb = & $mkLabel ''
     try { $crumb.ForeColor = Get-CheckColor 'NOT RUN' } catch { $null = $_ }
@@ -1299,11 +1358,14 @@ if ($gui) {
     $banner.Margin = New-Object System.Windows.Forms.Padding(3, 2, 3, 6)
     try { $banner.ForeColor = Get-CheckColor 'NOT RUN' } catch { $null = $_ }
     $newer = Get-NewerRound
-    if ($newer) { $banner.Text = 'A newer round, ' + $newer + ', is in the repository. Close this window and run ' + $newer + ' instead.   ' + $banner.Text; try { $banner.ForeColor = Get-CheckColor 'FAILED' } catch { $null = $_ } }
+    if ($newer) { $banner.Text = 'A newer round, ' + $newer + ', is in the repository. Close this window and run ' + $newer + ' instead.'; try { $banner.ForeColor = Get-CheckColor 'FAILED' } catch { $null = $_ } }
+    $banner.Visible = [bool]$newer   # layout A: the last round shows under the Choose title; only a newer round shows on every screen
     $body = New-Object System.Windows.Forms.Panel
     $body.Dock = 'Fill'; $body.Margin = New-Object System.Windows.Forms.Padding(0)
     $nav = New-Object System.Windows.Forms.FlowLayoutPanel
     $nav.AutoSize = $true; $nav.WrapContents = $false; $nav.Dock = 'Fill'; $nav.FlowDirection = 'RightToLeft'
+    $nav.Padding = New-Object System.Windows.Forms.Padding(0, 12, 0, 0)
+    $nav.Add_Paint({ $hp = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(227, 232, 238)); $_.Graphics.DrawLine($hp, 0, 0, $this.Width, 0); $hp.Dispose() })   # one hairline over the buttons
     $next = & $mkButton 'Next'
     $back = & $mkButton 'Back'
     $exitB = & $mkButton 'E&xit'; $exitB.AccessibleName = 'Exit RADE'   # PFM 14 Nov 26 (R17); Alt+X
@@ -1311,29 +1373,41 @@ if ($gui) {
 
     # ---- Screen 1: choose the application
     # Minimal (PFM 14 Nov 26): one plain heading, a roomy list, one summary line and one gray line of facts.
+    # Layout A (the Administrator, 2026-11-14): title, one gray line, the apps as two-line rows (name / facts), the summary.
     $pChoose = & $mkRows @('AutoSize', 'AutoSize', 'AutoSize', 'AutoSize', 'Percent')
-    $chooseHead = & $mkLabel 'Choose an application'
-    $chooseHead.Margin = New-Object System.Windows.Forms.Padding(3, 18, 3, 10)
-    try { $chooseHead.Font = New-Object System.Drawing.Font($form.Font.FontFamily, [single]15) } catch { $null = $_ }
+    $chooseHead = & $mkTitle 'Choose an application'
+    $chooseSub = & $mkSub (Get-LastRoundText $hist0)
     $appList = New-Object System.Windows.Forms.ListBox
-    $appList.Anchor = 'Left, Right'; $appList.IntegralHeight = $false; $appList.BorderStyle = 'FixedSingle'; $appList.AccessibleName = 'Applications'
-    try { $appList.Font = New-Object System.Drawing.Font($form.Font.FontFamily, [single]12) } catch { $null = $_ }
-    foreach ($a in $apps) { [void]$appList.Items.Add('  ' + $a.Name) }
-    $appList.Height = ($appList.ItemHeight * [math]::Max(2, $apps.Count)) + 8
+    $appList.Anchor = 'Left, Right'; $appList.IntegralHeight = $false; $appList.BorderStyle = 'None'; $appList.AccessibleName = 'Applications'
+    foreach ($a in $apps) { [void]$appList.Items.Add($a.Name) }   # the item text is what a screen reader says
+    try {
+      $appList.DrawMode = 'OwnerDrawFixed'; $appList.ItemHeight = 2 * $lineH + 16
+      $appList.Add_DrawItem({
+        try {
+          $e = $_; if ($e.Index -lt 0) { return }
+          $sel = (([int]$e.State -band [int][System.Windows.Forms.DrawItemState]::Selected) -ne 0)
+          $bb = New-Object System.Drawing.SolidBrush($(if ($sel) { [System.Drawing.Color]::FromArgb(231, 241, 251) } else { [System.Drawing.Color]::White })); $e.Graphics.FillRectangle($bb, $e.Bounds); $bb.Dispose()
+          $hp = New-Object System.Drawing.Pen($hairline); $e.Graphics.DrawLine($hp, $e.Bounds.Left, $e.Bounds.Bottom - 1, $e.Bounds.Right, $e.Bounds.Bottom - 1); $hp.Dispose()
+          $a = $apps[$e.Index]; $w = [math]::Max(1, $e.Bounds.Width - 24)
+          $h1 = [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $semiFont).Height; $y = $e.Bounds.Top + [int](($e.Bounds.Height - $h1 - $lineH) / 2)
+          [System.Windows.Forms.TextRenderer]::DrawText($e.Graphics, (& $fitText ([string]$a.Name) $semiFont $w), $semiFont, (New-Object System.Drawing.Rectangle(($e.Bounds.Left + 12), $y, $w, $h1)), $(if ($sel) { [System.Drawing.Color]::FromArgb(11, 37, 69) } else { $ink }), $flags1)
+          [System.Windows.Forms.TextRenderer]::DrawText($e.Graphics, (& $fitText ([string](Get-AppText $a $hist0).Meta) $smallFont $w), $smallFont, (New-Object System.Drawing.Rectangle(($e.Bounds.Left + 12), ($y + $h1), $w, $lineH)), $soft, $flags1)
+          if (([int]$e.State -band [int][System.Windows.Forms.DrawItemState]::Focus) -ne 0) { $e.DrawFocusRectangle() }
+        } catch { $null = $_ } })
+    } catch { $appList.DrawMode = 'Normal' }
+    $appList.Height = ($appList.ItemHeight * [math]::Max(2, $apps.Count)) + 2
     $appInfo = & $mkLabel ''
     $appInfo.Margin = New-Object System.Windows.Forms.Padding(3, 14, 3, 2)
-    $appMeta = & $mkLabel ''
-    try { $appMeta.ForeColor = Get-CheckColor 'NOT RUN' } catch { $null = $_ }
-    $row = 0; foreach ($c in @($chooseHead, $appList, $appInfo, $appMeta)) { $pChoose.Controls.Add($c, 0, $row); $row++ }
+    $row = 0; foreach ($c in @($chooseHead, $chooseSub, $appList, $appInfo)) { $pChoose.Controls.Add($c, 0, $row); $row++ }
 
     # ---- Screen 2: checks
-    $pCheck = & $mkRows @('AutoSize', 'AutoSize', 'AutoSize', 'Percent', 'AutoSize', 'AutoSize', 'AutoSize')
-    $checkHead = & $mkLabel ''
-    try { $checkHead.Font = New-Object System.Drawing.Font($form.Font.FontFamily, [single]11, $bold) } catch { $null = $_ }
-    $checkWhat = & $mkLabel ('Read-only. One test file and one test script are created and deleted at once.' + "`r`n" + 'Passed checks are reused for ' + $checkMaxDays + ' days. "Run checks again" runs every check now.')
+    $pCheck = & $mkRows @('AutoSize', 'AutoSize', 'AutoSize', 'Percent', 'AutoSize', 'AutoSize')
+    $checkHead = & $mkTitle ''
+    $checkWhat = & $mkSub ('Read-only. Passed checks are reused for ' + $checkMaxDays + ' days')
     $sitePanel = New-Object System.Windows.Forms.FlowLayoutPanel
     $sitePanel.AutoSize = $true; $sitePanel.WrapContents = $true; $sitePanel.Dock = 'Fill'
-    $siteLabel = & $mkLabel 'Site address:'
+    $siteLabel = & $mkLabel 'Site address'
+    try { $siteLabel.Font = $semiFont; $siteLabel.ForeColor = $soft } catch { $null = $_ }
     $siteLabel.Margin = New-Object System.Windows.Forms.Padding(3, 7, 3, 3)
     $siteBox = New-Object System.Windows.Forms.TextBox
     $siteBox.Width = 520; $siteBox.Text = Get-SiteUrl $basePath; if (-not $siteBox.Text) { $siteBox.Text = $sitePrefix }   # PFM 14 Nov 26: start the box with the DAF SharePoint address
@@ -1344,16 +1418,17 @@ if ($gui) {
     # e-mail. The Result column has a fixed width.
     $checkView = & $mkGrid 'Check results'
     $checkView.Dock = 'Fill'
-    foreach ($h in @(@('Check', 36), @('Result', 0), @('Details', 64))) {
-      $ci = $checkView.Columns.Add($h[0], $h[0]); $col = $checkView.Columns[$ci]; $col.SortMode = 'NotSortable'
-      if ($h[1]) { $col.AutoSizeMode = 'Fill'; $col.FillWeight = $h[1] } else { $col.AutoSizeMode = 'None'; $col.Width = 96 }
+    foreach ($h in @(@('Check', 40, 'over'), @('Result', 0, 'chip'), @('Details', 60, 'plain'))) {
+      $ci = $checkView.Columns.Add($h[0], $h[0]); $col = $checkView.Columns[$ci]; $col.SortMode = 'NotSortable'; $col.Tag = $h[2]
+      if ($h[1]) { $col.AutoSizeMode = 'Fill'; $col.FillWeight = $h[1] } else { $col.AutoSizeMode = 'None'; $col.Width = 104 }
     }
     $checkBtns = New-Object System.Windows.Forms.FlowLayoutPanel
     $checkBtns.AutoSize = $true; $checkBtns.WrapContents = $true; $checkBtns.Dock = 'Fill'
     $againB = & $mkButton 'Run checks again'
     $rightsB = & $mkButton 'Sign in and check site rights'
     $flowB = & $mkButton 'Check Power Automate'
-    $checkBtns.Controls.AddRange(@($againB, $rightsB, $flowB))
+    $checkBtns.Controls.AddRange(@($rightsB, $flowB, $againB))
+    & $styleSecondary $rightsB; & $styleSecondary $flowB; & $styleLink $againB
     # Counts, each in its own color (PFM 14 Nov 26): "Passed: 10.  Warnings: 1.  Failed: 0.  Not run: 2."
     $countPanel = New-Object System.Windows.Forms.FlowLayoutPanel
     $countPanel.AutoSize = $true; $countPanel.WrapContents = $true; $countPanel.Dock = 'Fill'
@@ -1362,16 +1437,29 @@ if ($gui) {
       $l = & $mkLabel ''; $l.Margin = New-Object System.Windows.Forms.Padding(3, 3, 14, 0)
       try { $l.ForeColor = Get-CheckColor $st; $l.Font = New-Object System.Drawing.Font($form.Font.FontFamily, [single]10, $bold) } catch { $null = $_ }
       # A fixed width (the widest count text), so a count going from 9 to 10 does not push the others (R17).
-      try { $l.AutoSize = $false; $l.Width = (& $at96 ([System.Windows.Forms.TextRenderer]::MeasureText('Warnings: 99.', $l.Font).Width)) + 8; $l.Height = $lineH96 + 4 } catch { $null = $_ }
+      try { $l.AutoSize = $false; $l.Width = (& $at96 ([System.Windows.Forms.TextRenderer]::MeasureText('99 warnings', $l.Font).Width)) + 8; $l.Height = $lineH96 + 4 } catch { $null = $_ }
       $countLabels[$st] = $l; [void]$countPanel.Controls.Add($l)
     }
-    $checkStatus = & $mkFixed '' 2
-    $row = 0; foreach ($c in @($checkHead, $checkWhat, $sitePanel, $checkView, $checkBtns, $countPanel, $checkStatus)) { $pCheck.Controls.Add($c, 0, $row); $row++ }
+    $checkStatus = & $mkFixed '' 1
+    # One row: counts on the left, the check buttons on the right.
+    $checkBar = New-Object System.Windows.Forms.TableLayoutPanel
+    $checkBar.Dock = 'Fill'; $checkBar.AutoSize = $true; $checkBar.ColumnCount = 2; $checkBar.RowCount = 1; $checkBar.Margin = New-Object System.Windows.Forms.Padding(0, 8, 0, 0)
+    [void]$checkBar.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle('Percent', 100))); [void]$checkBar.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle('AutoSize')))
+    $countPanel.Anchor = 'Left'; $checkBtns.Anchor = 'Right'; $checkBtns.Dock = 'None'; $countPanel.Dock = 'None'
+    $checkBar.Controls.Add($countPanel, 0, 0); $checkBar.Controls.Add($checkBtns, 1, 0)
+    $row = 0; foreach ($c in @($checkHead, $checkWhat, $sitePanel, $checkView, $checkBar, $checkStatus)) { $pCheck.Controls.Add($c, 0, $row); $row++ }
 
     # ---- Screen 3: deploy (the R06-R14 round screen, now with two bars)
-    $pDeploy = & $mkRows @('AutoSize', 'AutoSize', 'AutoSize', 'AutoSize', 'AutoSize', 'AutoSize', 'AutoSize', 'Percent', 'AutoSize', 'AutoSize', 'AutoSize')
+    # Layout A (the Administrator, 2026-11-14): title, "Writes to" with the path, the two bars right under it, then the steps.
+    $pDeploy = & $mkRows @('AutoSize', 'AutoSize', 'AutoSize', 'AutoSize', 'AutoSize', 'AutoSize', 'AutoSize', 'AutoSize', 'Percent', 'AutoSize', 'AutoSize', 'AutoSize')
+    $deployHead = & $mkTitle ''
+    $wherePanel = New-Object System.Windows.Forms.FlowLayoutPanel
+    $wherePanel.AutoSize = $true; $wherePanel.WrapContents = $true; $wherePanel.Dock = 'Fill'; $wherePanel.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 8)
+    $whereLead = & $mkLabel 'Writes to'
+    try { $whereLead.Font = $subFont; $whereLead.ForeColor = $soft } catch { $null = $_ }
     $where = & $mkLabel ''
-    $where.Margin = New-Object System.Windows.Forms.Padding(3, 6, 3, 3)
+    $where.Margin = New-Object System.Windows.Forms.Padding(0, 0, 3, 3)
+    $wherePanel.Controls.AddRange(@($whereLead, $where))
     # Cosmetics never stop the window. R06 fell back to text mode: Font('Segoe UI', 10, 'Bold') fails at binding with
     # "Multiple ambiguous overloads" (string 'Bold' fits FontStyle and GraphicsUnit). Typed enum here; each in its own try.
     try { $where.Font = New-Object System.Drawing.Font($form.Font.FontFamily, [single]10, $bold) } catch { $null = $_ }
@@ -1384,11 +1472,17 @@ if ($gui) {
     $runCol = New-Object System.Windows.Forms.DataGridViewCheckBoxColumn
     $runCol.HeaderText = 'Run'; $runCol.Width = 52; $runCol.AutoSizeMode = 'None'; $runCol.SortMode = 'NotSortable'
     [void]$stepView.Columns.Add($runCol)
-    $ci = $stepView.Columns.Add('Step', 'Step'); $stepView.Columns[$ci].AutoSizeMode = 'Fill'; $stepView.Columns[$ci].SortMode = 'NotSortable'
+    $ci = $stepView.Columns.Add('Step', 'Step'); $stepView.Columns[$ci].AutoSizeMode = 'Fill'; $stepView.Columns[$ci].SortMode = 'NotSortable'; $stepView.Columns[$ci].Tag = 'title'
+    $ci = $stepView.Columns.Add('Status', 'Status'); $stepView.Columns[$ci].AutoSizeMode = 'None'; $stepView.Columns[$ci].Width = 132; $stepView.Columns[$ci].SortMode = 'NotSortable'; $stepView.Columns[$ci].Tag = 'chip'
     $stepAdd = { param([string]$Name, [string]$Status, [bool]$On)
-      $i = $stepView.Rows.Add(); $stepView.Rows[$i].Cells[0].Value = $On; & $setCell $stepView.Rows[$i].Cells[1] $Name $Status; $i }
+      $i = $stepView.Rows.Add(); $stepView.Rows[$i].Cells[0].Value = $On; & $setCell $stepView.Rows[$i].Cells[1] $Name $Status; $stepView.Rows[$i].Cells[2].Value = 'WAITING'; $i }
     $stepOn = { param([int]$I) [bool]$stepView.Rows[$I].Cells[0].Value }
-    $stepSay = { param([int]$I, [string]$Status) $c = $stepView.Rows[$I].Cells[1]; & $setCell $c ([string]$c.Tag[0]) $Status }
+    $stepSay = { param([int]$I, [string]$Status, [string]$State)
+      # The chip shows the state word; line 2 the rest ("PASSED (1 passed, 0 failed) in 0m 02s" -> "1 passed, 0 failed, in 0m 02s").
+      if (-not $State) { $State = 'WAITING'; foreach ($w in 'NEEDS REVIEW', 'FAILED', 'SKIPPED', 'PASSED') { if ($Status.StartsWith($w)) { $State = $w; $Status = $Status.Substring($w.Length).Trim(); break } } }
+      if ($Status -match '^\((.*)\) in (.+)$') { $Status = $Matches[1] + ', in ' + $Matches[2] }
+      if ($Status) { $Status = $Status.Substring(0, 1).ToUpperInvariant() + $Status.Substring(1) }
+      $c = $stepView.Rows[$I].Cells[1]; & $setCell $c ([string]$c.Tag[0]) $Status; $stepView.Rows[$I].Cells[2].Value = $State; $stepView.InvalidateRow($I) }
     $stepToggle = { param([int]$I) if (-not $script:running -and $I -ge 0) { $c = $stepView.Rows[$I].Cells[0]; $c.Value = -not [bool]$c.Value } }
     $stepView.Add_CellClick({ if ($_.ColumnIndex -eq 0) { & $stepToggle $_.RowIndex } })
     $stepView.Add_PreviewKeyDown({ if ($_.KeyCode -eq 'Return') { $_.IsInputKey = $true } })   # Enter reaches KeyDown (runs), not the grid's next-row move
@@ -1403,17 +1497,24 @@ if ($gui) {
     $stepBar = & $mkBar 'step' 14 'Progress of this step' ([System.Drawing.Color]::FromArgb(46, 133, 64))   # green #2E8540, 4.1:1 on the track (the Administrator, 2026-11-14); overall bar stays blue
     $log = New-Object System.Windows.Forms.TextBox
     $log.Dock = 'Fill'; $log.Multiline = $true; $log.ScrollBars = 'Both'; $log.WordWrap = $false; $log.ReadOnly = $true; $log.AccessibleName = 'Log'
+    try { $log.BorderStyle = 'FixedSingle'; $log.BackColor = [System.Drawing.Color]::FromArgb(247, 249, 251); $log.ForeColor = $ink } catch { $null = $_ }
     $log.Font = New-Object System.Drawing.Font('Consolas', 9)
     $toPanel = New-Object System.Windows.Forms.FlowLayoutPanel
     $toPanel.AutoSize = $true; $toPanel.WrapContents = $true; $toPanel.Dock = 'Fill'
-    $toLabel = & $mkLabel 'Send results to (e-mail):'
+    $toLabel = & $mkLabel 'Results to'
+    try { $toLabel.Font = $semiFont; $toLabel.ForeColor = $soft } catch { $null = $_ }
     $toLabel.Margin = New-Object System.Windows.Forms.Padding(3, 7, 3, 3)
     $toBox = New-Object System.Windows.Forms.TextBox
     $toBox.Width = 360; $toBox.Text = Get-MailTo $basePath; $toBox.AccessibleName = 'Send results to (e-mail)'
-    $toPanel.Controls.AddRange(@($toLabel, $toBox))
+    $logLink = New-Object System.Windows.Forms.LinkLabel
+    $logLink.AutoSize = $true; $logLink.Text = 'Hide log'; $logLink.Margin = New-Object System.Windows.Forms.Padding(16, 7, 3, 3); $logLink.AccessibleName = 'Show or hide the log'
+    try { $logLink.LinkColor = $afBlue; $logLink.ActiveLinkColor = $navy } catch { $null = $_ }
+    $logLink.Add_LinkClicked({ $log.Visible = -not $log.Visible; $logLink.Text = $(if ($log.Visible) { 'Hide log' } else { 'Show log' }) })
+    $toPanel.Controls.AddRange(@($toLabel, $toBox, $logLink))
     $okBox = New-Object System.Windows.Forms.CheckBox
     $okBox.AutoSize = $true; $okBox.Checked = $true; $okBox.MaximumSize = $wrap
     $okBox.Text = 'The window displayed correctly (nothing overlapped or cut off)'
+    try { $okBox.ForeColor = $soft } catch { $null = $_ }
     $buttons = New-Object System.Windows.Forms.FlowLayoutPanel
     $buttons.AutoSize = $true; $buttons.WrapContents = $true; $buttons.Dock = 'Fill'
     $run = & $mkButton 'Run'
@@ -1421,7 +1522,8 @@ if ($gui) {
     $copy = & $mkButton 'Copy summary'; $copy.Enabled = $false
     $open = & $mkButton 'Open results folder'; $open.Enabled = $false
     $buttons.Controls.AddRange(@($run, $draft, $copy, $open))
-    $row = 0; foreach ($c in @($where, $warn, $stepView, $allLabel, $bar, $stepLabel, $stepBar, $log, $toPanel, $okBox, $buttons)) { $pDeploy.Controls.Add($c, 0, $row); $row++ }
+    & $styleSecondary $draft; & $styleSecondary $copy; & $styleSecondary $open
+    $row = 0; foreach ($c in @($deployHead, $wherePanel, $warn, $allLabel, $bar, $stepLabel, $stepBar, $stepView, $log, $toPanel, $okBox, $buttons)) { $pDeploy.Controls.Add($c, 0, $row); $row++ }
 
     foreach ($pnl in @($pChoose, $pCheck, $pDeploy)) { $pnl.Visible = $false; $body.Controls.Add($pnl) }
     $row = 0; foreach ($c in @($crumb, $banner, $body, $nav)) { $grid.Controls.Add($c, 0, $row); $row++ }
@@ -1483,28 +1585,29 @@ if ($gui) {
         $B.Add_EnabledChanged({ try { & $paintState $this } catch { $null = $_ } }); & $paintState $B   # light gray, dark-gray text (6.3:1) when disabled; styled from the start
         $B.Add_MouseEnter({ if ($this.Enabled) { $this.BackColor = $navy } }); $B.Add_MouseLeave({ try { & $paintState $this } catch { $null = $_ } })   # a click that disables Next leaves no navy hover
       } catch { $null = $_ } }
-    & $stylePrimary $next; & $stylePrimary $run
+    & $stylePrimary $next; & $stylePrimary $run; & $styleSecondary $back; & $styleSecondary $exitB
     # One size for the bottom-right buttons, whatever the text ("Next: check", "Next: deploy", Run, Back, Exit).
     foreach ($nb in @($next, $back, $exitB, $run)) { try { $nb.AutoSize = $false; $nb.MinimumSize = New-Object System.Drawing.Size(132, 34); $nb.Size = New-Object System.Drawing.Size(132, 34) } catch { $null = $_ } }
     $form.Controls.Add($grid)
     if ($rail) { $form.Controls.Add($rail); $grid.BringToFront(); $crumb.Visible = $false }   # the rail shows the screen steps
-    foreach ($h in @($chooseHead, $checkHead)) { try { $h.ForeColor = $navy } catch { $null = $_ } }   # the Fill control docks last, beside the rail
+    # the Fill control docks last, beside the rail; titles are navy from $mkTitle
     $form.ResumeLayout($false); $form.PerformLayout()
 
     $script:screen = 0; $script:running = $false; $script:off = 0
     $fillDeploy = {
       # The chosen app's steps only. $script:listIndex maps a step to its row in the list.
       $stepView.Rows.Clear(); $script:off = 0; $script:listIndex = @{}
-      if ($cleanup.Count) { [void](& $stepAdd 'Clean-up: move finished files to the Recycle Bin' 'Runs first. Clear its box to skip it.' $true); $script:off = 1 }
+      if ($cleanup.Count) { [void](& $stepAdd 'Clean-up' 'Moves finished files to the Recycle Bin. Clear the box to skip' $true); $script:off = 1 }
       foreach ($k in $script:appSteps) {
         $s = $steps[$k]
         $script:listIndex[$k] = $stepView.Rows.Count
-        [void](& $stepAdd ($s.Name + $(if ($s.AskParam) { '  (asks for a folder)' } elseif ($s.Kind -eq 'guide') { '  (needs you)' } else { '' })) $(if ($s.Note) { $s.Note } else { 'Waiting.' }) ([bool]$s.Default))
+        [void](& $stepAdd ($s.Name + $(if ($s.AskParam) { '  (asks for a folder)' } elseif ($s.Kind -eq 'guide') { '  (needs you)' } else { '' })) $(if ($s.Note) { $s.Note } else { '' }) ([bool]$s.Default))
       }
       $stepView.Height = $stepView.ColumnHeadersHeight + $stepView.RowTemplate.Height * [math]::Max(2, $stepView.Rows.Count) + 4
       $stepView.ClearSelection()
       $first = Get-RoundPlan
-      $where.Text = 'Writes to: ' + $first.Shown + $(if ($first.Found) { '' } else { '   (NOT found)' })
+      $deployHead.Text = 'Deploy ' + $script:app.Name
+      $where.Text = $first.Shown + $(if ($first.Found) { '' } else { '   (NOT found)' })
       $warnings = @()
       if (-not $first.Found) { $warnings += 'OneDrive folder NOT found in this Windows profile: open OneDrive from the Start menu and sign in, then paste and run again.' }
       $warn.Text = ($warnings -join "`r`n"); $warn.Visible = [bool]$warnings.Count
@@ -1529,11 +1632,12 @@ if ($gui) {
       $c = @{ PASSED = 0; WARNING = 0; FAILED = 0; 'NOT RUN' = 0 }
       foreach ($id in $script:appChecks) { $r = $script:checkResults[$id]; if ($r) { $c[$r.State]++ } else { $c['NOT RUN']++ } }
       $block = Get-CheckBlock $script:checkResults
-      $countLabels['PASSED'].Text = 'Passed: ' + $c.PASSED + '.'; $countLabels['WARNING'].Text = 'Warnings: ' + $c.WARNING + '.'
-      $countLabels['FAILED'].Text = 'Failed: ' + $c.FAILED + '.'; $countLabels['NOT RUN'].Text = 'Not run: ' + $c['NOT RUN'] + '.'
+      $countLabels['PASSED'].Text = [string]$c.PASSED + ' passed'; $countLabels['WARNING'].Text = [string]$c.WARNING + $(if ($c.WARNING -eq 1) { ' warning' } else { ' warnings' })
+      $countLabels['FAILED'].Text = [string]$c.FAILED + ' failed'; $countLabels['NOT RUN'].Text = [string]$c['NOT RUN'] + ' not run'
+      foreach ($st in 'WARNING', 'FAILED', 'NOT RUN') { $countLabels[$st].Visible = [bool]$c[$st] }   # layout A: a zero count is not shown
       $sv = @($script:appChecks | Where-Object { $script:checkResults[$_].Saved }).Count
       $checkStatus.Text = $(if ($c.FAILED) { 'Resolve each FAILED check, then select "Run checks again"' } elseif ($block) { 'Run the checks marked NOT RUN with the buttons above' } else { 'Ready to deploy. Press Enter or select "Next: deploy"' }) +
-        "`r`n" + $(if ($sv) { [string]$sv + ' of ' + $script:appChecks.Count + ' checks reused from earlier runs (valid ' + $checkMaxDays + ' days)' } else { 'All checks ran now' })
+        $(if ($sv) { '   (' + $sv + ' of ' + $script:appChecks.Count + ' reused from earlier runs)' } else { '' })
       try { $checkStatus.ForeColor = Get-CheckColor $(if ($block) { 'FAILED' } elseif ($c.WARNING) { 'WARNING' } else { 'PASSED' }) } catch { $null = $_ }
       $next.Enabled = (-not $block) }
     $runChecks = { param([string[]]$Kinds, [string[]]$Only, [bool]$Force)
@@ -1571,7 +1675,7 @@ if ($gui) {
         if (-not ($form.IsDisposed -or $script:closing)) { $againB.Enabled = $true; $rightsB.Enabled = $true; $flowB.Enabled = $true; $back.Enabled = $true; & $showCheckState }
       } }
     $fillChecks = {
-      $checkHead.Text = 'Check that you can deploy ' + $script:app.Name
+      $checkHead.Text = 'Check ' + $script:app.Name
       $checkView.Rows.Clear()
       for ($i = 0; $i -lt $script:appChecks.Count; $i++) {
         $d = Get-CheckDef $script:appChecks[$i]
@@ -1606,7 +1710,7 @@ if ($gui) {
         $form.AcceptButton = $run
         if ($toBox.Text) { $run.Focus() | Out-Null } else { $toBox.Focus() | Out-Null }
       } }
-    $appList.Add_SelectedIndexChanged({ if ($appList.SelectedIndex -ge 0) { Select-App $appList.SelectedIndex; $t = Get-AppText $script:app $hist0; $appInfo.Text = Split-Sentence $t.Summary; $appMeta.Text = $t.Meta } })
+    $appList.Add_SelectedIndexChanged({ if ($appList.SelectedIndex -ge 0) { Select-App $appList.SelectedIndex; $t = Get-AppText $script:app $hist0; $appInfo.Text = Split-Sentence $t.Summary } })
     $appList.Add_DoubleClick({ $next.PerformClick() })
     $next.Add_Click({
       if ($script:screen -eq 0) { & $fillChecks; & $showScreen 1; & $runChecks @('auto') @() $false; & $showScreen 1; return }
@@ -1656,10 +1760,10 @@ if ($gui) {
       $script:statusBase = $name; $script:stepStart = Get-Date; $script:stepEst = $estimate
       if ($i -le 1) { & $setBar 'all' 0 $false }   # a new run starts the overall bar at 0
       # The step row says it is running; the clean-up row (row 0) says done once the next step starts.
-      if ($script:off -eq 1 -and $name -ne 'Clean-up' -and [string]$stepView.Rows[0].Cells[1].Tag[1] -like 'Running now*') { & $stepSay 0 'Done. The log above the bars lists what moved to the Recycle Bin.' }
-      $now = 'Running now. Started ' + (Get-Date -Format 'HH:mm') + '.'
-      if ($name -eq 'Clean-up' -and $script:off -eq 1) { & $stepSay 0 $now }
-      else { foreach ($kk in @($script:listIndex.Keys)) { if ($steps[$kk].Name -eq $name) { & $stepSay $script:listIndex[$kk] $now } } }
+      if ($script:off -eq 1 -and $name -ne 'Clean-up' -and [string]$stepView.Rows[0].Cells[2].Value -eq 'RUNNING') { & $stepSay 0 'Finished files moved to the Recycle Bin (see the log)' 'PASSED' }
+      $now = 'Started ' + (Get-Date -Format 'HH:mm')
+      if ($name -eq 'Clean-up' -and $script:off -eq 1) { & $stepSay 0 $now 'RUNNING' }
+      else { foreach ($kk in @($script:listIndex.Keys)) { if ($steps[$kk].Name -eq $name) { & $stepSay $script:listIndex[$kk] $now 'RUNNING' } } }
       & $setBar 'step' 0 $false
       & $paint; [System.Windows.Forms.Application]::DoEvents() }
     $windowLine = { if ($okBox.Checked) { 'Window: OK' } else { 'Window: NOT OK - write here what overlapped or was cut off' } }
