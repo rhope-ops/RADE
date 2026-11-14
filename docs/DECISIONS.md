@@ -4,6 +4,7 @@ Newest first. Why the kit defaults are what they are: https://github.com/rhope-o
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-14 | Logo K yellow edge: 2.8 units wide (K+2, about 1.2 px at 56 px), up from 1.6, so it shows at window and header size. Same file names. | the Administrator | Logo K edge 1.6 (row below) |
 | 2026-11-14 | Window layout B (side rail) in Wing Master Version II colors: logo K with RADE to its right on the logo's midpoint; tagline "Test and deploy apps for your organization" below; one left edge. Preview: https://claude.ai/artifact/SU4ghsQWy7EBzaLiZWNEMy | the Administrator | — |
 | 2026-11-14 | The darker status-chip text stays in RADE only; 90-161.Z gets its own color scheme later (to be decided). | the Administrator | — |
 | 2026-11-14 | Official logo for every app in this project (for now): logo K (blue woven mark and rho on white, blue ring, thin yellow edge). Master copy here: assets/logo, built by scripts/build_logo.py; other repos link to it or copy a PNG only where a build needs the file. The RADE window shows it in place of the yellow "RADE" circle, with the word RADE beside it. | the Administrator | 90-161.Z logo r2 (bold white) and its navy thumbnail |
