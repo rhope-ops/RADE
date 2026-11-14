@@ -1463,15 +1463,19 @@ if ($gui) {
       $rail.Controls.Add($rt)
     } catch { $rail = $null; $railSteps = @() }
     # Primary buttons (Next, Run): Air Force blue with white text; gray when disabled, so the text keeps its contrast.
+    # $paintState lives at this (form) scope, not inside $stylePrimary: event handlers run after $stylePrimary returns,
+    # so a variable local to it is gone and '& $paintState' threw on Next (rade failure e-mail, 14 Nov 26).
+    $paintState = { param($X) if ($X.Enabled) { $X.BackColor = $afBlue; $X.ForeColor = [System.Drawing.Color]::White; $X.FlatAppearance.BorderColor = $afBlue } else { $X.BackColor = [System.Drawing.Color]::FromArgb(233, 236, 240); $X.ForeColor = [System.Drawing.Color]::FromArgb(85, 85, 85); $X.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(201, 210, 220) } }
     $stylePrimary = { param($B)
       try {
         $B.FlatStyle = 'Flat'; $B.FlatAppearance.BorderColor = $afBlue; $B.ForeColor = [System.Drawing.Color]::White; $B.BackColor = $afBlue
         try { $B.Font = New-Object System.Drawing.Font($form.Font.FontFamily, [single]10, $bold) } catch { $null = $_ }
-        $paintState = { param($X) if ($X.Enabled) { $X.BackColor = $afBlue; $X.ForeColor = [System.Drawing.Color]::White; $X.FlatAppearance.BorderColor = $afBlue } else { $X.BackColor = [System.Drawing.Color]::FromArgb(221, 226, 232); $X.ForeColor = [System.Drawing.Color]::FromArgb(85, 85, 85); $X.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(201, 210, 220) } }
-        $B.Add_EnabledChanged({ & $paintState $this }); & $paintState $B   # gray text on gray when disabled (5.9:1); styled from the start
-        $B.Add_MouseEnter({ if ($this.Enabled) { $this.BackColor = $navy } }); $B.Add_MouseLeave({ if ($this.Enabled) { $this.BackColor = $afBlue } })
+        $B.Add_EnabledChanged({ try { & $paintState $this } catch { $null = $_ } }); & $paintState $B   # light gray, dark-gray text (6.3:1) when disabled; styled from the start
+        $B.Add_MouseEnter({ if ($this.Enabled) { $this.BackColor = $navy } }); $B.Add_MouseLeave({ try { & $paintState $this } catch { $null = $_ } })   # a click that disables Next leaves no navy hover
       } catch { $null = $_ } }
     & $stylePrimary $next; & $stylePrimary $run
+    # One size for the bottom-right buttons, whatever the text ("Next: check", "Next: deploy", Run, Back, Exit).
+    foreach ($nb in @($next, $back, $exitB, $run)) { try { $nb.AutoSize = $false; $nb.MinimumSize = New-Object System.Drawing.Size(132, 34); $nb.Size = New-Object System.Drawing.Size(132, 34) } catch { $null = $_ } }
     $form.Controls.Add($grid)
     if ($rail) { $form.Controls.Add($rail); $grid.BringToFront(); $crumb.Visible = $false }   # the rail shows the screen steps
     foreach ($h in @($chooseHead, $checkHead)) { try { $h.ForeColor = $navy } catch { $null = $_ } }   # the Fill control docks last, beside the rail

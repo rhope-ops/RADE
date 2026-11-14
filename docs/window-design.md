@@ -23,7 +23,7 @@ Sources: RADE = [docs/DECISIONS.md](DECISIONS.md); Z = [rhope-ops/90-161.Z docs/
 | Layout B (side rail, 220 px, navy #0B2545 to Air Force blue #00539F, AF yellow #FFD520 edge), Wing Master Version II colors; preview https://claude.ai/artifact/SU4ghsQWy7EBzaLiZWNEMy. The rail holds the three screens as steps (this one in yellow bold) and the round and build. | Built (R18); first gov-device check is R18 "Window: OK" | RADE 2026-11-14 |
 | Logo K (PNG in WinForms, 56 px from logo-K-128.png) replaces the yellow "RADE" circle; the word RADE to its right on the logo's midpoint; tagline "Test and deploy apps for your organization" below; one left edge. Master: [assets/logo](../assets/logo), yellow edge 2.8 units (K+2). | Built (R18) | RADE 2026-11-14 (logo K, layout B, edge rows) |
 | Darker status-chip text in RADE only; 90-161.Z gets its own scheme later. | Not built | RADE 2026-11-14 |
-| Primary buttons (Next, Run) Air Force blue with white bold text, navy on hover, gray when disabled. | Built (R18) | layout B preview |
+| Primary buttons (Next, Run) Air Force blue with white bold text, navy on hover, light gray (#E9ECF0, text 6.3:1) when disabled. Next, Back, Exit and Run are one size: 132 x 34 px, whatever the text. | Built (R18; engine fix 2026-11-14) | layout B preview; the Administrator, 2026-11-14 (size, lighter disabled) |
 | 1020 x 760 at 100 % scaling (minimum 680 x 540), Segoe UI 10, DPI scaling; rows in table layouts, no fixed positions. | Built | Z 2026-11-14; engine comments (R02) |
 | Every check and step row is two lines high, so nothing moves while checks and steps run. | Built | Z 2026-11-14 (R17 window row) |
 
