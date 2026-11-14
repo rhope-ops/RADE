@@ -4,6 +4,7 @@ Newest first. Why the kit defaults are what they are: https://github.com/rhope-o
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-14 | Main area: proposal A "Quiet table" (https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld), with the Deploy bars right under "Writes to" (not at the bottom); the Choose screen uses the same style. Detail: docs/window-design.md. | the Administrator | Main area as built in R18 |
 | 2026-11-14 | Window text and grid: "Local" / "Network" / "Access" above each check name (word "check" gone); a reused check reads "Last check: DD-MM-YY" with what it found on the next line; Details lines have no full stop and are never joined with ";"; repository check details 2 lines at most; column headers bold. All text a user sees is professional and polished, formatted where possible. The main area (beyond the rail) gets a redesign: 3 proposals first. | the Administrator | Full-stop and ";" joining rule (Format-CheckResult, 2026-11-14) |
 | 2026-11-14 | Window: step bar green (#2E8540), overall bar stays Air Force blue; tagline "Test and deploy apps for your DoD organization". Next, Back, Exit and Run one size (132 x 34), light gray when disabled. | the Administrator | Gold step bar; tagline without DoD (layout B row) |
 | 2026-11-14 | Start using this repo: the engine moved here (engine/rade_build.py) from rhope-ops/90-161.Z; app facts come from the manifest application block; apps pin the engine by sha256. | the Administrator | Engine in 90-161.Z until after R17 |
