@@ -21,7 +21,7 @@ Sources: RADE = [docs/DECISIONS.md](DECISIONS.md); Z = [rhope-ops/90-161.Z docs/
 | Rule | State | Source |
 |---|---|---|
 | Layout B (side rail, 220 px, navy #0B2545 to Air Force blue #00539F, AF yellow #FFD520 edge), Wing Master Version II colors; preview https://claude.ai/artifact/SU4ghsQWy7EBzaLiZWNEMy. The rail holds the three screens as steps (this one in yellow bold) and the round and build. | Built (R18); first gov-device check is R18 "Window: OK" | RADE 2026-11-14 |
-| Logo K (PNG in WinForms, 56 px from logo-K-128.png) replaces the yellow "RADE" circle; the word RADE to its right on the logo's midpoint; tagline "Test and deploy apps for your organization" below; one left edge. Master: [assets/logo](../assets/logo), yellow edge 2.8 units (K+2). | Built (R18) | RADE 2026-11-14 (logo K, layout B, edge rows) |
+| Logo K (PNG in WinForms, 56 px from logo-K-128.png) replaces the yellow "RADE" circle; the word RADE to its right on the logo's midpoint; tagline "Test and deploy apps for your DoD organization" below (DoD added: the Administrator, 2026-11-14); one left edge. Master: [assets/logo](../assets/logo), yellow edge 2.8 units (K+2). | Built (R18) | RADE 2026-11-14 (logo K, layout B, edge rows) |
 | Darker status-chip text in RADE only; 90-161.Z gets its own scheme later. | Not built | RADE 2026-11-14 |
 | Primary buttons (Next, Run) Air Force blue with white bold text, navy on hover, light gray (#E9ECF0, text 6.3:1) when disabled. Next, Back, Exit and Run are one size: 132 x 34 px, whatever the text. | Built (R18; engine fix 2026-11-14) | layout B preview; the Administrator, 2026-11-14 (size, lighter disabled) |
 | 1020 x 760 at 100 % scaling (minimum 680 x 540), Segoe UI 10, DPI scaling; rows in table layouts, no fixed positions. | Built | Z 2026-11-14; engine comments (R02) |
@@ -31,9 +31,9 @@ Sources: RADE = [docs/DECISIONS.md](DECISIONS.md); Z = [rhope-ops/90-161.Z docs/
 
 | Rule | State | Source |
 |---|---|---|
-| Two bars: overall (weighted by expected seconds, with time left; Air Force blue) and this step ("PROGRESS n/m" lines, else time; AF yellow). | Built (colors R18) | Z 2026-11-14 |
+| Two bars: overall (weighted by expected seconds, with time left; Air Force blue) and this step ("PROGRESS n/m" lines, else time; green #2E8540, the Administrator 2026-11-14). | Built (colors R18) | Z 2026-11-14 |
 | RADE draws its own bars (smooth fill, one soft light band); still when Windows animations are off. | Built | Z 2026-11-14 (R17 window row) |
-| Both bars fill left to right; the back-and-forth block for a step with unknown progress is gone (the step bar follows time against the step's weight, at most 90 %). | Built (R18) | Z 2026-11-14 (R18 window row); the Administrator, 2026-11-14 |
+| Overall bar Air Force blue; step bar green #2E8540 (the Administrator, 2026-11-14). Both bars fill left to right; the back-and-forth block for a step with unknown progress is gone (the step bar follows time against the step's weight, at most 90 %). | Built (R18) | Z 2026-11-14 (R18 window row); the Administrator, 2026-11-14 |
 | Neither bar moves back inside a run (overall) or a step (step bar). | Built | engine (R18) |
 
 ## Text and status

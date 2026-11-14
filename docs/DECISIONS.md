@@ -4,6 +4,7 @@ Newest first. Why the kit defaults are what they are: https://github.com/rhope-o
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-14 | Window: step bar green (#2E8540), overall bar stays Air Force blue; tagline "Test and deploy apps for your DoD organization". Next, Back, Exit and Run one size (132 x 34), light gray when disabled. | the Administrator | Gold step bar; tagline without DoD (layout B row) |
 | 2026-11-14 | Start using this repo: the engine moved here (engine/rade_build.py) from rhope-ops/90-161.Z; app facts come from the manifest application block; apps pin the engine by sha256. | the Administrator | Engine in 90-161.Z until after R17 |
 | 2026-11-14 | RADE window UI decisions live in one place: docs/window-design.md. Step bar fills left to right like the overall bar (no back-and-forth block); by-hand steps get Done / It failed (error box) / Skip. Built in the 90-161.Z R18 bundle. | the Administrator | 90-161.Z R17 gliding step block |
 | 2026-11-14 | Logo K yellow edge: 2.8 units wide (K+2, about 1.2 px at 56 px), up from 1.6, so it shows at window and header size. Same file names. | the Administrator | Logo K edge 1.6 (row below) |
