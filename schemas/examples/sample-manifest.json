@@ -1,5 +1,21 @@
 {
   "_doc": "Fake sample for the RADE manifest schema. No real paths, names or sites.",
+  "application": {
+    "name": "Sample: Test App",
+    "folder": "SampleApp",
+    "prefix": "SAMPLE",
+    "repo": "example-org/sample-app",
+    "home": "https://example-org.github.io/sample-app",
+    "own": [
+      "SAMPLE-*"
+    ],
+    "knownDirs": [
+      [
+        "scripts",
+        "*.ps1"
+      ]
+    ]
+  },
   "bundles": [
     {
       "out": "scripts/gov/paste/SAMPLE-R01-round-r1.ps1",

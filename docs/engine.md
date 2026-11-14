@@ -1,6 +1,6 @@
 # RADE engine requirements
 
-Status: decided by the Administrator, 2026-11-14 (docs/DECISIONS.md); not all built. The engine still lives in rhope-ops/90-161.Z scripts/build_paste_bundles.py until R17 confirms the window. Drift check: [drift-check.md](drift-check.md). Input contract: [../schemas/rade-manifest.schema.json](../schemas/rade-manifest.schema.json).
+Status: decided by the Administrator, 2026-11-14 (docs/DECISIONS.md); not all built. The engine is [../engine/rade_build.py](../engine/rade_build.py) (moved from rhope-ops/90-161.Z on 2026-11-14; apps pin it by sha256). Drift check: [drift-check.md](drift-check.md). Input contract: [../schemas/rade-manifest.schema.json](../schemas/rade-manifest.schema.json).
 
 ## Modes
 

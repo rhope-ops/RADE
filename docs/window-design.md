@@ -1,6 +1,6 @@
 # RADE window design
 
-Status: the one place for the RADE window's UI decisions (the Administrator, 2026-11-14: consolidate them). Each row cites the decision; the decision text itself stays in its decisions table. Built today in rhope-ops/90-161.Z scripts/build_paste_bundles.py (WinForms, Windows PowerShell 5.1) until the engine moves here (docs/NEXT_PROMPT.md item 1). "Built" = in the R18 bundle; "Not built" = decided, waiting for its build.
+Status: the one place for the RADE window's UI decisions (the Administrator, 2026-11-14: consolidate them). Each row cites the decision; the decision text itself stays in its decisions table. Built in [engine/rade_build.py](../engine/rade_build.py) (WinForms, Windows PowerShell 5.1). "Built" = in the R18 bundle; "Not built" = decided, waiting for its build.
 
 Sources: RADE = [docs/DECISIONS.md](DECISIONS.md); Z = [rhope-ops/90-161.Z docs/DECISIONS.md](https://github.com/rhope-ops/90-161.Z/blob/main/docs/DECISIONS.md).
 
