@@ -188,6 +188,7 @@ function Get-NewerRound {
   # Reads go.md in the repository (the bookmark page's source; data, not code) and returns the highest round number listed in an open task
   # heading when it is newer than this one, else ''. Short timeout; any failure is silent, so it never blocks a run.
   try {
+    try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { $null = $_ }   # TLS 1.2 (R19)
     $rq = [System.Net.WebRequest]::Create($goUrl)
     $rq.Timeout = 4000
     try { $rq.UseDefaultCredentials = $true } catch { $null = $_ }   # https: Windows sign-in for the proxy (a file URL in tests has none)
@@ -453,7 +454,7 @@ function Show-GuideDialog($Step, [string]$File, [string]$Url, [string]$UrlFile) 
   $script:guideError = ''
   $errLabel = New-Object System.Windows.Forms.Label
   $errLabel.AutoSize = $true; $errLabel.MaximumSize = $wrap; $errLabel.Margin = New-Object System.Windows.Forms.Padding(3, 8, 3, 3)
-  $errLabel.Text = 'If it failed: paste the error message here (no names or site address), then select It failed.'
+  $errLabel.Text = 'If it failed, paste the error message here (no names or site address), then select "It failed"'
   $errBox = New-Object System.Windows.Forms.TextBox
   $errBox.Multiline = $true; $errBox.ScrollBars = 'Vertical'; $errBox.Width = 400; $errBox.Height = 72; $errBox.AccessibleName = 'Error message'
   $failB = & $mk 'It failed'
@@ -474,9 +475,9 @@ function Show-GuideDialog($Step, [string]$File, [string]$Url, [string]$UrlFile) 
     $u = $urlBox.Text.Trim()
     if ($u -notmatch '^https://') { $note.Text = 'The address must start with https://'; return }
     try { if ($UrlFile) { Set-Content -LiteralPath $UrlFile -Value $u -Encoding UTF8 } } catch { $null = $_ }
-    try { Start-Process -FilePath $u; $note.Text = 'Opened in your browser. Follow the steps above, then select Done.' } catch { $note.Text = 'The browser could not be opened: ' + $_.Exception.Message }
+    try { Start-Process -FilePath $u; $note.Text = 'Opened in your browser. Complete the steps above, then select "Done"' } catch { $note.Text = 'The browser could not be opened: ' + $_.Exception.Message }
   })
-  $copyB.Add_Click({ $note.Text = $(if (Copy-TextToClipboard $File) { 'File path copied. Paste it into the File name box of the upload window (Ctrl+V).' } else { 'The clipboard is busy. Select Copy file path again.' }) })
+  $copyB.Add_Click({ $note.Text = $(if (Copy-TextToClipboard $File) { 'File path copied. Press Ctrl+V in the "File name" box' } else { 'The clipboard is busy. Select Copy file path again.' }) })
   $showB.Add_Click({ Start-Process -FilePath 'explorer.exe' -ArgumentList ('/select,"' + $File + '"') })
   $d.CancelButton = $skipB
   $d.Add_Shown({
@@ -760,6 +761,8 @@ function Get-FlowPortal([string]$Base) {
   return @{ Url = ''; Config = '' }
 }
 function Test-WebReach([string]$Url) {
+  # TLS 1.2 first (R19: Windows PowerShell 5.1 starts with TLS 1.0, which GitHub closes: [ReceiveFailure]; Edge uses 1.2).
+  try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { $null = $_ }
   # Does the host answer? Any HTTP answer counts (401 or 403 = it answers but wants a sign-in). Windows sign-in for the proxy.
   # Returns no address and no message text (they can hold the site or tenant name): only the code or the error kind.
   try {
@@ -844,9 +847,11 @@ function Split-Sentence([string]$Text) {
   return ($Text -replace '(?<=[.!?])\s+(?=[A-Z"\[])', "`r`n")
 }
 function Format-CheckResult([string]$State, [string]$Detail, [string]$Fix) {
-  # Text rule (PFM 14 Nov 26): sentences start with a capital and end with a full stop. Names on the screen (buttons,
-  # menus) are in "double quotes"; literal values the computer reports (versions, codes, error names) are in [brackets].
-  if ($Detail) { $Detail = $Detail.Substring(0, 1).ToUpper() + $Detail.Substring(1); if ($Detail -notmatch '[.!?]$') { $Detail += '.' } }
+  # Text rule (the Administrator, 2026-11-14, replaces the full-stop rule): each Details line starts with a capital and ends
+  # with no full stop; one fact per line, never joined with ";". Names on the screen (buttons, menus) are in "double quotes";
+  # literal values the computer reports (versions, codes, error names) are in [brackets].
+  if ($Detail) { $Detail = $Detail.Substring(0, 1).ToUpper() + $Detail.Substring(1); $Detail = $Detail -replace '\.$', '' }
+  if ($Fix) { $Fix = $Fix -replace '\.$', '' }
   return @{ State = $State; Detail = $Detail; Fix = $Fix }
 }
 function Invoke-Check($Def, [string]$Base, [string]$Site, [scriptblock]$Tick) {
@@ -857,17 +862,17 @@ function Invoke-Check($Def, [string]$Base, [string]$Site, [scriptblock]$Tick) {
       'ps' {
         $v = $PSVersionTable.PSVersion
         if ($v -ge [version]'5.1') { $one = Format-CheckResult 'PASSED' ('version [' + $v + ']') '' }
-        else { $one = Format-CheckResult 'FAILED' ('version [' + $v + ']') 'Open Windows PowerShell ISE from the Start menu and paste the round again.' }
+        else { $one = Format-CheckResult 'FAILED' ('version [' + $v + ']') 'Open Windows PowerShell ISE from the Start menu, then paste the round again' }
       }
       'lang' {
         $m = [string]$ExecutionContext.SessionState.LanguageMode
-        if ($m -eq 'FullLanguage') { $one = Format-CheckResult 'PASSED' 'not limited' '' }
-        else { $one = Format-CheckResult 'FAILED' ('limited [' + $m + ']') 'Your computer limits PowerShell, so RADE cannot save files or open Word. Ask your security officer (ISSM). Send the results e-mail as it is.' }
+        if ($m -eq 'FullLanguage') { $one = Format-CheckResult 'PASSED' 'Not restricted' '' }
+        else { $one = Format-CheckResult 'FAILED' ('Restricted [' + $m + ']') 'PowerShell is restricted on this computer. Contact your ISSM and send the results e-mail as is' }
       }
       'onedrive' {
         $od = Get-OneDrivePath
         if (Test-Path -LiteralPath $od -PathType Container) { $one = Format-CheckResult 'PASSED' 'found' '' }
-        else { $one = Format-CheckResult 'FAILED' 'not found' 'Open OneDrive from the Start menu and sign in; wait until it says it is up to date, then select "Run checks again".' }
+        else { $one = Format-CheckResult 'FAILED' 'not found' 'Sign in to OneDrive, wait until it is up to date, then select "Run checks again"' }
       }
       'disk' {
         $od = Get-OneDrivePath
@@ -875,17 +880,17 @@ function Invoke-Check($Def, [string]$Base, [string]$Site, [scriptblock]$Tick) {
         $free = (New-Object System.IO.DriveInfo($root)).AvailableFreeSpace
         $need = 200MB; foreach ($f in $files) { $need += 2 * $f.Data.Length }
         $mb = [math]::Floor($free / 1MB)
-        if ($free -lt $need) { $one = Format-CheckResult 'FAILED' ('{0:N0} MB free, {1:N0} MB needed' -f $mb, [math]::Ceiling($need / 1MB)) 'Make some space (empty the Recycle Bin or delete old files), then select "Run checks again".' }
-        elseif ($free -lt 1GB) { $one = Format-CheckResult 'WARNING' ('{0:N0} MB free' -f $mb) 'Less than 1,000 MB is free; the deploy fits, but make more space soon.' }
+        if ($free -lt $need) { $one = Format-CheckResult 'FAILED' ('{0:N0} MB free, {1:N0} MB needed' -f $mb, [math]::Ceiling($need / 1MB)) 'Free up space (for example, empty the Recycle Bin), then select "Run checks again"' }
+        elseif ($free -lt 1GB) { $one = Format-CheckResult 'WARNING' ('{0:N0} MB free' -f $mb) 'Enough for this deployment. Free up space soon' }
         else { $one = Format-CheckResult 'PASSED' ('{0:N0} MB free' -f $mb) '' }
       }
       'write' {
         $od = Get-OneDrivePath
-        if (-not (Test-Path -LiteralPath $od -PathType Container)) { $one = Format-CheckResult 'NOT RUN' 'no OneDrive folder' 'Fix the OneDrive problem first.' }
+        if (-not (Test-Path -LiteralPath $od -PathType Container)) { $one = Format-CheckResult 'NOT RUN' 'No OneDrive folder' 'Resolve the OneDrive check first' }
         else {
           $t = Join-Path $od ('@@PREFIX@@-write-test-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.tmp')
           [System.IO.File]::WriteAllText($t, 'test'); Remove-Item -LiteralPath $t -Force
-          $one = Format-CheckResult 'PASSED' 'made and deleted one test file' ''
+          $one = Format-CheckResult 'PASSED' 'Test file saved and deleted' ''
         }
       }
       'child' {
@@ -893,64 +898,64 @@ function Invoke-Check($Def, [string]$Base, [string]$Site, [scriptblock]$Tick) {
         $r = Invoke-ChildScript "'child ok'`r`nexit 7`r`n" '' 60 $Tick
         $pol = ''
         try { $pol = (@(Get-ExecutionPolicy -List | Where-Object { $_.Scope -match 'Policy$' -and [string]$_.ExecutionPolicy -ne 'Undefined' } | ForEach-Object { [string]$_.Scope + '=' + [string]$_.ExecutionPolicy }) -join ', ') } catch { $null = $_ }
-        if ($r.Exit -eq 7) { $one = Format-CheckResult 'PASSED' ('a test script ran' + $(if ($pol) { '. Computer rule: [' + $pol + ']' } else { '' })) '' }
-        else { $one = Format-CheckResult 'FAILED' ('a test script did not run. Exit code [' + $r.Exit + ']' + $(if ($r.Why) { ', ' + $r.Why } else { '' }) + $(if ($pol) { '. Computer rule: [' + $pol + ']' } else { '' })) 'Your computer blocks the RADE scripts, so the steps cannot run. Ask your security officer (ISSM). Send the results e-mail as it is.' }
+        if ($r.Exit -eq 7) { $one = Format-CheckResult 'PASSED' ('Test script ran' + $(if ($pol) { ', policy [' + $pol + ']' } else { '' })) '' }
+        else { $one = Format-CheckResult 'FAILED' ('Test script did not run, exit code [' + $r.Exit + ']' + $(if ($r.Why) { ', ' + $r.Why } else { '' }) + $(if ($pol) { ', policy [' + $pol + ']' } else { '' })) 'This computer blocks RADE scripts. Contact your ISSM and send the results e-mail as is' }
       }
       'outlook' {
-        if ($env:OS -ne 'Windows_NT') { $one = Format-CheckResult 'WARNING' 'not Windows' 'You will make the e-mail yourself; RADE opens the results folder and copies the summary.' }
-        elseif ([type]::GetTypeFromProgID('Outlook.Application')) { $one = Format-CheckResult 'PASSED' 'installed' '' }
-        else { $one = Format-CheckResult 'WARNING' 'not found. The new Outlook cannot make drafts' 'You will make the e-mail yourself; RADE opens the results folder and copies the summary.' }
+        if ($env:OS -ne 'Windows_NT') { $one = Format-CheckResult 'WARNING' 'Not Windows' 'RADE opens the results folder and copies the summary for your e-mail' }
+        elseif ([type]::GetTypeFromProgID('Outlook.Application')) { $one = Format-CheckResult 'PASSED' 'Installed' '' }
+        else { $one = Format-CheckResult 'WARNING' 'Classic Outlook not found (new Outlook cannot make drafts)' 'RADE opens the results folder and copies the summary for your e-mail' }
       }
       'word' {
         if ($env:OS -eq 'Windows_NT' -and [type]::GetTypeFromProgID('Word.Application')) {
-          if (Test-WordOpen) { $one = Format-CheckResult 'FAILED' 'installed and open now' 'Save your work and close Word, then select "Run checks again".' }   # PFM 14 Nov 26: blocks (1B)
-          else { $one = Format-CheckResult 'PASSED' 'installed' '' }
-        } else { $one = Format-CheckResult 'FAILED' 'not found' 'This application needs Word on this computer.' }
+          if (Test-WordOpen) { $one = Format-CheckResult 'FAILED' 'Installed, but open now' 'Save your work, close Word, then select "Run checks again"' }   # PFM 14 Nov 26: blocks (1B)
+          else { $one = Format-CheckResult 'PASSED' 'Installed' '' }
+        } else { $one = Format-CheckResult 'FAILED' 'Not found' 'This application requires Microsoft Word' }
       }
       'pnp' {
         $m = @(Get-Module -ListAvailable -Name PnP.PowerShell | Sort-Object Version -Descending)
-        if (-not $m.Count) { $one = Format-CheckResult 'FAILED' 'not installed' 'The site steps need this tool; use the other way for those steps in the repository.' }
+        if (-not $m.Count) { $one = Format-CheckResult 'FAILED' 'Not installed' 'Site steps require it. Use the manual steps in the repository' }
         elseif ([string]$m[0].Version -eq '1.12.0') { $one = Format-CheckResult 'PASSED' 'version [1.12.0]' '' }
-        else { $one = Format-CheckResult 'WARNING' ('version [' + $m[0].Version + ']; we tested [1.12.0]') 'It may work; if a site step fails, send the results as they are.' }
+        else { $one = Format-CheckResult 'WARNING' ('Version [' + $m[0].Version + '], tested with [1.12.0]') 'Likely compatible. If a site step fails, send the results as is' }
       }
       'net-bookmark' {
         $w = Test-WebReach $goUrl   # the file the "newer round" notice reads
         if ($w.Ok) { $one = Format-CheckResult 'PASSED' ('reached' + $(if ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
-        else { $one = Format-CheckResult 'WARNING' ('not reached: ' + $w.Why) 'Only the "newer round" notice needs it; you can still deploy. The repository is [@@HOME@@].' }
+        else { $one = Format-CheckResult 'WARNING' ('Not reached: ' + $w.Why) 'Optional: only the new-round notice uses it' }
       }
       'net-site' {
-        if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'no site address' 'Type the rest of the site address after [https://usaf.dps.mil/sites/] in the "Site address" box, then select "Run checks again".' }
+        if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'No site address' 'Complete the "Site address" box, then select "Run checks again"' }
         else {
           $w = Test-WebReach $Site
-          if ($w.Ok) { $one = Format-CheckResult 'PASSED' ('reached' + $(if ($w.Code -in 401, 403) { ', code [' + $w.Code + ']; it asks you to sign in, which is normal' } elseif ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
-          else { $one = Format-CheckResult 'FAILED' ('not reached: ' + $w.Why) 'Check the site address and try to open it in Edge; if Edge cannot open it, the network or the address is wrong.' }
+          if ($w.Ok) { $one = Format-CheckResult 'PASSED' ('Reached' + $(if ($w.Code -in 401, 403) { ', code [' + $w.Code + '] (sign-in required, as expected)' } elseif ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
+          else { $one = Format-CheckResult 'FAILED' ('Not reached: ' + $w.Why) 'Verify the address opens in Edge, then select "Run checks again"' }
         }
       }
       'net-flow' {
         $fp = Get-FlowPortal $Base
-        if (-not $fp.Url) { $one = Format-CheckResult 'NOT RUN' 'no Power Automate address' '' }
+        if (-not $fp.Url) { $one = Format-CheckResult 'NOT RUN' 'No Power Automate address' '' }
         else {
           $w = Test-WebReach $fp.Url
           if ($w.Ok) { $one = Format-CheckResult 'PASSED' ('reached' + $(if ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
-          else { $one = Format-CheckResult 'FAILED' ('not reached: ' + $w.Why) 'Open Power Automate in Edge; if it opens, select "Check Power Automate" and answer what you see.' }
+          else { $one = Format-CheckResult 'FAILED' ('Not reached: ' + $w.Why) 'If Power Automate opens in Edge, select "Check Power Automate"' }
         }
       }
       'site-rights' {
-        if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'no site address' 'Type the site address in the "Site address" box first.' }
+        if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'No site address' 'Complete the "Site address" box first' }
         else {
           $r = Invoke-ChildScript $rightsScript ('-Site "' + $Site + '"') 300 $Tick
           $have = @{}
           foreach ($l in $r.Lines) { if ($l -match '^RIGHT (\w+) (True|False)$') { $have[$Matches[1]] = ($Matches[2] -eq 'True') } }
           if (-not $have.Count) {
-            $why = 'sign-in did not finish'; foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $why = $Matches[1] } }
-            if ($why -eq 'not-connected') { $why = 'sign-in did not finish' }
-            if ($why -eq 'no-pnp') { $one = Format-CheckResult 'FAILED' 'the SharePoint tool is not installed' 'See the SharePoint tool check.' }
-            else { $one = Format-CheckResult 'FAILED' ($why + $(if ($r.Why) { ', ' + $r.Why } else { '' })) 'Select "Sign in and check site rights" again and finish the CAC sign-in; if it fails two times, send the results as they are.' }
+            $why = 'Sign-in did not finish'; foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $why = $Matches[1] } }
+            if ($why -eq 'not-connected') { $why = 'Sign-in did not finish' }
+            if ($why -eq 'no-pnp') { $one = Format-CheckResult 'FAILED' 'SharePoint tool not installed' 'See the SharePoint tool check' }
+            else { $one = Format-CheckResult 'FAILED' ($why + $(if ($r.Why) { ', ' + $r.Why } else { '' })) 'Select "Sign in and check site rights" and complete the CAC sign-in' }
           } else {
             $miss = @($rightsNeeded | Where-Object { -not $have[$_] } | ForEach-Object { $rightWords[$_] })
             $got = @($have.Keys | Sort-Object | Where-Object { $have[$_] } | ForEach-Object { $rightWords[$_] })
-            if ($miss.Count) { $one = Format-CheckResult 'FAILED' ('missing: ' + ($miss -join ', ')) 'Ask a site owner to add you to the site "Owners" group, or use the steps in the repository that do not need this access.' }
-            else { $one = Format-CheckResult 'PASSED' ('you can ' + ($got -join ', ')) '' }
+            if ($miss.Count) { $one = Format-CheckResult 'FAILED' ('Missing: ' + ($miss -join ', ')) 'Ask a site owner to add you to the site Owners group' }
+            else { $one = Format-CheckResult 'PASSED' ('Rights: ' + ($got -join ', ')) '' }
           }
         }
       }
@@ -959,8 +964,8 @@ function Invoke-Check($Def, [string]$Base, [string]$Site, [scriptblock]$Tick) {
           $fp = Get-FlowPortal $Base
           Write-Host ('  Open Power Automate (' + $fp.Url + '). Look at the left menu for "Solutions" (it may be under "More"), then select "My flows" and look for "Import".')
           $a = ([string](Read-Host 'Did you see both "Solutions" and "Import"? Type Y or N and press Enter')).Trim()
-          if ($a -match '^[Yy]') { $one = Format-CheckResult 'PASSED' 'confirmed by you' '' }
-          else { $one = Format-CheckResult 'FAILED' 'you did not see "Solutions" or "Import"' 'Ask your Power Automate administrator for permission to make flows, or use the other way in the repository.' }
+          if ($a -match '^[Yy]') { $one = Format-CheckResult 'PASSED' 'Confirmed by you' '' }
+          else { $one = Format-CheckResult 'FAILED' '"Solutions" or "Import" not shown' 'Ask your Power Automate administrator for maker access' }
         }
         else {
           $fp = Get-FlowPortal $Base
@@ -971,14 +976,14 @@ function Invoke-Check($Def, [string]$Base, [string]$Site, [scriptblock]$Tick) {
               '3. Select My flows: Import must show at the top of the page.',
               '4. Come back here. Select Yes if you saw both, No if one is missing.') }
           $a = Show-GuideDialog $g '' $fp.Url $fp.Config
-          if ($a -eq 'OK') { $one = Format-CheckResult 'PASSED' 'confirmed by you' '' }
-          elseif ($a -eq 'No') { $one = Format-CheckResult 'FAILED' 'you did not see "Solutions" or "Import"' 'Ask your Power Automate administrator for permission to make flows, or use the other way in the repository.' }
-          else { $one = Format-CheckResult 'NOT RUN' 'not answered' 'Select "Check Power Automate" when you are ready.' }
+          if ($a -eq 'OK') { $one = Format-CheckResult 'PASSED' 'Confirmed by you' '' }
+          elseif ($a -eq 'No') { $one = Format-CheckResult 'FAILED' '"Solutions" or "Import" not shown' 'Ask your Power Automate administrator for maker access' }
+          else { $one = Format-CheckResult 'NOT RUN' 'Not answered' 'Select "Check Power Automate" when ready' }
         }
       }
       default { $one = Format-CheckResult 'NOT RUN' 'unknown check' '' }
     }
-  } catch { $one = Format-CheckResult 'FAILED' ('the check stopped with an error [' + $_.Exception.GetType().Name + ']') 'Select "Run checks again"; if it happens again, send the results as they are.' }
+  } catch { $one = Format-CheckResult 'FAILED' ('Check stopped with an error [' + $_.Exception.GetType().Name + ']') 'Select "Run checks again". If it repeats, send the results as is' }
   if ($Def.Advisory -and $one.State -eq 'FAILED') { $one.State = 'WARNING' }
   return $one
 }
@@ -1056,11 +1061,12 @@ function Get-SavedCheck($Cache, [string]$Id, [string]$Scope) {
   $c = $Cache[$Id]
   if (-not $c -or $c.State -ne 'PASSED' -or $c.Scope -ne $Scope) { return $null }
   $age = Get-CheckAge $c.At
-  if ($age -lt -0.01) { $script:savedWhy[$Id] = 'The saved result has a date in the future (the computer clock changed).'; return $null }
-  if ($age -gt $checkMaxDays) { $script:savedWhy[$Id] = ('The saved result is ' + [int][math]::Floor([math]::Max(0, $age)) + ' days old (older than ' + $checkMaxDays + ' days).'); return $null }
-  $days = [int][math]::Floor($age)
-  $when = $(if ($days -lt 1) { 'today' } elseif ($days -eq 1) { '1 day ago' } else { [string]$days + ' days ago' })
-  return @{ State = 'PASSED'; Detail = ('Saved result from ' + $when + ' (' + $c.At.Substring(0, 10) + '; checked again after ' + $checkMaxDays + ' days): ' + $c.Detail); Fix = ''; Saved = $true }
+  if ($age -lt -0.01) { $script:savedWhy[$Id] = 'Last check date is in the future (clock changed)'; return $null }
+  if ($age -gt $checkMaxDays) { $script:savedWhy[$Id] = ('Last check ' + [int][math]::Floor([math]::Max(0, $age)) + ' days ago, older than ' + $checkMaxDays + ' days'); return $null }
+  # Two lines (the Administrator, 2026-11-14): "Last check: DD-MM-YY", then what that check found; no full stops.
+  $d0 = [datetime]::ParseExact($c.At, 'yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
+  $found = ([string]$c.Detail) -replace '\.$', ''
+  return @{ State = 'PASSED'; Detail = ('Last check: ' + $d0.ToString('dd-MM-yy', [System.Globalization.CultureInfo]::InvariantCulture)); Fix = $found; Saved = $true; Found = $found }
 }
 function Save-CheckCache($Results, [string]$Base, [string]$Site) {
   # Keeps the old file's other entries (other apps' checks), replaces this run's: PASSED is saved, anything else removed.
@@ -1217,6 +1223,7 @@ if ($gui) {
       $v.ReadOnly = $true; $v.AllowUserToAddRows = $false; $v.AllowUserToDeleteRows = $false; $v.AllowUserToResizeRows = $false
       $v.RowHeadersVisible = $false; $v.SelectionMode = 'FullRowSelect'; $v.MultiSelect = $false; $v.BorderStyle = 'FixedSingle'
       $v.AutoSizeRowsMode = 'None'; $v.ColumnHeadersHeightSizeMode = 'AutoSize'; $v.AccessibleName = $Name
+      try { $v.ColumnHeadersDefaultCellStyle.Font = New-Object System.Drawing.Font($form.Font.FontFamily, [single]10, $bold) } catch { $null = $_ }   # bold headers (the Administrator, 2026-11-14)
       $v.RowTemplate.Height = 2 * $lineH + 10
       try { $v.BackgroundColor = [System.Drawing.SystemColors]::Window; $v.DefaultCellStyle.WrapMode = 'True'; $v.DefaultCellStyle.Alignment = 'MiddleLeft'
         $v.DefaultCellStyle.Padding = New-Object System.Windows.Forms.Padding(4, 2, 4, 2)
@@ -1323,7 +1330,7 @@ if ($gui) {
     $pCheck = & $mkRows @('AutoSize', 'AutoSize', 'AutoSize', 'Percent', 'AutoSize', 'AutoSize', 'AutoSize')
     $checkHead = & $mkLabel ''
     try { $checkHead.Font = New-Object System.Drawing.Font($form.Font.FontFamily, [single]11, $bold) } catch { $null = $_ }
-    $checkWhat = & $mkLabel ('The checks do not change anything; they make one test file and one short script, then delete them at once.' + "`r`n" + 'Checks that pass are saved for ' + $checkMaxDays + ' days in RADE\Config\rade-checks.json, so the next run skips them; "Run checks again" checks everything now.' + "`r`n" + 'If you type the site address, it is saved on this computer only (Config\@@PREFIX@@-site.txt).')
+    $checkWhat = & $mkLabel ('Read-only. One test file and one test script are created and deleted at once.' + "`r`n" + 'Passed checks are reused for ' + $checkMaxDays + ' days. "Run checks again" runs every check now.')
     $sitePanel = New-Object System.Windows.Forms.FlowLayoutPanel
     $sitePanel.AutoSize = $true; $sitePanel.WrapContents = $true; $sitePanel.Dock = 'Fill'
     $siteLabel = & $mkLabel 'Site address:'
@@ -1406,7 +1413,7 @@ if ($gui) {
     $toPanel.Controls.AddRange(@($toLabel, $toBox))
     $okBox = New-Object System.Windows.Forms.CheckBox
     $okBox.AutoSize = $true; $okBox.Checked = $true; $okBox.MaximumSize = $wrap
-    $okBox.Text = 'This window looked right (nothing overlapped or cut off). Uncheck if not; the e-mail says so.'
+    $okBox.Text = 'The window displayed correctly (nothing overlapped or cut off)'
     $buttons = New-Object System.Windows.Forms.FlowLayoutPanel
     $buttons.AutoSize = $true; $buttons.WrapContents = $true; $buttons.Dock = 'Fill'
     $run = & $mkButton 'Run'
@@ -1502,15 +1509,14 @@ if ($gui) {
       if (-not $first.Found) { $warnings += 'OneDrive folder NOT found in this Windows profile: open OneDrive from the Start menu and sign in, then paste and run again.' }
       $warn.Text = ($warnings -join "`r`n"); $warn.Visible = [bool]$warnings.Count
       $est = 0; $known = $true; foreach ($k in $script:appSteps) { $w = Get-StepWeight $hist0 $steps[$k]; $est += $w.Seconds; if (-not $w.Known) { $known = $false } }
-      $allLabel.Text = 'Overall: ready. About ' + (Format-Duration $est) + ' for all steps (' + $(if ($known) { 'based on your last runs' } else { 'a guess: no earlier runs' }) + '). Press Enter or select Run.'
-      $howTo = @('How to use this screen',
-        '  1. Check that "Writes to" above shows your own OneDrive folder. Type the address for the results e-mail (it is saved for next time).',
-        '  2. Press Enter or select Run. To skip a step, clear its check box. Keep this window open until the log shows DONE.',
-        '     The top bar shows all the work and the time left. The lower bar shows the step that is running now.',
-        '     A step marked "(needs you)" opens a short window with steps. Do them, then select Done.',
-        '  3. At DONE, an Outlook draft opens with the subject, the summary and all result files. Review it, then select Send.',
-        '     If no draft opens, the results folder opens and the summary is copied. Make e-mail draft tries Outlook again.',
-        '  If you close this window, the running step stops.', '')
+      $allLabel.Text = 'Ready. About ' + (Format-Duration $est) + ' in all (' + $(if ($known) { 'based on earlier runs' } else { 'estimate, no earlier runs' }) + '). Press Enter or select Run'
+      $howTo = @('HOW TO USE THIS SCREEN',
+        '  1. Confirm that "Writes to" shows your OneDrive folder, and enter the results e-mail address (saved for next time).',
+        '  2. Press Enter or select Run. Clear a step''s box to skip it. Keep this window open until the log shows DONE.',
+        '     Steps marked "(needs you)" open a short guide. Complete it, then select "Done".',
+        '  3. At DONE, an Outlook draft opens with the summary and all result files. Review it, then select Send.',
+        '     If no draft opens, the results folder opens and the summary is on the clipboard.',
+        '  Closing this window stops the running step.', '')
       $log.Text = (($howTo + $first.Lines) -join "`r`n") + "`r`n"
     }
     $setRow = { param([int]$I, $R)
@@ -1526,8 +1532,8 @@ if ($gui) {
       $countLabels['PASSED'].Text = 'Passed: ' + $c.PASSED + '.'; $countLabels['WARNING'].Text = 'Warnings: ' + $c.WARNING + '.'
       $countLabels['FAILED'].Text = 'Failed: ' + $c.FAILED + '.'; $countLabels['NOT RUN'].Text = 'Not run: ' + $c['NOT RUN'] + '.'
       $sv = @($script:appChecks | Where-Object { $script:checkResults[$_].Saved }).Count
-      $checkStatus.Text = $(if ($c.FAILED) { 'You cannot deploy yet; fix each check marked FAILED, then select "Run checks again".' } elseif ($block) { 'You cannot deploy yet; run the checks marked NOT RUN (use the buttons above).' } else { 'All checks passed; press Enter or select "Next: deploy".' }) +
-        "`r`n" + $(if ($sv) { [string]$sv + ' of ' + $script:appChecks.Count + ' checks use saved results (good for ' + $checkMaxDays + ' days). Select "Run checks again" to check everything now.' } else { 'No saved results were used.' })
+      $checkStatus.Text = $(if ($c.FAILED) { 'Resolve each FAILED check, then select "Run checks again"' } elseif ($block) { 'Run the checks marked NOT RUN with the buttons above' } else { 'Ready to deploy. Press Enter or select "Next: deploy"' }) +
+        "`r`n" + $(if ($sv) { [string]$sv + ' of ' + $script:appChecks.Count + ' checks reused from earlier runs (valid ' + $checkMaxDays + ' days)' } else { 'All checks ran now' })
       try { $checkStatus.ForeColor = Get-CheckColor $(if ($block) { 'FAILED' } elseif ($c.WARNING) { 'WARNING' } else { 'PASSED' }) } catch { $null = $_ }
       $next.Enabled = (-not $block) }
     $runChecks = { param([string[]]$Kinds, [string[]]$Only, [bool]$Force)
@@ -1547,7 +1553,7 @@ if ($gui) {
           else {
             $sv = Get-CheckToRun $d $cache $basePath $site $false
             if ($sv) { $script:checkResults[$id] = $sv; & $setRow $i $sv }
-            elseif ($script:savedWhy[$id]) { & $setRow $i (Format-CheckResult 'NOT RUN' $script:savedWhy[$id] $(if ($d.Kind -eq 'signin') { 'Select "Sign in and check site rights" to check again.' } else { 'Select "Check Power Automate" to check again.' })) }
+            elseif ($script:savedWhy[$id]) { & $setRow $i (Format-CheckResult 'NOT RUN' $script:savedWhy[$id] $(if ($d.Kind -eq 'signin') { 'Select "Sign in and check site rights"' } else { 'Select "Check Power Automate"' })) }
           }
           continue
         }
@@ -1569,9 +1575,9 @@ if ($gui) {
       $checkView.Rows.Clear()
       for ($i = 0; $i -lt $script:appChecks.Count; $i++) {
         $d = Get-CheckDef $script:appChecks[$i]
-        $wait = $(if ($d.Kind -eq 'signin') { @('Select "Sign in and check site rights".', 'You sign in with your CAC; nothing is changed.') } elseif ($d.Kind -eq 'guide') { @('Select "Check Power Automate".', 'You look and answer.') } else { @('Waiting.', '') })
+        $wait = $(if ($d.Kind -eq 'signin') { @('Select "Sign in and check site rights"', 'CAC sign-in, read-only') } elseif ($d.Kind -eq 'guide') { @('Select "Check Power Automate"', 'You look and answer, read-only') } else { @('Waiting', '') })
         [void]$checkView.Rows.Add([object[]]@('', 'NOT RUN', ''))
-        & $setCell $checkView.Rows[$i].Cells[0] $d.Name ($d.Group + ' check'); & $setCell $checkView.Rows[$i].Cells[2] $wait[0] $wait[1]
+        & $setCell $checkView.Rows[$i].Cells[0] $d.Group $d.Name; & $setCell $checkView.Rows[$i].Cells[2] $wait[0] $wait[1]
         try { $k = Get-CheckColor 'NOT RUN'; $checkView.Rows[$i].Cells[1].Style.ForeColor = $k; $checkView.Rows[$i].Cells[1].Style.SelectionForeColor = $k } catch { $null = $_ }
       }
       $checkView.ClearSelection()
@@ -1755,7 +1761,7 @@ try {
     $r = Get-CheckToRun $d $cache (Get-BasePath) $site0 $false
     if (-not $r) { $r = Invoke-Check $d (Get-BasePath) $site0 $null }
     $script:checkResults[$id] = $r
-    Write-Host ('  ' + $r.State + ': ' + $d.Name + '. ' + $r.Detail + $(if ($r.Fix -and $r.State -ne 'PASSED') { ' ' + $r.Fix } else { '' }))
+    Write-Host ('  ' + $r.State + ': ' + $d.Name + '. ' + $r.Detail + $(if ($r.Fix -and ($r.State -ne 'PASSED' -or $r.Saved)) { '. ' + $r.Fix + '.' } else { '.' }))
   }
   Save-CheckCache $script:checkResults (Get-BasePath) $site0
   if ($checkGate -and (Get-CheckBlock $script:checkResults)) {

@@ -42,6 +42,8 @@ Sources: RADE = [docs/DECISIONS.md](DECISIONS.md); Z = [rhope-ops/90-161.Z docs/
 |---|---|---|
 | All text a user sees is plain, simple English; the log reads professionally. | Built | Z 2026-11-14 (two rows) |
 | Check text: sentence case, screen names in "quotes", reported values in [brackets]. | Built | Z 2026-11-14 (no-deploy row) |
+| Details lines: one fact per line, no full stop, never joined with ";"; a reused check reads "Last check: DD-MM-YY" over what it found. Check column: group ("Local", "Network", "Access") above the check name. Column headers bold. Repository check details fit 2 lines. | Built (engine 2026-11-14, R20 bundle) | RADE 2026-11-14 (text and grid row) |
+| All text (window, guides, step notes, flow inputs) is professional and polished; formatted where the control allows. | Partly built (engine texts 2026-11-14; step notes and flow inputs per round) | RADE 2026-11-14 (text and grid row) |
 | Results: PASSED, PASSED (fallback), WARNING, FAILED, NOT RUN; one meaning per color and the word always shown (dark green, saddle brown, dark red, dim gray; running navy; all at least 4.5:1). | Built except PASSED (fallback) | RADE 2026-11-14 (engine); engine Get-CheckColor |
 | Each problem has a "What to do" line under it. | Built | Z 2026-11-13 (R06 row) |
 | The real path is on screen in bold ("Writes to"); before Run the window lists every file as New, Replace or Recycle. | Built | Z 2026-11-13 (R06 row) |
