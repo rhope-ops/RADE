@@ -191,6 +191,7 @@ function Get-NewerRound {
     try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { $null = $_ }   # TLS 1.2 (R19)
     $rq = [System.Net.WebRequest]::Create($goUrl)
     $rq.Timeout = 4000
+    try { $rq.UserAgent = $webAgent } catch { $null = $_ }   # R21: as in Test-WebReach
     try { $rq.UseDefaultCredentials = $true } catch { $null = $_ }   # https: Windows sign-in for the proxy (a file URL in tests has none)
     if ($rq.Proxy) { $rq.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials }
     $rs = $rq.GetResponse()
@@ -323,6 +324,7 @@ function Save-RoundDownload([string]$Base, [scriptblock]$Say) {
     $wc = New-Object System.Net.WebClient
     try {
       $wc.UseDefaultCredentials = $true
+      $wc.Headers['User-Agent'] = $webAgent   # R21: as in Test-WebReach
       if ($wc.Proxy) { $wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials }
       $wc.DownloadFile($f.Url, $path)
       if ($f.Sha) {
@@ -770,6 +772,9 @@ function Test-WebReach([string]$Url) {
   try {
     $rq = [System.Net.WebRequest]::Create($Url)
     $rq.Timeout = 6000
+    # R20: [ReceiveFailure] stayed with TLS 1.2 set. A request with no User-Agent can be closed by a filtering proxy (agent
+    # finding, Confidence low); send the one Edge's family sends.
+    try { $rq.UserAgent = $webAgent } catch { $null = $_ }
     try { $rq.UseDefaultCredentials = $true } catch { $null = $_ }
     try { $rq.AllowAutoRedirect = $false } catch { $null = $_ }
     try { if ($rq.Proxy) { $rq.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials } } catch { $null = $_ }
@@ -789,6 +794,11 @@ function Test-WebReach([string]$Url) {
       $why = @{ Timeout = 'no reply in time'; NameResolutionFailure = 'address not found'; ConnectFailure = 'could not connect'; ProxyNameResolutionFailure = 'network proxy not found'; TrustFailure = 'the security certificate was not trusted'; SecureChannelFailure = 'secure connection failed' }[[string]$e.Status]
       if (-not $why) { $why = 'network error' }
       $why += ' [' + [string]$e.Status + ']'
+      # R21 diagnostics: the inner error kinds, a socket error code and the TLS setting (names and numbers only, no address).
+      $kinds = @(); $x = $e.InnerException
+      while ($x) { $k = $x.GetType().Name; if ($x -is [System.Net.Sockets.SocketException]) { $k += ' ' + [int]$x.ErrorCode } elseif ($x.HResult) { $k += ' 0x' + ('{0:X8}' -f $x.HResult) }; $kinds += $k; $x = $x.InnerException }
+      $tls = ''; try { $tls = [string][Net.ServicePointManager]::SecurityProtocol } catch { $null = $_ }
+      if ($kinds.Count -or $tls) { $why += ' (' + (@($kinds) + @('TLS ' + $tls) -join '; ') + ')' }
       return @{ Ok = $false; Why = $why }
     }
     return @{ Ok = $false; Why = 'network error [' + $e.GetType().Name + ']' }
@@ -2125,7 +2135,7 @@ def build(b):
     engine = ENGINE.replace('@@HOME@@', APP['home']).replace('@@PREFIX@@', APP['prefix']).replace('@@APP@@', APP['folder'])
     own = '$ownPatterns = @(' + ', '.join(q(p) for p in APP['own']) + ')\n'
     go = q('https://raw.githubusercontent.com/' + APP['repo'] + '/main/go.md')
-    body = ('$goUrl = %s\n$logoPng = \'%s\'\n%s$round = %s\n$appFolder = %s\n$usersRoot = \'C:\\Users\'\n$files = @()\n%s\n$fetch = @()\n%s\n$steps = @()\n%s\n$collect = @()\n%s\n$cleanup = @()\n%s\n$known = @(%s)\n$apps = @()\n%s\n%s'
+    body = ('$goUrl = %s\n$webAgent = \'Mozilla/5.0 (Windows NT 10.0; Win64; x64) RADE\'\n$logoPng = \'%s\'\n%s$round = %s\n$appFolder = %s\n$usersRoot = \'C:\\Users\'\n$files = @()\n%s\n$fetch = @()\n%s\n$steps = @()\n%s\n$collect = @()\n%s\n$cleanup = @()\n%s\n$known = @(%s)\n$apps = @()\n%s\n%s'
             % (go, logo, own, q(b['round']), q(APP['folder']), '\n'.join(parts), '\n'.join(fetchs), '\n'.join(steps), '\n'.join(collect), '\n'.join(cleanup), ', '.join(q(k) for k in known), '\n'.join(apps), engine))
     build_id = hashlib.sha256(body.encode('ascii')).hexdigest()[:8]
     head = ('<#\n  RADE (Redacted Application Deployment Engine), round bundle: %s.\n'
