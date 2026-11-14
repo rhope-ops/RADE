@@ -4,3 +4,5 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 python3 scripts/check_manifest.py
+# Engine (moved from rhope-ops/90-161.Z, 2026-11-14): it compiles. Each app's own tests build and check its bundles.
+python3 -m py_compile engine/rade_build.py

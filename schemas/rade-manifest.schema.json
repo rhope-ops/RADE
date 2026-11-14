@@ -2,88 +2,463 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/rhope-ops/RADE/main/schemas/rade-manifest.schema.json",
   "title": "RADE manifest",
-  "description": "The contract between an application and the RADE engine (the Administrator, 2026-11-14). One manifest lists round bundles; the engine builds each bundle into one PowerShell text that is pasted into Windows PowerShell ISE. The engine runs only what the bundle embeds and never fetches code. Source today: rhope-ops/90-161.Z scripts/paste_bundles.json, read by scripts/build_paste_bundles.py; this schema matches what that build reads.",
+  "description": "The contract between an application and the RADE engine (the Administrator, 2026-11-14). One manifest lists round bundles; the engine builds each bundle into one PowerShell text that is pasted into Windows PowerShell ISE. The engine runs only what the bundle embeds and never fetches code. The engine is engine/rade_build.py in this repo (moved from rhope-ops/90-161.Z on 2026-11-14); this schema matches what it reads. First app: rhope-ops/90-161.Z scripts/paste_bundles.json.",
   "type": "object",
-  "required": ["bundles"],
+  "required": [
+    "application",
+    "bundles"
+  ],
   "additionalProperties": false,
   "properties": {
-    "_doc": {"type": "string", "description": "Free text for maintainers. The engine does not read it."},
-    "bundles": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/bundle"}}
+    "_doc": {
+      "type": "string",
+      "description": "Free text for maintainers. The engine does not read it."
+    },
+    "application": {
+      "$ref": "#/$defs/application"
+    },
+    "bundles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/bundle"
+      }
+    }
   },
   "$defs": {
-    "relPath": {"type": "string", "minLength": 1, "pattern": "^[^/\\\\:][^:]*$", "description": "A path relative to the application repo root, or a folder name; never absolute."},
+    "relPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/\\\\:][^:]*$",
+      "description": "A path relative to the application repo root, or a folder name; never absolute."
+    },
     "bundle": {
       "type": "object",
-      "required": ["out", "round", "title", "files", "steps", "collect"],
+      "required": [
+        "out",
+        "round",
+        "title",
+        "files",
+        "steps",
+        "collect"
+      ],
       "additionalProperties": false,
       "properties": {
-        "out": {"$ref": "#/$defs/relPath", "description": "Generated bundle file (.ps1). Never hand-edit it."},
-        "round": {"type": "string", "pattern": "^R[0-9]{2,}$", "description": "Round id; also the results folder Rounds\\<round> and the e-mail subject."},
-        "title": {"type": "string", "minLength": 1, "description": "One line on what the round does. Shown in the bundle header; the catalog summary when there is no apps list."},
-        "app": {"type": "string", "description": "Application name when there is no apps list. Default: the engine's application name."},
-        "files": {"type": "array", "items": {"$ref": "#/$defs/file"}, "description": "Every file the round writes. Every step's dir and file must be one of these."},
-        "fetch": {"type": "array", "items": {"$ref": "#/$defs/fetch"}, "description": "Data files the round downloads (never code). Usually empty."},
-        "steps": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/step"}},
-        "collect": {"type": "array", "items": {"$ref": "#/$defs/collect"}, "description": "Files copied into the results folder after the steps."},
-        "cleanup": {"type": "array", "items": {"$ref": "#/$defs/cleanup"}, "description": "Finished files the round moves to the Recycle Bin (only files the application made)."},
-        "apps": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/app"}, "description": "The catalog on the Choose screen. Without it: one application with every step."}
+        "out": {
+          "$ref": "#/$defs/relPath",
+          "description": "Generated bundle file (.ps1). Never hand-edit it."
+        },
+        "round": {
+          "type": "string",
+          "pattern": "^R[0-9]{2,}$",
+          "description": "Round id; also the results folder Rounds\\<round> and the e-mail subject."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One line on what the round does. Shown in the bundle header; the catalog summary when there is no apps list."
+        },
+        "app": {
+          "type": "string",
+          "description": "Application name when there is no apps list. Default: the engine's application name."
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          },
+          "description": "Every file the round writes. Every step's dir and file must be one of these."
+        },
+        "fetch": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fetch"
+          },
+          "description": "Data files the round downloads (never code). Usually empty."
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        },
+        "collect": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/collect"
+          },
+          "description": "Files copied into the results folder after the steps."
+        },
+        "cleanup": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cleanup"
+          },
+          "description": "Finished files the round moves to the Recycle Bin (only files the application made)."
+        },
+        "apps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/app"
+          },
+          "description": "The catalog on the Choose screen. Without it: one application with every step."
+        }
       }
     },
     "file": {
-      "type": "object", "required": ["dir", "src"], "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "dir",
+        "src"
+      ],
+      "additionalProperties": false,
       "properties": {
-        "dir": {"$ref": "#/$defs/relPath", "description": "Task folder under the application folder (for example T17)."},
-        "src": {"$ref": "#/$defs/relPath", "description": "Source in the repo. .ps1 .json .txt .md .csv embed as ASCII text; other files embed as base64."}
+        "dir": {
+          "$ref": "#/$defs/relPath",
+          "description": "Task folder under the application folder (for example T17)."
+        },
+        "src": {
+          "$ref": "#/$defs/relPath",
+          "description": "Source in the repo. .ps1 .json .txt .md .csv embed as ASCII text; other files embed as base64."
+        }
       }
     },
     "fetch": {
-      "type": "object", "required": ["dir"], "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "dir"
+      ],
+      "additionalProperties": false,
       "properties": {
-        "dir": {"$ref": "#/$defs/relPath"},
-        "src": {"$ref": "#/$defs/relPath", "description": "Repo file, downloaded from raw main and checked by SHA-256."},
-        "name": {"type": "string", "description": "File name for a public page (with url)."},
-        "url": {"type": "string", "pattern": "^https://", "description": "Public page, saved as it is (with name)."}
+        "dir": {
+          "$ref": "#/$defs/relPath"
+        },
+        "src": {
+          "$ref": "#/$defs/relPath",
+          "description": "Repo file, downloaded from raw main and checked by SHA-256."
+        },
+        "name": {
+          "type": "string",
+          "description": "File name for a public page (with url)."
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://",
+          "description": "Public page, saved as it is (with name)."
+        }
       },
-      "anyOf": [{"required": ["src"]}, {"required": ["name", "url"]}]
+      "anyOf": [
+        {
+          "required": [
+            "src"
+          ]
+        },
+        {
+          "required": [
+            "name",
+            "url"
+          ]
+        }
+      ]
     },
     "step": {
-      "type": "object", "required": ["name", "dir", "file"], "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "dir",
+        "file"
+      ],
+      "additionalProperties": false,
       "properties": {
-        "name": {"type": "string", "minLength": 1, "description": "Unique in the bundle; apps and collect refer to it."},
-        "dir": {"$ref": "#/$defs/relPath"},
-        "file": {"type": "string", "minLength": 1, "description": "File name from files[] in the same dir."},
-        "kind": {"enum": ["script", "guide"], "default": "script", "description": "script: runs as a child powershell.exe. guide: work the user does in another program; RADE opens the address and waits for Done or Skip."},
-        "default": {"description": "Ticked or not. An object {passed, paths}: ticked only when those files changed since the round that passed it.",
-          "oneOf": [{"type": "boolean"}, {"type": "object", "required": ["passed", "paths"], "additionalProperties": false,
-            "properties": {"passed": {"type": "string"}, "paths": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/relPath"}}}}]},
-        "needs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z-]+$"}, "description": "Check ids from the engine's check list. The engine owns that list, so this checker does not test the ids; the build fails on an unknown id."},
-        "estimate": {"type": "integer", "minimum": 0, "description": "Expected minutes, used for the overall bar until a real run time exists."},
-        "minutes": {"type": "integer", "minimum": 1, "default": 30, "description": "Time limit for a script step."},
-        "args": {"type": "string", "description": "Extra arguments for a script step."},
-        "note": {"type": "string", "description": "Plain-English line shown under the step."},
-        "ask": {"type": "object", "additionalProperties": false, "properties": {"param": {"type": "string"}, "prompt": {"type": "string"}}, "description": "A value the window asks for and passes as -<param>."},
-        "screenOnly": {"type": "string"},
-        "guide": {"type": "array", "items": {"type": "string"}, "description": "Numbered steps for a guide step, one action each."},
-        "url": {"type": "string", "description": "Address a guide step opens."},
-        "urlConfig": {"type": "string", "description": "Config file that holds the address, when it must not be in the public repo."},
-        "url_source": {"type": "string", "description": "Maintainer note on where the address comes from. The engine does not read it."},
-        "marker": {"type": "string", "description": "File a guide step writes on Done."},
-        "doneText": {"type": "string", "description": "Label of the Done button."},
-        "doneLog": {"type": "string", "description": "Log line on Done."}
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique in the bundle; apps and collect refer to it."
+        },
+        "dir": {
+          "$ref": "#/$defs/relPath"
+        },
+        "file": {
+          "type": "string",
+          "description": "File name from files[] in the same dir. Empty only for a guide step that needs no file (R18)."
+        },
+        "kind": {
+          "enum": [
+            "script",
+            "guide"
+          ],
+          "default": "script",
+          "description": "script: runs as a child powershell.exe. guide: work the user does in another program; RADE opens the address and waits for Done or Skip."
+        },
+        "default": {
+          "description": "Ticked or not. An object {passed, paths}: ticked only when those files changed since the round that passed it.",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "required": [
+                "passed",
+                "paths"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "passed": {
+                  "type": "string"
+                },
+                "paths": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/relPath"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "needs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z-]+$"
+          },
+          "description": "Check ids from the engine's check list. The engine owns that list, so this checker does not test the ids; the build fails on an unknown id."
+        },
+        "estimate": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Expected minutes, used for the overall bar until a real run time exists."
+        },
+        "minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30,
+          "description": "Time limit for a script step."
+        },
+        "args": {
+          "type": "string",
+          "description": "Extra arguments for a script step."
+        },
+        "note": {
+          "type": "string",
+          "description": "Plain-English line shown under the step."
+        },
+        "ask": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "param": {
+              "type": "string"
+            },
+            "prompt": {
+              "type": "string"
+            }
+          },
+          "description": "A value the window asks for and passes as -<param>."
+        },
+        "screenOnly": {
+          "type": "string"
+        },
+        "guide": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Numbered steps for a guide step, one action each."
+        },
+        "url": {
+          "type": "string",
+          "description": "Address a guide step opens."
+        },
+        "urlConfig": {
+          "type": "string",
+          "description": "Config file that holds the address, when it must not be in the public repo."
+        },
+        "url_source": {
+          "type": "string",
+          "description": "Maintainer note on where the address comes from. The engine does not read it."
+        },
+        "marker": {
+          "type": "string",
+          "description": "File a guide step writes on Done."
+        },
+        "doneText": {
+          "type": "string",
+          "description": "Label of the Done button."
+        },
+        "doneLog": {
+          "type": "string",
+          "description": "Log line on Done."
+        }
       },
-      "allOf": [{"if": {"properties": {"kind": {"const": "guide"}}, "required": ["kind"]}, "then": {"required": ["guide"]}}]
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "guide"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "guide"
+            ]
+          }
+        }
+      ]
     },
     "collect": {
-      "type": "object", "required": ["dir", "name"], "additionalProperties": false,
-      "properties": {"dir": {"$ref": "#/$defs/relPath"}, "name": {"type": "string", "minLength": 1}, "step": {"type": "string", "description": "Step that makes the file."}}
+      "type": "object",
+      "required": [
+        "dir",
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "dir": {
+          "$ref": "#/$defs/relPath"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "step": {
+          "type": "string",
+          "description": "Step that makes the file."
+        }
+      }
     },
     "cleanup": {
-      "type": "object", "required": ["path", "kind"], "additionalProperties": false,
-      "properties": {"path": {"$ref": "#/$defs/relPath"}, "kind": {"enum": ["dir", "glob"]}}
+      "type": "object",
+      "required": [
+        "path",
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/relPath"
+        },
+        "kind": {
+          "enum": [
+            "dir",
+            "glob"
+          ]
+        }
+      }
     },
     "app": {
-      "type": "object", "required": ["name", "summary", "steps"], "additionalProperties": false,
-      "properties": {"name": {"type": "string", "minLength": 1}, "summary": {"type": "string", "minLength": 1}, "mode": {"enum": ["deploy", "test", "drift"], "default": "test", "description": "deploy: install an app. test: a test round (the default; a permanent mode, the Administrator 2026-11-14). drift: the owner-only drift check (docs/drift-check.md)."}, "steps": {"type": "array", "minItems": 1, "items": {"type": "string"}, "description": "Step names, in run order."}}
+      "type": "object",
+      "required": [
+        "name",
+        "summary",
+        "steps"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "enum": [
+            "deploy",
+            "test",
+            "drift"
+          ],
+          "default": "test",
+          "description": "deploy: install an app. test: a test round (the default; a permanent mode, the Administrator 2026-11-14). drift: the owner-only drift check (docs/drift-check.md)."
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "Step names, in run order."
+        }
+      }
+    },
+    "application": {
+      "type": "object",
+      "required": [
+        "name",
+        "folder",
+        "prefix",
+        "repo",
+        "home",
+        "own",
+        "knownDirs"
+      ],
+      "additionalProperties": false,
+      "description": "Facts about the application the engine writes into every bundle.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full name on the Choose screen when a bundle has no apps list."
+        },
+        "folder": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+$",
+          "description": "The app folder under OneDrive\\RADE; also the short name in user text."
+        },
+        "prefix": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9]+$",
+          "description": "File name prefix of the app's own files (Config files, report, e-mail subject)."
+        },
+        "repo": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+          "description": "owner/name on GitHub; go.md and fetch files come from its main branch."
+        },
+        "home": {
+          "type": "string",
+          "pattern": "^https://",
+          "description": "The app's bookmark page, named in the repository check."
+        },
+        "own": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Wildcard patterns of file names the app made; clean-up recycles only these and the known files."
+        },
+        "knownDirs": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/relPath"
+              },
+              {
+                "type": "string",
+                "minLength": 1
+              }
+            ],
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "description": "[folder, glob] pairs in the app repo: support files with fixed names that clean-up may also recycle."
+        }
+      }
     }
   }
 }

@@ -26,7 +26,9 @@ def refs(m):
         if len(names) != len(set(names)):
             out.append('%s: step names are not unique' % r)
         for s in b.get('steps', []):
-            if (s['dir'], s['file']) not in have:
+            if not s['file'] and s.get('kind') != 'guide':
+                out.append('%s: step %r: only a guide step may have no file' % (r, s['name']))
+            elif s['file'] and (s['dir'], s['file']) not in have:
                 out.append('%s: step %r: %s/%s is not in files' % (r, s['name'], s['dir'], s['file']))
         for a in b.get('apps', []):
             for n in a['steps']:
