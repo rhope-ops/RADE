@@ -1,0 +1,22 @@
+{
+  "_doc": "Fake sample for the RADE manifest schema. No real paths, names or sites.",
+  "bundles": [
+    {
+      "out": "scripts/gov/paste/SAMPLE-R01-round-r1.ps1",
+      "round": "R01",
+      "title": "Round R01: sample check and one guide step",
+      "files": [
+        {"dir": "T01", "src": "scripts/gov/SAMPLE-T01-check-r1.ps1"},
+        {"dir": "T02", "src": "flow/SAMPLE-T02-import-r1.zip"}
+      ],
+      "steps": [
+        {"name": "T01 Sample check r1", "dir": "T01", "file": "SAMPLE-T01-check-r1.ps1", "needs": ["ps"], "estimate": 2, "note": "Reads this computer only."},
+        {"name": "T02 Sample import r1", "dir": "T02", "file": "SAMPLE-T02-import-r1.zip", "kind": "guide",
+         "guide": ["Open the import page.", "Choose the file on the clipboard.", "Select Import."], "url": "https://example.invalid/import", "doneText": "Imported"}
+      ],
+      "collect": [{"dir": "T01", "name": "SAMPLE-T01-result-r1.txt", "step": "T01 Sample check r1"}],
+      "cleanup": [{"path": "T00", "kind": "dir"}],
+      "apps": [{"name": "Sample app", "summary": "A fake application for the schema test.", "steps": ["T01 Sample check r1", "T02 Sample import r1"]}]
+    }
+  ]
+}
