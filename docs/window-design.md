@@ -31,7 +31,7 @@ Sources: RADE = [docs/DECISIONS.md](DECISIONS.md); Z = [rhope-ops/90-161.Z docs/
 
 | Rule | State | Source |
 |---|---|---|
-| Two bars: overall (weighted by expected seconds, with time left; Air Force blue) and this step ("PROGRESS n/m" lines, else time; AF yellow). | Built (colors R18) | Z 2026-11-14 |
+| Two bars: overall (weighted by expected seconds, with time left; Air Force blue) and this step ("PROGRESS n/m" lines, else time; green #2E8540, the Administrator 2026-11-14). | Built (colors R18) | Z 2026-11-14 |
 | RADE draws its own bars (smooth fill, one soft light band); still when Windows animations are off. | Built | Z 2026-11-14 (R17 window row) |
 | Overall bar Air Force blue; step bar green #2E8540 (the Administrator, 2026-11-14). Both bars fill left to right; the back-and-forth block for a step with unknown progress is gone (the step bar follows time against the step's weight, at most 90 %). | Built (R18) | Z 2026-11-14 (R18 window row); the Administrator, 2026-11-14 |
 | Neither bar moves back inside a run (overall) or a step (step bar). | Built | engine (R18) |

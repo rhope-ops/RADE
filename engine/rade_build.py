@@ -1390,7 +1390,7 @@ if ($gui) {
     $bar = & $mkBar 'all' 20 'Overall progress' $afBlue
     $stepLabel = & $mkFixed 'This step: none running' 2
     $stepLabel.Margin = New-Object System.Windows.Forms.Padding(3, 6, 3, 0)
-    $stepBar = & $mkBar 'step' 14 'Progress of this step' ([System.Drawing.Color]::FromArgb(46, 133, 64))   # green #2E8540, 4.1:1 on the track (the Administrator, 14 Nov 26); overall bar stays blue
+    $stepBar = & $mkBar 'step' 14 'Progress of this step' ([System.Drawing.Color]::FromArgb(46, 133, 64))   # green #2E8540, 4.1:1 on the track (the Administrator, 2026-11-14); overall bar stays blue
     $log = New-Object System.Windows.Forms.TextBox
     $log.Dock = 'Fill'; $log.Multiline = $true; $log.ScrollBars = 'Both'; $log.WordWrap = $false; $log.ReadOnly = $true; $log.AccessibleName = 'Log'
     $log.Font = New-Object System.Drawing.Font('Consolas', 9)
