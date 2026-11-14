@@ -38,4 +38,4 @@ Network or port scanning; scheduled runs (Task Scheduler on a locked device look
 ## When and approval (the Administrator, 2026-11-14)
 
 - Drift is compared at every round's checks, plus "Drift check" on demand (engine.md "Check stages").
-- The ISSM sees the report field list once before the first run; the first run waits for the ISSM's OK.
+- The ISSM sees the report field list once before the first run.
