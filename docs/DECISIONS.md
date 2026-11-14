@@ -4,6 +4,7 @@ Newest first. Why the kit defaults are what they are: https://github.com/rhope-o
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-14 | RADE window UI decisions live in one place: docs/window-design.md. Step bar fills left to right like the overall bar (no back-and-forth block); by-hand steps get Done / It failed (error box) / Skip. Built in the 90-161.Z R18 bundle. | the Administrator | 90-161.Z R17 gliding step block |
 | 2026-11-14 | Logo K yellow edge: 2.8 units wide (K+2, about 1.2 px at 56 px), up from 1.6, so it shows at window and header size. Same file names. | the Administrator | Logo K edge 1.6 (row below) |
 | 2026-11-14 | Window layout B (side rail) in Wing Master Version II colors: logo K with RADE to its right on the logo's midpoint; tagline "Test and deploy apps for your organization" below; one left edge. Preview: https://claude.ai/artifact/SU4ghsQWy7EBzaLiZWNEMy | the Administrator | — |
 | 2026-11-14 | The darker status-chip text stays in RADE only; 90-161.Z gets its own color scheme later (to be decided). | the Administrator | — |
