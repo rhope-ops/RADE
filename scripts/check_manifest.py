@@ -5,7 +5,10 @@ Pass = last line "MANIFEST files=N fail=0". Needs jsonschema (PyPI) 4.x.
 """
 import json, sys
 from pathlib import Path
-from jsonschema import Draft202012Validator
+try:
+    from jsonschema import Draft202012Validator
+except ImportError:
+    sys.exit('FAIL jsonschema is missing: pip install "jsonschema>=4,<5"')
 
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = json.loads((ROOT / 'schemas/rade-manifest.schema.json').read_text())
