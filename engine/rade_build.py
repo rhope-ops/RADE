@@ -324,7 +324,7 @@ function Save-RoundDownload([string]$Base, [scriptblock]$Say) {
     $wc = New-Object System.Net.WebClient
     try {
       $wc.UseDefaultCredentials = $true
-      $wc.Headers['User-Agent'] = $webAgent   # R21: as in Test-WebReach
+      try { $wc.Headers['User-Agent'] = $webAgent } catch { $null = $_ }   # R21: as in Test-WebReach
       if ($wc.Proxy) { $wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials }
       $wc.DownloadFile($f.Url, $path)
       if ($f.Sha) {
