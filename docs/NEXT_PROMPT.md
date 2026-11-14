@@ -5,7 +5,7 @@ Updated: 2026-11-14 by Claude. Keep this file at 40 lines or fewer. The current 
 ## State
 
 - main: bootstrapped from rhope-ops/archimedes_lever. Manifest contract: schemas/rade-manifest.schema.json; `python3 scripts/check_manifest.py <manifest>` checks one (the 90-161.Z manifest passes, 14 Nov 26).
-- Engine source: still rhope-ops/90-161.Z scripts/build_paste_bundles.py (AGENTS.md Project rules). Size test (300 KB) in its tests; queued for the round after R17 there: size in the summary, hash-pinned engine, JSON results block (DECISIONS 14 Nov 26).
+- Engine source: engine/rade_build.py here (AGENTS.md Project rules); 90-161.Z pins 0e2bbf6 (layout A window, TLS 1.2 before checks, check text; PRs 12-13, 14 Nov 26). First gov-device proof: 90-161.Z R20 "Window: OK" and a PASSED repository check. Known cosmetic notes left: Run box not tinted on the current row, old result text under a reset chip, one culture-sensitive StartsWith, Choose list too tall at high DPI.
 
 ## Open (in order)
 
