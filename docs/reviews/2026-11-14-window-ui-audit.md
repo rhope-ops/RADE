@@ -1,6 +1,6 @@
 # RADE window: UI audit and pixel budget (2026-11-14)
 
-Scope: the 3 screens in [engine/rade_build.py](../../engine/rade_build.py) (Choose, Check, Deploy) as built for 90-161.Z R20. Approved rules: [docs/window-design.md](../window-design.md). Mockups P1 and P2: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld (rows "P1" and "P2" above the A, B, C rows). Status: proposal; nothing built. The Administrator picks P1 or P2.
+Scope: the 3 screens in [engine/rade_build.py](../../engine/rade_build.py) (Choose, Check, Deploy) as built for 90-161.Z R20. Approved rules: [docs/window-design.md](../window-design.md). Mockups P1 and P2: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld (rows "P1" and "P2" above the A, B, C rows). Status: the Administrator chose P1 (2026-11-14); the final spec is in [docs/window-design.md](../window-design.md) "Layout P1".
 
 All sizes are logical pixels (100 % scaling). Line heights: Segoe UI 10 pt = 19, 9 pt = 16, Semibold 15 pt = 27.
 
