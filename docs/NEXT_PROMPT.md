@@ -1,14 +1,15 @@
 # Next prompt: RADE
 
-Updated: 2026-11-14 by bootstrap. Keep this file at 40 lines or fewer. The current request overrides it.
+Updated: 2026-11-14 by Claude. Keep this file at 40 lines or fewer. The current request overrides it.
 
 ## State
 
-- main: bootstrapped from rhope-ops/archimedes_lever.
+- main: bootstrapped from rhope-ops/archimedes_lever. Manifest contract: schemas/rade-manifest.schema.json; `python3 scripts/check_manifest.py <manifest>` checks one (the 90-161.Z manifest passes, 14 Nov 26).
+- Engine source: still rhope-ops/90-161.Z scripts/build_paste_bundles.py (AGENTS.md Project rules). Size test (300 KB) in its tests; queued for the round after R17 there: size in the summary, hash-pinned engine, JSON results block (DECISIONS 14 Nov 26).
 
 ## Open (in order)
 
-1. Add the first project rules to AGENTS.md "Project rules".
+1. After R17 confirms the window: move the engine here, with the manifest schema as its input contract.
 
 ## Needs the Administrator
 
