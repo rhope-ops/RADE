@@ -1464,14 +1464,18 @@ if ($gui) {
     $ui.RecTitle = & $ui.Label $ui.F.BodyB $ui.C.Navy 9; $ui.RecTitle.Margin = (& $ui.Pad 10 9 0 0); $ui.RecTitle.Text = 'Record'; $ui.RecTitle.Visible = $true
     [void]$ui.RecHead.Controls.Add($ui.RecClose); [void]$ui.RecHead.Controls.Add($ui.RecTitle)
     $ui.RecChecks = New-Object System.Windows.Forms.Panel
-    $ui.RecChecks.Dock = 'Fill'; $ui.RecChecks.BackColor = $ui.C.White; $ui.RecChecks.Margin = (& $ui.Pad 5 0 16 0); $ui.RecChecks.AccessibleRole = 'StaticText'; $ui.RecChecks.AccessibleName = 'Checks'
+    $ui.RecChecks.Dock = 'Top'; $ui.RecChecks.BackColor = $ui.C.White; $ui.RecChecks.AccessibleRole = 'StaticText'; $ui.RecChecks.AccessibleName = 'Checks'
     try { [System.Windows.Forms.Control].GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]'NonPublic, Instance').SetValue($ui.RecChecks, $true, $null) } catch { $null = $_ }
     $ui.RecSteps = New-Object System.Windows.Forms.FlowLayoutPanel
     $ui.RecSteps.Dock = 'Fill'; $ui.RecSteps.FlowDirection = 'TopDown'; $ui.RecSteps.WrapContents = $false; $ui.RecSteps.AutoScroll = $true; $ui.RecSteps.BackColor = $ui.C.White; $ui.RecSteps.Margin = (& $ui.Pad 0 0 16 0); $ui.RecSteps.AccessibleName = 'Steps'
     $ui.RecText = New-Object System.Windows.Forms.TextBox
     $ui.RecText.Dock = 'Fill'; $ui.RecText.Multiline = $true; $ui.RecText.ReadOnly = $true; $ui.RecText.ScrollBars = 'Vertical'; $ui.RecText.WordWrap = $true; $ui.RecText.Font = $ui.F.Mono; $ui.RecText.BackColor = $ui.C.White; $ui.RecText.ForeColor = $ui.C.Ink; $ui.RecText.BorderStyle = 'FixedSingle'; $ui.RecText.AccessibleName = 'Files, made list and log'
     $ui.Rec.Controls.Add($ui.RecHead, 0, 0); $ui.Rec.SetColumnSpan($ui.RecHead, 3)
-    $ui.Rec.Controls.Add($ui.RecChecks, 0, 1); $ui.Rec.Controls.Add($ui.RecSteps, 1, 1); $ui.Rec.Controls.Add($ui.RecText, 2, 1)
+    # The painted list sits in a panel that scrolls only when the list is taller than the window (many reused checks at 150 %).
+    $ui.RecScroll = New-Object System.Windows.Forms.Panel
+    $ui.RecScroll.Dock = 'Fill'; $ui.RecScroll.AutoScroll = $true; $ui.RecScroll.BackColor = $ui.C.White; $ui.RecScroll.Margin = (& $ui.Pad 5 0 16 0)
+    $ui.RecScroll.Controls.Add($ui.RecChecks)
+    $ui.Rec.Controls.Add($ui.RecScroll, 0, 1); $ui.Rec.Controls.Add($ui.RecSteps, 1, 1); $ui.Rec.Controls.Add($ui.RecText, 2, 1)
     # The Fill parts go in first: they dock last, inside the light, the logo line, the bottom line and the edge bar.
     foreach ($c in @($ui.Card, $ui.Rec, $ui.Bottom, $ui.Edge, $ui.Top, $ui.Light)) { $ui.Form.Controls.Add($c) }
     $ui.Form.ResumeLayout($false); $ui.Form.PerformLayout()
@@ -1514,7 +1518,7 @@ if ($gui) {
         if ($o.R2) { & $ui.Word $G ([string]$o.R2) $ui.F.Small $ui.C.Gray $rx ($y + $h1) $rw $h2 'Right, Top, NoPrefix, SingleLine' }
       } catch { $null = $_ } }
     $ui.FillOpts = { param($List)
-      $ui.Trash = @($ui.Trash) + @($ui.Opts.Controls); $ui.Opts.Controls.Clear()   # old choices are disposed when the window closes: a button is never disposed inside its own Click
+      $ui.Trash = @($ui.Trash) + @($ui.Opts.Controls); $ui.Opts.Controls.Clear()   # old choices are disposed after the window has closed: a button is never disposed inside its own Click
       $n = 0
       foreach ($o in @($List | Where-Object { $_ })) {
         $said = (@($o.Name, $o.Ver, $o.Sub, $o.Note, $o.R1, $o.R2) | Where-Object { $_ }) -join '. '
@@ -1831,7 +1835,7 @@ if ($gui) {
         P = @(($Why.Substring(0, 1).ToUpperInvariant() + $Why.Substring(1)), $What, 'The report in the results folder says STOPPED.'); Help = $(if ($dep) { Get-HelpLine } else { '' })
         Buttons = @(@{ Text = 'Copy the log'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Try again'; Act = { & $ui.VReady } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } }); Back = { & $ui.VReady } }
       & $ui.ToFront }
-    $ui.OkBox.Add_CheckedChanged({ & $ui.Say1 $(if ($ui.OkBox.Checked) { '' } else { 'Select "Make e-mail draft" to make a draft that says "Window: NOT OK".' }) })
+    $ui.OkBox.Add_CheckedChanged({ if (-not $ui.OkBox.Checked) { & $ui.Say1 'Select "Make e-mail draft" to make a draft that says "Window: NOT OK".' } elseif ($ui.Note.Text -match '^Select "Make e-mail draft"') { & $ui.Say1 '' } })   # ticking again removes only this note
     $ui.DraftB.Add_Click({
       $to = $ui.ToBox.Text.Trim()
       if ($to -and -not (Test-MailTo $to)) { & $ui.Say1 'The e-mail address does not look right.'; return }
@@ -1873,13 +1877,13 @@ if ($gui) {
     # ---- The Record
     $ui.StateInk = { param([string]$St) $(if ($St -eq 'PASSED') { $ui.C.GreenInk } elseif ($St -in 'FAILED', 'NEEDS REVIEW') { $ui.C.Red } elseif ($St -in 'WARNING', 'RUNNING') { $ui.C.Ink } else { $ui.C.Gray }) }   # the word is always shown: never color alone
     $ui.RecRows = {
-      # The checks to list: the chosen application's, or (before a choice) the base checks. Group, name, state, one detail line.
+      # The checks to list: the chosen application's, or (before a choice) the base checks. Group, name, state, and the rows under it.
       $ids = $(if ($ui.Picked) { @($script:appChecks) } else { @($ui.BaseIds) }); $rows = @(); $g0 = ''
       foreach ($id in $ids) {
         $d = Get-CheckDef $id; $r = $(if ($ui.Picked) { $script:checkResults[$id] } else { $ui.BaseRes[$id] }); if (-not $r) { $r = @{ State = 'NOT RUN'; Detail = ''; Fix = '' } }
         if ([string]$d.Group -ne $g0) { $g0 = [string]$d.Group; $rows += @{ Head = $g0.ToUpperInvariant() } }
         $nm = [string]$d.Short; if (-not $nm) { $nm = [string]$d.Name }
-        $rows += @{ Name = $nm; State = [string]$r.State; More = $(if ($r.State -ne 'PASSED') { @(@($r.Detail, $r.Fix) | Where-Object { $_ }) } else { @() }) }   # a check that passed is one row, so the column fits; the report has its detail
+        $rows += @{ Name = $nm; State = [string]$r.State; More = $(if ($r.State -ne 'PASSED') { @(@($r.Detail, $r.Fix) | Where-Object { $_ }) } elseif ($r.Saved) { @((([string]$r.Detail) -replace '\s*[\r\n]+\s*', $dot)) } else { @() }) }   # not passed: what was found, then what to do; reused: "Last check: DD-MM-YY" and what it found, on one row
       }
       return $rows }
     $ui.RecChecks.Add_Paint({
@@ -1896,6 +1900,9 @@ if ($gui) {
     $ui.RecChecks.Add_Resize({ $this.Invalidate() })
     $ui.VRecord = {
       $ui.RecOn = $true; $ui.RecData = @(& $ui.RecRows)
+      $rh = [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $ui.F.Small).Height + (& $ui.Sc 3); $tall = 0   # the same row height as the Paint handler
+      foreach ($r in @($ui.RecData)) { if ($r.Head) { $tall += $rh + (& $ui.Sc 8) } else { $tall += $rh * (1 + @($r.More).Count) } }
+      $ui.RecChecks.Height = $tall + (& $ui.Sc 4)
       $ui.RecChecks.AccessibleName = 'Checks. ' + ((@($ui.RecData) | ForEach-Object { if ($_.Head) { $_.Head + ':' } else { $_.Name + ' ' + $_.State + $(if (@($_.More).Count) { ', ' + (@($_.More) -join ', ') } else { '' }) } }) -join '. ')
       $old = @($ui.RecSteps.Controls); $ui.RecSteps.Controls.Clear(); foreach ($o in $old) { $o.Dispose() }
       $mk = { param([string]$Text, $Font, $Color) $l = New-Object System.Windows.Forms.Label; $l.AutoSize = $true; $l.UseMnemonic = $false; $l.MaximumSize = New-Object System.Drawing.Size(([math]::Max(120, $ui.RecSteps.ClientSize.Width - (& $ui.Sc 24))), 0); $l.Text = $Text; $l.Font = $Font; $l.ForeColor = $Color; $l.Margin = (& $ui.Pad 5 0 0 (& $ui.Sc 6)); [void]$ui.RecSteps.Controls.Add($l) }
@@ -1959,9 +1966,9 @@ if ($gui) {
         if ([string]$a -ne 'Yes') { $_.Cancel = $true; return }
       }
       $script:closing = $true; try { $ui.Anim.Stop() } catch { $null = $_ }
-      foreach ($o in @($ui.Trash)) { try { $o.Dispose() } catch { $null = $_ } }
       if ($script:child -and -not $script:child.HasExited) { try { $script:child.Kill() } catch { $null = $_ } } })
     [void]$ui.Form.ShowDialog()
+    foreach ($o in @($ui.Trash)) { try { $o.Dispose() } catch { $null = $_ } }   # after the window has closed: no handler is running
     return
   } catch {
     $gui = $false; $script:noWindowWhy = [string]$_.Exception.Message

@@ -1,6 +1,6 @@
 // Render assets/logo/logo-K.svg to PNG (headless Chromium via Playwright). Run after scripts/build_logo.py:
 //   node scripts/render_logo.js
-// 512: site logo and thumbnail (SharePoint scales it). 128: the RADE window (40 px at up to 300 % scaling). 64: header size. 32 and 16: icons and browser tabs.
+// 512: site logo and thumbnail (SharePoint scales it). 128: the RADE window (shown at 40 px; 128 px covers 3 x 40). 64: header size. 32 and 16: icons and browser tabs.
 const {chromium} = require('playwright'); const fs = require('fs'); const path = require('path');
 const dir = path.join(__dirname, '..', 'assets', 'logo');
 (async () => {

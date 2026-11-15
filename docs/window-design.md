@@ -39,7 +39,7 @@ Colors, one meaning each: navy #0B2545 = text and focus; Air Force blue #00539F 
 | Needs review (red) | The first step that needs review with its help line; that passed steps stay done; the help line with the Teams channel; "Copy summary" first | `Get-HelpLine`, the summary from `Invoke-Round` |
 | Stopped (red) | Why the run stopped and what to do; the help line; "Copy the log", "Try again", Close | `Get-WhatToDo` |
 
-The Record (F2, or its links): three columns. Checks by group (Local, Network, Access) with the result word and, for a check that did not simply pass, one line of detail. Steps, each with a box ("needs you", "asks for a folder", its note or result; a Clean-up row when the bundle has one); the boxes can be changed only from Ready. One text box: each file as New, Replace or Recycle, the list of what the application's installs made, and the log.
+The Record (F2, or its links): three columns. Checks by group (Local, Network, Access) with the result word; under a check that did not pass, what was found and what to do; under a reused check, "Last check: DD-MM-YY" and what it found on one row. This column scrolls only when it is taller than the window. Steps, each with a box ("needs you", "asks for a folder", its note or result; a Clean-up row when the bundle has one); the boxes can be changed only from Ready. One text box: each file as New, Replace or Recycle, the list of what the application's installs made, and the log.
 
 ## Rules that stay
 
@@ -53,7 +53,7 @@ The Record (F2, or its links): three columns. Checks by group (Local, Network, A
 | Results: PASSED, PASSED (fallback), WARNING, FAILED, NOT RUN; the word is always shown, never color alone | RADE 2026-11-14 |
 | RADE draws its own bars; no bar moves back inside a run or a step; still when Windows animations are off | Z 2026-11-14 (R17, R18) |
 | A deploy sends nothing; a test round makes an Outlook draft that is never sent (fallback: folder and clipboard) | [engine.md "Deploy v1"](engine.md#deploy-v1); Z 2026-11-13 |
-| No tooltips; AccessibleName on every control; every control by keyboard (Tab, Enter, F2 = Record, 1 to 9 = a choice; Esc = Back, and on Choose, which has no Back, it exits) | R21 W9; RADE 2026-11-14 |
+| No tooltips; AccessibleName on every control; every control by keyboard (Tab, Enter, F2 = Record, 1 to 9 = a choice; Esc = close the Record, else Back, and on Choose, which has no Back, it exits) | R21 W9; RADE 2026-11-14 |
 | The same steps run as text when no window can open | Z 2026-11-13 |
 
 Not in the window yet: bundle size in the summary, engine version and sha256 in the window, a JSON results block (RADE 2026-11-14, engine work row); the Maintenance actions other than Install.
