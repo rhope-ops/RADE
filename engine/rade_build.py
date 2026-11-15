@@ -439,7 +439,7 @@ function Get-StepState($R) {
 function Get-StepLine($Step, $R, [double]$Seconds) {
   # One line per step in the summary and the e-mail: name, result, check counts, time.
   $state = Get-StepState $R
-  if ($R.Skipped) { return ($Step.Name + ': SKIPPED by you') }
+  if ($R.Skipped) { return ($Step.Name + ': SKIPPED' + $(if ($R.Why) { ' (' + $R.Why + ')' } else { ' by you' })) }
   if ($Step.Kind -eq 'guide' -and $R.FailText) { return ($Step.Name + ': FAILED (reported by you) in ' + (Format-Duration $Seconds) + ': ' + $R.FailText) }
   if ($Step.Kind -eq 'guide') { return ($Step.Name + ': ' + $state + ' (confirmed by you) in ' + (Format-Duration $Seconds)) }
   return ($Step.Name + ': ' + $state + ' (' + $R.Pass + ' passed, ' + $R.Fail + ' failed' + $(if ($R.Skip) { ', ' + $R.Skip + ' skipped' } else { '' }) + ', exit code ' + $R.Exit + ') in ' + (Format-Duration $Seconds))
@@ -717,6 +717,25 @@ function Save-Installed([string]$State, [bool]$Whole, $StepRecs) {
     return ''
   } catch { return (ConvertTo-Masked $_.Exception.Message) }
 }
+function Get-StepPrior {
+  # Deploy only: step name -> state, for the steps the record holds at the version this bundle installs.
+  $res = @{}
+  if (-not (Test-Deploy)) { return $res }
+  $e = (Read-Installed)[(Get-InstalledKey $script:app)]
+  if ($e -and $e.steps) { foreach ($n in @($e.steps.Keys)) { if ([string]$e.steps[$n].version -eq [string]$script:app.Version) { $res[[string]$n] = [string]$e.steps[$n].state } } }
+  return $res
+}
+function Get-StepDefault([int]$K) {
+  # Safe second run (deploy v1 item 3): a step that PASSED at this version starts off, so a second run does only what is
+  # left. When every step of the app has PASSED, the run is a repair: every step starts on again.
+  $d = [bool]$steps[$K].Default
+  if (-not $d -or -not (Test-Deploy)) { return $d }
+  $prior = Get-StepPrior
+  $all = $true; foreach ($j in $script:appSteps) { if ($prior[[string]$steps[$j].Name] -ne 'PASSED') { $all = $false } }
+  if ($all) { return $true }
+  return ($prior[[string]$steps[$K].Name] -ne 'PASSED')
+}
+function Get-HelpLine { return ('For help, ask in the Teams channel ' + $helpChannel + '.') }
 function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock]$Say, [scriptblock]$Tick, [scriptblock]$OnStep, [scriptblock]$OnStatus, [scriptblock]$WindowLine, [string[]]$Answers, [string[]]$CheckLines) {
   $script:ranSteps = @()
   $script:roundBad = $false
@@ -731,7 +750,9 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   $summary = @(('@@PREFIX@@ ' + $round), ('Round ' + $round + ', build ' + $buildId + ', started ' + (Get-Date -Format 'yyyy-MM-dd HH:mm')))
   $summary += ('Application: ' + $script:app.Name)
   $deploy = Test-Deploy
-  $whole = $true; foreach ($k in $script:appSteps) { if (-not $Selected[$k]) { $whole = $false } }
+  $prior = Get-StepPrior   # empty in a test round
+  # A step that is off still counts when the record says it PASSED at this version (safe second run).
+  $whole = $true; foreach ($k in $script:appSteps) { if (-not $Selected[$k] -and $prior[[string]$steps[$k].Name] -ne 'PASSED') { $whole = $false } }
   $stepRecs = @{}
   $modeLine = ''; if ($deploy) { $modeLine = 'Mode: deploy, ' + (Get-InstalledText $script:app); $summary += $modeLine }
   if ($CheckLines) { $summary += $CheckLines }
@@ -771,7 +792,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   }
   for ($k = 0; $k -lt $steps.Count; $k++) {
     if ($script:closing) { throw 'the window was closed (Exit) while the round ran; the steps after it did not run' }
-    if (-not $Selected[$k]) { if ($script:appSteps -contains $k) { $summary += ($steps[$k].Name + ': not selected') }; continue }
+    if (-not $Selected[$k]) { if ($script:appSteps -contains $k) { $summary += ($steps[$k].Name + $(if ($prior[[string]$steps[$k].Name] -eq 'PASSED') { ': already done for version ' + $script:app.Version + ', not run again' } else { ': not selected' })) }; continue }
     $est = Get-StepEstimate $hist $steps[$k].Name
     $w = Get-StepWeight $hist $steps[$k]
     $n++; $k1++
@@ -783,7 +804,15 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     & $speak ('  Started ' + (Get-Date -Format 'HH:mm') + $(if ($est) { '. Last successful run took ' + (Format-Duration $est) + '.' } else { '.' }))
     $t0 = Get-Date
     $ans = ''; if ($Answers -and $Answers.Count -gt $k) { $ans = [string]$Answers[$k] }
-    if ($steps[$k].Kind -eq 'guide') { $r = Invoke-GuideStep $base $steps[$k] $speak }
+    # "after" (manifest): a step runs only when each step it needs PASSED, in this run or (deploy) at this version before.
+    $need = ''
+    foreach ($a in @($steps[$k].After)) {
+      if (-not $a) { continue }
+      $okA = $(if ($stepRecs.ContainsKey([string]$a)) { $stepRecs[[string]$a].state -eq 'PASSED' } else { $prior[[string]$a] -eq 'PASSED' })
+      if (-not $okA) { $need = [string]$a; break }
+    }
+    if ($need) { $r = @{ Pass = 0; Fail = 0; Exit = 0; Skipped = $true; Why = 'it needs "' + $need + '" to pass first' }; & $speak ('    Skipped: ' + $r.Why + '.') }
+    elseif ($steps[$k].Kind -eq 'guide') { $r = Invoke-GuideStep $base $steps[$k] $speak }
     else { $r = Invoke-RoundStep $base $steps[$k] $speak $Tick $ans }
     if ((Get-StepState $r) -ne 'SKIPPED') { $script:ranSteps += $steps[$k].Name }   # a step you skip, or one that only printed SKIP, expects no result files
     $secs = ((Get-Date) - $t0).TotalSeconds
@@ -806,7 +835,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     # A run that stops midway still leaves a report to send (summary so far + the log up to the stop).
     $summary[0] = '@@PREFIX@@ ' + $round + ' STOPPED'
     $summary += ('STOPPED: ' + (ConvertTo-Masked ([string]$_)))
-    if ($deploy) { $sv = Save-Installed 'STOPPED' $whole $stepRecs; if ($sv) { $summary += ('NOTE: the installed-version record could not be saved: ' + $sv) } }
+    if ($deploy) { $summary += (Get-HelpLine); & $sayRaw (Get-HelpLine); $sv = Save-Installed 'STOPPED' $whole $stepRecs; if ($sv) { $summary += ('NOTE: the installed-version record could not be saved: ' + $sv) } }
     [void](Export-RoundResult $base $summary)
     Add-RoundHistory $base 'ROUND' 'STOPPED' ([int]((Get-Date) - $started).TotalSeconds)
     throw
@@ -826,7 +855,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     $script:draftMade = $false
     $sv = Save-Installed $state $whole $stepRecs
     if ($sv) { & $speak ('NOTE: the installed-version record (RADE\Config\rade-installed.json) could not be saved: ' + $sv) }
-    if ($bad) { & $speak ('Note: one or more items need review (see above). The report in Rounds\' + $round + ' shows what went wrong. Nothing was sent.') }
+    if ($bad) { & $speak ('Note: one or more items need review (see above). The report in Rounds\' + $round + ' shows what went wrong. Nothing was sent.'); & $speak (Get-HelpLine) }
     elseif (-not $whole) { & $speak ('Note: some steps were off or skipped, so version ' + $script:app.Version + ' is not recorded as installed. Run again with every step on.') }
     else { & $speak ('Version ' + $script:app.Version + ' of ' + $script:app.Name + ' is recorded as installed.') }
     & $speak ('DONE in ' + (Format-Duration ((Get-Date) - $started).TotalSeconds) + '. The report is in Rounds\' + $round + ' on this computer. Nothing was sent.')
@@ -1286,6 +1315,7 @@ function Get-ProgressText($G, [string]$Name) {
 }
 $script:secret = @(); $script:dodid = ''; $script:child = $null; $script:runLog = $null; $script:resultsDir = ''; $script:draftMade = $false; $script:textMode = $false; $script:helped = @{}; $stepMinutes = 30
 $script:statusBase = ''; $script:stepStart = $null; $script:stepEst = 0; $script:noWindowWhy = ''; $script:ranSteps = @(); $script:prog = $null; $script:roundStart = Get-Date
+$helpChannel = 'RHOPE-OPS'   # a placeholder name (the Administrator, 14 Nov 26); a name only, never a link or an address
 $script:checkResults = @{}; $script:closing = $false; $checkGate = $true   # tests turn the gate off to run steps
 $script:checkHost = $null; $script:savedWhy = @{}
 function Select-App([int]$I) {
@@ -1901,7 +1931,7 @@ if ($gui) {
       foreach ($k in $script:appSteps) {
         $s = $steps[$k]
         $script:listIndex[$k] = $stepView.Rows.Count
-        [void](& $stepAdd ($s.Name + $(if ($s.AskParam) { '  (asks for a folder)' } elseif ($s.Kind -eq 'guide') { '  (needs you)' } else { '' })) $(if ($s.Note) { $s.Note } else { '' }) ([bool]$s.Default))
+        [void](& $stepAdd ($s.Name + $(if ($s.AskParam) { '  (asks for a folder)' } elseif ($s.Kind -eq 'guide') { '  (needs you)' } else { '' })) $(if ((Test-Deploy) -and [bool]$s.Default -and -not (Get-StepDefault $k)) { 'Already done for version ' + $script:app.Version + '. Tick the box to run it again' } elseif ($s.Note) { $s.Note } else { '' }) (Get-StepDefault $k))
       }
       $stepView.Height = $stepView.ColumnHeadersHeight + $stepView.RowTemplate.Height * [math]::Max(2, $stepView.Rows.Count) + 4
       $stepView.ClearSelection()
@@ -2202,7 +2232,7 @@ try {
   # The plan above shows first; Enter starts the run (PFM 13 Nov), N stops before anything is written.
   $go = ([string](Read-Host 'Press Enter to start the round, or type N and press Enter to stop with no changes')).Trim()
   if ($go -match '^[Nn]') { Write-Host 'Stopped. Only the saved checks (RADE\Config\rade-checks.json) were written.'; return }
-  $sel = @(); for ($k = 0; $k -lt $steps.Count; $k++) { $sel += ($script:appSteps -contains $k -and [bool]$steps[$k].Default -and -not $steps[$k].AskParam) }   # text mode: steps that need a folder are skipped
+  $sel = @(); for ($k = 0; $k -lt $steps.Count; $k++) { $sel += ($script:appSteps -contains $k -and (Get-StepDefault $k) -and -not $steps[$k].AskParam) }   # text mode: steps that need a folder are skipped
   $onStatusText = { param($i, $count, $name, $estimate) $null = $name; $null = $estimate; $g = Get-Progress; Write-Host ('  Overall: step ' + $i + ' of ' + $count + ', ' + [int]($g.All * 100) + ' % done, about ' + (Format-Duration $g.Left) + ' left (a guess)') }
   $checkLines = Get-CheckSummary $script:checkResults
   $sum = Invoke-Round $true $sel $to $say { } { } $onStatusText { 'Window: text mode (no window opened)' } @() $checkLines
@@ -2239,6 +2269,25 @@ def app_lines(b):
                 assert n in CHECK_IDS, 'unknown check %r in step %r' % (n, names[i])
                 need.add(n)
         checks = [c for c in CHECK_IDS if c in need]
+        # "after": each step a step needs is in this app and runs before it. In a deploy, automatic steps come first
+        # (deploy v1 item 3): a script step may follow a hand (guide) step only when it needs that step, directly or not.
+        byname = {names[i]: b['steps'][i] for i in idx}
+        def reach(n, seen=None):
+            seen = seen if seen is not None else set()
+            for d in byname[n].get('after', []):
+                if d not in seen:
+                    seen.add(d); reach(d, seen)
+            return seen
+        hand = []
+        for i in sorted(idx):
+            s = b['steps'][i]
+            for d in s.get('after', []):
+                if d not in byname or names.index(d) >= i:
+                    raise SystemExit('app %r: step %r needs %r (after), which is not an earlier step of this app' % (a['name'], names[i], d))
+            if s.get('kind') == 'guide':
+                hand.append(names[i])
+            elif mode == 'deploy' and hand and not (reach(names[i]) & set(hand)):
+                raise SystemExit('app %r: automatic step %r comes after the hand step %r but does not need it: move it before, or name the step it needs in "after"' % (a['name'], names[i], hand[0]))
         out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s }'
                    % (q(a['name']), q(a['summary']), ', '.join(str(i) for i in idx), ', '.join(q(c) for c in checks), q(mode), q(version)))
     return out
@@ -2258,13 +2307,13 @@ def build(b):
         parts.append("$files += @{ Dir = %s; Name = %s; Kind = '%s'; Sha = '%s'; Data = %s }"
                      % (q(f['dir']), q(src.name), kind, sha, body))
     # kind "guide": a step the PFM does in another program (guide lines, an address to open, a marker file on Done).
-    steps = ['$steps += @{ Name = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s; Makes = @(%s) }'
+    steps = ['$steps += @{ Name = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s; Makes = @(%s); After = @(%s) }'
              % (q(s['name']), q(s['dir']), q(s['file']), 'true' if step_default(s) else 'false',
                 q(s.get('ask', {}).get('param', '')), q(s.get('ask', {}).get('prompt', '')), q(s.get('screenOnly', '')),
                 int(s.get('minutes', 30)), q(s.get('args', '')), q(s.get('note', '')), q(s.get('kind', 'script')),
                 ', '.join(q(g) for g in s.get('guide', [])), q(s.get('url', '')), q(s.get('urlConfig', '')), q(s.get('marker', '')),
                 int(s.get('estimate', 0)) * 60, q(s.get('doneText', '')), q(s.get('doneLog', '')),
-                ', '.join('@{ kind = %s; name = %s }' % (q(m['kind']), q(m['name'])) for m in s.get('makes', [])))
+                ', '.join('@{ kind = %s; name = %s }' % (q(m['kind']), q(m['name'])) for m in s.get('makes', [])), ', '.join(q(a) for a in s.get('after', [])))
              for s in b['steps']]
     apps = app_lines(b)
     # Data files the round downloads (not code, PFM 3A): repo files from raw main, checked by SHA-256; public pages as they are.

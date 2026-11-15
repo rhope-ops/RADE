@@ -34,11 +34,15 @@ grep -q "^Note: some steps were off or skipped, so version 1.0.0 is not recorded
 # 1. First deploy: every step on, PASSED, version recorded, nothing sent.
 round 2
 grep -q "^Mode: deploy, version 1.0.0 (not installed yet)" "$od/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && grep -q "^Mode: deploy, version 1.0.0 (not installed yet)" "$t/out.txt" && ok || { bad "deploy 1: report has the mode line"; tail -30 "$t/out.txt"; }
+# Item 3, safe second run: T01 PASSED in run 0, so it is off now; only the two steps left run, and the version is installed.
+grep -q "^Step 1 of 2: T02 Sample import r1" "$t/out.txt" && ! grep -q "contract=1" "$t/out.txt" && grep -q "^T01 Sample check r1: already done for version 1.0.0, not run again" "$od/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && ok || { bad "item 3: a step that PASSED must start off"; grep "^Step " "$t/out.txt"; }
 grep -q "^Version 1.0.0 of Sample app (deploy) is recorded as installed" "$t/out.txt" && grep -q "^DONE in .*Nothing was sent\.$" "$t/out.txt" && ok || bad "deploy 1: DONE line says nothing was sent"
 ! grep -qi "outlook\|e-mail\|draft\|Summary copied" "$t/out.txt" && ok || { bad "deploy 1: output names Outlook, an e-mail, a draft or a copied summary"; grep -i "outlook\|e-mail\|draft\|Summary copied" "$t/out.txt"; }
 [ ! -e "$cfg/rade-mail-to.txt" ] && ok || bad "deploy 1: an e-mail address file was written"
 [ "$(js)" = "rade-installed/1 1 1.0.0 1.0.0 PASSED" ] && ! grep -q "test1234\|$t" "$inst" && ok || { bad "deploy 1: rade-installed.json ($(js))"; cat "$inst"; }
 
+# Item 3: the step that needs the skipped hand step is skipped too ("after").
+grep -q "^    Skipped: it needs .T02 Sample import r1. to pass first" "$t/out0.txt" && grep -q "^  Result: SKIPPED (it needs .T02 Sample import r1. to pass first)" "$t/out0.txt" && ok || { bad "item 3: a step whose needed step was skipped must be skipped"; tail -12 "$t/out0.txt"; }
 # A deploy app with no version fails the schema and the build.
 python3 - "$t" <<'P' && ok || bad "a deploy without a version must fail the schema check and the build"
 import json, subprocess, sys, pathlib
@@ -52,6 +56,7 @@ P
 
 # 2. Same version again: the record says it is installed.
 round 2
+grep -q "^Step 1 of 3: T01 Sample check r1" "$t/out.txt" && ok || bad "item 3: with every step done, a run is a repair and every step is on"
 grep -q "^Mode: deploy, version 1.0.0 is installed" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 1.0.0 1.0.0 PASSED" ] && ok || bad "deploy 2: installed text ($(js))"
 
 # Step contract (docs/engine.md): inputs as environment variables, MADE lines and "makes" in the record.
@@ -73,11 +78,30 @@ grep -q "Outlook draft could not be created" "$t/out.txt" && ! grep -q "^Mode: d
 # 4. A newer version whose step fails: lastRun changes, installed stays 1.0.0.
 sed -i 's/"version": "1.0.0"/"version": "1.1.0"/' "$t/app/scripts/paste_bundles.json"; echo "Write-Output 'FAIL sample check: forced by the test'" >> "$t/app/scripts/gov/SAMPLE-T01-check-r1.ps1"
 build; round 2
-grep -q "^Mode: deploy, version 1.1.0 (installed now: 1.0.0)" "$t/out.txt" && grep -q "^Note: one or more items need review.*Nothing was sent\.$" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 1.0.0 1.1.0 NEEDS REVIEW" ] && ok || { bad "deploy 4: failed upgrade ($(js))"; tail -15 "$t/out.txt"; }
+grep -q "^Mode: deploy, version 1.1.0 (installed now: 1.0.0)" "$t/out.txt" && grep -q "^Note: one or more items need review.*Nothing was sent\.$" "$t/out.txt" && grep -q "^For help, ask in the Teams channel RHOPE-OPS\.$" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 1.0.0 1.1.0 NEEDS REVIEW" ] && ok || { bad "deploy 4: failed upgrade ($(js))"; tail -15 "$t/out.txt"; }
 
 # 5. A damaged record is kept as .damaged and replaced by a valid file.
 echo '{ not json' > "$inst"; round 2
 [ -f "$inst.damaged" ] && [ "$(js)" = "rade-installed/1 1 None 1.1.0 NEEDS REVIEW" ] && ok || bad "deploy 5: damaged record ($(js))"
+
+# 6. Item 3: the failed step is fixed; the next run does only that step and the version becomes installed.
+sed -i '/forced by the test/d' "$t/app/scripts/gov/SAMPLE-T01-check-r1.ps1"; build; round 2; round 2 > /dev/null
+round_a=$(js)
+sed -i 's/"version": "1.1.0"/"version": "1.2.0"/' "$t/app/scripts/paste_bundles.json"; echo "Write-Output 'FAIL sample check: forced by the test'" >> "$t/app/scripts/gov/SAMPLE-T01-check-r1.ps1"; build; round 2
+sed -i '/forced by the test/d' "$t/app/scripts/gov/SAMPLE-T01-check-r1.ps1"; build; round 2
+grep -q "^Step 1 of 1: T01 Sample check r1" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 1.2.0 1.2.0 PASSED" ] && ok || { bad "item 3: resume after a failed step ($round_a -> $(js))"; grep "^Step \|Result" "$t/out.txt"; }
+
+# Item 3, automatic first: in a deploy, a script step after a hand step must need it ("after"); else the build fails.
+python3 - "$t" <<'P' && ok || bad "item 3: a deploy with an automatic step after a hand step it does not need must fail the build"
+import json, subprocess, sys, pathlib, shutil
+t = pathlib.Path(sys.argv[1]); shutil.copytree(t / 'app', t / 'order/app')
+p = t / 'order/app/scripts/paste_bundles.json'; m = json.loads(p.read_text())
+del m['bundles'][0]['steps'][2]['after']; p.write_text(json.dumps(m))
+a = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'order/app')], capture_output=True, text=True)
+m['bundles'][0]['steps'][2]['after'] = ['T09 no such step']; p.write_text(json.dumps(m))
+b = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'order/app')], capture_output=True, text=True)
+sys.exit(0 if a.returncode != 0 and 'comes after the hand step' in a.stderr and b.returncode != 0 and 'not an earlier step of this app' in b.stderr else 1)
+P
 
 # The tagline (the Administrator, 14 Nov 26): no "DoD".
 ! grep -q "for your DoD organization" engine/rade_build.py && grep -q "'Test and deploy apps for your organization'" engine/rade_build.py && ok || bad "tagline"
