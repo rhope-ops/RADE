@@ -151,4 +151,5 @@ The project log records how the project got there (milestones, breakthroughs, mi
 
 <!-- Add rules for this project below. Date each decision by the Administrator, for example "(the Administrator, 2026-11-09)". -->
 - Project log: https://claude.ai/artifact/5W4UUpdfMgYJqt6zdB2sBM (private Claude doc; the Administrator, 2026-11-14). This repo is public, so log entries never go in it.
-- Engine source (the Administrator, 2026-11-14): engine/rade_build.py here. Apps pin it by sha256 (rhope-ops/90-161.Z scripts/rade.lock.json); after an engine change merges, bump each app's lock in that app's repo.
+- Engine source (the Administrator, 2026-11-14): engine/rade_build.py here. Apps fetch it by commit and check each file's SHA-256 (docs/engine.md "How an app gets the engine").
+- App repos (the Administrator, 2026-11-15): a RADE session never edits an app repo. After an engine change merges, report the new commit; a session of the app changes that app's lock.

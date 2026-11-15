@@ -4,6 +4,7 @@ Newest first. Why the kit defaults are what they are: https://github.com/rhope-o
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-15 | Apps fetch the engine by commit and check each file's SHA-256; an app repo needs no RADE checkout and owns its lock. A RADE session never edits an app repo: it reports the new commit. Detail: docs/engine.md "How an app gets the engine". | the Administrator | 2026-11-14 "apps pin the engine by sha256" (the bump-each-app-lock rule) |
 | 2026-11-14 | Guardrail, NIPR only: before it writes anything RADE reads this computer's own domain names and stops on a classified-network suffix; a site address is accepted only on the DAF SharePoint prefix. No banner or other security-setting read. Scope: the engine, every app. Detail: docs/engine.md "Guardrails". | the Administrator | — |
 | 2026-11-14 | Guardrail, install right: Full Control stays the gate; RADE reads and shows the user's own site collection administrator flag but never requires it. Scope: the engine, every app. | the Administrator | — |
 | 2026-11-14 | Guardrail, one install per site: an app's manifest `marker` names one row on the site that holds the installed version and date (no name); a site that has it blocks a deploy from an account that did not install it, and a first install shows a "once for each wing" notice. Scope: the engine, every app with a marker. | the Administrator | — |
