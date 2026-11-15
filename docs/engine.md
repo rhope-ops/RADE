@@ -36,6 +36,7 @@ The Administrator, 2026-11-15. An app repo builds alone: it needs no RADE checko
 - The app's build downloads those files from `raw.githubusercontent.com/rhope-ops/RADE/<commit>/<path>`, checks each SHA-256, and runs the engine with `--app-root`. A commit never changes, so the same lock always gives the same bundle.
 - The app owns its lock. A RADE session never edits an app repo: it reports the new commit, and a session of the app changes the lock, rebuilds and tests. Rollback = the app keeps its old lock.
 - Releases: after an engine change merges, a manual run of the workflow [release.yml](../.github/workflows/release.yml) from main (input: the next tag, `engine-v<N>`) runs the checks, signs the file list as a build attestation (keyless, no secret) and makes the tag and the GitHub release with `rade-engine.sha256` (the signed list, the authority) and `rade-engine.lock.json` (the same hashes in lock form). The app copies the commit and the hashes from that release into its lock and records the tag. The app's build still fetches by commit and checks the hashes; it needs no new tool. To check the signature by hand: `gh attestation verify engine/rade_build.py --repo rhope-ops/RADE`.
+- What an app repo must hold: [make-an-app.md](make-an-app.md).
 - First app and working example: rhope-ops/90-161.Z `scripts/rade.lock.json`, `scripts/build_paste_bundles.py`, docs/dev-setup.md "RADE engine".
 
 ## Guardrails
