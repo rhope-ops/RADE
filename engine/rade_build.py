@@ -1863,7 +1863,8 @@ if ($gui) {
               if ($want.Width -gt $c.Width + 1 -or $want.Height -gt $c.Height + 1) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' text: needs ' + $want.Width + 'x' + $want.Height + ' has ' + $c.Width + 'x' + $c.Height) }
             }
             for ($j = $i + 1; $j -lt $kids.Count; $j++) { if ($c.Bounds.IntersectsWith($kids[$j].Bounds)) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' overlaps ' + (& $ui.NameOf $kids[$j])) } }
-            if ($c.Controls.Count) { $todo.Push(@($c, [System.Drawing.Rectangle]::Intersect($clip, $r), ($scroll -or [bool]$c.AutoScroll))) }
+            $sc2 = [bool]$c.AutoScroll; if ([object]::ReferenceEquals($c, $ui.Scroll)) { $sc2 = [bool]$ui.Scrolls }   # the card's text scrolls only when $ui.Squeeze says so
+            if ($c.Controls.Count) { $todo.Push(@($c, [System.Drawing.Rectangle]::Intersect($clip, $r), ($scroll -or $sc2))) }
           }
         }
       } catch { $ui.LayBad.Add('LAYOUT ' + $card + ' the self-check stopped: ' + (ConvertTo-Masked ([string]$_.Exception.Message))) } }
@@ -2519,6 +2520,39 @@ def build(b):
     return head + body
 
 
+# Text lengths (the Administrator, 2026-11-15; docs/window-design.md "Text lengths"). The most characters of each text an
+# application gives the window, set from the real font (Segoe UI, measured in the window by the Windows job) and the
+# narrowest card (604 px: 1280 x 800 at 150 % scaling). The window never cuts a part off: a longer text wraps or ends
+# with "..." as the table in the document says. In this release a longer text is a WARNING line of the build, not a
+# failure; a later release makes it a failure. This table is the one source: tests/engine_test.sh checks that the
+# document has the same numbers.
+TEXT_LIMITS = {'application name': 48, 'version': 14, 'summary': 150, 'step name': 56, 'step note': 200,
+               'guide line': 160, 'doneText': 24, 'step help': 160}
+
+
+def text_lengths(b):
+    """One WARNING line for each text of a bundle that is longer than its limit."""
+    found = []
+    def over(what, field, value):
+        if isinstance(value, str) and len(value) > TEXT_LIMITS[field]:
+            found.append('WARNING text length: %s: %s has %d characters, the limit is %d (docs/window-design.md "Text lengths")'
+                         % (what, field, len(value), TEXT_LIMITS[field]))
+    for app in b.get('apps', []):
+        what = 'application %r' % app.get('name', '')[:40]
+        over(what, 'application name', app.get('name'))
+        over(what, 'version', app.get('version'))
+        over(what, 'summary', app.get('summary'))
+    for st in b.get('steps', []):
+        what = 'step %r' % st.get('name', '')[:40]
+        over(what, 'step name', st.get('name'))
+        over(what, 'step note', st.get('note'))
+        over(what, 'doneText', st.get('doneText'))
+        over(what, 'step help', st.get('help'))
+        for g in st.get('guide', []):
+            over(what, 'guide line', g)
+    return found
+
+
 def main():
     global ROOT, APP, MANIFEST
     import argparse
@@ -2546,6 +2580,8 @@ def main():
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(text.encode('ascii'))
         print('BUILT %s bytes=%d files=%d steps=%d' % (b['out'], len(text), len(b['files']), len(b['steps'])))
+        for line in text_lengths(b):
+            print(line)
     if a.check:
         print('PASTE bundles=%d stale=%d' % (len(m['bundles']), stale))
         sys.exit(1 if stale else 0)

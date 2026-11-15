@@ -1,8 +1,8 @@
 # RADE window design
 
-Status: the one place for the RADE window's UI decisions (the Administrator, 2026-11-14: consolidate them). The window is the "One thing" design (the Administrator, 2026-11-14, [DECISIONS.md](DECISIONS.md)); it replaced layout B, layout A, layout P1 and the UI pass 3 proposals. Built in [engine/rade_build.py](../engine/rade_build.py) (WinForms drawn in code, Windows PowerShell 5.1); the window code is the part from `function Get-AppFact` to the text-mode block. **Not verified on a device**: its logic runs in [tests/engine_test.sh](../tests/engine_test.sh) (section "window") against stand-in types; what it looks like is checked first by a round on a work computer.
+Status: the one place for the RADE window's UI decisions (the Administrator, 2026-11-14: consolidate them). The window is the "One thing" design (the Administrator, 2026-11-14, [DECISIONS.md](DECISIONS.md)); it replaced layout B, layout A, layout P1 and the UI pass 3 proposals. Built in [engine/rade_build.py](../engine/rade_build.py) (WinForms drawn in code, Windows PowerShell 5.1); the window code is the part from `function Get-AppFact` to the text-mode block. **Not verified on a device**: its logic runs in [tests/engine_test.sh](../tests/engine_test.sh) (section "window") against stand-in types; its layout is measured on the real Windows Forms by the Windows job and by the layout self-check ("Proof" below); a round on a work computer is the last proof.
 
-Mockups: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "Redesign: One thing (14 Nov)". How the three concepts compared: [reviews/2026-11-14-window-redesign-proposals.md](reviews/2026-11-14-window-redesign-proposals.md). Sources of older rows: RADE = [docs/DECISIONS.md](DECISIONS.md); Z = [rhope-ops/90-161.Z docs/DECISIONS.md](https://github.com/rhope-ops/90-161.Z/blob/main/docs/DECISIONS.md).
+Mockups: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, pages "Redesign: One thing (14 Nov)" and "Polish pass (15 Nov)" (sizes, states, text lengths and each corrected part, before and after; the Administrator, 2026-11-15). How the three concepts compared: [reviews/2026-11-14-window-redesign-proposals.md](reviews/2026-11-14-window-redesign-proposals.md). Sources of older rows: RADE = [docs/DECISIONS.md](DECISIONS.md); Z = [rhope-ops/90-161.Z docs/DECISIONS.md](https://github.com/rhope-ops/90-161.Z/blob/main/docs/DECISIONS.md).
 
 ## The idea
 
@@ -14,20 +14,60 @@ The window shows one statement or one question at a time (a "card"). It is quiet
 |---|---|
 | Light | 6 px on the top edge. Yellow #FFD520 = RADE waits for you. Dark red #8B1A1A = FAILED, NEEDS REVIEW or STOPPED. Else off. The words on the card always say it too |
 | Logo line | Logo K 40 px, the word RADE 15 pt bold navy, then the chosen application and version in gray. The tagline "Test and deploy apps for your organization" is in the title bar |
-| Card | One block: its left edge at 12 % of the width, 40 % of the spare height above it. Parts, top to bottom, each shown only when the card names it: a line in capitals, the sentence (Segoe UI Semibold 22 pt, navy), up to 4 paragraphs (11 pt), the choices, the numbered lines of a hand step, the step line with its bar and the last log line, a box with its label, the error box, two file links, a note, the help line (13.5 pt), up to 5 buttons, a last gray line, the owner's test extras |
+| Card | One block: its left edge at 12 % of the width, 40 % of the spare height above it. Parts, top to bottom, each shown only when the card names it: a line in capitals, the sentence (Segoe UI Semibold 22 pt, navy), up to 4 paragraphs (11 pt), the choices, the numbered lines of a hand step, the step line with its bar and the last log line, a box with its label, the error box, two file links, a note, the help line (13.5 pt), up to 5 buttons, a last gray line, the owner's test extras. The buttons, the last gray line and the test extras are always in view: when a card is taller than the window, only the parts above the buttons scroll |
 | Bottom line | "Record (F2)" and "Back" as links on the left; on the right one gray text (progress, time, state) |
 | Bottom edge | The bar for all steps, 4 px, Air Force blue; green when a run passed. The bar for this step is 200 x 4 px beside the step name |
-| Size | 1020 x 760 at 100 % scaling; at most 95 % of the screen; no minimum size (a scaled minimum could be taller than a small screen). Text wraps at the card's width; nothing scrolls except the log box and a long step list in the Record |
+| Size | 1020 x 760 at 100 % scaling; at most 95 % of the screen; no minimum size (a scaled minimum could be taller than a small screen). Text and rows of buttons wrap at the card's width, and no box is wider than the card. Nothing scrolls at 1020 x 616 and larger, except the log box and a long list in the Record; in a smaller window (1280 x 800 at 150 % gives 811 x 469) the text of a tall card scrolls above its buttons |
 
-Colors, one meaning each: navy #0B2545 = text and focus; Air Force blue #00539F = the action and progress; yellow = your turn; dark red = failed and the one destructive action (Uninstall); green #2E8540 = passed; gray #5A6573 = second lines. Buttons: primary blue with white bold text; others white with a gray edge (#7A8794); not available = gray (#E9ECF0, text #555555). Links are blue, bold and underlined. Focus is a 2 px navy ring around the control that has it, also after a mouse click.
+Colors, one meaning each: navy #0B2545 = text and focus; Air Force blue #00539F = the action and progress; yellow = your turn; dark red = failed and the one destructive action (Uninstall); green #2E8540 = passed; gray #5A6573 = second lines. Buttons: primary blue with white bold text; others white with a gray edge (#7A8794); not available = gray (#E9ECF0, text #555555, drawn by RADE so that Windows does not gray the text again). Under the pointer a white button is #E3E8EE and while pressed #E9ECF0; a blue or dark red button keeps its color. "Uninstall" while it is not available: gray with dark red text and edge; when it is built: dark red with white text. Links are blue, bold and underlined. Focus is a 2 px navy ring around the control that has it, also after a mouse click, also on the Record's step boxes and text box.
+
+## Sizes
+
+One place in the engine: `$ui.Z` (pixels at 100 % scaling). The [RADE page](../index.html) uses the same button size and gap (the Administrator, 2026-11-15).
+
+| Part | Size |
+|---|---|
+| Action button (a card's buttons; every button of the page) | 132 x 40 at least; it grows with its text |
+| Compact button (beside a box; the Record's "Back") | 110 x 30 at least |
+| Link | 28 high, bold, underlined |
+| Choice (Choose) | 66 high, or as tall as its lines |
+| Between two buttons or two links | 8 |
+| "Uninstall" | alone at the right end of the row; when the row wraps, on its own row at the left edge |
+| Gaps above a card part | 4 (sentence, second paragraph), 8 (last log line, box row, error box, note), 12 (first paragraph, hand-step lines, step line), 16 (help line, buttons), 24 (choices, last gray line, test extras) |
+| Page only | button corners 3 px |
+
+## Text lengths
+
+The most characters of each text an application gives the window. Source of the numbers: `TEXT_LIMITS` in [engine/rade_build.py](../engine/rade_build.py) (a test keeps this table equal to it). They come from the real font, measured in the window by the Windows job (Segoe UI 10 pt = 6.8 px for each letter, 12 pt bold = 8.3, 22 pt semibold = 14.9), and the narrowest card (604 px). In this release a longer text is a WARNING line of the build and a note of the app check (`scripts/check_apps.py`), not a failure (the Administrator, 2026-11-15); the window never cuts a part off, whatever the length.
+
+| Text (manifest) | Limit | When longer, the window |
+|---|---|---|
+| application name | 48 | ends it with "..." on Choose and the logo line; wraps it in a sentence |
+| version | 14 | ends it with "..." |
+| summary | 150 | wraps it to 2 lines on Choose, then "..." |
+| step name | 56 | wraps it as the sentence of a hand step and in the Record; in the step line the bar goes to the next line |
+| step note | 200 | wraps it in the Record (the step list scrolls) |
+| guide line | 160 | wraps it |
+| doneText | 24 | the button grows with the text and the row wraps |
+| step help | 160 | wraps it |
+
+RADE's own texts follow the same rule: a text the window draws wraps to 2 lines at most and then ends with "...", or its row wraps.
+
+## Proof
+
+| What | Where | Proves |
+|---|---|---|
+| Layout self-check | the engine (`$ui.Check`), in a test round and in the Windows job; a deploy does not run it | For each card shown: no text needs more room than its control has, no parent cuts a control, no two parts overlap. One line under "Window: OK" in the results e-mail draft: "Layout self-check: PASS layout, N cards (width x height at scale)" or the defects |
+| Windows job | [.github/workflows/window.yml](../.github/workflows/window.yml) with [tests/window_real.py](../tests/window_real.py): each pull request that changes the engine or the tests | Draws the real window of the sample bundle on Windows PowerShell 5.1 at 4 sizes (as the engine sets it, 1020 x 616, 811 x 469 twice), keeps one picture of each card, and fails on a layout defect or on a card that scrolls above 811 x 469. The runner has 100 % scaling only: 150 % is tested as the same size in 100 % pixels |
+| Work computer | a test round | The same self-check at the real scaling, and the person's "The window displayed correctly" box |
 
 ## Cards
 
 | Card | Shows | Engine function or data |
 |---|---|---|
 | Boot | "Checking this computer." The Local checks of every application in the paste run once (base checks before Choose). Their PASSED results are used for the chosen application, except Word, disk and write, which run again | `$ui.RunBase`, `Get-CheckToRun`, `Invoke-Check` |
-| Choose | One button per application: name, version, summary; steps, time and checks; for a deploy what is installed; a notice when a newer version is on the app page. Keys 1 to 9 choose. None is chosen for you. An application with a FAILED Local check is not a button: a red cross, the reason, what to do, and FAILED; "Check this computer again" then shows. A newer round (test) is a paragraph; the last round is the gray line | `$apps`, `Get-AppFact`, `Get-InstalledText`, `Get-NewerVersion`, `Get-NewerRound`, `Get-LastRoundText`, `Select-App` |
-| Maintenance | For an application that is installed: name, installed version and date; "Update to <version>" or "Repair" (it goes on to the checks); Diagnose, Back up, Restore and Uninstall are shown off (no engine function yet), Uninstall set apart. Mockups for Restore and Uninstall are on the canvas | `Read-Installed`; [engine.md "Maintenance run types"](engine.md#maintenance-run-types) |
+| Choose | One button per application: name, version, summary; steps, time and checks; for a deploy what is installed; a notice when a newer version is on the app page. The name gets its width first; the two facts stay on the right when they fit beside it, else they go on one line under the summary. Keys 1 to 9 choose. None is chosen for you. An application with a FAILED Local check is not a button: a red cross, the reason, "What to do" on its own line, and FAILED; "Check this computer again" then shows. A newer round (test) is a paragraph; the last round is the gray line | `$apps`, `Get-AppFact`, `Get-InstalledText`, `Get-NewerVersion`, `Get-NewerRound`, `Get-LastRoundText`, `Select-App` |
+| Maintenance | For an application that is installed: name, installed version and date; "Update to <version>" or "Repair" (it goes on to the checks); Diagnose, Back up, Restore and Uninstall are shown off (no engine function yet), Uninstall alone at the right end of the row with dark red text and edge. Mockups for Restore and Uninstall are on the canvas | `Read-Installed`; [engine.md "Maintenance run types"](engine.md#maintenance-run-types) |
 | Site | "Which site does the application go to?" with one box, when a check needs the address and none is saved | `Get-SiteUrl`, `Test-SiteUrl`, `Save-SiteUrl` |
 | Checking | The name of the check that runs; the bottom bar counts the checks | `Invoke-Check`, `Save-CheckCache` |
 | A check failed (red) | The first FAILED check: its name, what was found, "What to do"; "Run checks again" (a sign-in or look-and-answer check that failed has its own button instead); "Change the site address" when the application has a site | `Get-CheckDef`, `$script:checkResults` |
@@ -39,7 +79,7 @@ Colors, one meaning each: navy #0B2545 = text and focus; Air Force blue #00539F 
 | Needs review (red) | The first step that needs review with its help line; that passed steps stay done; the help line with the Teams channel; "Copy summary" first | `Get-HelpLine`, the summary from `Invoke-Round` |
 | Stopped (red) | Why the run stopped and what to do; the help line; "Copy the log", "Try again", Close | `Get-WhatToDo` |
 
-The Record (F2, or its links): three columns. Checks by group (Local, Network, Access) with the result word; under a check that did not pass, what was found and what to do; under a reused check, "Last check: DD-MM-YY" and, on the next row, what it found. This column scrolls only when it is taller than the window (Page Down, Page Up). Steps, each with a box ("needs you", "asks for a folder", its note or result; a Clean-up row when the bundle has one); the boxes can be changed only from Ready. One text box: each file as New, Replace or Recycle, the list of what the application's installs made, and the log.
+The Record (F2, or its links): three columns. Checks by group (Local, Network, Access) with the result word in its own column: no name and no detail enters that column, and "fallback" goes under "PASSED" in gray. A name and each detail wrap to 2 lines at most. Under a check that did not pass, what was found and what to do; under a reused check, "Last check: DD-MM-YY" and, on the next row, what it found. This column scrolls only when it is taller than the window (Page Down, Page Up). Steps, each with a box ("needs you", "asks for a folder", its note or result; a Clean-up row when the bundle has one); the boxes can be changed only from Ready. One text box: each file as New, Replace or Recycle, the list of what the application's installs made, and the log.
 
 ## Rules that stay
 

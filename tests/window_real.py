@@ -10,6 +10,8 @@ Usage: python tests/window_real.py OUT_DIR
 Pass = every run ends with "WIN closed=True", prints no "LAYOUT " line (the engine's layout self-check) and no card
 scrolls at a size larger than the smallest (exit 0). Output: OUT_DIR/<run>/*.png, out.txt.
 """
+import importlib.util
+import json
 import os
 import pathlib
 import re
@@ -23,26 +25,67 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 # 1020x616 = 1920 x 1080 at 150 % scaling; 811x469 = 95 % of the work area of 1280 x 800 at 150 % scaling)
 SMALLEST = "811x469"   # the only size at which the text of a card may scroll (the buttons stay in view)
 RUNS = [
-    ("deploy-full", 1, "done", "0", ""),
-    ("deploy-616", 1, "done", "1", "1020x616"),
-    ("deploy-tour-small", 1, "fail", "1", "811x469"),
-    ("test-small", 0, "done", "0", "811x469"),
+    ("deploy-full", 1, "done", "0", "", False),
+    ("deploy-616", 1, "done", "1", "1020x616", False),
+    ("deploy-tour-small", 1, "fail", "1", "811x469", False),
+    ("test-small", 0, "done", "0", "811x469", False),
+    # the same bundle with every text at its limit (docs/window-design.md "Text lengths")
+    ("long-616", 1, "fail", "1", "1020x616", True),
+    ("long-small", 0, "done", "0", "811x469", True),
 ]
+WORDS = "readiness tracker for each unit member with a reminder before an item is due and one page for the commander "
+
+
+def fill(text, n):
+    """text made n characters long with plain words (a text at its limit, with spaces so that it can wrap)."""
+    return (text + " " + WORDS * 4)[:n].rstrip().ljust(n, "x")
+
+
+def stretch(m, limits):
+    """Every text of the manifest that has a limit, at its limit. Step names keep their place in "steps", "after" and "collect"."""
+    for b in m["bundles"]:
+        names = {}
+        for st in b["steps"]:
+            names[st["name"]] = fill(st["name"], limits["step name"])
+            st["name"] = names[st["name"]]
+            st["note"] = fill(st.get("note", "Note"), limits["step note"])
+            st["help"] = fill(st.get("help", "Help"), limits["step help"])
+            if st.get("kind") == "guide":
+                st["guide"] = [fill(g, limits["guide line"]) for g in st.get("guide", [])]
+                st["doneText"] = fill(st.get("doneText", "Done"), limits["doneText"])
+            st["after"] = [names.get(a, a) for a in st.get("after", [])]
+            if not st["after"]:
+                del st["after"]
+        for c in b.get("collect", []):
+            c["step"] = names.get(c.get("step"), c.get("step"))
+        for a in b["apps"]:
+            a["name"] = fill(a["name"], limits["application name"])
+            a["summary"] = fill(a["summary"], limits["summary"])
+            a["steps"] = [names[x] for x in a["steps"]]
+    return m
 
 
 def file_url(p):
     return pathlib.Path(p).resolve().as_uri()
 
 
-def bundle(t):
+def bundle(t, long):
     app = t / "app"
     shutil.copytree(ROOT / "tests" / "fixture-app", app)
-    shutil.copy(ROOT / "schemas" / "examples" / "sample-manifest.json", app / "scripts" / "paste_bundles.json")
+    m = json.loads((ROOT / "schemas" / "examples" / "sample-manifest.json").read_text(encoding="utf-8"))
+    names = [a["name"] for a in m["bundles"][0]["apps"]]
+    if long:
+        sp = importlib.util.spec_from_file_location("rade_build", str(ROOT / "engine" / "rade_build.py"))
+        eng = importlib.util.module_from_spec(sp)
+        sp.loader.exec_module(eng)
+        m = stretch(m, eng.TEXT_LIMITS)
+        names = [a["name"] for a in m["bundles"][0]["apps"]]
+    (app / "scripts" / "paste_bundles.json").write_text(json.dumps(m), encoding="utf-8")
     r = subprocess.run([sys.executable, str(ROOT / "engine" / "rade_build.py"), "--app-root", str(app)], capture_output=True, text=True)
     if r.returncode:
         sys.exit("FAIL build of the sample bundle\n" + r.stdout + r.stderr)
     (t / "go.md").write_text("", encoding="utf-8")
-    (t / "rel.json").write_text('{ "apps": { "Sample app (deploy)": "9.0.0", "Sample app": "9.0.0" } }', encoding="utf-8")
+    (t / "rel.json").write_text(json.dumps({"apps": dict((n, "9.0.0") for n in names)}), encoding="utf-8")   # a newer version on the app page: the notice shows
     users = t / "wu"
     (users / "test1234" / "OneDrive - United States Air Force").mkdir(parents=True)
     s = (app / "scripts" / "gov" / "paste" / "SAMPLE-R01-round-r1.ps1").read_text(encoding="utf-8")
@@ -67,9 +110,9 @@ def bundle(t):
 def main():
     out = pathlib.Path(sys.argv[1]).resolve()
     bad = 0
-    for name, app, hand, tour, size in RUNS:
+    for name, app, hand, tour, size, long in RUNS:
         t = pathlib.Path(tempfile.mkdtemp())
-        users = bundle(t)
+        users = bundle(t, long)
         d = out / name
         d.mkdir(parents=True, exist_ok=True)
         env = dict(os.environ, RADE_T_OUT=str(d), RADE_T_APP=str(app), RADE_T_HAND=hand, RADE_T_TOUR=tour, RADE_T_SIZE=size, USERPROFILE=str(users / "test1234"))
@@ -87,7 +130,7 @@ def main():
         first = name == RUNS[0][0]
         for l in lines:
             if l.startswith(("WIN", "LAYOUT ", "No window could open", "Layout self-check")) or (first and l.startswith("MEASURE")):
-                print("   " + l[:300])
+                print("   " + l[:170])
         if not closed:
             print("   --- last lines ---")
             for l in lines[-25:]:

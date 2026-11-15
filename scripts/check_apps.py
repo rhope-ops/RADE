@@ -151,7 +151,9 @@ def check(app, tmp):
     elif out.count('BUILT ') != count:
         problems.append('engine/rade_build.py: built %d of %d bundles' % (out.count('BUILT '), count))
     if not problems:
-        return 'ok', ['%d bundle(s) built with this engine' % count]
+        # A text longer than its limit (docs/window-design.md "Text lengths") is a note for the app's own session, not a FAIL.
+        long = sorted(set(l.replace('WARNING text length: ', 'text length: ') for l in out.splitlines() if l.startswith('WARNING text length: ')))
+        return 'ok', ['%d bundle(s) built with this engine' % count] + long
     try:
         lock = read_lock(base, manifest_rel)
         if lock is None:
