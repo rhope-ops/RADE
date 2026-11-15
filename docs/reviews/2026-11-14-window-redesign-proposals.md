@@ -1,8 +1,8 @@
-# Window redesign: three concepts (15 Nov 26)
+# Window redesign: three concepts (14 Nov 26)
 
-Status: **not chosen**. Agent proposals for the Administrator's request of 15 Nov 26 (a redesign from zero, not a refinement of layout P1 or of UI pass 3 A, B, C). The contract is [window-design.md "For a GUI redesign"](../window-design.md#for-a-gui-redesign-what-the-window-must-do). The engine is not changed.
+Status: **not chosen**. Agent proposals for the Administrator's request of 14 Nov 26 (a redesign from zero, not a refinement of layout P1 or of UI pass 3 A, B, C). The contract is [window-design.md "For a GUI redesign"](../window-design.md#for-a-gui-redesign-what-the-window-must-do). The engine is not changed.
 
-Mockups: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "Redesign: 3 concepts (15 Nov)", 25 artboards at 1020 x 760. Each row has two notes: thesis and cost, and where each contract function lives.
+Mockups: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "Redesign: 3 concepts (14 Nov)", 25 artboards at 1020 x 760. Each row has two notes: thesis and cost, and where each contract function lives.
 
 ## The three
 
@@ -28,13 +28,13 @@ Confidence in the size and work estimates: low (no code written). All three buil
 
 Same in all three (agent choices, not decided): no Exit button (Esc or the window X; the question shows only while a step runs); the step bar is not green, so green means "passed" only; the owner's test extras are one dashed box on Done.
 
-Decided by the Administrator, 15 Nov 26 ([DECISIONS.md](../DECISIONS.md)): FAILED and NEEDS REVIEW are dark red #8B1A1A, so yellow means "your turn" only; the redesign has no Exit button. No concept is chosen.
+Decided by the Administrator, 14 Nov 26 ([DECISIONS.md](../DECISIONS.md)): FAILED and NEEDS REVIEW are dark red #8B1A1A, so yellow means "your turn" only; the redesign has no Exit button. No concept is chosen.
 
 Maintenance: one artboard for each concept shows the screen of [engine.md "Maintenance run types"](../engine.md#maintenance-run-types) (an agent recommendation, not approved) after Diagnose, with no backup yet: Back up is the primary button, Restore and Uninstall are off, Uninstall is set apart. Not drawn: the Restore choice with its dry run, and the Uninstall confirmation. "Back" and "Copy summary" stay; "Exit" follows the decision above.
 
 ## Measured
 
-Method: [measure script of the ui-verify skill](../../.claude/skills/ui-verify/SKILL.md) (its `audit()` for contrast and targets) on each artboard in Chromium at 1020 x 760 (100 %) and 1020 x 616 (150 % on 1920 x 1080), 50 runs, 15 Nov 26. The skill's own widths (375 and 1440 px, dark scheme) do not apply to a fixed-size window mockup. Font: Inter, because Segoe UI is not on the build computer; Inter is wider, so widths are on the safe side. Not measured on a device.
+Method: [measure script of the ui-verify skill](../../.claude/skills/ui-verify/SKILL.md) (its `audit()` for contrast and targets) on each artboard in Chromium at 1020 x 760 (100 %) and 1020 x 616 (150 % on 1920 x 1080), 50 runs, 14 Nov 26. The skill's own widths (375 and 1440 px, dark scheme) do not apply to a fixed-size window mockup. Font: Inter, because Segoe UI is not on the build computer; Inter is wider, so widths are on the safe side. Not measured on a device.
 
 | | 1 One thing | 2 Ledger | 3 Dark cockpit |
 |---|---|---|---|
