@@ -1283,7 +1283,7 @@ function Select-App([int]$I) {
   $script:app = $apps[$I]; $script:appSteps = @($script:app.Steps); $script:appChecks = @($script:app.Checks); $script:checkResults = @{}
 }
 Select-App 0
-function Get-AppFacts($A, $Hist) {
+function Get-AppFact($A, $Hist) {
   # Choose: the facts of one application (steps, time, checks; for a deploy the version and what is installed).
   $est = 0; $you = 0
   foreach ($k in $A.Steps) { $est += (Get-StepWeight $Hist $steps[$k]).Seconds; if ($steps[$k].Kind -eq 'guide') { $you++ } }
@@ -1603,7 +1603,7 @@ if ($gui) {
       for ($j = 0; $j -lt $apps.Count; $j++) {
         $a = $apps[$j]; if ([string]$a.Mode -eq 'deploy') { $dep = $true }
         if ($ui.Blocked.ContainsKey($j)) { $list += @{ Off = $true; Index = $j; Name = [string]$a.Name; Ver = $(if ($a.Version) { ' ' + $a.Version } else { '' }); Sub = [string]$ui.Blocked[$j]; R1 = 'FAILED' }; continue }
-        $f = Get-AppFacts $a $ui.Hist
+        $f = Get-AppFact $a $ui.Hist
         $list += @{ Index = $j; Name = [string]$a.Name; Ver = $(if ($a.Version) { ' ' + $a.Version } else { '' }); Sub = [string]$a.Summary; R1 = $f.Steps; R2 = $f.Installed
           Note = $(if ($ui.Newer[$j]) { 'Version ' + $ui.Newer[$j] + ' is on the app page. This paste installs ' + $a.Version + '.' } else { '' }) }
       }
