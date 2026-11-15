@@ -31,6 +31,25 @@ grep "Name = 'Sample app'" "$b" | grep -q "'outlook'.*Mode = 'test'; Version = '
 round 2 S; cp "$t/out.txt" "$t/out0.txt"
 grep -q "^Note: some steps were off or skipped, so version 1.0.0 is not recorded as installed" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 None 1.0.0 PASSED" ] && ok || { bad "deploy 0: skipped step ($(js))"; tail -8 "$t/out.txt"; }
 
+# Optional = "default": false only (review): T04 is optional, the other steps are needed.
+[ "$(grep -c '^\$steps += .*Optional = \$false }$' "$b")" = 3 ] && grep -q "^\$steps += @{ Name = 'T04 Sample optional r1'.*Default = \$false.*Optional = \$true }$" "$b" && ok || bad "catalog: Optional flags"
+# A files-changed default that the build turns off is still a needed step: in a deploy it runs (review).
+python3 - "$t" <<'P' && ok || bad "item 3: a step with a files-changed default must stay needed in a deploy"
+import json, subprocess, sys, pathlib, shutil, os, re
+t = pathlib.Path(sys.argv[1]); shutil.copytree(t / 'app', t / 'cond/app')
+p = t / 'cond/app/scripts/paste_bundles.json'; m = json.loads(p.read_text())
+ns = {'__file__': os.path.abspath('engine/rade_build.py')}; exec(open('engine/rade_build.py').read().split('\ndef here')[0], ns); ns['ROOT'] = t / 'cond/app'
+paths = ['scripts/gov/SAMPLE-T01-check-r1.ps1']
+m['bundles'][0]['steps'][0]['default'] = {'passed': ns['files_hash'](paths), 'paths': paths}; p.write_text(json.dumps(m))
+r = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'cond/app')], capture_output=True, text=True)
+line = [l for l in (t / 'cond/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1').read_text().split('\n') if l.startswith("$steps += @{ Name = 'T01 Sample check r1'")][0]
+assert r.returncode == 0 and 'Default = $false' in line and line.endswith('Optional = $false }'), line
+P
+sed -e "s#^\$usersRoot = 'C:\\\\Users'#\$usersRoot = '$t/cu'#" -e "s#^\$goUrl = '.*'#\$goUrl = 'file://$t/go.md'#" -e "s#\$checkGate = \$true#\$checkGate = \$false#" -e "s#https://example-org.github.io/sample-app#file://$t/go.md#g" -e "s#https://example.invalid/import#file://$t/go.md#" "$t/cond/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" > "$t/c.ps1"
+mkdir -p "$t/cu/test1234/OneDrive - United States Air Force"
+printf '2\n\n\n\n' | USERPROFILE="$t/cu/test1234" pwsh -NoProfile -File "$t/c.ps1" > "$t/outc.txt" 2>&1
+grep -q "^Step 1 of 3: T01 Sample check r1" "$t/outc.txt" && grep -q "is recorded as installed" "$t/outc.txt" && ok || { bad "item 3: files-changed default step did not run in a deploy"; grep "^Step \|installed" "$t/outc.txt"; }
+
 # 1. First deploy: every step on, PASSED, version recorded, nothing sent.
 round 2
 grep -q "^Mode: deploy, version 1.0.0 (not installed yet)" "$od/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && grep -q "^Mode: deploy, version 1.0.0 (not installed yet)" "$t/out.txt" && ok || { bad "deploy 1: report has the mode line"; tail -30 "$t/out.txt"; }

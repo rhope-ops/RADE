@@ -728,11 +728,12 @@ function Get-StepPrior {
 function Get-StepDefault([int]$K) {
   # Safe second run (deploy v1 item 3): a step that PASSED at this version starts off, so a second run does only what is
   # left. When every step of the app has PASSED, the run is a repair: every step starts on again.
-  $d = [bool]$steps[$K].Default
-  if (-not $d -or -not (Test-Deploy)) { return $d }
+  # Optional = the manifest says "default": false. Every other step is needed: in a deploy it is on until it has PASSED
+  # at this version, whatever a files-changed default says (that default is for test rounds).
+  if (-not (Test-Deploy) -or [bool]$steps[$K].Optional) { return [bool]$steps[$K].Default }
   $prior = Get-StepPrior
-  # Only the steps that are on by default count: an optional step that never ran must not block the repair (review).
-  $all = $true; foreach ($j in $script:appSteps) { if ([bool]$steps[$j].Default -and $prior[[string]$steps[$j].Name] -ne 'PASSED') { $all = $false } }
+  # Only needed steps count: an optional step that never ran must not block the repair (review).
+  $all = $true; foreach ($j in $script:appSteps) { if (-not [bool]$steps[$j].Optional -and $prior[[string]$steps[$j].Name] -ne 'PASSED') { $all = $false } }
   if ($all) { return $true }
   return ($prior[[string]$steps[$K].Name] -ne 'PASSED')
 }
@@ -753,8 +754,8 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   $deploy = Test-Deploy
   $prior = Get-StepPrior   # empty in a test round
   # A step that is off still counts when the record says it PASSED at this version (safe second run).
-  $whole = $true; foreach ($k in $script:appSteps) { if ([bool]$steps[$k].Default -and -not $Selected[$k] -and $prior[[string]$steps[$k].Name] -ne 'PASSED') { $whole = $false } }   # an optional step (default off) is not needed for "installed"
-  $stepRecs = @{}
+  $whole = $true; foreach ($k in $script:appSteps) { if (-not [bool]$steps[$k].Optional -and -not $Selected[$k] -and $prior[[string]$steps[$k].Name] -ne 'PASSED') { $whole = $false } }   # an optional step ("default": false) is not needed for "installed"
+  $stepRecs = @{}; $runState = @{}   # runState: every step this run reached (the "after" check); stepRecs: what goes to the record
   $modeLine = ''; if ($deploy) { $modeLine = 'Mode: deploy, ' + (Get-InstalledText $script:app); $summary += $modeLine }
   if ($CheckLines) { $summary += $CheckLines }
   $units = 0
@@ -809,7 +810,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     $need = ''
     foreach ($a in @($steps[$k].After)) {
       if (-not $a) { continue }
-      $okA = $(if ($stepRecs.ContainsKey([string]$a)) { $stepRecs[[string]$a].state -eq 'PASSED' } else { $prior[[string]$a] -eq 'PASSED' })
+      $okA = $(if ($runState.ContainsKey([string]$a)) { $runState[[string]$a] -eq 'PASSED' } else { $prior[[string]$a] -eq 'PASSED' })
       if (-not $okA) { $need = [string]$a; break }
     }
     if ($need) { $r = @{ Pass = 0; Fail = 0; Exit = 0; Skipped = $true; Why = 'it needs "' + $need + '" to pass first' }; & $speak ('    Skipped: ' + $r.Why + '.') }
@@ -819,8 +820,9 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     $secs = ((Get-Date) - $t0).TotalSeconds
     $state = Get-StepState $r
     if ($state -eq 'NEEDS REVIEW') { $script:roundBad = $true }
-    if ($state -ne 'PASSED' -and [bool]$steps[$k].Default) { $whole = $false }   # a skipped step is not installed (review, deploy v1); an optional step that fails makes the run NEEDS REVIEW
+    if ($state -ne 'PASSED' -and -not [bool]$steps[$k].Optional) { $whole = $false }   # a skipped step is not installed (review, deploy v1); an optional step that fails makes the run NEEDS REVIEW
     $made = @($r.Made | Where-Object { $_ }); if ($state -eq 'PASSED') { foreach ($m in @($steps[$k].Makes)) { $made += @{ kind = [string]$m.kind; name = [string]$m.name } } }
+    $runState[[string]$steps[$k].Name] = $state
     if (-not $need) { $stepRecs[[string]$steps[$k].Name] = @{ state = $state; made = $made } }   # a step skipped for a missing dependency keeps its older record
     $line = Get-StepLine $steps[$k] $r $secs
     $summary += $line
@@ -1932,7 +1934,7 @@ if ($gui) {
       foreach ($k in $script:appSteps) {
         $s = $steps[$k]
         $script:listIndex[$k] = $stepView.Rows.Count
-        [void](& $stepAdd ($s.Name + $(if ($s.AskParam) { '  (asks for a folder)' } elseif ($s.Kind -eq 'guide') { '  (needs you)' } else { '' })) $(if ((Test-Deploy) -and [bool]$s.Default -and -not (Get-StepDefault $k)) { 'Already done for version ' + $script:app.Version + '. Tick the box to run it again' } elseif ($s.Note) { $s.Note } else { '' }) (Get-StepDefault $k))
+        [void](& $stepAdd ($s.Name + $(if ($s.AskParam) { '  (asks for a folder)' } elseif ($s.Kind -eq 'guide') { '  (needs you)' } else { '' })) $(if ((Test-Deploy) -and -not [bool]$s.Optional -and -not (Get-StepDefault $k)) { 'Already done for version ' + $script:app.Version + '. Tick the box to run it again' } elseif ($s.Note) { $s.Note } else { '' }) (Get-StepDefault $k))
       }
       $stepView.Height = $stepView.ColumnHeadersHeight + $stepView.RowTemplate.Height * [math]::Max(2, $stepView.Rows.Count) + 4
       $stepView.ClearSelection()
@@ -2308,13 +2310,14 @@ def build(b):
         parts.append("$files += @{ Dir = %s; Name = %s; Kind = '%s'; Sha = '%s'; Data = %s }"
                      % (q(f['dir']), q(src.name), kind, sha, body))
     # kind "guide": a step the PFM does in another program (guide lines, an address to open, a marker file on Done).
-    steps = ['$steps += @{ Name = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s; Makes = @(%s); After = @(%s) }'
+    steps = ['$steps += @{ Name = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s; Makes = @(%s); After = @(%s); Optional = $%s }'
              % (q(s['name']), q(s['dir']), q(s['file']), 'true' if step_default(s) else 'false',
                 q(s.get('ask', {}).get('param', '')), q(s.get('ask', {}).get('prompt', '')), q(s.get('screenOnly', '')),
                 int(s.get('minutes', 30)), q(s.get('args', '')), q(s.get('note', '')), q(s.get('kind', 'script')),
                 ', '.join(q(g) for g in s.get('guide', [])), q(s.get('url', '')), q(s.get('urlConfig', '')), q(s.get('marker', '')),
                 int(s.get('estimate', 0)) * 60, q(s.get('doneText', '')), q(s.get('doneLog', '')),
-                ', '.join('@{ kind = %s; name = %s }' % (q(m['kind']), q(m['name'])) for m in s.get('makes', [])), ', '.join(q(a) for a in s.get('after', [])))
+                ', '.join('@{ kind = %s; name = %s }' % (q(m['kind']), q(m['name'])) for m in s.get('makes', [])), ', '.join(q(a) for a in s.get('after', [])),
+                'true' if s.get('default', True) is False else 'false')   # optional = "default": false only; a files-changed default is still a needed step
              for s in b['steps']]
     apps = app_lines(b)
     # Data files the round downloads (not code, PFM 3A): repo files from raw main, checked by SHA-256; public pages as they are.
