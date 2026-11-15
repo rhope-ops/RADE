@@ -39,7 +39,7 @@ Colors, one meaning each: navy #0B2545 = text and focus; Air Force blue #00539F 
 | Needs review (red) | The first step that needs review with its help line; that passed steps stay done; the help line with the Teams channel; "Copy summary" first | `Get-HelpLine`, the summary from `Invoke-Round` |
 | Stopped (red) | Why the run stopped and what to do; the help line; "Copy the log", "Try again", Close | `Get-WhatToDo` |
 
-The Record (F2, or its links): three columns. Checks by group (Local, Network, Access) with the result word; under a check that did not pass, what was found and what to do; under a reused check, "Last check: DD-MM-YY" and what it found on one row. This column scrolls only when it is taller than the window. Steps, each with a box ("needs you", "asks for a folder", its note or result; a Clean-up row when the bundle has one); the boxes can be changed only from Ready. One text box: each file as New, Replace or Recycle, the list of what the application's installs made, and the log.
+The Record (F2, or its links): three columns. Checks by group (Local, Network, Access) with the result word; under a check that did not pass, what was found and what to do; under a reused check, "Last check: DD-MM-YY" and, on the next row, what it found. This column scrolls only when it is taller than the window (Page Down, Page Up). Steps, each with a box ("needs you", "asks for a folder", its note or result; a Clean-up row when the bundle has one); the boxes can be changed only from Ready. One text box: each file as New, Replace or Recycle, the list of what the application's installs made, and the log.
 
 ## Rules that stay
 

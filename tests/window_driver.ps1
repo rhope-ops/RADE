@@ -68,10 +68,13 @@ function global:Push-RadeButton([string]$Text) {
   }
   elseif ($v -eq 'ready') {
     if ($global:RadeT.Record -and -not $global:RadeT.Opened) {
-      $global:RadeT.Opened = $true; Push-RadeButton 'Steps and files'
+      $global:RadeT.Opened = $true
+      $script:checkResults['ps'] = @{ State = 'PASSED'; Detail = 'Last check: 14-11-26'; Fix = 'Version [5.1]'; Saved = $true }   # a reused check, as Get-SavedCheck gives it
+      Push-RadeButton 'Steps and files'
       $ui.Form.Repaint()
       $boxes = @($ui.RecSteps.Controls | Where-Object { $_ -is [System.Windows.Forms.CheckBox] })
-      Write-Host ('WIN record on=' + $ui.RecOn + ' rows=' + @($ui.RecData).Count + ' boxes=' + $boxes.Count + ' enabled=' + $boxes[0].Enabled + ' text=' + [bool]($ui.RecText.Text -match 'Files this round saves') + ' name=' + [bool]($ui.RecChecks.Values['AccessibleName'] -match 'PASSED'))
+      Write-Host ('WIN record on=' + $ui.RecOn + ' rows=' + @($ui.RecData).Count + ' boxes=' + $boxes.Count + ' enabled=' + $boxes[0].Enabled + ' text=' + [bool]($ui.RecText.Text -match 'Files this round saves') + ' name=' + [bool]($ui.RecChecks.Values['AccessibleName'] -match 'PASSED') + ' reused=' + (@($ui.RecData | Where-Object { $_.Name -match '^PowerShell is version' })[0].More -join ' / ') + ' tall=' + ($ui.RecChecks.Height -gt 100))
+      $ui.Form.Key('PageDown'); $ui.Form.Key('PageUp')
       foreach ($b in $boxes) { if ([int]$b.Tag -lt 0) { $b.Checked = $false } }
       $ui.Form.Key('Escape'); Write-Host ('WIN record on=' + $ui.RecOn + ' clean=' + $ui.Clean)
     }

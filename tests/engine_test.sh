@@ -43,7 +43,7 @@ has() { local x; grep -q "No window could open\|WIN NONAME\|WIN BAD" "$t/win.txt
 # 1. A first deploy: boot, choose with the newer-version notice, ready, the Record (boxes can change, Clean-up off), the hand step, done.
 win 1 done 1 0
 has "view=boot" "view=choose light=off kick= sent=Which application do you want to install?" "2 Sample app (deploy) 1.0.0 NOTE Version 9.0.0 is on the app page" "view=ready light=off kick=ALL 7 CHECKS PASSED sent=Ready to install Sample app (deploy) 1.0.0." \
-  "WIN record on=True rows=9 boxes=5 enabled=True text=True name=True" "WIN record on=False clean=False" "view=hand light=RADE waits for you kick=STEP 2 OF 3 · YOUR TURN sent=T02 Sample import r1" "btn=[Imported] [It failed] [Skip]" \
+  "WIN record on=True rows=9 boxes=5 enabled=True text=True name=True reused=Last check: 14-11-26 / Version [5.1] tall=True" "WIN record on=False clean=False" "view=hand light=RADE waits for you kick=STEP 2 OF 3 · YOUR TURN sent=T02 Sample import r1" "btn=[Imported] [It failed] [Skip]" \
   "view=done light=off kick=ALL STEPS PASSED sent=Sample app (deploy) 1.0.0 is installed. p=Nothing was sent." "btn=[Close] [What it made] [Open results folder] [Copy summary]" "WIN made=True log=True locked=True" "WIN copied=True" && ok || { bad "window 1: first deploy"; tail -5 "$t/win.txt" | cut -c1-300; }
 # 2. A second deploy with a blocked application, Maintenance (Esc = Back, then the same choice: 2 Maintenance cards),
 # the site address, a failed check that runs again (2 cards), a sign-in check that failed (its card offers the sign-in),
