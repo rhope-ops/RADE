@@ -1,6 +1,6 @@
 # R21 window notes (the Administrator, 15 Nov 26)
 
-Source: the Administrator's notes after 90-161.Z round R21 (engine pinned at eb561ce, layout P1; the round e-mail said "Window: NOT OK"). Status: **documented only** (the Administrator, 15 Nov 26: "for these visual cleanups, make a note for another session to handle it. just document for now"). A separate session builds them as one UI pass, with a preview first (UI change: the Administrator approves before merge) and the measured checks in 90-161.Z `.claude/skills/ui-verify/SKILL.md`.
+Source: the Administrator's notes after 90-161.Z round R21 (engine pinned at eb561ce, layout P1; the round e-mail said "Window: NOT OK"). Status: **closed by the "One thing" redesign** (built 14 Nov 26, docs/window-design.md; W4 still needs the 90-161.Z task-script change). Before that: **documented only** (the Administrator, 15 Nov 26: "for these visual cleanups, make a note for another session to handle it. just document for now"). A separate session builds them as one UI pass, with a preview first (UI change: the Administrator approves before merge) and the measured checks in 90-161.Z `.claude/skills/ui-verify/SKILL.md`.
 
 | # | Note (the Administrator's words, shortened) | Where it lives (agent finding) | Proposed direction (agent REC, not decided) |
 |---|---|---|---|
