@@ -22,6 +22,8 @@ Decided by the Administrator, 2026-11-14. RADE owns the computer and the run. Th
 
 Hard rule (the Administrator, 2026-11-14): users cannot write data across the DoD365 boundary through any of the Administrator's apps, RADE included. Inside DoD365 (the site, the user's OneDrive) RADE may read and write. The first version of the two rows above said RADE never writes to the site or touches app data; that was agent wording and is replaced.
 
+No reconnaissance (the Administrator, 2026-11-14; cannot be changed): nothing like network reconnaissance may occur, in RADE or in any app. RADE and a step contact only the fixed hosts the engine or the manifest names, the one site the user gave, and the user's own flows and app; they never search for or list hosts, ports, sites, tenants, accounts or groups beyond those.
+
 Environment (the Administrator, 2026-11-14): what works on the owner's NIPR computer works on every NIPR computer, PnP.PowerShell included; the owner's account has no special flag. Windows PowerShell 5.1 is the least that is always there: all engine and step code runs on it, and tests run on it.
 
 Preflight: RADE's checks are the one preflight; an app keeps a probe flow only for rights a script cannot see (for example the connector data policy, Send As). Updates: RADE compares the installed version with the newest one at each run; an app only shows its installed version.
