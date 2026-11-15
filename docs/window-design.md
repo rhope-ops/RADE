@@ -94,3 +94,24 @@ Pixel budget (main body: 680 at 100 %; 536 at 150 % on 1920 x 1080, where the wi
 | Deploy | 60 + 83 + 26 + 44 per step + log (80 or more) + 40 + 46 | 3 steps: 213 / 69; the log hides above 7 / 4 steps |
 
 Below the budget (1280 x 800 at 150 %: body about 364) the check columns scroll and the log hides; nothing is cut off. Not verified on a device until the next round's "Window: OK" line.
+
+## For a GUI redesign: what the window must do
+
+Status: written 2026-11-14, when the engine became function complete for deploy v1 (docs/engine.md). A redesign may change every look and layout rule above with the Administrator's approval; it must keep each function below. The window code is the part of engine/rade_build.py after `Add-Type -AssemblyName System.Windows.Forms`; the functions before it hold the behavior and are tested in text mode (tests/engine_test.sh). The same steps must still run as text when no window can open.
+
+| Screen | The window must | Engine function or data |
+|---|---|---|
+| Choose | List the apps in the paste: name, summary, steps, time, checks; for a deploy the version and what is installed. One choice, none pre-selected. | `$apps`, `Get-AppText`, `Get-InstalledText`, `Select-App` |
+| Choose | Show the last run and a newer round (test) or a newer version (deploy). | `Get-LastRoundText`, `Get-NewerRound`, `Get-NewerVersionText` (not in the window yet) |
+| Check | Run the chosen app's checks, in groups Local, Network and Access; show state, one details line and the fix; reuse a saved check; "Run checks again". | `$script:appChecks`, `Get-CheckToRun`, `Invoke-Check`, `Save-CheckCache`, `Get-CheckSummary` |
+| Check | Take the site address when a check needs it; save it. | `Get-SiteUrl`, `Test-SiteUrl`, `Save-SiteUrl` |
+| Check | Ask the look-and-answer checks (Power Automate). Block Deploy while a check is FAILED or NOT RUN. | `Get-CheckBlock` |
+| Deploy | Show where RADE writes, each file as New, Replace or Recycle, and a warning when OneDrive is not found. | `Get-RoundPlan` |
+| Deploy | List the steps with a tick each: "(needs you)", "(asks for a folder)", the note; in a deploy a step that is done starts off. A Clean-up row when the bundle has one. | `$steps`, `Get-StepDefault`, `Get-StepPrior` |
+| Deploy | Run; two progress values (all, this step) with time left; a live log; ask for a folder for an `ask` step. | `Invoke-Round`, `Get-Progress`, `Get-ProgressText` |
+| Deploy | For a hand step: numbered lines, open the address, show the file, Done / It failed (with an error box) / Skip. | `Show-GuideDialog`, `Invoke-GuideStep` |
+| Deploy, at the end (test) | The results address box, "window displayed correctly" box, Make e-mail draft, Copy summary, Open results folder. Goes away with the test branch. | `Save-RoundDraft`, `Get-MailTo` |
+| Deploy, at the end (deploy) | Say that nothing was sent; Open results folder, Copy summary; the list of what the app's installs made; the help line. | `Get-MadeLine` (in the log and report; no screen yet), `Get-HelpLine` |
+| All | Exit asks first only while a step runs; closing stops the running step. | `$script:closing`, `$script:child` |
+
+Decided but not in the window: base checks when the window opens, with an app that cannot pass marked on Choose ("Screens and flow"); the R21 notes W1-W10 (docs/reviews/2026-11-15-r21-window-notes.md).

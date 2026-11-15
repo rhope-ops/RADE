@@ -337,7 +337,7 @@ function Save-RoundDownload([string]$Base, [scriptblock]$Say) {
     } catch {
       $bad++
       if (Test-Path -LiteralPath $path -PathType Leaf) { try { Remove-Item -LiteralPath $path -Force } catch { $null = $_ } }   # no partial file left behind
-      & $Say ('  Download failed   ' + $f.Dir + '\' + $f.Name + ': ' + (ConvertTo-Masked $_.Exception.Message) + ' (save it from the repository instead)')
+      & $Say ('  Download failed   ' + $f.Dir + '\' + $f.Name + ': ' + (ConvertTo-Masked $_.Exception.Message) + $(if (Test-Deploy) { '' } else { ' (save it from the repository instead)' }))
     } finally { $wc.Dispose() }
   }
   $line = 'Downloads: ' + $ok + ' saved, ' + $bad + ' failed.'
@@ -388,7 +388,7 @@ function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]
   $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true
   $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
   try { $envs = Get-StepEnv $Base $Step; foreach ($k in @($envs.Keys)) { $psi.EnvironmentVariables[[string]$k] = [string]$envs[$k] } } catch { & $Say ('    NOTE: the step inputs could not be set: ' + (ConvertTo-Masked $_.Exception.Message)) }
-  $r = @{ Pass = 0; Fail = 0; Skip = 0; Exit = $null; Made = @() }
+  $r = @{ Pass = 0; Fail = 0; Skip = 0; Exit = $null; Made = @(); Fallback = '' }
   $siteNow = [string](Get-SiteUrl $Base)
   $p = [System.Diagnostics.Process]::Start($psi)
   $script:child = $p
@@ -410,14 +410,20 @@ function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]
       if ($script:prog -and [int]$Matches[2] -gt 0) { $script:prog.Frac = [math]::Min(1.0, [double]$Matches[1] / [double]$Matches[2]); $script:prog.FracText = $Matches[1] + ' of ' + $Matches[2] }
       $lineTask = $p.StandardOutput.ReadLineAsync(); continue
     }
-    # Lines that may name a unit or a file (for example seal details) never reach the report (data boundary).
-    if ($Step.ScreenOnly -and $line -match $Step.ScreenOnly) { $line = ($line -replace '^(\S+).*$', '$1') + ' (detail hidden: it may hold a name; run the step script by hand to see it)' }
     # "MADE <kind>: <name>": something the step created (a list, a flow, a file); kept for the undo list (step contract).
     # A MADE line is never a result: it is logged with the cleaned name and not counted as PASS, FAIL or SKIP (review).
     if ($line -cmatch '^\s*MADE\s+([a-z][a-z-]{0,30}):\s+(\S.*)$') {
       $mk = $Matches[1]; $mn = ConvertTo-MadeName $Matches[2] $siteNow; $r.Made += @{ kind = $mk; name = $mn }
       & $Say ('    MADE ' + $mk + ': ' + $mn); $lineTask = $p.StandardOutput.ReadLineAsync(); continue
     }
+    # "FALLBACK: <route>": the step used its documented fallback route (for a user with fewer rights). Not a result line;
+    # a step that passes this way reads PASSED (fallback) and counts as passed (docs/engine.md "Results").
+    if ($line -cmatch '^\s*FALLBACK:\s+(\S.*)$') {
+      $r.Fallback = ConvertTo-MadeName $Matches[1] $siteNow
+      & $Say ('    FALLBACK: ' + $r.Fallback); $lineTask = $p.StandardOutput.ReadLineAsync(); continue
+    }
+    # Lines that may name a unit or a file (for example seal details) never reach the report (data boundary).
+    if ($Step.ScreenOnly -and $line -match $Step.ScreenOnly) { $line = ($line -replace '^(\S+).*$', '$1') + ' (detail hidden: it may hold a name; run the step script by hand to see it)' }
     if ($line -match '(^|\s)PASS(\s|$)') { $r.Pass++ }
     if ($line -cmatch '(^|\s)SKIP(\s|$)') { $r.Skip++ }   # upper case only: prose such as "skip this" is not a result
     if ($line -match '(^|\s)(FAIL|FORMAT-FAIL|RENDER-ERROR|MEASURE-ERROR|STOPPED:)(\s|$)') { $r.Fail++ }
@@ -442,6 +448,7 @@ function Get-StepLine($Step, $R, [double]$Seconds) {
   if ($R.Skipped) { return ($Step.Name + ': SKIPPED' + $(if ($R.Why) { ' (' + $R.Why + ')' } else { ' by you' })) }
   if ($Step.Kind -eq 'guide' -and $R.FailText) { return ($Step.Name + ': FAILED (reported by you) in ' + (Format-Duration $Seconds) + ': ' + $R.FailText) }
   if ($Step.Kind -eq 'guide') { return ($Step.Name + ': ' + $state + ' (confirmed by you) in ' + (Format-Duration $Seconds)) }
+  if ($state -eq 'PASSED' -and $R.Fallback) { $state = 'PASSED (fallback: ' + $R.Fallback + ')' }
   return ($Step.Name + ': ' + $state + ' (' + $R.Pass + ' passed, ' + $R.Fail + ' failed' + $(if ($R.Skip) { ', ' + $R.Skip + ' skipped' } else { '' }) + ', exit code ' + $R.Exit + ') in ' + (Format-Duration $Seconds))
 }
 function Copy-TextToClipboard([string]$Text) {
@@ -737,6 +744,37 @@ function Get-StepDefault([int]$K) {
   if ($all) { return $true }
   return ($prior[[string]$steps[$K].Name] -ne 'PASSED')
 }
+function Get-NewerVersion {
+  # Deploy: reads rade-release.json in the app repository (data, not code): { "apps": { "<app name>": "<version>" } }.
+  # Returns that version when it is newer than the one this bundle installs, else ''. Short timeout; any failure is silent.
+  if (-not (Test-Deploy)) { return '' }
+  try {
+    try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { $null = $_ }
+    $rq = [System.Net.WebRequest]::Create($releaseUrl)
+    $rq.Timeout = 4000
+    try { $rq.UserAgent = $webAgent } catch { $null = $_ }
+    try { $rq.UseDefaultCredentials = $true } catch { $null = $_ }
+    if ($rq.Proxy) { $rq.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials }
+    $rs = $rq.GetResponse()
+    try { $text = (New-Object System.IO.StreamReader($rs.GetResponseStream())).ReadToEnd() } finally { $rs.Close() }
+    $v = [string](($text | ConvertFrom-Json).apps.PSObject.Properties | Where-Object { $_.Name -eq [string]$script:app.Name } | ForEach-Object { $_.Value } | Select-Object -First 1)
+    if ($v -match '^\d+\.\d+(\.\d+)?$' -and ([version]$v) -gt ([version][string]$script:app.Version)) { return $v }
+  } catch { $null = $_ }
+  return ''
+}
+function Get-NewerVersionText {
+  $v = Get-NewerVersion
+  if ($v) { return ('A newer version, ' + $v + ', of ' + $script:app.Name + ' is on the app page (' + $homeUrl + '). Use that one instead.') }
+  return ''
+}
+function Get-MadeLine {
+  # Deploy: what the installs of the chosen app made, from the record (deploy v1 item 4: the list a user needs to remove it by hand).
+  $out = @()
+  $e = (Read-Installed)[(Get-InstalledKey $script:app)]
+  if ($e -and $e.steps) { foreach ($n in @($e.steps.Keys)) { foreach ($m in @($e.steps[$n].made)) { if ($null -ne $m) { $out += ('  ' + [string]$m.kind + ': ' + [string]$m.name + '  (' + [string]$n + ')') } } } }
+  if ($out.Count) { return (@('Made by this app''s installs on this computer and site (to remove the app, remove these by hand):') + $out) }
+  return @()
+}
 function Get-HelpLine { return ('For help, ask in the Teams channel ' + $helpChannel + '.') }
 function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock]$Say, [scriptblock]$Tick, [scriptblock]$OnStep, [scriptblock]$OnStatus, [scriptblock]$WindowLine, [string[]]$Answers, [string[]]$CheckLines) {
   $script:ranSteps = @()
@@ -774,7 +812,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   & $speak ('RADE (Redacted Application Deployment Engine), round ' + $round + ' (build ' + $buildId + '), started ' + (Get-Date -Format 'yyyy-MM-dd HH:mm'))
   $base = Move-ToRade $speak
   & $speak ('Working folder: ' + (ConvertTo-Masked $base))
-  if ($modeLine) { & $speak $modeLine }
+  if ($modeLine) { & $speak $modeLine; $nv = Get-NewerVersionText; if ($nv) { & $speak $nv; $summary += $nv } }
   if ($script:noWindowWhy) { & $speak ('Note: no window could open, so the round runs in text mode. Reason: ' + (ConvertTo-Masked $script:noWindowWhy)) }
   if (Test-WordOpen) { & $speak 'Note: Word is open. Renders use Word: save your documents and close Word if a step stops.' }
   & $speak ''
@@ -782,6 +820,8 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   if ($script:closing) { throw 'the window was closed (Exit) while the round ran; no step ran' }
   $fl = Save-RoundDownload $base $speak
   if ($fl) { $summary += $fl }
+  # A deploy needs every file: with a failed download no step runs (deploy v1 item 5).
+  if ($deploy -and $script:roundBad) { throw 'a file this install needs could not be downloaded, so no step ran. Check the network connection, then run again' }
   # An empty box clears the saved address (review R06 #5).
   if (-not $deploy) { try { if ($To -or (Get-MailTo $base)) { Save-MailTo $base $To } } catch { & $speak ('NOTE: could not save the e-mail address: ' + (ConvertTo-Masked $_.Exception.Message)) } }
   if ($cleanup.Count) {
@@ -827,6 +867,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     $line = Get-StepLine $steps[$k] $r $secs
     $summary += $line
     & $speak ('  Result: ' + ($line.Substring($steps[$k].Name.Length + 2)))
+    if ($state -eq 'NEEDS REVIEW' -and $steps[$k].Help) { $hl = '  What to do: ' + $steps[$k].Help; & $speak $hl; $summary += $hl }   # the step's own help text (manifest "help")
     $script:prog.Done += $script:prog.Cur; $script:prog.Cur = 0; $script:prog.Frac = -1
     & $OnStep $k $line
     Add-RoundHistory $base $steps[$k].Name $(if ($state -eq 'PASSED') { 'OK' } else { 'CHECK' }) ([int]$secs)
@@ -861,6 +902,8 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     if ($bad) { & $speak ('Note: one or more items need review (see above). The report in Rounds\' + $round + ' shows what went wrong. Nothing was sent.'); & $speak (Get-HelpLine) }
     elseif (-not $whole) { & $speak ('Note: some steps were off or skipped, so version ' + $script:app.Version + ' is not recorded as installed. Run again with every step on.') }
     else { & $speak ('Version ' + $script:app.Version + ' of ' + $script:app.Name + ' is recorded as installed.') }
+    $ml = @(Get-MadeLine); if ($ml.Count) { foreach ($l in $ml) { & $speak $l }; $summary += $ml }
+    [void](Export-RoundResult $base $summary)   # the report also holds the deploy notes and the made list
     & $speak ('DONE in ' + (Format-Duration ((Get-Date) - $started).TotalSeconds) + '. The report is in Rounds\' + $round + ' on this computer. Nothing was sent.')
     return ,$summary
   }
@@ -2310,14 +2353,14 @@ def build(b):
         parts.append("$files += @{ Dir = %s; Name = %s; Kind = '%s'; Sha = '%s'; Data = %s }"
                      % (q(f['dir']), q(src.name), kind, sha, body))
     # kind "guide": a step the PFM does in another program (guide lines, an address to open, a marker file on Done).
-    steps = ['$steps += @{ Name = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s; Makes = @(%s); After = @(%s); Optional = $%s }'
+    steps = ['$steps += @{ Name = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s; Makes = @(%s); After = @(%s); Optional = $%s; Help = %s }'
              % (q(s['name']), q(s['dir']), q(s['file']), 'true' if step_default(s) else 'false',
                 q(s.get('ask', {}).get('param', '')), q(s.get('ask', {}).get('prompt', '')), q(s.get('screenOnly', '')),
                 int(s.get('minutes', 30)), q(s.get('args', '')), q(s.get('note', '')), q(s.get('kind', 'script')),
                 ', '.join(q(g) for g in s.get('guide', [])), q(s.get('url', '')), q(s.get('urlConfig', '')), q(s.get('marker', '')),
                 int(s.get('estimate', 0)) * 60, q(s.get('doneText', '')), q(s.get('doneLog', '')),
                 ', '.join('@{ kind = %s; name = %s }' % (q(m['kind']), q(m['name'])) for m in s.get('makes', [])), ', '.join(q(a) for a in s.get('after', [])),
-                'true' if s.get('default', True) is False else 'false')   # optional = "default": false only; a files-changed default is still a needed step
+                'true' if s.get('default', True) is False else 'false', q(s.get('help', '')))   # optional = "default": false only; a files-changed default is still a needed step
              for s in b['steps']]
     apps = app_lines(b)
     # Data files the round downloads (not code, PFM 3A): repo files from raw main, checked by SHA-256; public pages as they are.
@@ -2325,7 +2368,8 @@ def build(b):
     for f in b.get('fetch', []):
         if 'src' in f:
             data = (ROOT / f['src']).read_bytes()
-            url = 'https://raw.githubusercontent.com/' + APP['repo'] + '/main/' + f['src']
+            # A tagged release (bundle "release") gives a fixed address; without it the file comes from main.
+            url = 'https://raw.githubusercontent.com/' + APP['repo'] + '/' + b.get('release', 'main') + '/' + f['src']
             fetch.append((f['dir'], Path(f['src']).name, url, hashlib.sha256(data).hexdigest()))
         else:
             fetch.append((f['dir'], f['name'], f['url'], ''))
@@ -2340,8 +2384,9 @@ def build(b):
     engine = ENGINE.replace('@@HOME@@', APP['home']).replace('@@PREFIX@@', APP['prefix']).replace('@@APP@@', APP['folder'])
     own = '$ownPatterns = @(' + ', '.join(q(p) for p in APP['own']) + ')\n'
     go = q('https://raw.githubusercontent.com/' + APP['repo'] + '/main/go.md')
-    body = ('$goUrl = %s\n$webAgent = \'Mozilla/5.0 (Windows NT 10.0; Win64; x64) RADE\'\n$logoPng = \'%s\'\n%s$round = %s\n$appFolder = %s\n$usersRoot = \'C:\\Users\'\n$files = @()\n%s\n$fetch = @()\n%s\n$steps = @()\n%s\n$collect = @()\n%s\n$cleanup = @()\n%s\n$known = @(%s)\n$apps = @()\n%s\n%s'
-            % (go, logo, own, q(b['round']), q(APP['folder']), '\n'.join(parts), '\n'.join(fetchs), '\n'.join(steps), '\n'.join(collect), '\n'.join(cleanup), ', '.join(q(k) for k in known), '\n'.join(apps), engine))
+    rel = q('https://raw.githubusercontent.com/' + APP['repo'] + '/main/rade-release.json')
+    body = ('$goUrl = %s\n$releaseUrl = %s\n$homeUrl = %s\n$webAgent = \'Mozilla/5.0 (Windows NT 10.0; Win64; x64) RADE\'\n$logoPng = \'%s\'\n%s$round = %s\n$appFolder = %s\n$usersRoot = \'C:\\Users\'\n$files = @()\n%s\n$fetch = @()\n%s\n$steps = @()\n%s\n$collect = @()\n%s\n$cleanup = @()\n%s\n$known = @(%s)\n$apps = @()\n%s\n%s'
+            % (go, rel, q(APP['home']), logo, own, q(b['round']), q(APP['folder']), '\n'.join(parts), '\n'.join(fetchs), '\n'.join(steps), '\n'.join(collect), '\n'.join(cleanup), ', '.join(q(k) for k in known), '\n'.join(apps), engine))
     build_id = hashlib.sha256(body.encode('ascii')).hexdigest()[:8]
     modes = {a.get('mode', 'test') for a in b.get('apps', [])} or {'test'}
     sends = ' on this computer. It sends nothing.' if modes == {'deploy'} else ', then opens an Outlook draft with them (never sent; a deploy makes no draft).' if 'deploy' in modes else ', then opens an Outlook draft with them (never sent).'

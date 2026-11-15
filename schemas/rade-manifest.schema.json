@@ -104,6 +104,11 @@
             "$ref": "#/$defs/app"
           },
           "description": "The catalog on the Choose screen. Without it: one application with every step."
+        },
+        "release": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "description": "A git tag of the app repo (for example v1.0.0). Fetch files with src then download from that tag, a fixed address, and are still checked by SHA-256; without it they come from main. Tag the commit that holds the bundle and its files."
         }
       }
     },
@@ -137,7 +142,7 @@
         },
         "src": {
           "$ref": "#/$defs/relPath",
-          "description": "Repo file, downloaded from raw main and checked by SHA-256."
+          "description": "Repo file, downloaded from the bundle's release tag (or raw main without one) and checked by SHA-256."
         },
         "name": {
           "type": "string",
@@ -325,6 +330,11 @@
             "minLength": 1
           },
           "description": "Names of earlier steps of the same app that must PASS before this step runs; else RADE skips it. In a deploy, an automatic step may come after a hand (guide) step only when it needs it (docs/engine.md \"Deploy v1\" item 3)."
+        },
+        "help": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Plain words on what the user can do when this step needs review (shown under its result). No address, no person."
         }
       },
       "allOf": [
