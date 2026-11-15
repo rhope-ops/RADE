@@ -9,7 +9,7 @@ Updated: 2026-11-14 by Claude (deploy v1). Keep this file at 40 lines or fewer. 
 
 ## Open (in order)
 
-0. Deploy v1 (docs/engine.md "Deploy v1"; the Administrator, 14 Nov 26): items 1-2 built and tested in text mode (tests/engine_test.sh, 15 checks); the window part (hidden address box and "displayed correctly" box, DONE text) is not verified on a device. Next: items 3-6. Review MINOR notes left for the next engine change: the `about` text in rade-installed.json still says "PASSED with every step on" (rule: every step ran and PASSED); test 2 in tests/engine_test.sh runs `round 2` twice; no STOPPED record when a run fails before its first step. The engine sha256 changed; 90-161.Z keeps its lock until its next round build (its bundle grows about 6.8 KB to 276,106 of 307,200 bytes).
+0. Deploy v1 (docs/engine.md "Deploy v1"; the Administrator, 14 Nov 26): items 1-2 built and tested in text mode (tests/engine_test.sh, 15 checks); the window part (hidden address box and "displayed correctly" box, DONE text) is not verified on a device. Next: items 3-6. Review MINOR notes left for the next engine change: the `about` text in rade-installed.json still says "PASSED with every step on" (rule: every step ran and PASSED); test 2 in tests/engine_test.sh runs `round 2` twice; no STOPPED record when a run fails before its first step; remove the engine header line "ISSM approved paste and run in writing" (DECISIONS 14 Nov). The engine sha256 changed; 90-161.Z keeps its lock until its next round build (its bundle grows about 6.8 KB to 276,106 of 307,200 bytes).
 1. Engine moved here (engine/rade_build.py, 14 Nov). Next engine items: size in the summary, engine version + sha256 in the window, JSON results block (DECISIONS 14 Nov).
 2. Build docs/engine.md (modes, two check stages, fallback result, fresh fast checks) and the drift check (docs/drift-check.md).
 3. Window UI pass P1: merged (PR 15, 14 Nov; engine sha256 b4968af9...08b5). R21 carried it and came back "Window: NOT OK" (item 4). Open review MINOR notes: unused $filler row, focus after a row link, Select-App 0 at start. Spec: docs/window-design.md "Layout P1".
@@ -18,8 +18,7 @@ Updated: 2026-11-14 by Claude (deploy v1). Keep this file at 40 lines or fewer. 
 
 ## Needs the Administrator
 
-- Where the help contact text lives (org box address, Teams link): this public repo holds no e-mail address.
-- Does "no ISSM approval needed" (DECISIONS 14 Nov) remove open item 5 and the drift decision "the ISSM sees the report field list"? The engine header also still says "ISSM approved paste and run in writing".
+- The Teams channel name for the help text (DECISIONS 14 Nov: name only, no link).
 
 ## Do not
 

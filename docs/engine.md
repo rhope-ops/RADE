@@ -28,7 +28,7 @@ Scope approved by the Administrator, 2026-11-14 (docs/DECISIONS.md). RADE is the
 | 3 | Safe second run: a repeat or an upgrade changes only what is different. The engine gives each step the installed version; each step script must be safe to run again. | Not built |
 | 4 | Undo list: what a deploy made (files, lists, flows), so a user can remove it. | Not built |
 | 5 | A fixed release: a deploy bundle at a tagged, stable address with its sha256 on the app page (a round bundle on main is replaced each round). | Not built |
-| 6 | The app page: what the app does, what RADE reads and writes, one Copy button, and how to get help (the owner's org box and Teams channel). | Not built; where the contact text lives is open (this repo is public and holds no e-mail address) |
+| 6 | The app page: what the app does, what RADE reads and writes, one Copy button, and how to get help (the Teams channel, by name only; DECISIONS 2026-11-14). | Not built |
 
 Not in v1: environment values in the manifest (the OneDrive folder name and the site prefix stay in the engine: NIPR is the same everywhere, the Administrator, 2026-11-14). Rights are not the same for every user, so each step that needs extra rights keeps a documented fallback.
 
