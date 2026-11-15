@@ -4,7 +4,7 @@ Status: decided by the Administrator, 2026-11-14 (docs/DECISIONS.md); not all bu
 
 ## RADE and the app
 
-Decided by the Administrator, 2026-11-15. RADE owns the computer and the run. The app owns the product and the site. RADE may know a platform (SharePoint, Power Automate, Word, Outlook), never an app's objects (a list, column, flow or setting by name). Test for any line of code or text: would it be the same for a different app? If yes, it is RADE's.
+Decided by the Administrator, 2026-11-14. RADE owns the computer and the run. The app owns the product and the site. RADE may know a platform (SharePoint, Power Automate, Word, Outlook), never an app's objects (a list, column, flow or setting by name). Test for any line of code or text: would it be the same for a different app? If yes, it is RADE's.
 
 | Subject | RADE | The selected app |
 |---|---|---|
@@ -91,4 +91,4 @@ After the owner's test rounds end, the test branch and its results e-mail (draft
 
 ## Maintenance run types
 
-Decided by the Administrator, 2026-11-15: RADE offers Install, Diagnose, Restore and Uninstall as run types and keeps the record right for each (version, step states, made list); the app supplies the steps for each run type. Not built. The functions each run type needs are under discussion (no list is approved yet).
+Decided by the Administrator, 2026-11-14: RADE offers Install, Diagnose, Restore and Uninstall as run types and keeps the record right for each (version, step states, made list); the app supplies the steps for each run type. Not built. The functions each run type needs are under discussion (no list is approved yet).
