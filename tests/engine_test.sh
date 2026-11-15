@@ -34,6 +34,29 @@ b="$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1"
 grep -q "Name = 'Sample app (deploy)'.*Mode = 'deploy'; Version = '1.0.0'" "$b" && ! grep "Name = 'Sample app (deploy)'" "$b" | grep -q "'outlook'" && ok || bad "catalog: deploy app has Mode, Version and no outlook check"
 grep "Name = 'Sample app'" "$b" | grep -q "'outlook'.*Mode = 'test'; Version = ''" && ok || bad "catalog: test app keeps the outlook check and Mode test"
 
+# ---- sizes and text lengths (docs/window-design.md "Sizes", "Text lengths"; the Administrator, 2026-11-15)
+# Every button is made with a named kind (its size is in $ui.Z), and no other place sets a button's size.
+[ "$(grep -o '& \$ui\.Btn [^;)]*' engine/rade_build.py | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -c 'MinimumSize = ' engine/rade_build.py)" = 2 ] && ok || bad "sizes: a button is made without a kind, or sets its own size"
+# The limits in the document are the limits of the build.
+python3 - <<'P' && ok || bad "text lengths: docs/window-design.md and TEXT_LIMITS (engine/rade_build.py) differ"
+import importlib.util, re, pathlib
+sp = importlib.util.spec_from_file_location('rade_build', 'engine/rade_build.py'); m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m)
+doc = pathlib.Path('docs/window-design.md').read_text().split('## Text lengths')[1].split('## ')[0]
+rows = dict((a.strip(), int(b)) for a, b in re.findall(r'^\| ([a-zA-Z ]+?) \| (\d+) \|', doc, re.M))
+assert rows == m.TEXT_LIMITS, (rows, m.TEXT_LIMITS)
+P
+# A text over its limit is a WARNING line of the build, and the bundle is still built (this release warns only).
+python3 - "$t" <<'P' && ok || bad "text lengths: a long summary must give a WARNING line and a built bundle"
+import json, subprocess, sys, pathlib, shutil
+t = pathlib.Path(sys.argv[1]); a = t / 'long'; shutil.copytree(t / 'app', a)
+m = json.loads((a / 'scripts/paste_bundles.json').read_text()); m['bundles'][0]['apps'][0]['summary'] = 'x' * 151
+(a / 'scripts/paste_bundles.json').write_text(json.dumps(m))
+r = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(a)], capture_output=True, text=True)
+assert r.returncode == 0 and 'BUILT ' in r.stdout and r.stdout.count('WARNING text length: ') == 1 and 'summary has 151 characters, the limit is 150' in r.stdout, r.stdout + r.stderr
+r = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'app'), '--check'], capture_output=True, text=True)
+assert 'WARNING' not in r.stdout, r.stdout
+P
+
 # ---- window: the "One thing" window (docs/window-design.md) with stand-in Windows Forms types (tests/window_stub.cs) and
 # a scripted user (tests/window_driver.ps1) that prints one WIN line per card, runs every Paint handler and checks names.
 # win APP HAND RECORD TOUR [BUNDLE]: runs the window for application APP (0 = test, 1 = deploy); output in $t/win.txt.
@@ -43,7 +66,7 @@ win() { sed -E -e 's#Add-Type -AssemblyName System.Windows.Forms; Add-Type -Asse
   cat tests/window_driver.ps1 "$t/wb2.ps1" > "$t/w.ps1"
   RADE_T_STUB="$PWD/tests/window_stub.cs" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$t/wu/test1234" timeout 180 pwsh -NoProfile -File "$t/w.ps1" < /dev/null > "$t/win.txt" 2>&1; }
 # has TEXT...: every text is in the window output, and the window did not fall back to text mode or miss a name.
-has() { local x; grep -q "No window could open\|WIN NONAME\|WIN BAD" "$t/win.txt" && return 1; for x in "$@"; do grep -qF -- "$x" "$t/win.txt" || { echo "  missing: $x"; return 1; }; done; grep -q "^WIN closed=True" "$t/win.txt"; }
+has() { local x; grep -q "No window could open\|WIN NONAME\|WIN NOFOCUS\|WIN BAD" "$t/win.txt" && return 1; for x in "$@"; do grep -qF -- "$x" "$t/win.txt" || { echo "  missing: $x"; return 1; }; done; grep -q "^WIN closed=True" "$t/win.txt"; }
 # 1. A first deploy: boot, choose with the newer-version notice, ready, the Record (boxes can change, Clean-up off), the hand step, done.
 win 1 done 1 0
 has "view=boot" "view=choose light=off kick= sent=Which application do you want to install?" "2 Sample app (deploy) 1.0.0 NOTE Version 9.0.0 is on the app page" "view=ready light=off kick=ALL 8 CHECKS PASSED sent=Ready to install Sample app (deploy) 1.0.0." \

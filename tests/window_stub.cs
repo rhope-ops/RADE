@@ -51,7 +51,7 @@ namespace RadeDraw {
 }
 namespace System.Windows.Forms {
   using System.Drawing; using RadeDraw;
-  [Flags] public enum TextFormatFlags { Left = 0, Top = 0, HorizontalCenter = 1, Right = 2, VerticalCenter = 4, SingleLine = 32, NoPrefix = 2048, EndEllipsis = 32768 }
+  [Flags] public enum TextFormatFlags { Left = 0, Top = 0, HorizontalCenter = 1, Right = 2, VerticalCenter = 4, SingleLine = 32, WordBreak = 16, NoPrefix = 2048, TextBoxControl = 8192, EndEllipsis = 32768 }
   public enum MessageBoxButtons { OK, YesNo } public enum MessageBoxIcon { None, Warning } public enum MessageBoxDefaultButton { Button1, Button2 }
   public struct Padding { public int Left, Top, Right, Bottom; public Padding(int l, int t, int r, int b) { Left = l; Top = t; Right = r; Bottom = b; } public Padding(int a) { Left = Top = Right = Bottom = a; } }
   public class ColumnStyle { public ColumnStyle(object a) { } public ColumnStyle(object a, object b) { } }
@@ -107,9 +107,10 @@ namespace System.Windows.Forms {
       if (RadeStub.Driver.Pump != null) RadeStub.Driver.Pump.Invoke();
     }
   }
-  public static class SystemInformation { public static bool UIEffectsEnabled = true; }
+  public static class SystemInformation { public static bool UIEffectsEnabled = true; public static int VerticalScrollBarWidth = 17; }
   public static class TextRenderer {
     public static Size MeasureText(string t, object f) { return new Size((t ?? "").Length * 7, 18); }
+    public static Size MeasureText(string t, object f, Size s, TextFormatFlags fl) { int w = (t ?? "").Length * 7; int lines = Math.Max(1, (w + Math.Max(1, s.Width) - 1) / Math.Max(1, s.Width)); return new Size(Math.Min(w, Math.Max(1, s.Width)), 18 * lines); }   // a text that wraps at a width
     public static void DrawText(object g, string t, object f, Rectangle r, Color c, TextFormatFlags fl) { if (t == null) throw new ArgumentNullException("text"); }
   }
   public static class Clipboard { public static void SetText(string t) { if (string.IsNullOrEmpty(t)) throw new ArgumentNullException("text"); RadeStub.Driver.Clip = t; } }

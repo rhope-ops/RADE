@@ -1,0 +1,34 @@
+name: window
+# The real RADE window on Windows PowerShell 5.1 (the Administrator, 2026-11-15; docs/window-design.md "Proof").
+# Linux cannot draw Windows Forms, so the repo checks test only the window's logic. This job draws each card of the
+# sample bundle, checks the layout (no cut text, no overlap, nothing outside its parent) and keeps one PNG per card.
+# Pull requests that change the engine or the tests, and manual runs; never on push (AGENTS.md "Checks").
+# No secret, read-only token. This repo is public: standard runners use no paid minutes.
+on:
+  pull_request:
+    paths:
+      - "engine/**"
+      - "tests/**"
+      - ".github/workflows/window.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  window:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Keep line ends as they are in the repository (a fetched file is checked by its SHA-256)
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          persist-credentials: false
+      - name: Draw each card and check the layout
+        run: python tests/window_real.py window-out
+      - name: Keep the pictures and the output
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: window
+          path: window-out
+          retention-days: 14

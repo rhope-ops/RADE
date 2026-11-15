@@ -1,6 +1,6 @@
 # Window redesign: three concepts (14 Nov 26)
 
-Status: **concept 1 (One thing) is approved for the build** (the Administrator, 14 Nov 26). Concepts 2 and 3 are not built; their mockups were removed from the canvas the same day, and this file keeps their description. Agent proposals for the Administrator's request of 14 Nov 26 (a redesign from zero, not a refinement of layout P1 or of UI pass 3 A, B, C). The contract is [window-design.md "For a GUI redesign"](../window-design.md#for-a-gui-redesign-what-the-window-must-do). The engine is not changed.
+Status: **concept 1 (One thing) is approved for the build** (the Administrator, 14 Nov 26). Concepts 2 and 3 are not built; their mockups were removed from the canvas the same day, and this file keeps their description. Agent proposals for the Administrator's request of 14 Nov 26 (a redesign from zero, not a refinement of layout P1 or of UI pass 3 A, B, C). The contract is [window-design.md](../window-design.md) (its section "For a GUI redesign" of that day; the built design replaced it). The engine is not changed.
 
 Mockups: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "Redesign: One thing (14 Nov)", 12 artboards at 1020 x 760, with notes on the thesis, the cost and where each contract function lives.
 

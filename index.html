@@ -7,9 +7,10 @@
 /* Layout: the RADE window as a page ("One thing", docs/window-design.md): a 6 px light on the top edge, the logo line,
    one card whose left edge is at 12 % of the width, a bottom line and a 4 px bar on the bottom edge.
    Colors, one meaning each: navy = text and focus; blue = the action and progress; yellow = your turn;
-   dark red = failed; green = done; gray = second lines. */
-:root{--bg:#ffffff;--navy:#0b2545;--text:#16202e;--gray:#5a6573;--action:#00539f;--action-fg:#ffffff;--link:#00539f;
---turn:#ffd520;--fail:#8b1a1a;--pass:#2e8540;--edge:#7a8794;--track:#e9ecf0;--btn:#ffffff;
+   dark red = failed; green = done; gray = second lines. The light-theme values are the window's ($ui.C in
+   engine/rade_build.py). Sizes: docs/window-design.md "Sizes" (a button is 132 x 40 at least; a link is underlined). */
+:root{--bg:#ffffff;--navy:#0b2545;--text:#1b2430;--gray:#5a6573;--action:#00539f;--action-fg:#ffffff;--link:#00539f;
+--turn:#ffd520;--fail:#8b1a1a;--pass:#2e8540;--edge:#7a8794;--track:#e3e8ee;--btn:#ffffff;
 --ui:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;--mono:Consolas,"Cascadia Mono",ui-monospace,monospace}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e141c;--navy:#dde8f3;--text:#e6ebf1;--gray:#a5b1c0;--action:#00539f;--action-fg:#ffffff;--link:#8db4ec;
 --turn:#ffd520;--fail:#f0a3a3;--pass:#6cc487;--edge:#8794a6;--track:#243143;--btn:#172130;color-scheme:dark}}
@@ -41,14 +42,14 @@ h1{margin:0;font-size:1.8rem;line-height:1.2;font-weight:600;color:var(--navy);t
 .file{font-family:var(--mono);font-size:.8125rem}
 .todo b{color:var(--navy)}
 ol{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:6px;max-width:65ch}
-.btns{display:flex;flex-wrap:wrap;gap:10px}
-.btn{font:inherit;font-size:.9375rem;min-width:132px;min-height:36px;padding:6px 16px;border:1px solid var(--edge);border-radius:3px;background:var(--btn);color:var(--text);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;text-align:center}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{font:inherit;font-size:.9375rem;min-width:132px;min-height:40px;padding:6px 16px;border:1px solid var(--edge);border-radius:3px;background:var(--btn);color:var(--text);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;text-align:center}
 .btn:hover{border-color:var(--link)}
 .btn.primary{background:var(--action);border-color:var(--action);color:var(--action-fg);font-weight:700}
 .btn.primary:hover{filter:brightness(1.15)}
 .btn.app{display:block;text-align:left;width:100%;padding:10px 16px}
 .btn.app b{display:block;color:var(--navy)}
-a{color:var(--link);font-weight:700}
+a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-offset:3px}
 :focus-visible{outline:2px solid var(--navy);outline-offset:2px}
 .help{font-size:1.0625rem}
 .bottom{display:flex;flex-wrap:wrap;gap:6px 20px;align-items:center;padding-block:10px;font-size:.875rem}
@@ -71,7 +72,7 @@ a{color:var(--link);font-weight:700}
 'use strict';
 var KEY='rade-page-app-v1';
 var win=document.getElementById('win'),card=document.getElementById('card'),state=document.getElementById('state'),bar=document.getElementById('bar'),back=document.getElementById('back');
-var HELP='',APPS=[],cur=null;
+var HELP='',APPS=[],cur=null,load=0;   // load: a counter for each load, so a late answer of an older load is dropped
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function num(n){return Number(n).toLocaleString('en-US')}
 function recall(){try{return localStorage.getItem(KEY)}catch(e){return null}}
@@ -94,7 +95,7 @@ function failCard(what,found,todo,btns){
     '<p>Found: '+esc(found)+'</p><p class="todo"><b>What to do:</b> '+todo+'</p><div class="btns">'+btns+'</div>'+helpLine()});
 }
 function start(){
-  cur=null;
+  cur=null;load++;
   show({bar:10,state:'Loading',html:'<p class="caps">RADE</p><h1>Getting the list of applications.</h1>'});
   get('apps.json',true).then(function(c){
     HELP=c.help||'';
@@ -107,15 +108,15 @@ function start(){
   });
 }
 function choose(){
-  cur=null;
+  cur=null;load++;
   show({light:'turn',state:num(APPS.length)+' applications',html:'<p class="caps">Choose</p><h1>Which application?</h1><div class="btns">'+
     APPS.map(function(a,i){return '<button type="button" class="btn app" data-app="'+i+'"'+(i?'':' data-focus')+'><b>'+esc(a.name||a.repo)+'</b></button>'}).join('')+'</div>'+helpLine()});
 }
 function open(a){
-  cur=a;a.url='';a.none=false;remember(a.repo);
+  cur=a;a.url='';a.none=false;remember(a.repo);var my=++load;
   show({bar:30,state:'Loading',html:'<p class="caps">RADE</p><h1>Getting the newest script.</h1><p class="second">'+esc(a.repo)+'</p>'});
   get(a.base+a.manifest,true).then(function(m){
-    if(cur!==a){return null}
+    if(my!==load){return null}
     var b=(m.bundles||[])[(m.bundles||[]).length-1];
     if(!b||!b.out){a.none=true;throw new Error('the application lists no script')}
     var cat=(b.apps||[])[0]||{};
@@ -126,10 +127,10 @@ function open(a){
     bar.style.width='60%';
     return get(a.url,false);
   }).then(function(t){
-    if(cur!==a||t===null){return}
+    if(my!==load||t===null){return}
     a.text=t;a.loaded=new Date();ready(a,false);
   }).catch(function(e){
-    if(cur!==a){return}
+    if(my!==load){return}
     var link=a.url?'<a class="btn" href="'+esc(a.url)+'">Open the script</a>':'<a class="btn" href="https://github.com/'+esc(a.repo)+'">Open the repository</a>';
     failCard('The script did not load.',e.message||'no answer',a.url?'Select "Open the script". On that page press Ctrl+A, then Ctrl+C. Then do the steps for PowerShell ISE.':a.none?'No script is published for this application yet. Ask in the Teams channel.':'Check the network connection, then select "Try again".',
       '<button type="button" class="btn primary" data-act="open" data-focus>Try again</button>'+link);
