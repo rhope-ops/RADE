@@ -18,8 +18,9 @@ inst="$cfg/installed/$(rec 'SampleApp/Sample app (deploy)')"
 mkdir -p "$od" "$t/app/scripts"; cp -r tests/fixture-app/. "$t/app/"; cp schemas/examples/sample-manifest.json "$t/app/scripts/paste_bundles.json"
 : > "$t/go.md"; echo '{ "apps": { "Sample app (deploy)": "9.0.0", "Sample app": "9.0.0" } }' > "$t/rel.json"
 mkdir -p "$od/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$od/RADE/SampleApp/Config/SAMPLE-site.txt"
-# swap IN OUT USERS: the test copy of a bundle: users root, repository addresses and the check gate swapped for local ones.
-swap() { sed -e "s#^\$usersRoot = 'C:\\\\Users'#\$usersRoot = '$3'#" -e "s#^\$goUrl = '.*'#\$goUrl = 'file://$t/go.md'#" -e "s#^\$releaseUrl = '.*'#\$releaseUrl = 'file://$t/rel.json'#" -e "s#\$checkGate = \$true#\$checkGate = \$false#" \
+# swap IN OUT USERS: the test copy of a bundle: users root, repository addresses and the check gate swapped for local ones,
+# and the computer's full name read from RADE_TEST_FQDN (default: a fake NIPR name; the engine itself has no such switch).
+swap() { sed -e 's#^function Get-OwnFqdn .*#function Get-OwnFqdn { if ($null -ne $env:RADE_TEST_FQDN) { return $env:RADE_TEST_FQDN }; return '"'pc01.area52.example.invalid'"' }#' -e "s#^\$usersRoot = 'C:\\\\Users'#\$usersRoot = '$3'#" -e "s#^\$goUrl = '.*'#\$goUrl = 'file://$t/go.md'#" -e "s#^\$releaseUrl = '.*'#\$releaseUrl = 'file://$t/rel.json'#" -e "s#\$checkGate = \$true#\$checkGate = \$false#" \
     -e "s#https://raw.githubusercontent.com/example-org/sample-app/v1.0.0/#file://$t/app/#" -e "s#https://example-org.github.io/sample-app#file://$t/go.md#g" -e "s#https://example.invalid/import#file://$t/go.md#" "$1" > "$2"; }
 build() { python3 engine/rade_build.py --app-root "$t/app" > "$t/build.txt" 2>&1 || { cat "$t/build.txt"; return 1; }
   swap "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/b.ps1" "$t/u"; }
@@ -198,13 +199,15 @@ sys.exit(0 if a.returncode != 0 and 'comes after the hand step' in a.stderr and 
 P
 
 # ---- Guardrails (the Administrator, 14 Nov 26; docs/engine.md "Guardrails").
-# 1. A classified-network domain suffix stops RADE before it writes anything.
+# 1. A computer whose full name lacks the NIPR label '.area52.' stops RADE before it writes anything (the Administrator, 15 Nov 26).
 mkdir -p "$t/gu/test1234/OneDrive - United States Air Force"; sed "s#usersRoot = '$t/u'#usersRoot = '$t/gu'#" "$t/b.ps1" > "$t/g.ps1"
-printf '2\n\n\n\n' | USERDNSDOMAIN="AREA.EXAMPLE.SMIL.MIL" USERPROFILE="$t/gu/test1234" pwsh -NoProfile -File "$t/g.ps1" > "$t/outg.txt" 2>&1
-grep -q "^STOPPED: RADE runs on NIPR computers only" "$t/outg.txt" && ! grep -qi "example" "$t/outg.txt" && [ -z "$(find "$t/gu" -type f)" ] && [ ! -d "$t/gu/test1234/OneDrive - United States Air Force/RADE" ] && ok || { bad "guard: classified suffix must stop with nothing written"; head -5 "$t/outg.txt"; }
-printf '2\n\n\n\n' | USERDNSDOMAIN="notsmil.mil" USERPROFILE="$t/gu/test1234" pwsh -NoProfile -File "$t/g.ps1" > "$t/outg2.txt" 2>&1
-grep -q "PASSED: This computer is not on a classified network" "$t/outg2.txt" && ! grep -q "^STOPPED: RADE runs on NIPR" "$t/outg2.txt" && ok || { bad "guard: a look-alike suffix must pass"; head -5 "$t/outg2.txt"; }
-grep -q "PASSED: This computer is not on a classified network" "$t/out0.txt" && ok || bad "guard: the check line is in a normal run"
+for n in 'pc01.example.invalid' 'pc01.notarea52.example.invalid' 'pc01.area52x.example.invalid' 'pc01.example.area52' 'pc01.' ''; do
+  printf '2\n\n\n\n' | RADE_TEST_FQDN="$n" USERPROFILE="$t/gu/test1234" pwsh -NoProfile -File "$t/g.ps1" > "$t/outg.txt" 2>&1
+  [ "$(cat "$t/outg.txt")" = "This application cannot be installed in your environment." ] && [ -z "$(find "$t/gu" -type f)" ] && [ ! -d "$t/gu/test1234/OneDrive - United States Air Force/RADE" ] && ok || { bad "guard: '$n' must stop with only the message and nothing written"; head -5 "$t/outg.txt"; }
+done
+printf '2\n\n\n\n' | RADE_TEST_FQDN="PC01.AREA52.EXAMPLE.INVALID" USERPROFILE="$t/gu/test1234" pwsh -NoProfile -File "$t/g.ps1" > "$t/outg2.txt" 2>&1
+grep -q "PASSED: This computer is on NIPR (area52 domain)" "$t/outg2.txt" && ! grep -qi "example" "$t/outg2.txt" && ! grep -q "cannot be installed" "$t/outg2.txt" && ok || { bad "guard: an area52 name in capitals must pass and never be shown"; head -5 "$t/outg2.txt"; }
+grep -q "PASSED: This computer is on NIPR (area52 domain)" "$t/out0.txt" && ok || bad "guard: the check line is in a normal run"
 # 2. Only a site on the DAF SharePoint host is accepted.
 grep "^\$sitePrefix = \|^function Test-SiteUrl" "$t/b.ps1" > "$t/site.ps1"
 cat >> "$t/site.ps1" <<'P'

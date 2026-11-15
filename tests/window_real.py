@@ -95,6 +95,8 @@ def bundle(t, long, keep=None):
     s = (app / "scripts" / "gov" / "paste" / "SAMPLE-R01-round-r1.ps1").read_text(encoding="utf-8")
     go = file_url(t / "go.md")
     for pat, new in [
+        # the NIPR guard: the test copy gives a computer name with the NIPR label, as tests/engine_test.sh does (the engine has no switch)
+        (r"(?m)^function Get-OwnFqdn .*", "function Get-OwnFqdn { return 'pc01.area52.example.invalid' }"),
         (r"(?m)^\$usersRoot = 'C:\\Users'", "$usersRoot = '%s'" % users),
         (r"(?m)^\$goUrl = '.*'", "$goUrl = '%s'" % go),
         (r"(?m)^\$releaseUrl = '.*'", "$releaseUrl = '%s'" % file_url(t / "rel.json")),

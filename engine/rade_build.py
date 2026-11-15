@@ -955,7 +955,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
 # Kind: auto = runs on its own when the Check screen opens; signin = needs a CAC sign-in (button); guide = the PFM looks
 # in another program and answers (button). Advisory: a problem is a WARNING, never a FAILED.
 $checkDefs = @(
-  @{ Id = 'nipr'; Group = 'Local'; Name = 'This computer is not on a classified network'; Kind = 'auto' },
+  @{ Id = 'nipr'; Group = 'Local'; Name = 'This computer is on NIPR (area52 domain)'; Kind = 'auto' },
   @{ Id = 'ps'; Group = 'Local'; Name = 'PowerShell is version 5.1 or newer'; Kind = 'auto' },
   @{ Id = 'lang'; Group = 'Local'; Name = 'PowerShell is not restricted'; Kind = 'auto' },
   @{ Id = 'onedrive'; Group = 'Local'; Name = 'Your OneDrive folder is set up'; Kind = 'auto' },
@@ -973,19 +973,12 @@ $checkDefs = @(
 )
 # Short: the name in the window's narrow check column (the Administrator, 2026-11-14); the log and the e-mail keep Name.
 $dot = ' ' + [char]0x00B7 + ' '   # a middle dot between facts, made at run time so the bundle stays ASCII
-# ---- Environment guard (the Administrator, 14 Nov 26): RADE runs on NIPR computers only. It reads this computer's own
-# domain names (two local values: nothing is sent and no host is contacted) and compares their endings with the
-# classified-network suffixes below. It cannot prove NIPR; it stops an honest mistake. The names are never shown or saved.
-$classifiedSuffixes = @('smil.mil', 'sgov.gov', 'ic.gov')
-function Get-OwnDomain {
-  $d = @([string]$env:USERDNSDOMAIN)
-  try { $d += [string][System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().DomainName } catch { $null = $_ }
-  return @($d | Where-Object { $_ } | ForEach-Object { $_.Trim().TrimEnd('.').ToLowerInvariant() })
-}
-function Test-ClassifiedDomain {
-  foreach ($n in @(Get-OwnDomain)) { foreach ($x in $classifiedSuffixes) { if ($n -eq $x -or $n.EndsWith('.' + $x, [System.StringComparison]::Ordinal)) { return $true } } }
-  return $false
-}
+# ---- Environment guard (the Administrator, 15 Nov 26): RADE runs on NIPR computers only. It reads this computer's own
+# full name (host name and its domain: two local values; nothing is sent and no host is contacted) and goes on only when
+# that name contains the NIPR domain label below. It cannot prove NIPR; it stops an honest mistake. The name is never shown or saved.
+$niprLabel = '.area52.'
+function Get-OwnFqdn { try { $g = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties(); return [string]$g.HostName + '.' + [string]$g.DomainName } catch { return '' } }
+function Test-NiprDevice { return ([string](Get-OwnFqdn)).Trim().ToLowerInvariant().Contains($niprLabel) }
 function Get-CheckDef([string]$Id) { foreach ($d in $checkDefs) { if ($d.Id -eq $Id) { return $d } }; return $null }
 function Get-SiteUrl([string]$Base) {
   # Config\@@PREFIX@@-site.txt: the same file T16 site setup keeps (one place for the site address; never in the repo).
@@ -1205,9 +1198,9 @@ function Invoke-Check($Def, [string]$Base, [string]$Site, [scriptblock]$Tick) {
   try {
     switch ($Def.Id) {
       'nipr' {
-        # Reads only this computer's own domain names (Test-ClassifiedDomain); the name itself is never shown or saved.
-        if (Test-ClassifiedDomain) { $one = Format-CheckResult 'FAILED' 'This computer''s domain name ends in a classified-network suffix' 'Close RADE. Use it on a NIPR computer only' }
-        else { $one = Format-CheckResult 'PASSED' 'Read this computer''s own domain name: no classified-network suffix' '' }
+        # Reads only this computer's own full name (Test-NiprDevice); the name itself is never shown or saved.
+        if (Test-NiprDevice) { $one = Format-CheckResult 'PASSED' 'Read this computer''s own full name: it is in the area52 domain' '' }
+        else { $one = Format-CheckResult 'FAILED' 'This application cannot be installed in your environment.' '' }
       }
       'ps' {
         $v = $PSVersionTable.PSVersion
@@ -1504,11 +1497,9 @@ function Get-AppFact($A, $Hist) {
   $i = Get-InstalledText $A; if ($i) { $i = $i.Substring(0, 1).ToUpperInvariant() + $i.Substring(1) }
   return @{ Steps = $t; Installed = $i }
 }
-if (Test-ClassifiedDomain) {
+if (-not (Test-NiprDevice)) {
   # Before anything is written: no folder, no file, no saved check, no e-mail, no window.
-  Write-Host 'STOPPED: RADE runs on NIPR computers only.'
-  Write-Host 'This computer''s domain name ends in a classified-network suffix. RADE read only that name; it wrote nothing and sent nothing.'
-  Write-Host 'What to do: close this window. Do not copy RADE or its files to this network.'
+  Write-Host 'This application cannot be installed in your environment.'
   return
 }
 $gui = $true
