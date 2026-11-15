@@ -4,7 +4,12 @@ Newest first. Why the kit defaults are what they are: https://github.com/rhope-o
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-14 | Window redesign: concept 1 "One thing" goes forward as the mockup, with Restore and Uninstall screens and a larger logo and word mark (40 px, 15 pt). Build not approved yet. Detail: docs/reviews/2026-11-14-window-redesign-proposals.md. | the Administrator | "concept not chosen" in the row below |
+<<<<<<< HEAD
 | 2026-11-14 | Window redesign (concept not chosen; three concepts in docs/reviews/2026-11-14-window-redesign-proposals.md): (1) FAILED and NEEDS REVIEW are dark red #8B1A1A, added to the palette, so yellow #FFD520 means "your turn" only; (2) the redesign has no Exit button: Esc or the window's X exits, and RADE asks first only while a step runs; (3) a Maintenance screen is shown as a preview only and is not built before the Administrator approves it. | the Administrator | (2) replaces the Exit button of 90-161.Z 2026-11-14 (R17 window row) for the redesign |
+=======
+| 2026-11-14 | Maintenance screen: title "Maintenance", five action buttons: Install (label "Update to <version>" or "Repair" by state), Diagnose, Back up, Restore, Uninstall. Detail: docs/engine.md "Maintenance run types". The GUI session draws it (preview first). Not built. | the Administrator | Adds Back up to the four run types (row below) |
+>>>>>>> origin/main
 | 2026-11-14 | No reconnaissance, reworded and hardened: never anything malicious in nature or that could be misconstrued as malicious (no host finding or pinging, no port checks, no probing of network or logical boundaries; no exception). Reading SharePoint and Power Platform data with the user's own account, in the open, including to record what the account can do, is allowed. If there is any doubt, seek approval from the owner first. The rule itself cannot be changed. | the Administrator | Wording of the "nothing like network reconnaissance" row below |
 | 2026-11-14 | Tests: no change. The work-computer rounds are the Windows PowerShell 5.1 test; cloud tests stay on PowerShell 7; a 5.1 fault is fixed when a round finds it. | the Administrator | "how to move them is open" in the tests row below |
 | 2026-11-14 | Test-round results e-mail: the allowed owner-only exception to the DoD365 boundary rule until the test rounds end (masked counts, sent by hand by the owner). | the Administrator | — |
