@@ -145,12 +145,13 @@ printf '2\n\n\n\n' | USERDNSDOMAIN="notsmil.mil" USERPROFILE="$t/gu/test1234" pw
 grep -q "PASSED: This computer is not on a classified network" "$t/outg2.txt" && ! grep -q "^STOPPED: RADE runs on NIPR" "$t/outg2.txt" && ok || { bad "guard: a look-alike suffix must pass"; head -5 "$t/outg2.txt"; }
 grep -q "PASSED: This computer is not on a classified network" "$t/out0.txt" && ok || bad "guard: the check line is in a normal run"
 # 2. Only a site on the DAF SharePoint host is accepted.
-python3 - <<'P' && ok || bad "site address rule"
-import re
-src = open('engine/rade_build.py').read()
-assert "function Test-SiteUrl([string]$Url) { return ($Url -match ('^' + [regex]::Escape($sitePrefix) + '[^/\\s\"]+/?$')) }" in src
-assert "$sitePrefix = 'https://usaf.dps.mil/sites/'" in src
+grep "^\$sitePrefix = \|^function Test-SiteUrl" "$t/b.ps1" > "$t/site.ps1"
+cat >> "$t/site.ps1" <<'P'
+$bad = @('https://example.com/sites/a', 'http://usaf.dps.mil/sites/a', 'https://usaf.dps.mil/teams/a', 'https://usaf.dps.mil/sites/a/b', 'https://usaf.dps.mil.example.com/sites/a', 'https://usaf.dps.mil/sites/a\', 'https://usaf.dps.mil/sites/', '') | Where-Object { Test-SiteUrl $_ }
+$good = @('https://usaf.dps.mil/sites/a', 'https://USAF.dps.mil/sites/a-b_1/') | Where-Object { -not (Test-SiteUrl $_) }
+if (@($bad).Count -or @($good).Count) { 'WRONG ' + (@($bad) + @($good) -join ' '); exit 1 }
 P
+pwsh -NoProfile -File "$t/site.ps1" > "$t/outsite.txt" 2>&1 && ok || { bad "site address rule"; cat "$t/outsite.txt"; }
 # 3 and 4. Site rights with the admin flag (shown only), and the install record on the site (fake PnP: tests/fake-pnp).
 python3 - "$t" <<'P' && ok || bad "marker: build of the marker manifest"
 import json, subprocess, sys, pathlib, shutil
@@ -173,7 +174,7 @@ mkround() { # $1 = users root name; runs the marker bundle as the deploy app wit
   printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/$1/test1234" pwsh -NoProfile -File "$t/m-$1.ps1" > "$t/out-$1.txt" 2>&1; }
 echo '{ "admin": false, "rights": true, "list": true, "rows": {} }' > "$fake"; mkround m1
 grep -q "PASSED: You can change the site.*Site collection administrator: no (shown only, not required)" "$t/out-m1.txt" && ok || { bad "rights: admin flag shown, not required"; grep "change the site" "$t/out-m1.txt"; }
-grep -q '^On the site   when every step has passed, one row in the list "Sample Settings"' "$t/out-m1.txt" && grep -q "^First install from this account. Install Sample app (deploy) once for each wing" "$t/out-m1.txt" && ok || bad "marker: the plan names the row and gives the one-install notice"
+grep -q '^On the site   after the steps, one row in the list "Sample Settings"' "$t/out-m1.txt" && grep -q "^First install from this account. Install Sample app (deploy) once for each wing" "$t/out-m1.txt" && ok || bad "marker: the plan names the row and gives the one-install notice"
 grep -q '^Install record on the site: "Sample Settings", row "InstalledVersion" now holds version [0-9.]* and the date (added)' "$t/out-m1.txt" && grep -q '"InstalledVersion": *"[0-9.]* 20[0-9-]*"' "$fake" && ok || { bad "marker: written after a whole install"; tail -5 "$t/out-m1.txt"; cat "$fake"; }
 # Another account (no record of its own) on the same site: the check fails. The installer's own second run passes.
 mkround m2
@@ -186,6 +187,25 @@ mkround m1
 grep -q "PASSED: You can change the site" "$t/out-m1.txt" && ! grep -q "^First install from this account" "$t/out-m1.txt" && ok || { bad "marker: the installer's own second run passes"; grep "change the site" "$t/out-m1.txt"; }
 echo '{ "admin": true, "rights": true, "list": false, "rows": {} }' > "$fake"; mkround m3
 grep -q "Site collection administrator: yes" "$t/out-m3.txt" && grep -q '^NOTE: the install record on the site ("Sample Settings", row "InstalledVersion") was not written: the list was not found' "$t/out-m3.txt" && ok || { bad "marker: a missing list gives a NOTE"; tail -5 "$t/out-m3.txt"; }
+
+# Review, 15 Nov 26. The installer on another site that has a row is stopped too (the record is per site).
+echo '{ "admin": false, "rights": true, "list": true, "rows": { "InstalledVersion": "9.9 2026-01-01" } }' > "$fake"
+echo "https://usaf.dps.mil/sites/other" > "$t/m1/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
+printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m1/test1234" pwsh -NoProfile -File "$t/m-m1.ps1" > "$t/out-m1b.txt" 2>&1
+grep -q "FAILED: You can change the site.*\[version 9.9\], made from another account or for another site" "$t/out-m1b.txt" && ok || { bad "marker: the installer is stopped on another site"; grep "change the site" "$t/out-m1b.txt"; }
+# A row value that is not a version still counts as an install; a list that cannot be read is FAILED.
+echo '{ "admin": false, "rights": true, "list": true, "rows": { "InstalledVersion": "v9.9 someday" } }' > "$fake"; mkround m5
+grep -q "FAILED: You can change the site.*\[version not readable\]" "$t/out-m5.txt" && ok || { bad "marker: any row value is an install"; grep "change the site" "$t/out-m5.txt"; }
+echo '{ "admin": false, "rights": true, "list": true, "listError": true, "rows": {} }' > "$fake"; mkround m7
+grep -q "FAILED: You can change the site.*The install record on the site could not be read" "$t/out-m7.txt" && ok || { bad "marker: an unreadable record fails closed"; grep "change the site" "$t/out-m7.txt"; }
+# A part install (one step skipped) writes the row marked partial; that account's next run is not stopped; the row is then updated.
+echo '{ "admin": false, "rights": true, "list": true, "rows": {} }' > "$fake"
+mkdir -p "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
+swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-m6.ps1" "$t/m6"
+printf '2\n\nS\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234" pwsh -NoProfile -File "$t/m-m6.ps1" > "$t/out-m6.txt" 2>&1
+grep -q "marked partial (added)" "$t/out-m6.txt" && grep -q '"InstalledVersion": *"[0-9.]* 20[0-9-]* partial"' "$fake" && ok || { bad "marker: a part install is recorded as partial"; tail -4 "$t/out-m6.txt"; cat "$fake"; }
+mkround m6
+grep -q "PASSED: You can change the site" "$t/out-m6.txt" && grep -q "now holds version [0-9.]* and the date (updated)" "$t/out-m6.txt" && ! grep -q "partial" "$fake" && ok || { bad "marker: the same account finishes its part install"; grep "change the site\|Install record" "$t/out-m6.txt"; cat "$fake"; }
 
 # The tagline (the Administrator, 14 Nov 26): no "DoD".
 ! grep -q "for your DoD organization" engine/rade_build.py && grep -q "'Test and deploy apps for your organization'" engine/rade_build.py && ok || bad "tagline"

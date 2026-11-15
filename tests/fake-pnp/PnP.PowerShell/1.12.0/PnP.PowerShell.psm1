@@ -11,11 +11,11 @@ function Get-PnPWeb {
   $perm = New-Object psobject | Add-Member -PassThru -MemberType ScriptMethod -Name Has -Value ([scriptblock]::Create('param($k) return ' + $(if ($s.rights) { '$true' } else { '$false' })))
   return [pscustomobject]@{ EffectiveBasePermissions = $perm; CurrentUser = [pscustomobject]@{ IsSiteAdmin = [bool]$s.admin } }
 }
-function Get-PnPList { param([string]$Identity) if ((Get-FakeState).list) { return [pscustomobject]@{ Title = $Identity } } }
+function Get-PnPList { param([string]$Identity) if ((Get-FakeState).listError) { throw "list read failed" }; if ((Get-FakeState).list) { return [pscustomobject]@{ Title = $Identity } } }
 function Get-PnPListItem {
   param($List, [string]$Query)
-  $s = Get-FakeState
-  foreach ($p in @($s.rows.PSObject.Properties)) { if ($Query -like ("*>" + $p.Name + "<*")) { $h = @{ Title = $p.Name; SettingValue = [string]$p.Value }; $h | Add-Member -NotePropertyName Id -NotePropertyValue 1; return , $h } }
+  $s = Get-FakeState; $i = 0
+  foreach ($p in @($s.rows.PSObject.Properties)) { $i++; if ($Query -like ("*>" + $p.Name + "<*")) { $h = @{ Title = $p.Name; SettingValue = [string]$p.Value }; $h | Add-Member -NotePropertyName Id -NotePropertyValue $i; return , $h } }
 }
 function Set-FakeRow([hashtable]$Values, [string]$Title) {
   $s = Get-FakeState
@@ -23,4 +23,4 @@ function Set-FakeRow([hashtable]$Values, [string]$Title) {
   $s | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
 }
 function Add-PnPListItem { param($List, [hashtable]$Values) Set-FakeRow $Values ([string]$Values['Title']) }
-function Set-PnPListItem { param($List, $Identity, [hashtable]$Values) Set-FakeRow $Values 'InstalledVersion' }
+function Set-PnPListItem { param($List, $Identity, [hashtable]$Values) Set-FakeRow $Values ([string]@((Get-FakeState).rows.PSObject.Properties)[[int]$Identity - 1].Name) }

@@ -357,7 +357,7 @@ function Get-StepEnv([string]$Base, $Step) {
     }
   }
   return [ordered]@{ RADE_CONTRACT = '1'; RADE_MODE = [string]$script:app.Mode; RADE_APP = [string]$script:app.Name; RADE_APP_VERSION = [string]$script:app.Version
-    RADE_INSTALLED_VERSION = $inst; RADE_STEP_LAST = $last; RADE_SITE = [string](Get-SiteUrl $Base) }
+    RADE_INSTALLED_VERSION = $inst; RADE_STEP_LAST = $last; RADE_SITE = $(if (Test-SiteUrl (Get-SiteUrl $Base)) { [string](Get-SiteUrl $Base) } else { '' }) }
 }
 function ConvertTo-MadeName([string]$Name, [string]$Site) {
   # A made item's name goes into the record: no address, no ID, one line, 200 characters at most.
@@ -628,7 +628,7 @@ function Get-RoundPlan {
   $lines += ('Settings   RADE\Config (' + $(if (Test-Deploy) { 'the installed versions' } else { 'the e-mail address' }) + ' and the saved checks) and Config\@@PREFIX@@-site.txt (the site address).')
   if ((Test-Deploy) -and $script:app.Marker) {
     $lines += ''
-    $lines += ('On the site   when every step has passed, one row in the list "' + $script:app.Marker.List + '" (row "' + $script:app.Marker.Key + '": the installed version and the date, no name).')
+    $lines += ('On the site   after the steps, one row in the list "' + $script:app.Marker.List + '" (row "' + $script:app.Marker.Key + '": the installed version and the date, no name).')
     if (Test-FirstInstall) { $lines += ('First install from this account. Install ' + $script:app.Name + ' once for each wing, on one site: RADE stops a second install on this site, but it cannot see an install on another site.') }
   }
   $lines += ''
@@ -661,6 +661,7 @@ function ConvertTo-InstalledRun($V) {
   $at = $V.at; if ($at -is [datetime]) { $at = $at.ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }   # PowerShell 7 reads it as a date
   $o = [ordered]@{ version = [string]$V.version; build = [string]$V.build; round = [string]$V.round; at = [string]$at }
   if ($null -ne $V.state) { $o.state = [string]$V.state }
+  if ($V.site) { $o.site = [string]$V.site }
   return $o
 }
 function Read-Installed {
@@ -707,8 +708,12 @@ function Save-Installed([string]$State, [bool]$Whole, $StepRecs) {
     $key = Get-InstalledKey $script:app
     $run = [ordered]@{ version = [string]$script:app.Version; build = [string]$buildId; round = [string]$round; at = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }
     $inst = $null; if ($all.ContainsKey($key)) { $inst = $all[$key].installed }
-    if ($State -eq 'PASSED' -and $Whole) { $inst = [ordered]@{ version = $run.version; build = $run.build; round = $run.round; at = $run.at } }
+    # "site": a short hash of the site address this run used (never the address): an install record on the site is
+    # this account's own only when the hashes match (review, 15 Nov 26: one account, two sites).
+    $sm = Get-SiteMark (Get-SiteUrl (Get-BasePath))
+    if ($State -eq 'PASSED' -and $Whole) { $inst = [ordered]@{ version = $run.version; build = $run.build; round = $run.round; at = $run.at }; if ($sm) { $inst.site = $sm } }
     $run.state = $State
+    if ($sm) { $run.site = $sm }
     $st = [ordered]@{}; if ($all.ContainsKey($key) -and $all[$key].steps) { $st = $all[$key].steps }
     if ($StepRecs) { foreach ($n in @($StepRecs.Keys)) {
       $made = @(); $seen = @{}
@@ -908,8 +913,8 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     elseif (-not $whole) { & $speak ('Note: some steps were off or skipped, so version ' + $script:app.Version + ' is not recorded as installed. Run again with every step on.') }
     else {
       & $speak ('Version ' + $script:app.Version + ' of ' + $script:app.Name + ' is recorded as installed.')
-      if ($script:app.Marker) { $mw = Write-SiteMarker $base; & $speak $mw; $summary += $mw }
     }
+    if ($script:app.Marker -and ($whole -or $stepRecs.Count)) { $mw = Write-SiteMarker $base ([bool]($whole -and -not $bad)); & $speak $mw; $summary += $mw }
     $ml = @(Get-MadeLine); if ($ml.Count) { foreach ($l in $ml) { & $speak $l }; $summary += $ml }
     [void](Export-RoundResult $base $summary)   # the report also holds the deploy notes and the made list
     & $speak ('DONE in ' + (Format-Duration ((Get-Date) - $started).TotalSeconds) + '. The report is in Rounds\' + $round + ' on this computer. Nothing was sent.')
@@ -977,7 +982,7 @@ function Get-SiteUrl([string]$Base) {
 $sitePrefix = 'https://usaf.dps.mil/sites/'   # the DAF SharePoint address every site starts with; the box starts with it
 # Guardrail (the Administrator, 15 Nov 26): only a site on the DAF SharePoint host is accepted, so RADE never signs in to
 # or writes to another host.
-function Test-SiteUrl([string]$Url) { return ($Url -match ('^' + [regex]::Escape($sitePrefix) + '[^/\s"]+/?$')) }
+function Test-SiteUrl([string]$Url) { return ($Url -match ('^' + [regex]::Escape($sitePrefix) + '[^/\\\s"]+/?$')) }
 function Save-SiteUrl([string]$Base, [string]$Url) {
   $p = Get-ConfigFile $Base '@@PREFIX@@-site.txt'
   $dir = Split-Path -Parent $p
@@ -1091,11 +1096,14 @@ try {
     try {
       $script:mk = 'none'
       $null = & {
-        $l = Get-PnPList -Identity $MarkerList -ErrorAction SilentlyContinue
+        $l = Get-PnPList -Identity $MarkerList -ErrorAction Stop   # a list that does not exist gives nothing, not an error
         if ($l) {
           $q = "<View><Query><Where><Eq><FieldRef Name='Title'/><Value Type='Text'>" + $MarkerKey + "</Value></Eq></Where></Query><RowLimit>1</RowLimit></View>"
           $it = @(Get-PnPListItem -List $l -Query $q -ErrorAction Stop)
-          if ($it.Count -and ([string]$it[0][$MarkerField]) -match '^\s*([0-9][0-9.]*)') { $script:mk = 'found ' + $Matches[1] }
+          if ($it.Count) {
+            $v = ([string]$it[0][$MarkerField]).Trim()
+            if ($v -match '^([0-9][0-9.]*)') { $script:mk = 'found ' + $Matches[1] } elseif ($v) { $script:mk = 'found 0' }   # any value is an install
+          }
         }
       } *>&1
       'MARKER ' + $script:mk
@@ -1115,10 +1123,16 @@ function Get-MarkerArg {
   if (-not $m) { return '' }
   return (' -MarkerList "' + $m.List + '" -MarkerKey "' + $m.Key + '" -MarkerField "' + $m.Field + '"')
 }
+function Get-SiteMark([string]$Site) {
+  if (-not (Test-SiteUrl $Site)) { return '' }
+  return (Get-ShortHash $Site.Trim().TrimEnd('/').ToLowerInvariant())
+}
 function Test-InstalledHere {
-  # True when this account's record says it installed the chosen app.
+  # True when this account's record says it ran a deploy of the chosen app on this site (a whole install or a part of one).
   $e = (Read-Installed)[(Get-InstalledKey $script:app)]
-  return [bool]($e -and $e.installed)
+  $h = Get-SiteMark (Get-SiteUrl (Get-BasePath))
+  if (-not $e -or -not $h) { return $false }
+  return [bool](($e.installed -and $e.installed.site -eq $h) -or ($e.lastRun -and $e.lastRun.site -eq $h))
 }
 function Test-FirstInstall { return ((Test-Deploy) -and [bool]$script:app.Marker -and -not (Test-InstalledHere)) }
 $markerScript = @'
@@ -1133,7 +1147,7 @@ try {
   $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1
   $script:res = 'no-list'
   $null = & {
-    $l = Get-PnPList -Identity $MarkerList -ErrorAction SilentlyContinue
+    $l = Get-PnPList -Identity $MarkerList -ErrorAction Stop
     if ($l) {
       $q = "<View><Query><Where><Eq><FieldRef Name='Title'/><Value Type='Text'>" + $MarkerKey + "</Value></Eq></Where></Query><RowLimit>1</RowLimit></View>"
       $it = @(Get-PnPListItem -List $l -Query $q -ErrorAction Stop)
@@ -1145,16 +1159,17 @@ try {
   exit 0
 } catch { 'RESULT failed ' + $_.Exception.GetType().Name; exit 2 }
 '@
-function Write-SiteMarker([string]$Base) {
-  # After a whole install. Returns the one line for the log and the report.
+function Write-SiteMarker([string]$Base, [bool]$Whole) {
+  # After a deploy that ran a step: a part install is recorded too (its flows may be imported already), with the word
+  # "partial". Returns the one line for the log and the report.
   $m = $script:app.Marker; $site = Get-SiteUrl $Base
   $where = '"' + $m.List + '", row "' + $m.Key + '"'
   $again = ' Until it is written, another account is not stopped from a second install on this site: run this deploy again'
   if (-not (Test-SiteUrl $site)) { return ('NOTE: the install record on the site (' + $where + ') was not written: no site address.' + $again) }
-  $val = [string]$script:app.Version + ' ' + (Get-Date).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+  $val = [string]$script:app.Version + ' ' + (Get-Date).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture) + $(if ($Whole) { '' } else { ' partial' })
   $r = Invoke-ChildScript $markerScript ('-Site "' + $site + '"' + (Get-MarkerArg) + ' -Value "' + $val + '"') 300 $null
   $w = ''; foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $w = $Matches[1] } }
-  if ($w -in 'added', 'updated') { return ('Install record on the site: ' + $where + ' now holds version ' + $script:app.Version + ' and the date (' + $w + ').') }
+  if ($w -in 'added', 'updated') { return ('Install record on the site: ' + $where + ' now holds version ' + $script:app.Version + ' and the date' + $(if ($Whole) { '' } else { ', marked partial' }) + ' (' + $w + ').') }
   $why = $(switch ($w) { 'no-list' { 'the list was not found' } 'no-pnp' { 'the SharePoint tool is not installed' } default { 'the sign-in or the write did not finish' } })
   return ('NOTE: the install record on the site (' + $where + ') was not written: ' + $why + '.' + $again)
 }
@@ -1281,7 +1296,7 @@ function Invoke-Check($Def, [string]$Base, [string]$Site, [scriptblock]$Tick) {
             $miss = @($rightsNeeded | Where-Object { -not $have[$_] } | ForEach-Object { $rightWords[$_] })
             $got = @($have.Keys | Sort-Object | Where-Object { $have[$_] } | ForEach-Object { $rightWords[$_] })
             if ($miss.Count) { $one = Format-CheckResult 'FAILED' ('Missing: ' + ($miss -join ', ')) 'Ask a site owner to add you to the site Owners group' }
-            elseif ((Test-FirstInstall) -and $mk -like 'found *') { $one = Format-CheckResult 'FAILED' ('This site already has an install of this application [version ' + $mk.Substring(6) + '], made from another account') 'Do not install again: every flow would run twice. Ask the person who installed it to run RADE' }
+            elseif ((Test-FirstInstall) -and $mk -like 'found *') { $one = Format-CheckResult 'FAILED' ('This site already has an install of this application [version ' + $(if ($mk -eq 'found 0') { 'not readable' } else { $mk.Substring(6) }) + '], made from another account or for another site') 'Do not install again: every flow would run twice. Ask the person who installed it to run RADE' }
             elseif ((Test-FirstInstall) -and $mk -ne 'none') { $one = Format-CheckResult 'FAILED' 'The install record on the site could not be read' 'Select "Sign in and check site rights" again' }
             else { $one = Format-CheckResult 'PASSED' ('Rights: ' + ($got -join ', ') + '. ' + $admText) '' }
           }
