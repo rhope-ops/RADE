@@ -15,7 +15,14 @@ od="$t/u/test1234/OneDrive - United States Air Force"; cfg="$od/RADE/Config"
 # rec KEY: the record file name of one app (the first 12 hex of the SHA-256 of the lower-case key), as the engine names it.
 rec() { python3 -c "import hashlib,sys; print(hashlib.sha256(sys.argv[1].lower().rstrip('/').encode()).hexdigest()[:12] + '.json')" "$1"; }
 inst="$cfg/installed/$(rec 'SampleApp/Sample app (deploy)')"
-mkdir -p "$od" "$t/app/scripts"; cp -r tests/fixture-app/. "$t/app/"; cp schemas/examples/sample-manifest.json "$t/app/scripts/paste_bundles.json"
+# ans FILE: the hand step T02 of a manifest gets the questions in tests/fixture-app/answers.json (manifest "answers").
+ans() { python3 - "$1" <<'P'
+import json, sys
+p = sys.argv[1]; m = json.load(open(p)); a = json.load(open('tests/fixture-app/answers.json'))
+[s for s in m['bundles'][0]['steps'] if s['name'] == a['step']][0]['answers'] = a['answers']; json.dump(m, open(p, 'w'), indent=2)
+P
+}
+mkdir -p "$od" "$t/app/scripts"; cp -r tests/fixture-app/. "$t/app/"; cp schemas/examples/sample-manifest.json "$t/app/scripts/paste_bundles.json"; ans "$t/app/scripts/paste_bundles.json"
 : > "$t/go.md"; echo '{ "apps": { "Sample app (deploy)": "9.0.0", "Sample app": "9.0.0" } }' > "$t/rel.json"
 mkdir -p "$od/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$od/RADE/SampleApp/Config/SAMPLE-site.txt"
 # swap IN OUT USERS: the test copy of a bundle: users root, repository addresses and the check gate swapped for local ones,
@@ -34,9 +41,40 @@ b="$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1"
 grep -q "Name = 'Sample app (deploy)'.*Mode = 'deploy'; Version = '1.0.0'" "$b" && ! grep "Name = 'Sample app (deploy)'" "$b" | grep -q "'outlook'" && ok || bad "catalog: deploy app has Mode, Version and no outlook check"
 grep "Name = 'Sample app'" "$b" | grep -q "'outlook'.*Mode = 'test'; Version = ''" && ok || bad "catalog: test app keeps the outlook check and Mode test"
 
+# ---- answers: a hand step's questions after Done (docs/engine.md "Step contract"; the Administrator, 2026-11-15).
+python3 scripts/check_manifest.py "$t/app/scripts/paste_bundles.json" > "$t/cm.txt" && grep -q "^\$steps += @{ Name = 'T02 Sample import r1'.*; Answers = @(@{ Key = 'run-started'; Prompt = 'Did the flow run start?'; Kind = 'yesno'; Choices = @() }, @{ Key = 'flow-count'; .*Kind = 'pick'; Choices = @('One', 'Two', 'Three or more') }, @{ Key = 'note'; .*Kind = 'text'; Choices = @() }) }$" "$b" && ! grep "^\$steps += " "$b" | grep -v "Name = 'T02 " | grep -q "Answers" && ok || { bad "answers: the schema must accept the fixture, and only its hand step gets an Answers list"; cat "$t/cm.txt"; }
+# Bad lists: the schema check and the build both reject them, each with its reason.
+python3 - "$t" <<'P' && ok || bad "answers: a bad list must fail the schema check and the build"
+import json, subprocess, sys, pathlib, shutil
+t = pathlib.Path(sys.argv[1]); good = json.loads((t / 'app/scripts/paste_bundles.json').read_text())
+qs = [s for s in good['bundles'][0]['steps'] if s['name'] == 'T02 Sample import r1'][0]['answers']
+def case(name, edit, check_says, build_says):
+    m = json.loads(json.dumps(good)); edit(m['bundles'][0]['steps']); a = t / ('ans-' + name)
+    shutil.copytree(t / 'app', a); (a / 'scripts/paste_bundles.json').write_text(json.dumps(m))
+    c = subprocess.run([sys.executable, 'scripts/check_manifest.py', str(a / 'scripts/paste_bundles.json')], capture_output=True, text=True)
+    b = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(a)], capture_output=True, text=True)
+    assert c.returncode == 1 and check_says in c.stdout, (name, c.stdout)
+    assert b.returncode != 0 and build_says in b.stderr, (name, b.stderr)
+def on_script(st): st[0]['answers'] = [qs[0]]
+def no_choices(st): st[2]['answers'] = [{'key': 'n', 'prompt': 'How many?', 'kind': 'pick'}]
+def five(st): st[2]['answers'] = qs + [{'key': 'k%d' % i, 'prompt': 'Again?', 'kind': 'yesno'} for i in range(2)]
+def twice(st): st[2]['answers'] = [qs[0], dict(qs[2], key='run-started')]
+case('script', on_script, "step 'T01 Sample check r1': answers: only a guide step (kind \"guide\") can ask questions", "step 'T01 Sample check r1': answers: only a guide step (kind \"guide\") can ask questions")
+case('pick', no_choices, "'choices' is a required property", "question 'n': a pick needs 2 to 4 choices")
+case('five', five, 'is too long', 'answers: 1 to 4 questions, not 5')
+case('twice', twice, "answers: the key 'run-started' is used twice", "question 2: the key 'run-started' is used twice")
+def newline(st): st[2]['answers'] = [dict(qs[0], key='abc\n')]
+def same(st): st[2]['answers'] = [dict(qs[1], choices=['One', 'One'])]
+case('newline', newline, "should not be valid under {'pattern': '\\n'}", 'question 1: the key must be 1 to 24 lowercase')
+case('same', same, 'has non-unique elements', "question 'flow-count': the choices of a pick must differ")
+def case_sp(st): st[2]['answers'] = [dict(qs[1], choices=['One', 'one ', 'Two'])]
+case('case', case_sp, "answers: the choices of 'flow-count' must differ (case and spaces ignored)", "question 'flow-count': the choices of a pick must differ (case and spaces ignored)")
+P
+
 # ---- sizes and text lengths (docs/window-design.md "Sizes", "Text lengths"; the Administrator, 2026-11-15)
 # Every button is made with a named kind (its size is in $ui.Z), and no other place sets a button's size.
-[ "$(grep -o '& \$ui\.Btn [^;)]*' engine/rade_build.py | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -c 'MinimumSize = ' engine/rade_build.py)" = 2 ] && ok || bad "sizes: a button is made without a kind, or sets its own size"
+# (The bottom line's own minimum height, 46, is not a button size: R24. Only that one expression is left out of the count.)
+[ "$(grep -o '& \$ui\.Btn [^;)]*' engine/rade_build.py | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_build.py | grep -vxc 'MinimumSize = New-Object System\.Drawing\.Size(0, 46)')" = 2 ] && ok || bad "sizes: a button is made without a kind, or sets its own size"
 # The limits in the document are the limits of the build.
 python3 - <<'P' && ok || bad "text lengths: docs/window-design.md and TEXT_LIMITS (engine/rade_build.py) differ"
 import importlib.util, re, pathlib
@@ -64,7 +102,7 @@ mkdir -p "$t/wu/test1234/OneDrive - United States Air Force"
 swap "$b" "$t/wb.ps1" "$t/wu"
 win() { sed -E -e 's#Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing#$null = 0#' -e "s#^\\\$sitePrefix = 'https://usaf.dps.mil/sites/'#\$sitePrefix = 'https://rade-test.invalid/sites/'#" -e 's#System\.Drawing\.(FontStyle|Font|Pen|SolidBrush|Image|Graphics)\b#RadeDraw.\1#g' "${5:-$t/wb.ps1}" > "$t/wb2.ps1"
   cat tests/window_driver.ps1 "$t/wb2.ps1" > "$t/w.ps1"
-  RADE_T_STUB="$PWD/tests/window_stub.cs" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$t/wu/test1234" timeout 180 pwsh -NoProfile -File "$t/w.ps1" < /dev/null > "$t/win.txt" 2>&1; }
+  RADE_T_SCALE="${scale:-}" RADE_T_LOOP="${loop:-}" RADE_T_STUB="$PWD/tests/window_stub.cs" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$t/wu/test1234" timeout 180 pwsh -NoProfile -File "$t/w.ps1" < /dev/null > "$t/win.txt" 2>&1; }
 # has TEXT...: every text is in the window output, and the window did not fall back to text mode or miss a name.
 has() { local x; grep -q "No window could open\|WIN NONAME\|WIN NOFOCUS\|WIN BAD" "$t/win.txt" && return 1; for x in "$@"; do grep -qF -- "$x" "$t/win.txt" || { echo "  missing: $x"; return 1; }; done; grep -q "^WIN closed=True" "$t/win.txt"; }
 # 1. A first deploy: boot, choose with the newer-version notice, ready, the Record (boxes can change, Clean-up off), the hand step, done.
@@ -72,6 +110,40 @@ win 1 done 1 0
 has "view=boot" "view=choose light=off kick= sent=Which application do you want to install?" "2 Sample app (deploy) 1.0.0 NOTE Version 9.0.0 is on the app page" "view=ready light=off kick=ALL 8 CHECKS PASSED sent=Ready to install Sample app (deploy) 1.0.0." \
   "WIN record on=True rows=10 boxes=5 enabled=True text=True name=True reused=Last check: 14-11-26 / Version [5.1] tall=True" "WIN paged=" "WIN record on=False clean=False" "view=hand light=RADE waits for you kick=STEP 2 OF 3 · YOUR TURN sent=T02 Sample import r1" "btn=[Imported] [It failed] [Skip]" \
   "view=done light=off kick=ALL STEPS PASSED sent=Sample app (deploy) 1.0.0 is installed. p=Nothing was sent." "btn=[Close] [What it made] [Open results folder] [Copy summary]" "WIN made=True log=True locked=True" "WIN copied=True" && ! grep -q "foot=Site\|Change the site address" "$t/win.txt" && ok || { bad "window 1: first deploy"; tail -5 "$t/win.txt" | cut -c1-300; }
+# 1b. The hand step's questions after Done: one card each (No, the second choice, a text with an e-mail address), and
+# their lines under the step's line in the report, the text masked (docs/engine.md "Step contract").
+wr="$t/wu/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt"
+has "view=answer light=RADE waits for you kick=STEP 2 OF 3 · QUESTION 1 OF 3 sent=Did the flow run start? p= btn=[Yes] [No]" "kick=STEP 2 OF 3 · QUESTION 2 OF 3 sent=How many flows does the import page show? p= btn=[One] [Two] [Three or more]" \
+  "kick=STEP 2 OF 3 · QUESTION 3 OF 3 sent=Anything else to report? p=Do not type names or addresses. btn=[Continue]" "WIN answer-box max=120 enter=Continue focus=True" && [ "$(grep -c "^WIN view=answer" "$t/win.txt")" = 3 ] &&
+  [ "$(grep -A3 "^T02 Sample import r1: PASSED (confirmed by you) in " "$wr" | tail -3 | tr -d '\r' | tr '\n' '|')" = "  Answer run-started: No|  Answer flow-count: Two|  Answer note: Mail <EMAIL> about it|" ] && ! grep -q "someone@" "$wr" && ok || { bad "window 1b: the answer cards and the answers in the report"; grep -A3 "^T02 Sample" "$wr"; grep "view=answer\|answer-box" "$t/win.txt" | cut -c1-300; }
+# 1c. A minimized window comes back when RADE needs the person; it has its own taskbar button (Application.Run: no owner).
+# The layout line and the SCALE line at 100 %; the sizes RADE sets after the form has scaled, at 100 % (the same numbers as
+# before the one scale source: tests/window_driver.ps1 "WIN measure").
+has "WIN restored=Normal taskbar=True minbox=True shown-by=Run" "WIN layline=Layout self-check: PASS layout, 0 cards (1020 x 684 at 100 %) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=96x96 font=17 fontPt=10 aware=n/a screen=1280x800 work=1280x720 client=1020x684 state=Normal logo=40x40 btn=400x40" \
+  "WIN measure choice h=110 gap=8 plan-x=54" "WIN measure record box=5,4 label=5,6 rows=268" && ok || { bad "window 1c: restore, taskbar, the scale line"; grep "restored=\|layline=" "$t/win.txt" | cut -c1-300; }
+# 1d. Polish after the R24 pictures (docs/window-design.md "Sizes"): the header and the label-box-button rows share one
+# midpoint within 1 px (from margins and sizes; an odd height gives a half pixel; the stand-ins have no layout), a box is as tall as a compact button, gaps of 8; the
+# question headline is the prompt's first sentence (one sentence: no body line; two: the rest is the body line, 1b) and a
+# first sentence too long for one line shrinks (22 pt, floor 13.2 pt = 60 %; the stand-ins' card is 258 px); the self-check's alignment rules pass an aligned fixture
+# and give one LAYOUT line for each fault of a misaligned one (a box 6.5 px off, a button 3 px off, box 23 vs button 30, a headline 3 px right).
+has "WIN mid hand label=18.5 box=19 button=19 box-h=30 button-h=30 gaps=8,8 inner=148/160 tick=0" "WIN mid header logo=20 word=20 app=19.5" "WIN mid answer label=18.5 box=19 h=30" \
+  'WIN sent-pt=22 for "Did the flow run start?"' 'WIN sent-pt=22 for "Anything else to report?"' 'WIN sent-pt=13.2 for "How many flows does the import page show?"' \
+  "WIN rule aligned=0 misaligned=4 ~ LAYOUT fixture FieldRow FieldBox midpoint: 15.5, the row midpoint is 22 ~ LAYOUT fixture FieldRow FieldB midpoint: 19, the row midpoint is 22 ~ LAYOUT fixture FieldRow heights: box FieldBox 23, button FieldB 30 ~ LAYOUT fixture Sent edge: starts at 126, the card edge is 123 (Kick)" && ok || { bad "window 1d: alignment, question headline, alignment rules"; grep "WIN mid\|sent-pt\|WIN rule" "$t/win.txt" | cut -c1-300; }
+# 1f. Review of b093036: a click within 400 ms of a new card does nothing (a double-click on Done answers no question
+# unseen; Enter clicks the same buttons); a word wider than the line is cut into pieces that fit, and the self-check
+# reports a word of a wrapping label that is wider than the label; the Record's step boxes are one line that ends with
+# "..." (R24 job: "(needs you)" was cut to "(ne"), shortened by RADE (no AutoEllipsis: no tooltip); the click guard runs on a
+# monotonic clock (a reference "in the future", as after the clock stepped back, never blocks; 401 ms after a card the click
+# is taken, 100 ms after it is not); long words break by text element (a surrogate pair stays whole) and in body lines too.
+has "WIN measure record box=5,4 label=5,6 rows=268 one-line=True" "WIN guard held=True then=Yes" "WIN break=abc|def|ghi|j word-bad=LAYOUT fixture P0 text: the word \"abcdefghij\" needs 70, the line is 50 word-ok=True" && ok || { bad "window 1f: click guard, long words"; grep "WIN guard\|WIN break" "$t/win.txt" | cut -c1-300; }
+# 1g. Second review of 9d71b28: the click guard on a monotonic clock, breaks by text element and in body lines, and a step
+# name shortened by RADE with "..." (no AutoEllipsis).
+has "WIN clock future=True after400=True within=False" && ok || { bad "window 1g: monotonic click guard"; grep "WIN clock" "$t/win.txt"; }
+has "WIN surrogate pieces=3 whole=True" "WIN shorten=abcd... body-break=True" && ok || { bad "window 1g: text elements, body lines, shortened step names"; grep "WIN surrogate\|WIN shorten" "$t/win.txt"; }
+# 1e. R24 job on b093036: a box's text box fills its frame (frame - 2 x 6) also when the frame's size never changed, and the
+# box is as tall as the compact button measured; a row that wraps is aligned line by line (the check box alone on the
+# second line of the test extras is no defect; on the first line, 39 px low, it is).
+has "WIN rule wrapped=0 one-line=1 ~ LAYOUT fixture TestRow OkBox midpoint: 58, the row midpoint is 19" && ok || { bad "window 1e: rows that wrap"; grep "WIN rule" "$t/win.txt" | cut -c1-300; }
 # 2. A second deploy with a blocked application, Maintenance (Esc = Back, then the same choice: 2 Maintenance cards),
 # the site address, a failed check that runs again (2 cards), a sign-in check that failed (its card offers the sign-in),
 # the look-and-answer check, and a hand step that failed: needs review with the help line.
@@ -79,14 +151,22 @@ win 1 fail 0 1
 has "opts=OFF Sample app; 1 Sample app (deploy) 1.0.0" "btn=[Check this computer again]" "view=maint light=off kick=SAMPLE APP (DEPLOY) 1.0.0 · INSTALLED " "sent=Maintenance" "btn=[Repair] (Diagnose) (Back up) (Restore) (Uninstall)" \
   "view=site light=off kick= sent=Which site does the application go to?" "WIN site-note=The address must look like https://rade-test.invalid/sites/name" "view=fail light=failed kick=CHECK 9 OF 11 · FAILED sent=One check failed. p=Your SharePoint site can be reached" "btn=[Run checks again] [Change the site address]" "WIN esc" "WIN again" "sent=One check failed. p=You can change the site (sign in with your CAC) / Sign-in was not finished" "btn=[Sign in and check site rights] [Change the site address]" \
   "view=need light=RADE waits for you kick=CHECK 10 OF 11 · YOUR TURN sent=One check needs you." "btn=[Sign in and check site rights]" "btn=[Check Power Automate]" "sent=Check Power Automate" "btn=[Yes: I see both] [No: one is missing] [Not now]" "kick=ALL 11 CHECKS PASSED" "btn=[Install] [Steps and files] [Change the site address] foot=Site: fake" \
-  "view=handfail" "view=review light=failed kick=NEEDS REVIEW sent=The install is not complete. p=T02 Sample import r1: FAILED (reported by you)" "flow <SITE> not found" "help=For help, ask in the Teams channel" "btn=[Copy summary] [Open results folder] [What it made] [Close]" && [ "$(grep -c "^WIN view=maint" "$t/win.txt")" = 2 ] && [ "$(grep -c "^WIN view=fail .*CHECK 9 OF 11" "$t/win.txt")" = 2 ] && ok || { bad "window 2: Maintenance, checks that fail or need you, needs review"; tail -5 "$t/win.txt" | cut -c1-300; }
+  "view=handfail" "view=review light=failed kick=NEEDS REVIEW sent=The install is not complete. p=T02 Sample import r1: FAILED (reported by you)" "flow <SITE> not found" "help=For help, ask in the Teams channel" "btn=[Copy summary] [Open results folder] [What it made] [Close]" && [ "$(grep -c "^WIN view=maint" "$t/win.txt")" = 2 ] && [ "$(grep -c "^WIN view=fail .*CHECK 9 OF 11" "$t/win.txt")" = 2 ] && ! grep -q "^WIN view=answer" "$t/win.txt" && ok || { bad "window 2: Maintenance, checks that fail or need you, needs review (and no question after It failed)"; tail -5 "$t/win.txt" | cut -c1-300; }
 # 3. A test round: the owner's test extras show on Done; a deploy never shows them (1 and 2 have no "test=shown").
-win 0 done 0 0
-has "sent=Ready to run round R01." "view=done light=off kick=ALL STEPS PASSED sent=Round R01 is done." "test=shown" "WIN draft-note=The Outlook draft could not be created" && ! grep -q "Sample app (deploy).*test=shown" "$t/win.txt" && ok || { bad "window 3: test round"; tail -5 "$t/win.txt" | cut -c1-300; }
+# Here Application.Run fails as when a message loop already runs on the thread: the window opens with ShowDialog.
+loop=1 win 0 done 0 0
+has "shown-by=ShowDialog" "sent=Ready to run round R01." "view=done light=off kick=ALL STEPS PASSED sent=Round R01 is done." "test=shown" "WIN draft-note=The Outlook draft could not be created" && ! grep -q "Sample app (deploy).*test=shown" "$t/win.txt" && ok || { bad "window 3: test round"; tail -5 "$t/win.txt" | cut -c1-300; }
 # 4. A deploy whose download fails: stopped, with the help line.
 sed "s#file://$t/app/flow/SAMPLE-data#file://$t/app/flow/NOPE#" "$t/wb.ps1" > "$t/wf.ps1"
 win 1 done 0 0 "$t/wf.ps1"
 has "view=stopped light=failed kick=STOPPED sent=The install stopped. p=A file this install needs could not be downloaded" "help=For help, ask in the Teams channel" "btn=[Copy the log] [Try again] [Close]" && ok || { bad "window 4: stopped"; tail -5 "$t/win.txt" | cut -c1-300; }
+# 5. The R24 device case: the form scales 1.5 x (144 dpi) while the screen dpi says 96. What RADE sizes after the form has
+# scaled follows the form: a drawn part (the text start of a choice: 54 -> 81), a control made later (the gap under a
+# choice: 8 -> 12; the Record's step box and label margins: 5,4 -> 8,6 and 5,6 -> 8,9). The stand-ins have no layout and
+# no fonts: text heights, the logo and the buttons made before the form scaled stay at their coded sizes here, and the
+# layout self-check does not run (the Windows job and a round on a work computer measure those).
+scale=150 win 1 done 1 0
+has "WIN measure choice h=120 gap=12 plan-x=81" "WIN measure record box=8,6 label=8,9 " "(1020 x 684 at 150 % (the form auto-scale; the screen dpi says 100 %)) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=144x144 " && ok || { bad "window 5: scale 150 % with a 96 dpi screen"; grep "measure\|layline" "$t/win.txt" | cut -c1-300; }
 
 # 0. A skipped step: the run is PASSED but the version is not recorded as installed (review of deploy v1).
 round 2 S; cp "$t/out.txt" "$t/out0.txt"
@@ -122,6 +202,8 @@ grep -q "^A newer version, 9.0.0, of Sample app (deploy) is on the app page" "$t
 # 1. First deploy: every step on, PASSED, version recorded, nothing sent.
 round 2
 grep -q "^Mode: deploy, version 1.0.0 (not installed yet)" "$od/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && grep -q "^Mode: deploy, version 1.0.0 (not installed yet)" "$t/out.txt" && ok || { bad "deploy 1: report has the mode line"; tail -30 "$t/out.txt"; }
+# Text mode asks no question: each answer of the hand step is "not asked (text mode)", under the step's line.
+[ "$(grep -A3 "^T02 Sample import r1: PASSED (confirmed by you) in " "$od/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" | tail -3 | tr -d '\r' | tr '\n' '|')" = "  Answer run-started: not asked (text mode)|  Answer flow-count: not asked (text mode)|  Answer note: not asked (text mode)|" ] && ok || { bad "answers: text mode"; grep -A3 "^T02 Sample" "$od/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt"; }
 # Item 3, safe second run: T01 PASSED in run 0, so it is off now; only the two steps left run, and the version is installed.
 grep -q "^Step 1 of 2: T02 Sample import r1" "$t/out.txt" && ! grep -q "contract=1" "$t/out.txt" && grep -q "^T01 Sample check r1: already done for version 1.0.0, not run again" "$od/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && ok || { bad "item 3: a step that PASSED must start off"; grep "^Step " "$t/out.txt"; }
 grep -q "^Version 1.0.0 of Sample app (deploy) is recorded as installed" "$t/out.txt" && grep -q "^DONE in .*Nothing was sent\.$" "$t/out.txt" && ok || bad "deploy 1: DONE line says nothing was sent"

@@ -34,6 +34,8 @@ namespace RadeStub {
     public static ScriptBlock Pump; public static System.Windows.Forms.Control Focus; public static string Clip = "";
     public static List<System.Windows.Forms.Timer> Timers = new List<System.Windows.Forms.Timer>();
     public static int Pumps = 0;
+    public static float FormDpi = 96f;   // the dpi the form scales to (RADE_T_SCALE=150: 144); the screen dpi (Graphics.DpiX) stays 96
+    public static bool RunThrows = false; public static string ShownBy = "";   // RunThrows: Application.Run fails as when a message loop already runs
   }
 }
 // PowerShell 7 on Linux has System.Drawing.Common, whose Font, Pen and the like throw there: the test copy of the bundle
@@ -60,6 +62,7 @@ namespace System.Windows.Forms {
     public List<Control> Items = new List<Control>(); public Control Owner;
     public void Add(Control c) { c.Parent = Owner; Items.Add(c); } public void Add(Control c, int col, int row) { Add(c); }
     public void AddRange(Control[] cs) { foreach (Control c in cs) Add(c); } public void Clear() { Items.Clear(); }
+    public Control this[int i] { get { return Items[i]; } }
     public int Count { get { return Items.Count; } } public IEnumerator GetEnumerator() { return Items.ToArray().GetEnumerator(); }
   }
   public class Control : RadeStub.Dyn {
@@ -71,6 +74,10 @@ namespace System.Windows.Forms {
     public Size Size { get { return new Size(Width, Height); } set { Width = value.Width; Height = value.Height; } }
     public Rectangle Bounds { get { return new Rectangle(Left, Top, Width, Height); } }
     public bool Focused { get { return RadeStub.Driver.Focus == this; } }
+    public bool ContainsFocus { get { for (Control c = RadeStub.Driver.Focus; c != null; c = c.Parent) { if (c == this) return true; } return false; } }
+    // The size the control asks for (no layout here): its own size; a label: its text in one line at its font; a button: its
+    // text with 12 px padding, at least its MinimumSize (as Windows Forms AutoSize does).
+    public virtual Size PreferredSize { get { return new Size(Width, Height); } }
     public bool Shown { get { for (Control c = this; c != null; c = c.Parent) { if (!c.Visible) return false; } return true; } }   // visible with every parent
     public bool Focus() { if (!Shown || !Enabled) return false; Control old = RadeStub.Driver.Focus; RadeStub.Driver.Focus = this; if (old != null && old != this) old.Fire("LostFocus", null); Fire("GotFocus", null); return true; }
     public void Invalidate() { } public void Dispose() { IsDisposed = true; } public void SuspendLayout() { } public void ResumeLayout() { } public void ResumeLayout(bool b) { } public void PerformLayout() { }
@@ -78,20 +85,25 @@ namespace System.Windows.Forms {
     public void Repaint() { RadeStub.Dyn e = new RadeStub.Dyn(); e.Values["Graphics"] = new Graphics(); Fire("Paint", e); foreach (Control c in Controls) c.Repaint(); }
     public void Walk(List<Control> all) { all.Add(this); foreach (Control c in Controls) c.Walk(all); }
   }
-  public class Panel : Control { } public class FlowLayoutPanel : Control { } public class Label : Control { } public class PictureBox : Control { }
+  public class Panel : Control { } public class FlowLayoutPanel : Control { } public class PictureBox : Control { }
+  public class Label : Control { public override Size PreferredSize { get { object f; int h = 18; if (Values.TryGetValue("Font", out f) && f is PSObject) f = ((PSObject)f).BaseObject; if (f is RadeDraw.Font) h = ((RadeDraw.Font)f).Height; return new Size((Text ?? "").Length * 7, h); } } }
   public class Bag { public int Count; public void Add(object o) { Count++; } public void Clear() { Count = 0; } }
   public class TableLayoutPanel : Control { public Bag ColumnStyles = new Bag(); public Bag RowStyles = new Bag(); public void SetColumnSpan(Control c, int n) { } }
-  public class Button : Control { } public class TextBox : Control { }
+  public class Button : Control { public override Size PreferredSize { get { object m; Size min = new Size(0, 0); if (Values.TryGetValue("MinimumSize", out m) && m is PSObject) m = ((PSObject)m).BaseObject; if (m is Size) min = (Size)m; return new Size(Math.Max((Text ?? "").Length * 7 + 24, min.Width), Math.Max(23, min.Height)); } } }
+  public class TextBox : Control { }
   public class CheckBox : Control { bool on; public bool Checked { get { return on; } set { bool ch = on != value; on = value; if (ch) Fire("CheckedChanged", new RadeStub.Dyn()); } } }
   public class FolderBrowserDialog : RadeStub.Dyn { public string ShowDialog(object owner) { return "Cancel"; } public void Dispose() { } }
   public class Timer : RadeStub.Dyn { public bool On; public void Start() { On = true; if (!RadeStub.Driver.Timers.Contains(this)) RadeStub.Driver.Timers.Add(this); } public void Stop() { On = false; } }
   public class Form : Control {
     public bool Closed; public Form() { Width = 1020; Height = 760; }
+    public string WindowState = "Normal";
+    public System.Drawing.SizeF CurrentAutoScaleDimensions { get { return new System.Drawing.SizeF(RadeStub.Driver.FormDpi, RadeStub.Driver.FormDpi); } }   // 144 = the R24 device: the form scales 1.5 x while the screen dpi says 96
     public Control ActiveControl { get { return RadeStub.Driver.Focus; } }
     public void Activate() { }
     public void Close() { if (Closed) return; RadeStub.Dyn e = new RadeStub.Dyn(); e.Values["Cancel"] = false; Fire("FormClosing", e); if (!(e.Values["Cancel"] is bool && (bool)e.Values["Cancel"])) { Closed = true; IsDisposed = true; } }
     public void Key(string code) { RadeStub.Dyn e = new RadeStub.Dyn(); e.Values["KeyCode"] = code; e.Values["SuppressKeyPress"] = false; Fire("KeyDown", e); }
-    public string ShowDialog() {   // the window "runs": the Shown handlers, then the test user until it closes the window
+    public string ShowDialog() { RadeStub.Driver.ShownBy = "ShowDialog"; return Loop(); }
+    public string Loop() {   // the window "runs": the Shown handlers, then the test user until it closes the window
       Fire("Shown", new RadeStub.Dyn());
       for (int i = 0; i < 400 && !Closed; i++) Application.DoEvents();
       if (!Closed) throw new InvalidOperationException("the test user did not close the window");
@@ -100,6 +112,10 @@ namespace System.Windows.Forms {
   }
   public static class Application {
     public static void EnableVisualStyles() { }
+    public static void Run(Form f) {
+      if (RadeStub.Driver.RunThrows) throw new InvalidOperationException("Starting a second message loop on a single thread is not a valid operation. Use Form.ShowDialog instead.");
+      RadeStub.Driver.ShownBy = "Run"; f.Loop();
+    }
     public static void DoEvents() {
       RadeStub.Driver.Pumps++;
       if (RadeStub.Driver.Pumps > 20000) throw new InvalidOperationException("the window waits and the test user has no answer");
@@ -114,6 +130,6 @@ namespace System.Windows.Forms {
     public static void DrawText(object g, string t, object f, Rectangle r, Color c, TextFormatFlags fl) { if (t == null) throw new ArgumentNullException("text"); }
   }
   public static class Clipboard { public static void SetText(string t) { if (string.IsNullOrEmpty(t)) throw new ArgumentNullException("text"); RadeStub.Driver.Clip = t; } }
-  public class Screen { public Rectangle WorkingArea = new Rectangle(0, 0, 1280, 720); public static Screen FromControl(Control c) { return new Screen(); } }
+  public class Screen { public Rectangle Bounds = new Rectangle(0, 0, 1280, 800); public Rectangle WorkingArea = new Rectangle(0, 0, 1280, 720); public static Screen FromControl(Control c) { return new Screen(); } }
   public static class MessageBox { public static string Show(object owner, string text, string caption, MessageBoxButtons b, MessageBoxIcon i, MessageBoxDefaultButton d) { return "Yes"; } }
 }
