@@ -76,6 +76,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 function num(n){return Number(n).toLocaleString('en-US')}
 function recall(){try{return localStorage.getItem(KEY)}catch(e){return null}}
 function remember(v){try{localStorage.setItem(KEY,v)}catch(e){}}
+function web(u){return /^https:\/\//i.test(String(u||''))?String(u):''}   // links from a manifest: https only
 function get(url,asJson){return fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('code ['+r.status+']');return asJson?r.json():r.text()})}
 // light: '' (off), 'turn' (yellow: the page waits for you) or 'fail' (dark red). done = the bar turns green.
 function show(o){
@@ -111,22 +112,26 @@ function choose(){
     APPS.map(function(a,i){return '<button type="button" class="btn app" data-app="'+i+'"'+(i?'':' data-focus')+'><b>'+esc(a.name||a.repo)+'</b></button>'}).join('')+'</div>'+helpLine()});
 }
 function open(a){
-  cur=a;remember(a.repo);
+  cur=a;a.url='';a.none=false;remember(a.repo);
   show({bar:30,state:'Loading',html:'<p class="caps">RADE</p><h1>Getting the newest script.</h1><p class="second">'+esc(a.repo)+'</p>'});
   get(a.base+a.manifest,true).then(function(m){
+    if(cur!==a){return null}
     var b=(m.bundles||[])[(m.bundles||[]).length-1];
-    if(!b||!b.out){throw new Error('the application lists no script')}
+    if(!b||!b.out){a.none=true;throw new Error('the application lists no script')}
     var cat=(b.apps||[])[0]||{};
-    a.name=(m.application&&m.application.name)||a.repo;a.home=m.application&&m.application.home;
-    a.url=a.base+b.out;a.file=b.out.split('/').pop();a.summary=cat.summary||'';
-    a.kind=cat.mode==='deploy'?('Version '+(cat.version||'')):('Test round '+(b.round||''));
+    a.name=(m.application&&m.application.name)||a.repo;a.home=web(m.application&&m.application.home);
+    a.url=a.base+b.out;a.file=b.out.split('/').pop();a.summary=cat.summary||b.summary||'';
+    var mode=cat.mode||b.mode,ver=cat.version||b.version;
+    a.kind=mode==='deploy'?(ver?'Version '+ver:'Install'):mode==='drift'?'Drift check':('Test round '+(b.round||''));
     bar.style.width='60%';
     return get(a.url,false);
   }).then(function(t){
+    if(cur!==a||t===null){return}
     a.text=t;a.loaded=new Date();ready(a,false);
   }).catch(function(e){
+    if(cur!==a){return}
     var link=a.url?'<a class="btn" href="'+esc(a.url)+'">Open the script</a>':'<a class="btn" href="https://github.com/'+esc(a.repo)+'">Open the repository</a>';
-    failCard('The script did not load.',e.message||'no answer',a.url?'Select "Open the script". On that page press Ctrl+A, then Ctrl+C. Then do the steps for PowerShell ISE.':'Check the network connection, then select "Try again".',
+    failCard('The script did not load.',e.message||'no answer',a.url?'Select "Open the script". On that page press Ctrl+A, then Ctrl+C. Then do the steps for PowerShell ISE.':a.none?'No script is published for this application yet. Ask in the Teams channel.':'Check the network connection, then select "Try again".',
       '<button type="button" class="btn primary" data-act="open" data-focus>Try again</button>'+link);
   });
 }
