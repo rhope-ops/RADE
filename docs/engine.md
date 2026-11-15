@@ -99,9 +99,7 @@ After the owner's test rounds end, the test branch and its results e-mail (draft
 
 Decided by the Administrator, 2026-11-14: RADE offers Install, Diagnose, Restore and Uninstall as run types and keeps the record right for each (version, step states, made list); the app supplies what each needs. Not built.
 
-Everything below is an agent recommendation (2026-11-14), not approved.
-
-Screen: title "Maintenance", shown for an app that is installed. Five action buttons:
+Decided by the Administrator, 2026-11-14: the screen has the title "Maintenance", is shown for an app that is installed, and has five action buttons:
 
 | Button | Does | Writes | Asks first |
 |---|---|---|---|
@@ -110,6 +108,8 @@ Screen: title "Maintenance", shown for an app that is installed. Five action but
 | Back up | Saves every app list as JSON plus a CSV copy | The backup folder | No |
 | Restore | Puts rows back: Recycle Bin first, else a backup the user picks | Site rows | Yes, after a dry run with counts |
 | Uninstall | Backs up, then removes all that the made list names | Site, Power Automate (hand steps), the record | Yes: the user types the app name |
+
+The function lists below are an agent recommendation (2026-11-14), not approved.
 
 Diagnose functions: D1 installed record against the newest version; D2 schema compare (lists, columns, types, choices, indexes, views, list settings); D3 permission compare; D4 required settings rows; D5 empty required lookups and item counts against the 5,000 view threshold; D6 flow health from rows the flows write; D7 backup age and counts; D8 hand checks (co-owner, sharing, connections).
 

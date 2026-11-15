@@ -18,7 +18,7 @@ Updated: 2026-11-14 by Claude (deploy v1). Keep this file at 40 lines or fewer. 
 
 6. RADE and the app (docs/engine.md, 14 Nov 26): move the base checks from rhope-ops/90-161.Z scripts/build_paste_bundles.py (`BASE_CHECKS`) into the engine; then the maintenance run types (function list not approved yet).
 
-7. Maintenance screen (agent REC, docs/engine.md "Maintenance run types": 5 buttons, D1-D8, R1-R7): waits for the Administrator; the GUI session draws it.
+7. Maintenance screen (decided 14 Nov 26: 5 buttons, docs/engine.md "Maintenance run types"; the function lists D1-D8 and R1-R7 are still an agent REC): the GUI session draws it, preview first.
 
 ## Needs the Administrator
 

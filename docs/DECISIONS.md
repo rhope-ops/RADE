@@ -4,6 +4,7 @@ Newest first. Why the kit defaults are what they are: https://github.com/rhope-o
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-14 | Maintenance screen: title "Maintenance", five action buttons: Install (label "Update to <version>" or "Repair" by state), Diagnose, Back up, Restore, Uninstall. Detail: docs/engine.md "Maintenance run types". The GUI session draws it (preview first). Not built. | the Administrator | Adds Back up to the four run types (row below) |
 | 2026-11-14 | No reconnaissance, reworded and hardened: never anything malicious in nature or that could be misconstrued as malicious (no host finding or pinging, no port checks, no probing of network or logical boundaries; no exception). Reading SharePoint and Power Platform data with the user's own account, in the open, including to record what the account can do, is allowed. If there is any doubt, seek approval from the owner first. The rule itself cannot be changed. | the Administrator | Wording of the "nothing like network reconnaissance" row below |
 | 2026-11-14 | Tests: no change. The work-computer rounds are the Windows PowerShell 5.1 test; cloud tests stay on PowerShell 7; a 5.1 fault is fixed when a round finds it. | the Administrator | "how to move them is open" in the tests row below |
 | 2026-11-14 | Test-round results e-mail: the allowed owner-only exception to the DoD365 boundary rule until the test rounds end (masked counts, sent by hand by the owner). | the Administrator | — |
