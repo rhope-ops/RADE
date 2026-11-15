@@ -96,7 +96,7 @@ MARKING = [re.compile(r) for r in (
     r"\bFO" r"UO\b", r"(?i)\bfor\s+official\s+use\s+" r"only\b", r"\bNOF" r"ORN\b",
     r"(?i)\b(?:SECRET|CONFIDENTIAL|UNCLASSIFIED)/" r"/",
 )]
-_DODID_KW = r"(?<![A-Za-z])(?:DOD[\s_-]*ID|EDIPI|CAC(?![A-Za-z]))"  # also dod_id, and DODID joined to the number
+_DODID_KW = r"(?<![A-Za-z])(?:DOD[\s_-]*ID|EDIPI|CAC)(?![A-Za-z])"  # also dod_id, and DODID joined to the number
 DODID = [re.compile(r"(?i)" + _DODID_KW + r"\D{0,20}?(\d{10})(?!\d)"),          # keyword, then the number
          re.compile(r"(?i)(?<!\d)(\d{10})(?!\d)\D{0,20}?" + _DODID_KW)]        # the number, then the keyword
 ALLOWED_EMAIL = re.compile(
@@ -155,18 +155,19 @@ MISSING_HELP = ("no denylist found. Add your names (comma or newline separated),
 WARN_OPTION = "denylist: warn"  # .pii-guard option line; first_use_check.py reads it too
 
 
-OPTION_LINE = re.compile(r"(?i)^(profile|denylist)\s*:")  # option lines, never allowed values
+PROFILE_LINE = re.compile(r"(?i)^profile\s*(?:[:=]|\s+dod\b)")  # a tier line, also when written with = or no colon
+OPTION_LINE = re.compile(r"(?i)^(?:profile\s*(?:[:=]|\s+dod\b)|denylist\s*:)")  # option lines, never allowed values
 UNKNOWN_PROFILE = ("unknown profile line in .pii-guard: the only tier line is `profile: dod`. "
                    "Correct or remove the line; the guard does not guess a tier.")
 
 
 def profile_of(allow):
     """Tier from the .pii-guard lines: "minimum" (no profile line), "dod", or "unknown" (any other value: the caller
-    fails, so a wrong spelling cannot lower the tier in silence). Case and spacing of the line do not matter."""
-    vals = {re.sub(r"\s+", "", v.split(":", 1)[1]).lower() for v in allow if re.match(r"(?i)^profile\s*:", v)}
-    if not vals:
+    fails, so a wrong spelling cannot lower the tier in silence). Case, and spacing around the colon, do not matter."""
+    lines = [v for v in allow if PROFILE_LINE.match(v)]
+    if not lines:
         return "minimum"
-    return "dod" if vals == {"dod"} else "unknown"
+    return "dod" if all(re.fullmatch(r"(?i)profile\s*:\s*dod", v) for v in lines) else "unknown"
 
 
 def dod_mode(root):
@@ -197,7 +198,8 @@ def load_allow(root, ref=None):
         text = r.stdout if r.returncode == 0 else ""
     else:
         f = pathlib.Path(root) / ".pii-guard"
-        text = f.read_text() if f.is_file() else ""
+        text = f.read_text(encoding="utf-8", errors="replace") if f.is_file() else ""
+    text = text.replace("\ufeff", "")  # a byte-order mark (Windows editors add one) must not hide the first line
     # A comment starts at the line start or after whitespace, so "skip: docs/#1.txt" keeps its "#".
     vals = (re.split(r"(?:^|\s)#", l, maxsplit=1)[0].strip() for l in text.splitlines())
     return {v for v in vals if v}
@@ -461,8 +463,10 @@ def self_test():
     expect("dod id: 11 digits are not an ID", "EDIPI 12345" + "678901", [], dod=True)
     good = profile_of({"Profile: DoD"}) == profile_of({"profile:dod"}) == profile_of({"profile :  dod"}) == "dod" \
         and profile_of({"profile: dodd"}) == profile_of({"profile: dod", "profile: min"}) == profile_of({"profile:"}) == "unknown" \
-        and profile_of({"denylist: warn", "x"}) == "minimum"
-    print(("ok   " if good else "FAIL ") + "profile line: any case or spacing; any other value is unknown")
+        and profile_of({"profile: d o d"}) == profile_of({"profile = dod"}) == profile_of({"profile dod"}) == "unknown" \
+        and profile_of({"denylist: warn", "x", "profile.example.org"}) == "minimum"
+    print(("ok   " if good else "FAIL ") + "profile line: any case, spacing around the colon; any other form is unknown")
+    expect("dod id: a longer word that starts like the keyword is not one", "dodidentifier 12345" + "67890", [], dod=True)
     ok = ok and good
     expect("dod: 10 digits with no keyword", "ts 17312" + "34567", [], dod=True)
     expect("minimum tier: DoD ID not checked", "EDIPI 12345" + "67890", [])
@@ -533,6 +537,14 @@ def self_test():
         good = r.returncode == 1 and "PII GUARD FAIL: unknown profile" in r.stdout and r2.returncode == 1 \
             and "UNKNOWN" in r2.stdout and dod_mode(d) and not warn_mode(d)
         print(("ok   " if good else "FAIL ") + "unknown profile value: the scan and --status fail (no fall back to minimum)")
+        ok = ok and good
+        pathlib.Path(d, ".pii-guard").write_bytes(b"\xef\xbb\xbfprofile: dod\r\n")
+        r = subprocess.run(me + ["--status"], cwd=d, env=env, capture_output=True, text=True)
+        subprocess.run(["git", "add", ".pii-guard"], cwd=d, check=True, capture_output=True)
+        staged = load_allow(d, ":0")  # the same file read through git, as --allow-from does
+        good = r.returncode == 0 and "profile: dod" in r.stdout and dod_mode(d) and profile_of(staged) == "dod"
+        subprocess.run(["git", "rm", "-q", "--cached", ".pii-guard"], cwd=d, check=True, capture_output=True)
+        print(("ok   " if good else "FAIL ") + "tier line after a byte-order mark, with CRLF: DoD tier (file and git read)")
         ok = ok and good
         pathlib.Path(d, ".pii-guard").write_text("denylist: warn\nProfile:DoD\n")
         r = subprocess.run(me + ["--status"], cwd=d, env=env, capture_output=True, text=True)
