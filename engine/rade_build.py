@@ -640,7 +640,8 @@ function Get-InstalledText($A) {
   return ('version ' + $A.Version + ' (not installed yet)')
 }
 function Save-Installed([string]$State, [bool]$Whole) {
-  # Every deploy run is the app's lastRun. "installed" changes only when the run PASSED with every step of the app on.
+  # Every deploy run is the app's lastRun. "installed" changes only when every step of the app ran and PASSED (none off,
+  # none skipped). Clean-up is not a step: it only recycles old files, so it may be off.
   # Returns '' or the reason the record could not be saved (the caller says it: the record is the upgrade path).
   try {
     $p = Get-RadeConfigFile 'rade-installed.json'
@@ -738,6 +739,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     $secs = ((Get-Date) - $t0).TotalSeconds
     $state = Get-StepState $r
     if ($state -eq 'NEEDS REVIEW') { $script:roundBad = $true }
+    if ($state -ne 'PASSED') { $whole = $false }   # a skipped step is not installed (review, deploy v1)
     $line = Get-StepLine $steps[$k] $r $secs
     $summary += $line
     & $speak ('  Result: ' + ($line.Substring($steps[$k].Name.Length + 2)))
@@ -773,7 +775,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     $sv = Save-Installed $state $whole
     if ($sv) { & $speak ('NOTE: the installed-version record (RADE\Config\rade-installed.json) could not be saved: ' + $sv) }
     if ($bad) { & $speak ('Note: one or more items need review (see above). The report in Rounds\' + $round + ' shows what went wrong. Nothing was sent.') }
-    elseif (-not $whole) { & $speak ('Note: some steps were off, so version ' + $script:app.Version + ' is not recorded as installed. Run again with every step on.') }
+    elseif (-not $whole) { & $speak ('Note: some steps were off or skipped, so version ' + $script:app.Version + ' is not recorded as installed. Run again with every step on.') }
     else { & $speak ('Version ' + $script:app.Version + ' of ' + $script:app.Name + ' is recorded as installed.') }
     & $speak ('DONE in ' + (Format-Duration ((Get-Date) - $started).TotalSeconds) + '. The report is in Rounds\' + $round + ' on this computer. Nothing was sent.')
     return ,$summary

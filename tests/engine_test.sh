@@ -16,8 +16,9 @@ mkdir -p "$od" "$t/app/scripts"; cp -r tests/fixture-app/. "$t/app/"; cp schemas
 build() { python3 engine/rade_build.py --app-root "$t/app" > "$t/build.txt" 2>&1 || { cat "$t/build.txt"; return 1; }
   sed -e "s#^\$usersRoot = 'C:\\\\Users'#\$usersRoot = '$t/u'#" -e "s#^\$goUrl = '.*'#\$goUrl = 'file://$t/go.md'#" -e "s#\$checkGate = \$true#\$checkGate = \$false#" \
     -e "s#https://example-org.github.io/sample-app#file://$t/go.md#g" -e "s#https://example.invalid/import#file://$t/go.md#" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" > "$t/b.ps1"; }
-# $1 = the number typed on the Choose question (1 = test app, 2 = deploy app); the other questions get Enter.
-round() { printf '%s\n\n\n\n' "$1" | USERPROFILE="$t/u/test1234" pwsh -NoProfile -File "$t/b.ps1" > "$t/out.txt" 2>&1; }
+# $1 = the number typed on the Choose question (1 = test app, 2 = deploy app); $2 = the answer in the guide step
+# (empty = done, S = skip); the other questions get Enter. Not tested here: the window (Windows Forms) and Windows PowerShell 5.1.
+round() { printf '%s\n\n%s\n\n' "$1" "${2:-}" | USERPROFILE="$t/u/test1234" pwsh -NoProfile -File "$t/b.ps1" > "$t/out.txt" 2>&1; }
 js() { python3 -c "import json,sys; d=json.load(open(sys.argv[1])); a=d['apps']['SampleApp/Sample app (deploy)']; print(d['schema'], len(d['apps']), (a['installed'] or {}).get('version'), a['lastRun']['version'], a['lastRun']['state'])" "$inst" 2>&1; }
 
 build && ok || bad "build of the sample bundle"
@@ -25,15 +26,31 @@ b="$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1"
 grep -q "Name = 'Sample app (deploy)'.*Mode = 'deploy'; Version = '1.0.0'" "$b" && ! grep "Name = 'Sample app (deploy)'" "$b" | grep -q "'outlook'" && ok || bad "catalog: deploy app has Mode, Version and no outlook check"
 grep "Name = 'Sample app'" "$b" | grep -q "'outlook'.*Mode = 'test'; Version = ''" && ok || bad "catalog: test app keeps the outlook check and Mode test"
 
+# 0. A skipped step: the run is PASSED but the version is not recorded as installed (review of deploy v1).
+round 2 S
+grep -q "^Note: some steps were off or skipped, so version 1.0.0 is not recorded as installed" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 None 1.0.0 PASSED" ] && ok || { bad "deploy 0: skipped step ($(js))"; tail -8 "$t/out.txt"; }
+
 # 1. First deploy: every step on, PASSED, version recorded, nothing sent.
 round 2
-grep -q "^Mode: deploy, version 1.0.0 (not installed yet)" "$od/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && ok || { bad "deploy 1: report has the mode line"; tail -30 "$t/out.txt"; }
+grep -q "^Mode: deploy, version 1.0.0 (not installed yet)" "$od/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && grep -q "^Mode: deploy, version 1.0.0 (not installed yet)" "$t/out.txt" && ok || { bad "deploy 1: report has the mode line"; tail -30 "$t/out.txt"; }
 grep -q "^Version 1.0.0 of Sample app (deploy) is recorded as installed" "$t/out.txt" && grep -q "^DONE in .*Nothing was sent\.$" "$t/out.txt" && ok || bad "deploy 1: DONE line says nothing was sent"
 ! grep -qi "outlook\|e-mail\|draft\|Summary copied" "$t/out.txt" && ok || { bad "deploy 1: output names Outlook, an e-mail, a draft or a copied summary"; grep -i "outlook\|e-mail\|draft\|Summary copied" "$t/out.txt"; }
 [ ! -e "$cfg/rade-mail-to.txt" ] && ok || bad "deploy 1: an e-mail address file was written"
 [ "$(js)" = "rade-installed/1 1 1.0.0 1.0.0 PASSED" ] && ! grep -q "test1234\|$t" "$inst" && ok || { bad "deploy 1: rade-installed.json ($(js))"; cat "$inst"; }
 
+# A deploy app with no version fails the schema and the build.
+python3 - "$t" <<'P' && ok || bad "a deploy without a version must fail the schema check and the build"
+import json, subprocess, sys, pathlib
+t = pathlib.Path(sys.argv[1]); m = json.loads((t / 'app/scripts/paste_bundles.json').read_text())
+del m['bundles'][0]['apps'][1]['version']; (t / 'nover').mkdir(); 
+import shutil; shutil.copytree(t / 'app', t / 'nover/app'); (t / 'nover/app/scripts/paste_bundles.json').write_text(json.dumps(m))
+a = subprocess.run([sys.executable, 'scripts/check_manifest.py', str(t / 'nover/app/scripts/paste_bundles.json')], capture_output=True, text=True)
+b = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'nover/app')], capture_output=True, text=True)
+sys.exit(0 if a.returncode == 1 and 'version' in a.stdout and b.returncode != 0 and 'a deploy needs a version' in b.stderr else 1)
+P
+
 # 2. Same version again: the record says it is installed.
+round 2
 round 2
 grep -q "^Mode: deploy, version 1.0.0 is installed" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 1.0.0 1.0.0 PASSED" ] && ok || bad "deploy 2: installed text ($(js))"
 

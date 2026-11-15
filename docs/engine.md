@@ -23,8 +23,8 @@ Scope approved by the Administrator, 2026-11-14 (docs/DECISIONS.md). RADE is the
 
 | # | Item | State |
 |---|---|---|
-| 1 | Mode branch: a deploy sends nothing. No results e-mail draft, no saved address, no Outlook check, no clipboard copy; the report stays in Rounds\<round> on the computer. | Built (text mode tested: tests/engine_test.sh); the window part is not verified on a device |
-| 2 | Version record: RADE\Config\rade-installed.json (schema `rade-installed/1`). Per app (folder/name): `installed` = the last deploy that PASSED with every step on; `lastRun` = the last deploy run and its state. It holds no user, path, site or DODID. A damaged file is kept as `.damaged` and replaced. The app version is `version` on the manifest app entry (required for a deploy). | Built (same test) |
+| 1 | Mode branch: a deploy sends nothing. No results e-mail draft, no saved address, no Outlook check, no automatic clipboard copy (the "Copy summary" button stays, for a help request); the report stays in Rounds\<round> on the computer. | Built (text mode tested: tests/engine_test.sh); the window part is not verified on a device |
+| 2 | Version record: RADE\Config\rade-installed.json (schema `rade-installed/1`). Per app (folder/name): `installed` = the last deploy in which every step of the app ran and PASSED (none off, none skipped; clean-up may be off, it only recycles old files); `lastRun` = the last deploy run and its state. It holds no user, path, site or DODID. A damaged file is kept as `.damaged` and replaced. The app version is `version` on the manifest app entry (required for a deploy). | Built (same test) |
 | 3 | Safe second run: a repeat or an upgrade changes only what is different. The engine gives each step the installed version; each step script must be safe to run again. | Not built |
 | 4 | Undo list: what a deploy made (files, lists, flows), so a user can remove it. | Not built |
 | 5 | A fixed release: a deploy bundle at a tagged, stable address with its sha256 on the app page (a round bundle on main is replaced each round). | Not built |
