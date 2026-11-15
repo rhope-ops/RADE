@@ -317,6 +317,14 @@
             }
           },
           "description": "What the step creates when it PASSES (for example a flow a guide step imports), for the undo list. A script step can also print \"MADE <kind>: <name>\" lines (docs/engine.md \"Step contract\"). No site address, no person."
+        },
+        "after": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Names of earlier steps of the same app that must PASS before this step runs; else RADE skips it. In a deploy, an automatic step may come after a hand (guide) step only when it needs it (docs/engine.md \"Deploy v1\" item 3)."
         }
       },
       "allOf": [
