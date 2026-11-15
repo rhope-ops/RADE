@@ -1,0 +1,7 @@
+{
+  "_doc": "The applications the RADE page (index.html) offers. The page reads each application's RADE manifest from the main branch of its repository and offers the last bundle in it, so a new round needs no change here. help = the Teams channel name the page shows (the engine has the same name in $helpChannel, engine/rade_build.py: change both).",
+  "help": "RHOPE-OPS",
+  "apps": [
+    { "repo": "rhope-ops/90-161.Z", "manifest": "scripts/paste_bundles.json" }
+  ]
+}
