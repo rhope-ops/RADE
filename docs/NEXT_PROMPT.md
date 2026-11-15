@@ -22,6 +22,8 @@ Updated: 2026-11-14 by Claude (RADE page). Keep this file at 40 lines or fewer. 
 
 7. Maintenance (decided 14 Nov 26: 5 buttons, docs/engine.md "Maintenance run types"; the function lists D1-D8 and R1-R7 are still an agent REC): the window shows the screen with only Install on; Diagnose, Back up, Restore and Uninstall need their engine functions. Mockups for Restore and Uninstall: the canvas in docs/window-design.md.
 
+8. Guardrails (DECISIONS 14 Nov 26; docs/engine.md "Guardrails"): built and tested in text mode with a fake PnP module (tests/engine_test.sh, 60 checks with the window tests). Not verified on a device: the classified suffix list, the site collection administrator read and the install-record row on PnP.PowerShell 1.12.0. Next: 90-161.Z bumps its lock and adds `marker`; the window shows a failed start-up guard only as console text.
+
 ## Needs the Administrator
 
 - The final Teams channel name (placeholder RHOPE-OPS in the engine and in apps.json `help`, DECISIONS 14 Nov).

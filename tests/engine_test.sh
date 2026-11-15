@@ -35,24 +35,24 @@ grep "Name = 'Sample app'" "$b" | grep -q "'outlook'.*Mode = 'test'; Version = '
 # win APP HAND RECORD TOUR [BUNDLE]: runs the window for application APP (0 = test, 1 = deploy); output in $t/win.txt.
 mkdir -p "$t/wu/test1234/OneDrive - United States Air Force"
 swap "$b" "$t/wb.ps1" "$t/wu"
-win() { sed -E -e 's#Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing#$null = 0#' -e 's#System\.Drawing\.(FontStyle|Font|Pen|SolidBrush|Image|Graphics)\b#RadeDraw.\1#g' "${5:-$t/wb.ps1}" > "$t/wb2.ps1"
+win() { sed -E -e 's#Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing#$null = 0#' -e "s#^\\\$sitePrefix = 'https://usaf.dps.mil/sites/'#\$sitePrefix = 'https://rade-test.invalid/sites/'#" -e 's#System\.Drawing\.(FontStyle|Font|Pen|SolidBrush|Image|Graphics)\b#RadeDraw.\1#g' "${5:-$t/wb.ps1}" > "$t/wb2.ps1"
   cat tests/window_driver.ps1 "$t/wb2.ps1" > "$t/w.ps1"
   RADE_T_STUB="$PWD/tests/window_stub.cs" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$t/wu/test1234" timeout 180 pwsh -NoProfile -File "$t/w.ps1" < /dev/null > "$t/win.txt" 2>&1; }
 # has TEXT...: every text is in the window output, and the window did not fall back to text mode or miss a name.
 has() { local x; grep -q "No window could open\|WIN NONAME\|WIN BAD" "$t/win.txt" && return 1; for x in "$@"; do grep -qF -- "$x" "$t/win.txt" || { echo "  missing: $x"; return 1; }; done; grep -q "^WIN closed=True" "$t/win.txt"; }
 # 1. A first deploy: boot, choose with the newer-version notice, ready, the Record (boxes can change, Clean-up off), the hand step, done.
 win 1 done 1 0
-has "view=boot" "view=choose light=off kick= sent=Which application do you want to install?" "2 Sample app (deploy) 1.0.0 NOTE Version 9.0.0 is on the app page" "view=ready light=off kick=ALL 7 CHECKS PASSED sent=Ready to install Sample app (deploy) 1.0.0." \
-  "WIN record on=True rows=9 boxes=5 enabled=True text=True name=True reused=Last check: 14-11-26 / Version [5.1] tall=True" "WIN paged=" "WIN record on=False clean=False" "view=hand light=RADE waits for you kick=STEP 2 OF 3 · YOUR TURN sent=T02 Sample import r1" "btn=[Imported] [It failed] [Skip]" \
+has "view=boot" "view=choose light=off kick= sent=Which application do you want to install?" "2 Sample app (deploy) 1.0.0 NOTE Version 9.0.0 is on the app page" "view=ready light=off kick=ALL 8 CHECKS PASSED sent=Ready to install Sample app (deploy) 1.0.0." \
+  "WIN record on=True rows=10 boxes=5 enabled=True text=True name=True reused=Last check: 14-11-26 / Version [5.1] tall=True" "WIN paged=" "WIN record on=False clean=False" "view=hand light=RADE waits for you kick=STEP 2 OF 3 · YOUR TURN sent=T02 Sample import r1" "btn=[Imported] [It failed] [Skip]" \
   "view=done light=off kick=ALL STEPS PASSED sent=Sample app (deploy) 1.0.0 is installed. p=Nothing was sent." "btn=[Close] [What it made] [Open results folder] [Copy summary]" "WIN made=True log=True locked=True" "WIN copied=True" && ok || { bad "window 1: first deploy"; tail -5 "$t/win.txt" | cut -c1-300; }
 # 2. A second deploy with a blocked application, Maintenance (Esc = Back, then the same choice: 2 Maintenance cards),
 # the site address, a failed check that runs again (2 cards), a sign-in check that failed (its card offers the sign-in),
 # the look-and-answer check, and a hand step that failed: needs review with the help line.
 win 1 fail 0 1
 has "opts=OFF Sample app; 1 Sample app (deploy) 1.0.0" "btn=[Check this computer again]" "view=maint light=off kick=SAMPLE APP (DEPLOY) 1.0.0 · INSTALLED " "sent=Maintenance" "btn=[Repair] (Diagnose) (Back up) (Restore) (Uninstall)" \
-  "view=site light=off kick= sent=Which site does the application go to?" "WIN site-note=The address must look like" "view=fail light=failed kick=CHECK 8 OF 10 · FAILED sent=One check failed. p=Your SharePoint site can be reached" "btn=[Run checks again] [Change the site address]" "WIN esc" "WIN again" "sent=One check failed. p=You can change the site (sign in with your CAC) / Sign-in was not finished" "btn=[Sign in and check site rights] [Change the site address]" \
-  "view=need light=RADE waits for you kick=CHECK 9 OF 10 · YOUR TURN sent=One check needs you." "btn=[Sign in and check site rights]" "btn=[Check Power Automate]" "sent=Check Power Automate" "btn=[Yes: I see both] [No: one is missing] [Not now]" "kick=ALL 10 CHECKS PASSED" \
-  "view=handfail" "view=review light=failed kick=NEEDS REVIEW sent=The install is not complete. p=T02 Sample import r1: FAILED (reported by you)" "flow <SITE> not found" "help=For help, ask in the Teams channel" "btn=[Copy summary] [Open results folder] [What it made] [Close]" && [ "$(grep -c "^WIN view=maint" "$t/win.txt")" = 2 ] && [ "$(grep -c "^WIN view=fail .*CHECK 8 OF 10" "$t/win.txt")" = 2 ] && ok || { bad "window 2: Maintenance, checks that fail or need you, needs review"; tail -5 "$t/win.txt" | cut -c1-300; }
+  "view=site light=off kick= sent=Which site does the application go to?" "WIN site-note=The address must look like https://rade-test.invalid/sites/name" "view=fail light=failed kick=CHECK 9 OF 11 · FAILED sent=One check failed. p=Your SharePoint site can be reached" "btn=[Run checks again] [Change the site address]" "WIN esc" "WIN again" "sent=One check failed. p=You can change the site (sign in with your CAC) / Sign-in was not finished" "btn=[Sign in and check site rights] [Change the site address]" \
+  "view=need light=RADE waits for you kick=CHECK 10 OF 11 · YOUR TURN sent=One check needs you." "btn=[Sign in and check site rights]" "btn=[Check Power Automate]" "sent=Check Power Automate" "btn=[Yes: I see both] [No: one is missing] [Not now]" "kick=ALL 11 CHECKS PASSED" \
+  "view=handfail" "view=review light=failed kick=NEEDS REVIEW sent=The install is not complete. p=T02 Sample import r1: FAILED (reported by you)" "flow <SITE> not found" "help=For help, ask in the Teams channel" "btn=[Copy summary] [Open results folder] [What it made] [Close]" && [ "$(grep -c "^WIN view=maint" "$t/win.txt")" = 2 ] && [ "$(grep -c "^WIN view=fail .*CHECK 9 OF 11" "$t/win.txt")" = 2 ] && ok || { bad "window 2: Maintenance, checks that fail or need you, needs review"; tail -5 "$t/win.txt" | cut -c1-300; }
 # 3. A test round: the owner's test extras show on Done; a deploy never shows them (1 and 2 have no "test=shown").
 win 0 done 0 0
 has "sent=Ready to run round R01." "view=done light=off kick=ALL STEPS PASSED sent=Round R01 is done." "test=shown" "WIN draft-note=The Outlook draft could not be created" && ! grep -q "Sample app (deploy).*test=shown" "$t/win.txt" && ok || { bad "window 3: test round"; tail -5 "$t/win.txt" | cut -c1-300; }
@@ -167,6 +167,113 @@ m['bundles'][0]['steps'][3]['after'] = ['T09 no such step']; p.write_text(json.d
 b = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'order/app')], capture_output=True, text=True)
 sys.exit(0 if a.returncode != 0 and 'comes after the hand step' in a.stderr and b.returncode != 0 and 'not an earlier step of this app' in b.stderr else 1)
 P
+
+# ---- Guardrails (the Administrator, 14 Nov 26; docs/engine.md "Guardrails").
+# 1. A classified-network domain suffix stops RADE before it writes anything.
+mkdir -p "$t/gu/test1234/OneDrive - United States Air Force"; sed "s#usersRoot = '$t/u'#usersRoot = '$t/gu'#" "$t/b.ps1" > "$t/g.ps1"
+printf '2\n\n\n\n' | USERDNSDOMAIN="AREA.EXAMPLE.SMIL.MIL" USERPROFILE="$t/gu/test1234" pwsh -NoProfile -File "$t/g.ps1" > "$t/outg.txt" 2>&1
+grep -q "^STOPPED: RADE runs on NIPR computers only" "$t/outg.txt" && ! grep -qi "example" "$t/outg.txt" && [ -z "$(find "$t/gu" -type f)" ] && [ ! -d "$t/gu/test1234/OneDrive - United States Air Force/RADE" ] && ok || { bad "guard: classified suffix must stop with nothing written"; head -5 "$t/outg.txt"; }
+printf '2\n\n\n\n' | USERDNSDOMAIN="notsmil.mil" USERPROFILE="$t/gu/test1234" pwsh -NoProfile -File "$t/g.ps1" > "$t/outg2.txt" 2>&1
+grep -q "PASSED: This computer is not on a classified network" "$t/outg2.txt" && ! grep -q "^STOPPED: RADE runs on NIPR" "$t/outg2.txt" && ok || { bad "guard: a look-alike suffix must pass"; head -5 "$t/outg2.txt"; }
+grep -q "PASSED: This computer is not on a classified network" "$t/out0.txt" && ok || bad "guard: the check line is in a normal run"
+# 2. Only a site on the DAF SharePoint host is accepted.
+grep "^\$sitePrefix = \|^function Test-SiteUrl" "$t/b.ps1" > "$t/site.ps1"
+cat >> "$t/site.ps1" <<'P'
+$bad = @('https://example.com/sites/a', 'http://usaf.dps.mil/sites/a', 'https://usaf.dps.mil/teams/a', 'https://usaf.dps.mil/sites/a/b', 'https://usaf.dps.mil.example.com/sites/a', 'https://usaf.dps.mil/sites/a\', 'https://usaf.dps.mil/sites/', '') | Where-Object { Test-SiteUrl $_ }
+$good = @('https://usaf.dps.mil/sites/a', 'https://USAF.dps.mil/sites/a-b_1/') | Where-Object { -not (Test-SiteUrl $_) }
+if (@($bad).Count -or @($good).Count) { 'WRONG ' + (@($bad) + @($good) -join ' '); exit 1 }
+'SITEOK'
+P
+[ "$(grep -c "^\$sitePrefix = \|^function Test-SiteUrl" "$t/site.ps1")" = 2 ] && pwsh -NoProfile -File "$t/site.ps1" > "$t/outsite.txt" 2>&1 && [ "$(cat "$t/outsite.txt")" = "SITEOK" ] && ok || { bad "site address rule"; cat "$t/outsite.txt"; }
+# 3 and 4. Site rights with the admin flag (shown only), and the install record on the site (fake PnP: tests/fake-pnp).
+python3 - "$t" <<'P' && ok || bad "marker: build of the marker manifest"
+import json, subprocess, sys, pathlib, shutil
+t = pathlib.Path(sys.argv[1]); shutil.copytree(t / 'app', t / 'mk/app')
+p = t / 'mk/app/scripts/paste_bundles.json'; m = json.loads(p.read_text()); b = m['bundles'][0]
+b['apps'][1]['marker'] = {'list': 'Sample Settings', 'key': 'InstalledVersion', 'field': 'SettingValue'}
+p.write_text(json.dumps(m))
+r = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'mk/app')], capture_output=True, text=True)
+assert r.returncode != 0 and 'a marker needs mode deploy and a step that needs site-rights' in (r.stdout + r.stderr), r.stdout + r.stderr
+b['steps'][0]['needs'] = ['ps', 'site-rights']; p.write_text(json.dumps(m))
+r = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'mk/app')], capture_output=True, text=True)
+assert r.returncode == 0, r.stdout + r.stderr
+r = subprocess.run([sys.executable, 'scripts/check_manifest.py', str(p)], capture_output=True, text=True)
+assert r.returncode == 0, r.stdout + r.stderr
+P
+fake="$t/fake.json"; mods="$PWD/tests/fake-pnp"
+mkround() { # $1 = users root name; runs the marker bundle as the deploy app with the fake PnP
+  mkdir -p "$t/$1/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/$1/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
+  swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-$1.ps1" "$t/$1"
+  printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/$1/test1234" pwsh -NoProfile -File "$t/m-$1.ps1" > "$t/out-$1.txt" 2>&1; }
+echo '{ "admin": false, "rights": true, "list": true, "rows": {} }' > "$fake"; mkround m1
+grep -q "PASSED: You can change the site.*Site collection administrator: no (shown only, not required)" "$t/out-m1.txt" && ok || { bad "rights: admin flag shown, not required"; grep "change the site" "$t/out-m1.txt"; }
+grep -q '^On the site   after the steps, one row in the list "Sample Settings"' "$t/out-m1.txt" && grep -q "^First install from this account. Install Sample app (deploy) once for each wing" "$t/out-m1.txt" && ok || bad "marker: the plan names the row and gives the one-install notice"
+grep -q '^Install record on the site: "Sample Settings", row "InstalledVersion" now holds version [0-9.]* and the date (added)' "$t/out-m1.txt" && grep -q '"InstalledVersion": *"[0-9.]* 20[0-9-]*"' "$fake" && ok || { bad "marker: written after a whole install"; tail -5 "$t/out-m1.txt"; cat "$fake"; }
+# Another account (no record of its own) on the same site: the check fails. The installer's own second run passes.
+mkround m2
+grep -q "FAILED: You can change the site.*This site already has an install of this application \[version [0-9.]*\], made from another account" "$t/out-m2.txt" && ok || { bad "marker: a second account is stopped"; grep "change the site" "$t/out-m2.txt"; }
+mkdir -p "$t/m4/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/m4/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
+swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-m4.ps1" "$t/m4"; sed -i 's#\$checkGate = \$false#$checkGate = $true#' "$t/m-m4.ps1"   # a third account, with the gate on
+printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m4/test1234" pwsh -NoProfile -File "$t/m-m4.ps1" > "$t/out-m4.txt" 2>&1
+grep -q "^You cannot deploy yet" "$t/out-m4.txt" && ! grep -q "^Step 1 of" "$t/out-m4.txt" && [ ! -f "$t/m4/test1234/OneDrive - United States Air Force/RADE/Config/rade-installed.json" ] && ok || { bad "marker: with the gate on, another account runs no step"; tail -12 "$t/out-m4.txt"; }
+mkround m1
+grep -q "PASSED: You can change the site" "$t/out-m1.txt" && ! grep -q "^First install from this account" "$t/out-m1.txt" && ok || { bad "marker: the installer's own second run passes"; grep "change the site" "$t/out-m1.txt"; }
+echo '{ "admin": true, "rights": true, "list": false, "rows": {} }' > "$fake"; mkround m3
+grep -q "Site collection administrator: yes" "$t/out-m3.txt" && grep -q '^NOTE: the install record on the site ("Sample Settings", row "InstalledVersion") was not written: the list was not found' "$t/out-m3.txt" && ok || { bad "marker: a missing list gives a NOTE"; tail -5 "$t/out-m3.txt"; }
+
+# Review, 14 Nov 26. The installer on another site that has a row is stopped too (the record is per site).
+echo '{ "admin": false, "rights": true, "list": true, "rows": { "InstalledVersion": "9.9 2026-01-01" } }' > "$fake"
+echo "https://usaf.dps.mil/sites/other" > "$t/m1/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
+printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m1/test1234" pwsh -NoProfile -File "$t/m-m1.ps1" > "$t/out-m1b.txt" 2>&1
+grep -q "FAILED: You can change the site.*\[version 9.9\], made from another account or for another site" "$t/out-m1b.txt" && ok || { bad "marker: the installer is stopped on another site"; grep "change the site" "$t/out-m1b.txt"; }
+# A row value that is not a version still counts as an install; a list that cannot be read is FAILED.
+echo '{ "admin": false, "rights": true, "list": true, "rows": { "InstalledVersion": "v9.9 someday" } }' > "$fake"; mkround m5
+grep -q "FAILED: You can change the site.*\[version not readable\]" "$t/out-m5.txt" && ok || { bad "marker: any row value is an install"; grep "change the site" "$t/out-m5.txt"; }
+echo '{ "admin": false, "rights": true, "list": true, "listError": true, "rows": {} }' > "$fake"; mkround m7
+grep -q "FAILED: You can change the site.*The install record on the site could not be read" "$t/out-m7.txt" && ok || { bad "marker: an unreadable record fails closed"; grep "change the site" "$t/out-m7.txt"; }
+# A part install (one step skipped) writes the row marked partial; that account's next run is not stopped; the row is then updated.
+echo '{ "admin": false, "rights": true, "list": true, "rows": {} }' > "$fake"
+mkdir -p "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
+swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-m6.ps1" "$t/m6"
+printf '2\n\nS\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234" pwsh -NoProfile -File "$t/m-m6.ps1" > "$t/out-m6.txt" 2>&1
+grep -q "marked partial (added)" "$t/out-m6.txt" && grep -q '"InstalledVersion": *"[0-9.]* 20[0-9-]* partial"' "$fake" && ok || { bad "marker: a part install is recorded as partial"; tail -4 "$t/out-m6.txt"; cat "$fake"; }
+mkround m6
+grep -q "PASSED: You can change the site" "$t/out-m6.txt" && grep -q "now holds version [0-9.]* and the date (updated)" "$t/out-m6.txt" && ! grep -q "partial" "$fake" && ok || { bad "marker: the same account finishes its part install"; grep "change the site\|Install record" "$t/out-m6.txt"; cat "$fake"; }
+
+# Second review, 14 Nov 26. A run that reached no step (failed download) does not make the account "installed here":
+# after another account's install it is stopped, with the gate on, and the row stays.
+echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows": {} }' > "$fake"
+mkdir -p "$t/m8/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/m8/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
+swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-m8.ps1" "$t/m8"; sed "s#file://$t/app/flow/SAMPLE-data#file://$t/app/flow/NOPE#" "$t/m-m8.ps1" > "$t/m-m8f.ps1"
+printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m8/test1234" pwsh -NoProfile -File "$t/m-m8f.ps1" > "$t/out-m8f.txt" 2>&1
+grep -q "so no step ran" "$t/out-m8f.txt" && ! grep -q "InstalledVersion" "$fake" && ok || { bad "marker: a run with no step writes no row"; tail -4 "$t/out-m8f.txt"; }
+echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows": { "InstalledVersion": "7.7 2026-01-01" } }' > "$fake"
+sed -i 's#\$checkGate = \$false#$checkGate = $true#' "$t/m-m8.ps1"
+printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m8/test1234" pwsh -NoProfile -File "$t/m-m8.ps1" > "$t/out-m8.txt" 2>&1
+grep -q "FAILED: You can change the site.*\[version 7.7\]" "$t/out-m8.txt" && ! grep -q "^Step 1 of" "$t/out-m8.txt" && grep -q '"7.7 2026-01-01"' "$fake" && ok || { bad "marker: a no-step run does not make the account the installer"; grep "change the site\|^Step" "$t/out-m8.txt"; cat "$fake"; }
+# Step records from one site do not count on another: account m6 (whole install on site "fake") on a new, empty site
+# is a first install again and runs every needed step.
+echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows": {} }' > "$fake"
+echo "https://usaf.dps.mil/sites/second" > "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
+printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234" pwsh -NoProfile -File "$t/m-m6.ps1" > "$t/out-m6b.txt" 2>&1
+grep -q "^First install from this account" "$t/out-m6b.txt" && grep -q "^Step 1 of [0-9]: T01 Sample check r1" "$t/out-m6b.txt" && grep -q "and the date (added)" "$t/out-m6b.txt" && ok || { bad "marker: records from another site do not count"; grep "^First\|^Step\|Install record" "$t/out-m6b.txt"; }
+# A part install on a third site, then its second run: the step that never ran there (T03) runs; only then is the row whole.
+echo "https://usaf.dps.mil/sites/third" > "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
+printf '2\n\nS\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234" pwsh -NoProfile -File "$t/m-m6.ps1" > "$t/out-m6c.txt" 2>&1
+grep -q "marked partial" "$t/out-m6c.txt" && ! grep -q "T03 Sample verify r1: PASSED" "$t/out-m6c.txt" && ok || { bad "marker: part install on a third site"; grep "T03\|Install record" "$t/out-m6c.txt"; }
+printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234" pwsh -NoProfile -File "$t/m-m6.ps1" > "$t/out-m6d.txt" 2>&1
+grep -q "^Step [0-9] of [0-9]: T03 Sample verify r1" "$t/out-m6d.txt" && grep -q "is recorded as installed" "$t/out-m6d.txt" && ! grep -q "partial" "$fake" && ok || { bad "marker: a step that never ran on this site must run before the install is whole"; grep "^Step\|installed\|Install record" "$t/out-m6d.txt"; }
+python3 - "$t/m6/test1234/OneDrive - United States Air Force/RADE/Config/rade-installed.json" <<'P' && ok || bad "record: one entry for each site, keyed by a hash, no address"
+import json, sys, re
+raw = open(sys.argv[1], encoding='utf-8-sig').read(); a = json.loads(raw)['apps']
+keys = [k for k in a if k.startswith('SampleApp/Sample app (deploy)')]
+assert len(keys) == 3 and all(re.fullmatch(r'SampleApp/Sample app \(deploy\)@[0-9a-f]{12}', k) for k in keys), keys
+assert 'usaf.dps.mil' not in raw
+P
+# The site row is not written when the account's own record cannot be saved (it would stop that account's next run).
+echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows": {} }' > "$fake"
+mkdir -p "$t/m9/test1234/OneDrive - United States Air Force/RADE/Config/rade-installed.json"; mkround m9
+grep -q "installed-version record (RADE.Config.rade-installed.json) could not be saved" "$t/out-m9.txt" && ! grep -q "^Install record on the site" "$t/out-m9.txt" && ! grep -q "InstalledVersion" "$fake" && ok || { bad "marker: no row when the own record failed"; grep "record" "$t/out-m9.txt"; cat "$fake"; }
 
 # The tagline (the Administrator, 14 Nov 26): no "DoD".
 ! grep -q "for your DoD organization" engine/rade_build.py && grep -q "'Test and deploy apps for your organization'" engine/rade_build.py && ok || bad "tagline"
