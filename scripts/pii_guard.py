@@ -91,9 +91,9 @@ SECRET = [re.compile(r) for r in (
 )]
 # DoD tier (`profile: dod`). The marks are split in the source so this file does not flag itself.
 MILHOST = re.compile(
-    r"(?i)(?<![A-Za-z0-9])(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+mil(?![A-Za-z0-9-]|\.[A-Za-z0-9])"   # any host under the military domain
-    r"|(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)*sharepoint-mil\.us\b|dod\.teams\.microsoft\.us\b)")    # DoD cloud tenant hosts
-# A DNS label starts and ends with a letter or digit (hyphens only inside), so "word-" + ".mil" is not a host.
+    r"(?i)(?<![A-Za-z0-9])(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+mil(?![A-Za-z0-9-]|\.[A-Za-z0-9])"   # any host under the military domain
+    r"|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*sharepoint-mil\.us\b|dod\.teams\.microsoft\.us\b)")    # DoD cloud tenant hosts
+# A DNS label is 1-63 letters, digits or inside hyphens, so "word-" + ".mil" is not a host (the length cap keeps the scan linear).
 MARKING = [re.compile(r) for r in (
     r"\bCUI/" r"/", r"^[^A-Za-z0-9]*CU" r"I[^A-Za-z0-9]*$", r"(?i)\bcontrolled\s+unclassified\s+" r"information\b",
     r"^[^A-Za-z0-9]*(?:SEC" r"RET|CONFID" r"ENTIAL|UNCLASS" r"IFIED)[^A-Za-z0-9]*$",  # one word alone on its line, upper case
