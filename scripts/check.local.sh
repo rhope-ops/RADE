@@ -6,3 +6,5 @@ cd "$(git rev-parse --show-toplevel)"
 python3 scripts/check_manifest.py
 # Engine (moved from rhope-ops/90-161.Z, 2026-11-14): it compiles. Each app's own tests build and check its bundles.
 python3 -m py_compile engine/rade_build.py
+# Engine behavior (deploy v1): build the sample bundle and run it in pwsh text mode.
+bash tests/engine_test.sh
