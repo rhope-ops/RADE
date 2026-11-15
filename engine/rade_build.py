@@ -39,7 +39,7 @@ opens, so an application that cannot run on this computer cannot be chosen. All 
 English (PFM 14 Nov 26). The bars are drawn by RADE (still when Windows animations are off). There is no Exit button:
 the window's X asks first only while a step runs.
 A catalog app of mode deploy (deploy v1, docs/engine.md; the Administrator 14 Nov 26) sends nothing: no draft, no saved
-address; it updates RADE\\Config\\rade-installed.json (the version installed and the last deploy run).
+address; it updates the app's own record file in RADE\\Config\\installed (the version installed and the last deploy run).
 It runs only the steps embedded in it and never fetches code (PFM 3A). If no window can open (no Windows Forms),
 it runs the same steps as text.
 Text files are embedded as readable single-quoted here-strings, so anyone can read the code.
@@ -154,7 +154,7 @@ function Test-MailTo([string]$To) {
   return ($To -match ('^\s*' + $one + '(\s*;\s*' + $one + ')*\s*;?\s*$'))
 }
 function Get-ConfigFile([string]$Base, [string]$Name) { return (Join-Path (Join-Path $Base 'Config') $Name) }
-function Get-RadeConfigFile([string]$Name) { return (Join-Path (Join-Path (Get-RadePath) 'Config') $Name) }   # the engine's own settings (R17)
+function Get-RadeConfigFile([string]$Name) { if ($script:configOver) { return (Join-Path $script:configOver $Name) }; return (Join-Path (Join-Path (Get-RadePath) 'Config') $Name) }   # the engine's own settings (R17)
 function Get-MailTo([string]$Base) {
   # RADE\Config\rade-mail-to.txt: the address the results e-mail goes to (PFM 13 Nov; RADE R17). The window box saves it.
   # Until it exists, the app's old Config\@@PREFIX@@-mail-to.txt is read.
@@ -349,7 +349,7 @@ function Get-StepEnv([string]$Base, $Step) {
   # Variables, not parameters: a script that does not know them still runs.
   $inst = ''; $last = ''
   if (Test-Deploy) {
-    $e = (Read-Installed)[(Get-InstalledKey $script:app)]
+    $e = (Read-Installed (Get-InstalledKey $script:app))
     if ($e) {
       if ($e.installed) { $inst = [string]$e.installed.version }
       $s = $e.steps[[string]$Step.Name]; if ($s -and [string]$s.version -eq [string]$script:app.Version) { $last = [string]$s.state }
@@ -578,7 +578,7 @@ function Save-RoundDraft([string]$Dir, [string[]]$Summary, [string]$To, [string]
   } catch { return (ConvertTo-Masked $_.Exception.Message) }
 }
 function Test-Deploy { return ([string]$script:app.Mode -eq 'deploy') }
-# ---- Installed versions (the Administrator, 14 Nov 26, deploy v1): RADE\Config\rade-installed.json keeps, per app, the
+# ---- Installed versions (the Administrator, 14 Nov 26, deploy v1): RADE\Config\installed keeps, one file per app, the
 # version a deploy last installed and the last deploy run. It holds no user name, path, site or DODID. A deploy run sends
 # nothing: no e-mail draft, no saved address; its report stays in Rounds\<round> on this computer.
 function Get-InstalledKey($A) {
@@ -596,28 +596,60 @@ function ConvertTo-InstalledRun($V) {
   if ($null -ne $V.state) { $o.state = [string]$V.state }
   return $o
 }
-function Read-Installed {
-  $res = @{}
-  $p = Get-RadeConfigFile 'rade-installed.json'
-  if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { return $res }
+# Shared files (docs/engine.md "Shared files"; the Administrator, 2026-11-15). Many apps, each with its own engine version,
+# use RADE\Config. So: one record file for each app (RADE\Config\installed\<12 hex of the record key>.json, schema
+# rade-installed/2), and an engine reads and writes only its own app's file (S1). A record with a higher schema number is
+# never written, and that app is not deployed (S2). Every write goes to a temporary file first (S4). Only a file with the
+# exact name is read, so a conflict copy that OneDrive makes is ignored (S5).
+$installedSchema = 2
+function Write-FileWhole([string]$Path, [string]$Text) {
+  # The file is whole or unchanged: the text goes to a temporary file in the same folder, which then takes the place of
+  # the final file in one step. A stop in the middle leaves the old file as it was.
+  $dir = Split-Path -Parent $Path
+  if (-not (Test-Path -LiteralPath $dir -PathType Container)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
+  $tmp = $Path + '.tmp' + $PID
+  try {
+    [System.IO.File]::WriteAllText($tmp, $Text, (New-Object System.Text.UTF8Encoding $false))
+    if (Test-Path -LiteralPath $Path -PathType Leaf) {
+      if ((Get-Item -LiteralPath $Path -Force).IsReadOnly) { throw 'the file is read-only' }
+      [System.IO.File]::Replace($tmp, $Path, [NullString]::Value)   # $null would go in as an empty string, which Replace refuses
+    } else { [System.IO.File]::Move($tmp, $Path) }
+  } finally { if (Test-Path -LiteralPath $tmp -PathType Leaf) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue } }
+}
+function Get-InstalledFile([string]$Key) { return (Join-Path (Get-RadeConfigFile 'installed') ((Get-ShortHash $Key) + '.json')) }
+function Read-InstalledRaw([string]$Key) {
+  # State: none (no file), ok, damaged (not JSON, or not this app's record) or newer (a higher schema number: S2).
+  $p = Get-InstalledFile $Key
+  if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { return @{ State = 'none'; Path = $p } }
   try {
     $j = [System.IO.File]::ReadAllText($p) | ConvertFrom-Json
-    foreach ($c in @($j.apps.PSObject.Properties)) {
-      $st = [ordered]@{}
-      if ($c.Value.steps) { foreach ($s in @($c.Value.steps.PSObject.Properties)) {
-        $at = $s.Value.at; if ($at -is [datetime]) { $at = $at.ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }
-        $made = @(); foreach ($m in @($s.Value.made)) { if ($null -ne $m) { $made += [ordered]@{ kind = [string]$m.kind; name = [string]$m.name } } }
-        $st[$s.Name] = [ordered]@{ state = [string]$s.Value.state; version = [string]$s.Value.version; at = [string]$at; made = $made }
-      } }
-      $res[$c.Name] = [ordered]@{ installed = (ConvertTo-InstalledRun $c.Value.installed); lastRun = (ConvertTo-InstalledRun $c.Value.lastRun); steps = $st }
-    }
-  } catch { $res = @{} }   # a damaged file reads as nothing installed
-  return $res
+    if ([string]$j.schema -notmatch '^rade-installed/(\d{1,6})$') { return @{ State = 'damaged'; Path = $p } }
+    if ([int]$Matches[1] -gt $installedSchema) { return @{ State = 'newer'; Path = $p } }
+    if ([string]$j.key -ne $Key) { return @{ State = 'damaged'; Path = $p } }
+    return @{ State = 'ok'; Path = $p; Json = $j }
+  } catch { return @{ State = 'damaged'; Path = $p } }
+}
+function Test-InstalledNewer($A) { return ((Read-InstalledRaw (Get-InstalledKey $A)).State -eq 'newer') }
+$newerRadeText = 'a newer RADE installed this application: get the newest script from the RADE page'
+function Read-Installed([string]$Key) {
+  # This app's record, or $null (no file, a damaged file, or a record from a newer RADE).
+  $r = Read-InstalledRaw $Key
+  if ($r.State -ne 'ok') { return $null }
+  try {
+    $st = [ordered]@{}
+    if ($r.Json.steps) { foreach ($s in @($r.Json.steps.PSObject.Properties)) {
+      $at = $s.Value.at; if ($at -is [datetime]) { $at = $at.ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }
+      $made = @(); foreach ($m in @($s.Value.made)) { if ($null -ne $m) { $made += [ordered]@{ kind = [string]$m.kind; name = [string]$m.name } } }
+      $st[$s.Name] = [ordered]@{ state = [string]$s.Value.state; version = [string]$s.Value.version; at = [string]$at; made = $made }
+    } }
+    return [ordered]@{ installed = (ConvertTo-InstalledRun $r.Json.installed); lastRun = (ConvertTo-InstalledRun $r.Json.lastRun); steps = $st }
+  } catch { return $null }   # a damaged file reads as nothing installed
 }
 function Get-InstalledText($A) {
   # One short text for the Choose card and the log; '' for an app that is not a deploy.
   if ([string]$A.Mode -ne 'deploy') { return '' }
-  $e = (Read-Installed)[(Get-InstalledKey $A)]
+  if (Test-InstalledNewer $A) { return ('version ' + $A.Version + ' (' + $newerRadeText + ')') }
+  $e = (Read-Installed (Get-InstalledKey $A))
   if ($e -and $e.installed) {
     if ($e.installed.version -eq [string]$A.Version) { return ('version ' + $A.Version + ' is installed') }
     return ('version ' + $A.Version + ' (installed now: ' + $e.installed.version + ')')
@@ -631,42 +663,64 @@ function Save-Installed([string]$State, [bool]$Whole, $StepRecs) {
   # A step's "made" list adds up over runs (the undo list): an item stays until an undo removes it.
   # Returns '' or the reason the record could not be saved (the caller says it: the record is the upgrade path).
   try {
-    $p = Get-RadeConfigFile 'rade-installed.json'
-    if ((Test-Path -LiteralPath $p -PathType Leaf)) {
-      $bad = $false; try { $null = [System.IO.File]::ReadAllText($p) | ConvertFrom-Json } catch { $bad = $true }
-      if ($bad) { Copy-Item -LiteralPath $p -Destination ($p + '.damaged') -Force }   # keep what was there before it is replaced
-    }
-    $all = Read-Installed
     $key = Get-InstalledKey $script:app
+    $raw = Read-InstalledRaw $key
+    if ($raw.State -eq 'newer') { return $newerRadeText }   # S2: never write a record of a newer RADE
+    if ($raw.State -eq 'damaged') { Copy-Item -LiteralPath $raw.Path -Destination ($raw.Path + '.damaged') -Force }   # keep what was there before it is replaced
+    $old = Read-Installed $key
     $run = [ordered]@{ version = [string]$script:app.Version; build = [string]$buildId; round = [string]$round; at = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }
-    $inst = $null; if ($all.ContainsKey($key)) { $inst = $all[$key].installed }
+    $inst = $null; if ($old) { $inst = $old.installed }
     if ($State -eq 'PASSED' -and $Whole) { $inst = [ordered]@{ version = $run.version; build = $run.build; round = $run.round; at = $run.at } }
     $run.state = $State
-    $st = [ordered]@{}; if ($all.ContainsKey($key) -and $all[$key].steps) { $st = $all[$key].steps }
+    $st = [ordered]@{}; if ($old -and $old.steps) { $st = $old.steps }
     if ($StepRecs) { foreach ($n in @($StepRecs.Keys)) {
       $made = @(); $seen = @{}
-      $old = @(); if ($st.Contains($n)) { $old = @($st[$n].made) }
-      foreach ($m in ($old + @($StepRecs[$n].made))) { if ($null -eq $m) { continue }; $id = [string]$m.kind + '|' + [string]$m.name; if (-not $seen[$id]) { $seen[$id] = $true; $made += [ordered]@{ kind = [string]$m.kind; name = [string]$m.name } } }
+      $om = @(); if ($st.Contains($n)) { $om = @($st[$n].made) }
+      foreach ($m in ($om + @($StepRecs[$n].made))) { if ($null -eq $m) { continue }; $id = [string]$m.kind + '|' + [string]$m.name; if (-not $seen[$id]) { $seen[$id] = $true; $made += [ordered]@{ kind = [string]$m.kind; name = [string]$m.name } } }
       $st[$n] = [ordered]@{ state = [string]$StepRecs[$n].state; version = $run.version; at = $run.at; made = $made }
     } }
-    $all[$key] = [ordered]@{ installed = $inst; lastRun = $run; steps = $st }
-    $sorted = [ordered]@{}; foreach ($k in @($all.Keys | Sort-Object)) { $sorted[$k] = $all[$k] }
     $doc = [ordered]@{
-      schema = 'rade-installed/1'
-      about = 'Versions RADE installed on this computer, by app (folder/name). "installed" is the last deploy in which every step ran and PASSED; "lastRun" is the last deploy run and its state; "steps" holds each step''s last state and what it made. No user, path or site address is kept here (a key that ends in @ and letters is one site, as a short hash).'
-      apps = $sorted
+      schema = 'rade-installed/' + $installedSchema
+      about = 'What RADE installed for one app (key: folder/name; a key that ends in @ and letters is one site, as a short hash). "installed" is the last deploy in which every step ran and PASSED; "lastRun" is the last deploy run and its state; "steps" holds each step''s last state and what it made. No user, path or site address is kept here. Only the RADE that installs this app writes this file.'
+      key = $key
+      installed = $inst
+      lastRun = $run
+      steps = $st
     }
-    $dir = Split-Path -Parent $p
-    if (-not (Test-Path -LiteralPath $dir -PathType Container)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
-    [System.IO.File]::WriteAllText($p, ($doc | ConvertTo-Json -Depth 9), (New-Object System.Text.UTF8Encoding $false))
+    Write-FileWhole $raw.Path ($doc | ConvertTo-Json -Depth 9)
     return ''
   } catch { return (ConvertTo-Masked $_.Exception.Message) }
+}
+function Test-SharedFile([string]$Dir) {
+  # Test rounds only (it goes away with the test branch): runs the record functions on a scratch folder, so a round on a
+  # work computer proves them on Windows PowerShell 5.1. Returns one line for each test: "PASS ..." or "FAIL ...".
+  $out = @(); $keepApp = $script:app
+  try {
+    $script:configOver = $Dir
+    $script:app = @{ Name = 'Self test'; Version = '0.0.1'; Mode = 'test'; Marker = $null }
+    $key = Get-InstalledKey $script:app; $p = Get-InstalledFile $key
+    $rec = @{ 'step one' = @{ state = 'PASSED'; made = @(@{ kind = 'file'; name = 'a' }) } }
+    $w = Save-Installed 'PASSED' $true $rec; $e = Read-Installed $key
+    $out += $(if (-not $w -and $e -and $e.installed -and $e.installed.version -eq '0.0.1' -and @($e.steps['step one'].made).Count -eq 1 -and [string]$e.steps['step one'].made[0].name -eq 'a') { 'PASS' } else { 'FAIL' }) + ' shared files: a record is written and read back'
+    $w = Save-Installed 'NEEDS REVIEW' $false @{ 'step two' = @{ state = 'NEEDS REVIEW'; made = @() } }; $e = Read-Installed $key
+    $left = @(Get-ChildItem -LiteralPath (Split-Path -Parent $p) -Force | Where-Object { $_.Name -ne (Split-Path -Leaf $p) })
+    $out += $(if (-not $w -and $e -and $e.lastRun.state -eq 'NEEDS REVIEW' -and $e.installed.version -eq '0.0.1' -and $e.steps.Count -eq 2 -and -not $left.Count) { 'PASS' } else { 'FAIL' }) + ' shared files: a second write replaces the file and leaves no temporary file'
+    $newer = '{ "schema": "rade-installed/' + ($installedSchema + 1) + '", "key": "' + $key + '", "later": true }'
+    [System.IO.File]::WriteAllText($p, $newer)
+    $w = Save-Installed 'PASSED' $true $rec
+    $out += $(if ($w -eq $newerRadeText -and (Test-InstalledNewer $script:app) -and $null -eq (Read-Installed $key) -and [System.IO.File]::ReadAllText($p) -eq $newer) { 'PASS' } else { 'FAIL' }) + ' shared files: a record of a newer RADE is not read and not written'
+    [System.IO.File]::WriteAllText($p, '{ "schema": "rade-installed/2", "key": "')
+    $e0 = Read-Installed $key; $w = Save-Installed 'PASSED' $true $rec; $e = Read-Installed $key
+    $out += $(if ($null -eq $e0 -and -not $w -and $e -and $e.installed -and (Test-Path -LiteralPath ($p + '.damaged') -PathType Leaf)) { 'PASS' } else { 'FAIL' }) + ' shared files: a cut record is kept as .damaged and replaced'
+  } catch { $out += 'FAIL shared files: the self-test stopped (' + (ConvertTo-Masked $_.Exception.Message) + ')' }
+  finally { $script:configOver = $null; $script:app = $keepApp; try { Remove-Item -LiteralPath $Dir -Recurse -Force -ErrorAction SilentlyContinue } catch { $null = $_ } }
+  return $out
 }
 function Get-StepPrior {
   # Deploy only: step name -> state, for the steps the record holds at the version this bundle installs.
   $res = @{}
   if (-not (Test-Deploy)) { return $res }
-  $e = (Read-Installed)[(Get-InstalledKey $script:app)]
+  $e = (Read-Installed (Get-InstalledKey $script:app))
   if ($e -and $e.steps) { foreach ($n in @($e.steps.Keys)) { if ([string]$e.steps[$n].version -eq [string]$script:app.Version) { $res[[string]$n] = [string]$e.steps[$n].state } } }
   return $res
 }
@@ -708,7 +762,7 @@ function Get-NewerVersionText {
 function Get-MadeLine {
   # Deploy: what the installs of the chosen app made, from the record (deploy v1 item 4: the list a user needs to remove it by hand).
   $out = @()
-  $e = (Read-Installed)[(Get-InstalledKey $script:app)]
+  $e = (Read-Installed (Get-InstalledKey $script:app))
   if ($e -and $e.steps) { foreach ($n in @($e.steps.Keys)) { foreach ($m in @($e.steps[$n].made)) { if ($null -ne $m) { $out += ('  ' + [string]$m.kind + ': ' + [string]$m.name + '  (' + [string]$n + ')') } } } }
   if ($out.Count) { return (@('Made by this app''s installs on this computer and site (to remove the app, remove these by hand):') + $out) }
   return @()
@@ -751,6 +805,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   $base = Move-ToRade $speak
   & $speak ('Working folder: ' + (ConvertTo-Masked $base))
   if ($modeLine) { & $speak $modeLine; $nv = Get-NewerVersionText; if ($nv) { & $speak $nv; $summary += $nv } }
+  if ($deploy -and (Test-InstalledNewer $script:app)) { throw ($newerRadeText + '. No step ran') }   # S2, before any file is written
   if ($script:noWindowWhy) { & $speak ('Note: no window could open, so the round runs in text mode. Reason: ' + (ConvertTo-Masked $script:noWindowWhy)) }
   if (Test-WordOpen) { & $speak 'Note: Word is open. Renders use Word: save your documents and close Word if a step stops.' }
   & $speak ''
@@ -811,6 +866,15 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     Add-RoundHistory $base $steps[$k].Name $(if ($state -eq 'PASSED') { 'OK' } else { 'CHECK' }) ([int]$secs)
   }
   & $speak ''
+  if (-not $deploy) {
+    # Test rounds: the shared-file self-test (docs/engine.md "Shared files"), on a scratch folder that is removed again.
+    $sf = @(Test-SharedFile (Join-Path (Join-Path (Join-Path $base 'Rounds') $round) ('selftest' + $PID)))
+    foreach ($l in $sf) { & $speak ('  ' + $l) }
+    $sfBad = @($sf | Where-Object { $_ -notmatch '^PASS ' }).Count
+    $summary += ('Shared-file self-test: ' + ($sf.Count - $sfBad) + ' passed, ' + $sfBad + ' failed')
+    if ($sfBad) { $script:roundBad = $true }
+    & $speak ''
+  }
   if ($script:closing) { throw 'the window was closed (Exit) while the round ran' }
   $summary += (Get-FolderInventory $base)
   } catch {
@@ -838,7 +902,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     # Deploy v1: nothing leaves this computer. The report stays in Rounds\<round>; the version record is updated.
     $script:draftMade = $false
     $sv = Save-Installed $state $whole $stepRecs
-    if ($sv) { & $speak ('NOTE: the installed-version record (RADE\Config\rade-installed.json) could not be saved: ' + $sv) }
+    if ($sv) { & $speak ('NOTE: the installed-version record (RADE\Config\installed) could not be saved: ' + $sv) }
     if ($bad) { & $speak ('Note: one or more items need review (see above). The report in Rounds\' + $round + ' shows what went wrong. Nothing was sent.'); & $speak (Get-HelpLine) }
     elseif (-not $whole) { & $speak ('Note: some steps were off or skipped, so version ' + $script:app.Version + ' is not recorded as installed. Run again with every step on.') }
     else {
@@ -1062,7 +1126,7 @@ function Test-InstalledHere {
   # True when this account's record for this site (Get-InstalledKey) holds a step: a deploy from this account reached
   # a step here. A run that reached no step does not count.
   if (-not (Get-SiteMark (Get-SiteUrl (Get-BasePath)))) { return $false }
-  $e = (Read-Installed)[(Get-InstalledKey $script:app)]
+  $e = (Read-Installed (Get-InstalledKey $script:app))
   return [bool]($e -and $e.steps -and $e.steps.Count)
 }
 function Test-FirstInstall { return ((Test-Deploy) -and [bool]$script:app.Marker -and -not (Test-InstalledHere)) }
@@ -1367,9 +1431,7 @@ function Save-CheckCache($Results, [string]$Base, [string]$Site) {
       host = (Get-CheckHost)
       checks = $sorted
     }
-    $dir = Split-Path -Parent $p
-    if (-not (Test-Path -LiteralPath $dir -PathType Container)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
-    [System.IO.File]::WriteAllText($p, ($doc | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding $false))
+    Write-FileWhole $p ($doc | ConvertTo-Json -Depth 5)
   } catch { $null = $_ }   # saving is a convenience: never stop for it
 }
 function Get-CheckToRun($Def, $Cache, [string]$Base, [string]$Site, [bool]$Force) {
@@ -1759,7 +1821,7 @@ if ($gui) {
       foreach ($id in $script:appChecks) { if ($ui.BaseRes.ContainsKey($id) -and $checkNoSave -notcontains $id -and $ui.BaseRes[$id].State -in 'PASSED', 'WARNING') { $script:checkResults[$id] = $ui.BaseRes[$id] } }
       $ui.AppL.Text = $dot.TrimStart() + $script:app.Name + $(if ($script:app.Version) { ' ' + $script:app.Version } else { '' })
       & $ui.InitSel
-      $e = $null; if (Test-Deploy) { $e = (Read-Installed)[(Get-InstalledKey $script:app)] }
+      $e = $null; if (Test-Deploy) { $e = (Read-Installed (Get-InstalledKey $script:app)) }
       if ($e -and $e.installed) { & $ui.VMaint $e.installed } else { & $ui.Checks $false } }
     $ui.VMaint = { param($Inst)
       # Maintenance (the Administrator, 2026-11-14; docs/engine.md "Maintenance run types"): shown for an application that is
@@ -1930,7 +1992,7 @@ if ($gui) {
       } finally { $ui.Running = $false; $sv = $ui.StepState; & $ui.InitSel; $ui.StepState = $sv } }
     $ui.MadeText = {
       # Deploy: how many things the installs of this application made, by kind (the list is in the Record).
-      $c = [ordered]@{}; $e = (Read-Installed)[(Get-InstalledKey $script:app)]
+      $c = [ordered]@{}; $e = (Read-Installed (Get-InstalledKey $script:app))
       if ($e -and $e.steps) { foreach ($n in @($e.steps.Keys)) { foreach ($m in @($e.steps[$n].made)) { if ($null -ne $m) { $k = [string]$m.kind; if ($c.Contains($k)) { $c[$k] = [int]$c[$k] + 1 } else { $c[$k] = 1 } } } } }
       if (-not $c.Count) { return '' }
       $parts = @(); foreach ($k in @($c.Keys)) { $parts += ([string]$c[$k] + ' ' + $k + $(if ($c[$k] -ne 1) { 's' } else { '' })) }

@@ -3,7 +3,7 @@
 # Builds the sample manifest (schemas/examples/sample-manifest.json + tests/fixture-app) into a bundle and runs it in
 # pwsh text mode, with C:\Users swapped for a temp root. Linux has no Windows Forms: the window's logic runs against
 # stand-in types with a scripted user (section "window" below); what the window looks like is not tested here.
-# Covers deploy v1 (docs/engine.md): a deploy sends nothing and keeps RADE\Config\rade-installed.json; a test round is unchanged.
+# Covers deploy v1 (docs/engine.md): a deploy sends nothing and keeps one record file for each app in RADE\Config\installed (docs/engine.md "Shared files"); a test round is unchanged.
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 pass=0; fail=0
@@ -11,7 +11,10 @@ ok() { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL $1"; }
 command -v pwsh >/dev/null || { echo "FAIL pwsh is missing (PowerShell 7: see https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-linux)"; echo "ENGINE pass=0 fail=1"; exit 1; }
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
-od="$t/u/test1234/OneDrive - United States Air Force"; cfg="$od/RADE/Config"; inst="$cfg/rade-installed.json"
+od="$t/u/test1234/OneDrive - United States Air Force"; cfg="$od/RADE/Config"
+# rec KEY: the record file name of one app (the first 12 hex of the SHA-256 of the lower-case key), as the engine names it.
+rec() { python3 -c "import hashlib,sys; print(hashlib.sha256(sys.argv[1].lower().rstrip('/').encode()).hexdigest()[:12] + '.json')" "$1"; }
+inst="$cfg/installed/$(rec 'SampleApp/Sample app (deploy)')"
 mkdir -p "$od" "$t/app/scripts"; cp -r tests/fixture-app/. "$t/app/"; cp schemas/examples/sample-manifest.json "$t/app/scripts/paste_bundles.json"
 : > "$t/go.md"; echo '{ "apps": { "Sample app (deploy)": "9.0.0", "Sample app": "9.0.0" } }' > "$t/rel.json"
 mkdir -p "$od/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$od/RADE/SampleApp/Config/SAMPLE-site.txt"
@@ -23,7 +26,7 @@ build() { python3 engine/rade_build.py --app-root "$t/app" > "$t/build.txt" 2>&1
 # $1 = the number typed on the Choose question (1 = test app, 2 = deploy app); $2 = the answer in the guide step
 # (empty = done, S = skip); the other questions get Enter. Not tested here: Windows PowerShell 5.1.
 round() { printf '%s\n\n%s\n\n' "$1" "${2:-}" | USERPROFILE="$t/u/test1234" pwsh -NoProfile -File "$t/b.ps1" > "$t/out.txt" 2>&1; }
-js() { python3 -c "import json,sys; d=json.load(open(sys.argv[1])); a=d['apps']['SampleApp/Sample app (deploy)']; print(d['schema'], len(d['apps']), (a['installed'] or {}).get('version'), a['lastRun']['version'], a['lastRun']['state'])" "$inst" 2>&1; }
+js() { python3 -c "import json,sys; import glob,os; a=json.load(open(sys.argv[1])); assert a['key']=='SampleApp/Sample app (deploy)'; print(a['schema'], len(glob.glob(os.path.dirname(sys.argv[1])+'/*')), (a['installed'] or {}).get('version'), a['lastRun']['version'], a['lastRun']['state'])" "$inst" 2>&1; }
 
 build && ok || bad "build of the sample bundle"
 b="$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1"
@@ -63,7 +66,7 @@ has "view=stopped light=failed kick=STOPPED sent=The install stopped. p=A file t
 
 # 0. A skipped step: the run is PASSED but the version is not recorded as installed (review of deploy v1).
 round 2 S; cp "$t/out.txt" "$t/out0.txt"
-grep -q "^Note: some steps were off or skipped, so version 1.0.0 is not recorded as installed" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 None 1.0.0 PASSED" ] && ok || { bad "deploy 0: skipped step ($(js))"; tail -8 "$t/out.txt"; }
+grep -q "^Note: some steps were off or skipped, so version 1.0.0 is not recorded as installed" "$t/out.txt" && [ "$(js)" = "rade-installed/2 1 None 1.0.0 PASSED" ] && ok || { bad "deploy 0: skipped step ($(js))"; tail -8 "$t/out.txt"; }
 
 # Optional = "default": false only (review): T04 is optional, the other steps are needed.
 [ "$(grep -c '^\$steps += .*Optional = \$false; Help = ' "$b")" = 3 ] && grep -q "^\$steps += @{ Name = 'T04 Sample optional r1'.*Default = \$false.*Optional = \$true; Help = '' }$" "$b" && ok || bad "catalog: Optional flags"
@@ -88,7 +91,7 @@ grep -q "^Step 1 of 3: T01 Sample check r1" "$t/outc.txt" && grep -q "is recorde
 grep -q "Url = 'https://raw.githubusercontent.com/example-org/sample-app/v1.0.0/flow/SAMPLE-data-r1.txt'; Sha = '[0-9a-f]\{64\}'" "$b" && grep -q "^  Downloaded   T02.SAMPLE-data-r1.txt" "$t/out0.txt" && ok || bad "item 5: fetch from the release tag"
 sed "s#file://$t/app/flow/SAMPLE-data#file://$t/app/flow/NOPE#" "$t/b.ps1" | sed "s#usersRoot = '$t/u'#usersRoot = '$t/fu'#" > "$t/f.ps1"; mkdir -p "$t/fu/test1234/OneDrive - United States Air Force"
 printf '2\n\n\n\n' | USERPROFILE="$t/fu/test1234" pwsh -NoProfile -File "$t/f.ps1" > "$t/outf.txt" 2>&1
-grep -q "could not be downloaded, so no step ran" "$t/outf.txt" && ! grep -q "^Step 1 of" "$t/outf.txt" && grep -q "^For help, ask in the Teams channel" "$t/outf.txt" && grep -q '"state":  *"STOPPED"' "$t/fu/test1234/OneDrive - United States Air Force/RADE/Config/rade-installed.json" && ok || { bad "item 5: a failed download must stop a deploy before its steps"; tail -8 "$t/outf.txt"; }
+grep -q "could not be downloaded, so no step ran" "$t/outf.txt" && ! grep -q "^Step 1 of" "$t/outf.txt" && grep -q "^For help, ask in the Teams channel" "$t/outf.txt" && grep -q '"state":  *"STOPPED"' "$t/fu/test1234/OneDrive - United States Air Force/RADE/Config/installed/$(rec 'SampleApp/Sample app (deploy)')" && ok || { bad "item 5: a failed download must stop a deploy before its steps"; tail -8 "$t/outf.txt"; }
 # A newer version in rade-release.json is named in a deploy only.
 grep -q "^A newer version, 9.0.0, of Sample app (deploy) is on the app page" "$t/out0.txt" && ok || bad "newer-version notice in a deploy"
 
@@ -100,7 +103,7 @@ grep -q "^Step 1 of 2: T02 Sample import r1" "$t/out.txt" && ! grep -q "contract
 grep -q "^Version 1.0.0 of Sample app (deploy) is recorded as installed" "$t/out.txt" && grep -q "^DONE in .*Nothing was sent\.$" "$t/out.txt" && ok || bad "deploy 1: DONE line says nothing was sent"
 ! grep -qi "outlook\|e-mail\|draft\|Summary copied" "$t/out.txt" && ok || { bad "deploy 1: output names Outlook, an e-mail, a draft or a copied summary"; grep -i "outlook\|e-mail\|draft\|Summary copied" "$t/out.txt"; }
 [ ! -e "$cfg/rade-mail-to.txt" ] && ok || bad "deploy 1: an e-mail address file was written"
-[ "$(js)" = "rade-installed/1 1 1.0.0 1.0.0 PASSED" ] && ! grep -q "test1234\|$t" "$inst" && ok || { bad "deploy 1: rade-installed.json ($(js))"; cat "$inst"; }
+[ "$(js)" = "rade-installed/2 1 1.0.0 1.0.0 PASSED" ] && ! grep -q "test1234\|$t" "$inst" && ok || { bad "deploy 1: rade-installed.json ($(js))"; cat "$inst"; }
 
 # Item 3: the step that needs the skipped hand step is skipped too ("after").
 grep -q "^    Skipped: it needs .T02 Sample import r1. to pass first" "$t/out0.txt" && grep -q "^  Result: SKIPPED (it needs .T02 Sample import r1. to pass first)" "$t/out0.txt" && ok || { bad "item 3: a step whose needed step was skipped must be skipped"; tail -12 "$t/out0.txt"; }
@@ -118,13 +121,13 @@ P
 # 2. Same version again: the record says it is installed.
 round 2
 grep -q "^Step 1 of 3: T01 Sample check r1" "$t/out.txt" && ! grep -q "^Step .*T04 Sample optional" "$t/out.txt" && ok || bad "item 3: with every default step done, a run is a repair: every default step is on and the optional step stays off"
-grep -q "^Mode: deploy, version 1.0.0 is installed" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 1.0.0 1.0.0 PASSED" ] && ok || bad "deploy 2: installed text ($(js))"
+grep -q "^Mode: deploy, version 1.0.0 is installed" "$t/out.txt" && [ "$(js)" = "rade-installed/2 1 1.0.0 1.0.0 PASSED" ] && ok || bad "deploy 2: installed text ($(js))"
 
 # Step contract (docs/engine.md): inputs as environment variables, MADE lines and "makes" in the record.
 grep -q "contract=1 mode=deploy version=1.0.0 installed=1.0.0 last=PASSED site=True" "$t/out.txt" && grep -q "contract=1 mode=deploy version=1.0.0 installed= last= site=True" "$t/out0.txt" && ok || { bad "contract: step inputs"; grep "contract=" "$t/out.txt" "$t/out0.txt"; }
 python3 - "$inst" <<'P' && ok || { bad "contract: steps and made lists in the record"; cat "$inst"; }
 import json, sys
-s = json.load(open(sys.argv[1]))['apps']['SampleApp/Sample app (deploy)']['steps']
+s = json.load(open(sys.argv[1]))['steps']
 a, b = s['T01 Sample check r1'], s['T02 Sample import r1']
 assert a['state'] == 'PASSED' and a['version'] == '1.0.0' and a['made'] == [{'kind': 'file', 'name': 'SAMPLE-T01-result-r1.txt'}, {'kind': 'list', 'name': 'Sample FAIL list at <SITE> and <SITE> and <SITE> for <DODID>'}], a
 assert b['state'] == 'PASSED' and b['made'] == [{'kind': 'flow', 'name': 'Sample flow'}], b
@@ -140,21 +143,24 @@ grep -q "^Made by this app's installs" "$rp" && grep -q "^  flow: Sample flow  (
 # 3. A test round: the draft path is unchanged and the record is not touched.
 cp "$inst" "$t/inst.before"; round 1
 grep -q "Outlook draft could not be created" "$t/out.txt" && ! grep -q "^Mode: deploy\|newer version\|^Made by" "$t/out.txt" && cmp -s "$inst" "$t/inst.before" && ok || { bad "test round: draft path or record changed"; tail -15 "$t/out.txt"; }
+# The shared-file self-test (test rounds only; the 5.1 proof on a work computer): 4 PASS lines, the count in the report,
+# no scratch folder left, and nothing new in RADE\Config\installed.
+[ "$(grep -c "^  PASS shared files: " "$t/out.txt")" = 4 ] && ! grep -q "FAIL shared files" "$t/out.txt" && grep -q "^Shared-file self-test: 4 passed, 0 failed" "$od/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && [ -z "$(find "$od/RADE/SampleApp/Rounds" -name 'selftest*')" ] && [ "$(ls "$cfg/installed" | wc -l)" = 1 ] && ok || { bad "shared files: self-test in a test round"; grep "shared files\|Shared-file" "$t/out.txt"; ls "$cfg/installed"; }
 
 # 4. A newer version whose step fails: lastRun changes, installed stays 1.0.0.
 sed -i 's/"version": "1.0.0"/"version": "1.1.0"/' "$t/app/scripts/paste_bundles.json"; echo "Write-Output 'FAIL sample check: forced by the test'" >> "$t/app/scripts/gov/SAMPLE-T01-check-r1.ps1"
 build; round 2
-grep -q "^Mode: deploy, version 1.1.0 (installed now: 1.0.0)" "$t/out.txt" && grep -q "^Note: one or more items need review.*Nothing was sent\.$" "$t/out.txt" && grep -q "^For help, ask in the Teams channel RHOPE-OPS\.$" "$t/out.txt" && grep -q "^  What to do: Close other PowerShell windows, then run again\.$" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 1.0.0 1.1.0 NEEDS REVIEW" ] && ok || { bad "deploy 4: failed upgrade ($(js))"; tail -15 "$t/out.txt"; }
+grep -q "^Mode: deploy, version 1.1.0 (installed now: 1.0.0)" "$t/out.txt" && grep -q "^Note: one or more items need review.*Nothing was sent\.$" "$t/out.txt" && grep -q "^For help, ask in the Teams channel RHOPE-OPS\.$" "$t/out.txt" && grep -q "^  What to do: Close other PowerShell windows, then run again\.$" "$t/out.txt" && [ "$(js)" = "rade-installed/2 1 1.0.0 1.1.0 NEEDS REVIEW" ] && ok || { bad "deploy 4: failed upgrade ($(js))"; tail -15 "$t/out.txt"; }
 
 # 5. A damaged record is kept as .damaged and replaced by a valid file.
 echo '{ not json' > "$inst"; round 2
-[ -f "$inst.damaged" ] && [ "$(js)" = "rade-installed/1 1 None 1.1.0 NEEDS REVIEW" ] && ok || bad "deploy 5: damaged record ($(js))"
+[ -f "$inst.damaged" ] && [ "$(js)" = "rade-installed/2 2 None 1.1.0 NEEDS REVIEW" ] && ok || bad "deploy 5: damaged record ($(js))"
 
 # 6. Item 3: the failed step is fixed; the next run does only that step and the version becomes installed.
 sed -i '/forced by the test/d' "$t/app/scripts/gov/SAMPLE-T01-check-r1.ps1"; build; round 2
 sed -i 's/"version": "1.1.0"/"version": "1.2.0"/' "$t/app/scripts/paste_bundles.json"; echo "Write-Output 'FAIL sample check: forced by the test'" >> "$t/app/scripts/gov/SAMPLE-T01-check-r1.ps1"; build; round 2
 sed -i '/forced by the test/d' "$t/app/scripts/gov/SAMPLE-T01-check-r1.ps1"; build; round 2
-grep -q "^Step 1 of 1: T01 Sample check r1" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 1.2.0 1.2.0 PASSED" ] && ok || { bad "item 3: resume after a failed step ($(js))"; grep "^Step \|Result" "$t/out.txt"; }
+grep -q "^Step 1 of 1: T01 Sample check r1" "$t/out.txt" && [ "$(js)" = "rade-installed/2 2 1.2.0 1.2.0 PASSED" ] && ok || { bad "item 3: resume after a failed step ($(js))"; grep "^Step \|Result" "$t/out.txt"; }
 
 # Item 3, automatic first: in a deploy, a script step after a hand step must need it ("after"); else the build fails.
 python3 - "$t" <<'P' && ok || bad "item 3: a deploy with an automatic step after a hand step it does not need must fail the build"
@@ -215,7 +221,7 @@ grep -q "FAILED: You can change the site.*This site already has an install of th
 mkdir -p "$t/m4/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/m4/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
 swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-m4.ps1" "$t/m4"; sed -i 's#\$checkGate = \$false#$checkGate = $true#' "$t/m-m4.ps1"   # a third account, with the gate on
 printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m4/test1234" pwsh -NoProfile -File "$t/m-m4.ps1" > "$t/out-m4.txt" 2>&1
-grep -q "^You cannot deploy yet" "$t/out-m4.txt" && ! grep -q "^Step 1 of" "$t/out-m4.txt" && [ ! -f "$t/m4/test1234/OneDrive - United States Air Force/RADE/Config/rade-installed.json" ] && ok || { bad "marker: with the gate on, another account runs no step"; tail -12 "$t/out-m4.txt"; }
+grep -q "^You cannot deploy yet" "$t/out-m4.txt" && ! grep -q "^Step 1 of" "$t/out-m4.txt" && [ ! -e "$t/m4/test1234/OneDrive - United States Air Force/RADE/Config/installed" ] && ok || { bad "marker: with the gate on, another account runs no step"; tail -12 "$t/out-m4.txt"; }
 mkround m1
 grep -q "PASSED: You can change the site" "$t/out-m1.txt" && ! grep -q "^First install from this account" "$t/out-m1.txt" && ok || { bad "marker: the installer's own second run passes"; grep "change the site" "$t/out-m1.txt"; }
 echo '{ "admin": true, "rights": true, "list": false, "rows": {} }' > "$fake"; mkround m3
@@ -263,17 +269,68 @@ printf '2\n\nS\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t
 grep -q "marked partial" "$t/out-m6c.txt" && ! grep -q "T03 Sample verify r1: PASSED" "$t/out-m6c.txt" && ok || { bad "marker: part install on a third site"; grep "T03\|Install record" "$t/out-m6c.txt"; }
 printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234" pwsh -NoProfile -File "$t/m-m6.ps1" > "$t/out-m6d.txt" 2>&1
 grep -q "^Step [0-9] of [0-9]: T03 Sample verify r1" "$t/out-m6d.txt" && grep -q "is recorded as installed" "$t/out-m6d.txt" && ! grep -q "partial" "$fake" && ok || { bad "marker: a step that never ran on this site must run before the install is whole"; grep "^Step\|installed\|Install record" "$t/out-m6d.txt"; }
-python3 - "$t/m6/test1234/OneDrive - United States Air Force/RADE/Config/rade-installed.json" <<'P' && ok || bad "record: one entry for each site, keyed by a hash, no address"
-import json, sys, re
-raw = open(sys.argv[1], encoding='utf-8-sig').read(); a = json.loads(raw)['apps']
-keys = [k for k in a if k.startswith('SampleApp/Sample app (deploy)')]
+python3 - "$t/m6/test1234/OneDrive - United States Air Force/RADE/Config/installed" <<'P' && ok || bad "record: one file for each site, keyed by a hash, no address"
+import json, sys, re, pathlib, hashlib
+fs = sorted(pathlib.Path(sys.argv[1]).iterdir()); raw = [f.read_text() for f in fs]; keys = [json.loads(r)['key'] for r in raw]
 assert len(keys) == 3 and all(re.fullmatch(r'SampleApp/Sample app \(deploy\)@[0-9a-f]{12}', k) for k in keys), keys
-assert 'usaf.dps.mil' not in raw
+assert all(f.name == hashlib.sha256(k.lower().encode()).hexdigest()[:12] + '.json' for f, k in zip(fs, keys)), fs
+assert not any('usaf.dps.mil' in r for r in raw)
 P
 # The site row is not written when the account's own record cannot be saved (it would stop that account's next run).
 echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows": {} }' > "$fake"
-mkdir -p "$t/m9/test1234/OneDrive - United States Air Force/RADE/Config/rade-installed.json"; mkround m9
-grep -q "installed-version record (RADE.Config.rade-installed.json) could not be saved" "$t/out-m9.txt" && ! grep -q "^Install record on the site" "$t/out-m9.txt" && ! grep -q "InstalledVersion" "$fake" && ok || { bad "marker: no row when the own record failed"; grep "record" "$t/out-m9.txt"; cat "$fake"; }
+mkdir -p "$t/m9/test1234/OneDrive - United States Air Force/RADE/Config"; : > "$t/m9/test1234/OneDrive - United States Air Force/RADE/Config/installed"; mkround m9
+grep -q "installed-version record (RADE.Config.installed) could not be saved" "$t/out-m9.txt" && ! grep -q "^Install record on the site" "$t/out-m9.txt" && ! grep -q "InstalledVersion" "$fake" && ok || { bad "marker: no row when the own record failed"; grep "record" "$t/out-m9.txt"; cat "$fake"; }
+
+# ---- Shared files (docs/engine.md "Shared files"; the Administrator, 2026-11-15): many apps, each with its own engine
+# version, use RADE\Config. Fixtures are files the engines wrote; the hand-made ones only stand for another app's file.
+sha() { sha256sum "$@" | cut -c1-64 | tr '\n' ' '; }
+valid() { python3 - "$1" "$2" <<'P'
+import json, sys
+from jsonschema import Draft202012Validator
+s = json.load(open(sys.argv[1])); Draft202012Validator.check_schema(s)
+e = sorted(Draft202012Validator(s).iter_errors(json.load(open(sys.argv[2]))), key=str)
+for x in e: print('  schema:', '/'.join(str(p) for p in x.path), x.message[:160])
+sys.exit(1 if e else 0)
+P
+}
+# The files the engine wrote in the runs above follow the two schemas.
+valid schemas/rade-installed.schema.json "$inst" && valid schemas/rade-checks.schema.json "$cfg/rade-checks.json" && ok || bad "shared files: the engine's files do not follow schemas/rade-installed.schema.json and rade-checks.schema.json"
+# S1 and S5. A deploy of one app changes no other file in RADE\Config\installed: another app's record (with fields this
+# engine does not know) and a OneDrive conflict copy of this app's own record stay byte for byte.
+other="$cfg/installed/0123456789ab.json"; conflict="${inst%.json}-PC2.json"
+echo '{ "schema": "rade-installed/7", "key": "OtherApp/Other", "later": { "a": { "b": { "c": { "d": { "e": { "f": { "g": { "h": { "i": { "j": [1] } } } } } } } } } }, "big": 12345678901234567890 }' > "$other"
+sed 's/"version": *"[0-9.]*"/"version": "8.8.8"/' "$inst" > "$conflict"
+h0=$(sha "$other" "$conflict"); round 2
+[ "$(sha "$other" "$conflict")" = "$h0" ] && grep -q "^Mode: deploy, version 1.2.0 is installed" "$t/out.txt" && ! grep -q "8\.8\.8" "$t/out.txt" && ok || { bad "shared files: a deploy changed another app's record or read a conflict copy"; grep "^Mode" "$t/out.txt"; }
+rm -f "$other" "$conflict"
+# S4. A record that cannot be replaced (read-only) stays whole and the run says so; no temporary file is left.
+chmod a-w "$inst"; h0=$(sha "$inst"); round 2; chmod u+w "$inst"
+[ "$(sha "$inst")" = "$h0" ] && grep -q "installed-version record (RADE.Config.installed) could not be saved: .*read-only" "$t/out.txt" && [ -z "$(find "$cfg" -name '*.tmp*')" ] && ok || { bad "shared files: a read-only record must stay whole"; grep "record" "$t/out.txt"; find "$cfg" -name '*.tmp*'; }
+# A record cut in the middle of a write by something else: kept as .damaged, replaced by a whole file that follows the schema.
+rm -f "$inst.damaged"; head -c 150 "$inst" > "$t/cut.json"; cp "$t/cut.json" "$inst"; round 2
+cmp -s "$inst.damaged" "$t/cut.json" && valid schemas/rade-installed.schema.json "$inst" && ok || { bad "shared files: a cut record"; ls "$cfg/installed"; }
+# S2. A record from a newer RADE (a higher schema number): not written, and no step runs.
+cp "$inst" "$t/inst.good"; echo '{ "schema": "rade-installed/3", "key": "SampleApp/Sample app (deploy)", "later": true }' > "$inst"; h0=$(sha "$inst"); round 2
+[ "$(sha "$inst")" = "$h0" ] && grep -q "^Mode: deploy, version 1.2.0 (a newer RADE installed this application: get the newest script from the RADE page)" "$t/out.txt" && grep -q "^STOPPED: a newer RADE installed this application.*No step ran" "$t/out.txt" && ! grep -q "^Step 1 of\|^  Wrote\|^  Written\|^  Downloaded" "$t/out.txt" && [ ! -e "$inst.tmp" ] && ok || { bad "shared files: a record of a newer RADE must stop the deploy and stay as it is"; grep "^Mode\|^STOPPED\|^Step\|record" "$t/out.txt"; }
+cp "$t/inst.good" "$inst"
+# Cross-version: the engine in the field (engine-v1) and this engine on one computer. Run this engine, then v1, then this
+# engine: v1 does not change this engine's record, and this engine still uses the saved checks after v1 wrote them.
+v1=ba1b64e1a728c7aea0ab9b4ff53890e7c34c8151   # tag engine-v1: the engine in rhope-ops/90-161.Z scripts/rade.lock.json on 2026-11-15
+git cat-file -e "$v1^{commit}" 2>/dev/null || git fetch -q origin "$v1" 2>/dev/null
+mkdir -p "$t/v1/engine" "$t/v1/assets/logo" "$t/xv/app/scripts"
+if git show "$v1:engine/rade_build.py" > "$t/v1/engine/rade_build.py" 2>/dev/null && git show "$v1:assets/logo/logo-K-128.png" > "$t/v1/assets/logo/logo-K-128.png" 2>/dev/null; then
+  cp -r tests/fixture-app/. "$t/xv/app/"; cp schemas/examples/sample-manifest.json "$t/xv/app/scripts/paste_bundles.json"
+  xo="$t/xu/test1234/OneDrive - United States Air Force"; mkdir -p "$xo/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$xo/RADE/SampleApp/Config/SAMPLE-site.txt"
+  xb="$t/xv/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1"; xi="$xo/RADE/Config/installed/$(rec 'SampleApp/Sample app (deploy)')"
+  xrun() { printf '2\n\n\n\n' | USERPROFILE="$t/xu/test1234" pwsh -NoProfile -File "$1" > "$2" 2>&1; }
+  python3 engine/rade_build.py --app-root "$t/xv/app" > /dev/null 2>&1 && swap "$xb" "$t/x-new.ps1" "$t/xu"
+  python3 "$t/v1/engine/rade_build.py" --app-root "$t/xv/app" > /dev/null 2>&1 && swap "$xb" "$t/x-v1.ps1" "$t/xu"
+  xrun "$t/x-new.ps1" "$t/x1.txt"; h0=$(sha "$xi"); n0=$(ls "$xo/RADE/Config/installed" | wc -l)
+  xrun "$t/x-v1.ps1" "$t/x2.txt"; h1=$(sha "$xi"); n1=$(ls "$xo/RADE/Config/installed" | wc -l)
+  xrun "$t/x-new.ps1" "$t/x3.txt"
+  ! cmp -s "$t/x-new.ps1" "$t/x-v1.ps1" && grep -q "is recorded as installed" "$t/x1.txt" && grep -q "is recorded as installed" "$t/x2.txt" && [ -f "$xo/RADE/Config/rade-installed.json" ] && [ "$h0" = "$h1" ] && [ "$n0$n1" = 11 ] && ok || { bad "cross-version: engine-v1 changed this engine's record ($n0 $n1)"; tail -3 "$t/x2.txt"; }
+  grep -q "^Mode: deploy, version 1.0.0 is installed" "$t/x3.txt" && grep -q "PASSED: PowerShell is version 5.1 or newer. Last check: " "$t/x3.txt" && valid schemas/rade-installed.schema.json "$xi" && valid schemas/rade-checks.schema.json "$xo/RADE/Config/rade-checks.json" && ok || { bad "cross-version: this engine after engine-v1 (its record, the saved checks)"; grep "^Mode\|PowerShell is version" "$t/x3.txt"; }
+else bad "cross-version: the engine-v1 commit $v1 is not in this clone and could not be fetched (git fetch origin $v1)"; fi
 
 # Moved from rhope-ops/90-161.Z tests (2026-11-15): engine behavior is tested here, an app tests its own bundle.
 # Step default: a bool, or {passed, paths}: on only when those files changed since the round that last passed them.

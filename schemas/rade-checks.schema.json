@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rhope-ops/RADE/blob/main/schemas/rade-checks.schema.json",
+  "title": "RADE saved checks",
+  "description": "RADE\\Config\\rade-checks.json: a cache that every app's RADE reads and writes. Nothing whose loss matters goes in it (docs/engine.md \"Shared files\", S3): when it is lost or written by another engine version, a check runs again. Written by Save-CheckCache in engine/rade_build.py; tests/engine_test.sh checks the file the engine writes against this schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "about", "maxAgeDays", "host", "checks"],
+  "properties": {
+    "schema": { "const": "rade-checks/1" },
+    "about": { "type": "string" },
+    "maxAgeDays": { "type": "integer", "minimum": 1 },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["powershell", "pnp", "computer"],
+      "properties": {
+        "powershell": { "type": "string" },
+        "pnp": { "type": "string" },
+        "computer": { "type": "string", "description": "A short hash of the computer name, never the name.", "pattern": "^([0-9a-f]{12})?$" }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "description": "Check id to its saved result. Only PASSED results are saved.",
+      "propertyNames": { "pattern": "^[a-z-]+$" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["state", "detail", "at", "scope"],
+        "properties": {
+          "state": { "const": "PASSED" },
+          "detail": { "type": "string" },
+          "at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$" },
+          "scope": { "type": "string", "pattern": "^((site|flow):[0-9a-f]{0,12})?$" }
+        }
+      }
+    }
+  }
+}
