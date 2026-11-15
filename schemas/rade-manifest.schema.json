@@ -432,7 +432,7 @@
             "key": { "type": "string", "pattern": "^[A-Za-z0-9]+$", "description": "Title of the row." },
             "field": { "type": "string", "pattern": "^[A-Za-z0-9_]+$", "description": "Internal name of the text column that gets the version and the date." }
           },
-          "description": "The install record on the site (docs/engine.md \"Guardrails\"): after a whole install RADE writes the version and the date to this one row. The sign-in check reads it; a site that has it blocks a deploy from an account that did not install it. Needs mode deploy and a step that needs site-rights."
+          "description": "The install record on the site (docs/engine.md \"Guardrails\"): after a deploy that reached a step RADE writes the version and the date to this one row (marked partial until every needed step has passed). The sign-in check reads it; a site that has it blocks a deploy from an account that did not install it. Needs mode deploy and a step that needs site-rights."
         },
         "version": {
           "type": "string",

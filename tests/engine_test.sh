@@ -136,7 +136,7 @@ b = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t 
 sys.exit(0 if a.returncode != 0 and 'comes after the hand step' in a.stderr and b.returncode != 0 and 'not an earlier step of this app' in b.stderr else 1)
 P
 
-# ---- Guardrails (the Administrator, 15 Nov 26; docs/engine.md "Guardrails").
+# ---- Guardrails (the Administrator, 14 Nov 26; docs/engine.md "Guardrails").
 # 1. A classified-network domain suffix stops RADE before it writes anything.
 mkdir -p "$t/gu/test1234/OneDrive - United States Air Force"; sed "s#usersRoot = '$t/u'#usersRoot = '$t/gu'#" "$t/b.ps1" > "$t/g.ps1"
 printf '2\n\n\n\n' | USERDNSDOMAIN="AREA.EXAMPLE.SMIL.MIL" USERPROFILE="$t/gu/test1234" pwsh -NoProfile -File "$t/g.ps1" > "$t/outg.txt" 2>&1
@@ -150,8 +150,9 @@ cat >> "$t/site.ps1" <<'P'
 $bad = @('https://example.com/sites/a', 'http://usaf.dps.mil/sites/a', 'https://usaf.dps.mil/teams/a', 'https://usaf.dps.mil/sites/a/b', 'https://usaf.dps.mil.example.com/sites/a', 'https://usaf.dps.mil/sites/a\', 'https://usaf.dps.mil/sites/', '') | Where-Object { Test-SiteUrl $_ }
 $good = @('https://usaf.dps.mil/sites/a', 'https://USAF.dps.mil/sites/a-b_1/') | Where-Object { -not (Test-SiteUrl $_) }
 if (@($bad).Count -or @($good).Count) { 'WRONG ' + (@($bad) + @($good) -join ' '); exit 1 }
+'SITEOK'
 P
-pwsh -NoProfile -File "$t/site.ps1" > "$t/outsite.txt" 2>&1 && ok || { bad "site address rule"; cat "$t/outsite.txt"; }
+[ "$(grep -c "^\$sitePrefix = \|^function Test-SiteUrl" "$t/site.ps1")" = 2 ] && pwsh -NoProfile -File "$t/site.ps1" > "$t/outsite.txt" 2>&1 && [ "$(cat "$t/outsite.txt")" = "SITEOK" ] && ok || { bad "site address rule"; cat "$t/outsite.txt"; }
 # 3 and 4. Site rights with the admin flag (shown only), and the install record on the site (fake PnP: tests/fake-pnp).
 python3 - "$t" <<'P' && ok || bad "marker: build of the marker manifest"
 import json, subprocess, sys, pathlib, shutil
@@ -188,7 +189,7 @@ grep -q "PASSED: You can change the site" "$t/out-m1.txt" && ! grep -q "^First i
 echo '{ "admin": true, "rights": true, "list": false, "rows": {} }' > "$fake"; mkround m3
 grep -q "Site collection administrator: yes" "$t/out-m3.txt" && grep -q '^NOTE: the install record on the site ("Sample Settings", row "InstalledVersion") was not written: the list was not found' "$t/out-m3.txt" && ok || { bad "marker: a missing list gives a NOTE"; tail -5 "$t/out-m3.txt"; }
 
-# Review, 15 Nov 26. The installer on another site that has a row is stopped too (the record is per site).
+# Review, 14 Nov 26. The installer on another site that has a row is stopped too (the record is per site).
 echo '{ "admin": false, "rights": true, "list": true, "rows": { "InstalledVersion": "9.9 2026-01-01" } }' > "$fake"
 echo "https://usaf.dps.mil/sites/other" > "$t/m1/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
 printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m1/test1234" pwsh -NoProfile -File "$t/m-m1.ps1" > "$t/out-m1b.txt" 2>&1
@@ -206,6 +207,30 @@ printf '2\n\nS\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t
 grep -q "marked partial (added)" "$t/out-m6.txt" && grep -q '"InstalledVersion": *"[0-9.]* 20[0-9-]* partial"' "$fake" && ok || { bad "marker: a part install is recorded as partial"; tail -4 "$t/out-m6.txt"; cat "$fake"; }
 mkround m6
 grep -q "PASSED: You can change the site" "$t/out-m6.txt" && grep -q "now holds version [0-9.]* and the date (updated)" "$t/out-m6.txt" && ! grep -q "partial" "$fake" && ok || { bad "marker: the same account finishes its part install"; grep "change the site\|Install record" "$t/out-m6.txt"; cat "$fake"; }
+
+# Second review, 14 Nov 26. A run that reached no step (failed download) does not make the account "installed here":
+# after another account's install it is stopped, with the gate on, and the row stays.
+echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows": {} }' > "$fake"
+mkdir -p "$t/m8/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/m8/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
+swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-m8.ps1" "$t/m8"; sed "s#file://$t/app/flow/SAMPLE-data#file://$t/app/flow/NOPE#" "$t/m-m8.ps1" > "$t/m-m8f.ps1"
+printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m8/test1234" pwsh -NoProfile -File "$t/m-m8f.ps1" > "$t/out-m8f.txt" 2>&1
+grep -q "so no step ran" "$t/out-m8f.txt" && ! grep -q "InstalledVersion" "$fake" && ok || { bad "marker: a run with no step writes no row"; tail -4 "$t/out-m8f.txt"; }
+echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows": { "InstalledVersion": "7.7 2026-01-01" } }' > "$fake"
+sed -i 's#\$checkGate = \$false#$checkGate = $true#' "$t/m-m8.ps1"
+printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m8/test1234" pwsh -NoProfile -File "$t/m-m8.ps1" > "$t/out-m8.txt" 2>&1
+grep -q "FAILED: You can change the site.*\[version 7.7\]" "$t/out-m8.txt" && ! grep -q "^Step 1 of" "$t/out-m8.txt" && grep -q '"7.7 2026-01-01"' "$fake" && ok || { bad "marker: a no-step run does not make the account the installer"; grep "change the site\|^Step" "$t/out-m8.txt"; cat "$fake"; }
+# Step records from one site do not count on another: account m6 (whole install on site "fake") on a new, empty site
+# is a first install again and runs every needed step.
+echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows": {} }' > "$fake"
+echo "https://usaf.dps.mil/sites/second" > "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
+printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234" pwsh -NoProfile -File "$t/m-m6.ps1" > "$t/out-m6b.txt" 2>&1
+grep -q "^First install from this account" "$t/out-m6b.txt" && grep -q "^Step 1 of [0-9]: T01 Sample check r1" "$t/out-m6b.txt" && grep -q "and the date (added)" "$t/out-m6b.txt" && ok || { bad "marker: records from another site do not count"; grep "^First\|^Step\|Install record" "$t/out-m6b.txt"; }
+python3 - "$t/m6/test1234/OneDrive - United States Air Force/RADE/Config/rade-installed.json" <<'P' && ok || bad "record: sites holds two hashes and no address"
+import json, sys, re
+raw = open(sys.argv[1], encoding='utf-8-sig').read(); a = json.loads(raw)['apps']['SampleApp/Sample app (deploy)']
+assert len(a['sites']) == 2 and all(re.fullmatch(r'[0-9a-f]{12}', h) for h in a['sites']), a['sites']
+assert 'usaf.dps.mil' not in raw and 'site' not in a['lastRun']
+P
 
 # The tagline (the Administrator, 14 Nov 26): no "DoD".
 ! grep -q "for your DoD organization" engine/rade_build.py && grep -q "'Test and deploy apps for your organization'" engine/rade_build.py && ok || bad "tagline"

@@ -20,7 +20,7 @@ Updated: 2026-11-14 by Claude (deploy v1). Keep this file at 40 lines or fewer. 
 
 7. Maintenance screen (decided 14 Nov 26: 5 buttons, docs/engine.md "Maintenance run types"; the function lists D1-D8 and R1-R7 are still an agent REC): drawn as a preview for all three redesign concepts, with Restore and Uninstall for concept 1 (docs/reviews/2026-11-14-window-redesign-proposals.md); not built.
 
-8. Guardrails (DECISIONS 15 Nov 26; docs/engine.md "Guardrails"): built and tested in text mode with a fake PnP module (tests/engine_test.sh, 49 checks). Not verified on a device: the classified suffix list, the site collection administrator read and the install-record row on PnP.PowerShell 1.12.0. Next: 90-161.Z bumps its lock and adds `marker`; the window shows a failed start-up guard only as console text.
+8. Guardrails (DECISIONS 14 Nov 26; docs/engine.md "Guardrails"): built and tested in text mode with a fake PnP module (tests/engine_test.sh, 53 checks). Not verified on a device: the classified suffix list, the site collection administrator read and the install-record row on PnP.PowerShell 1.12.0. Next: 90-161.Z bumps its lock and adds `marker`; the window shows a failed start-up guard only as console text.
 
 ## Needs the Administrator
 

@@ -661,7 +661,6 @@ function ConvertTo-InstalledRun($V) {
   $at = $V.at; if ($at -is [datetime]) { $at = $at.ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }   # PowerShell 7 reads it as a date
   $o = [ordered]@{ version = [string]$V.version; build = [string]$V.build; round = [string]$V.round; at = [string]$at }
   if ($null -ne $V.state) { $o.state = [string]$V.state }
-  if ($V.site) { $o.site = [string]$V.site }
   return $o
 }
 function Read-Installed {
@@ -677,7 +676,8 @@ function Read-Installed {
         $made = @(); foreach ($m in @($s.Value.made)) { if ($null -ne $m) { $made += [ordered]@{ kind = [string]$m.kind; name = [string]$m.name } } }
         $st[$s.Name] = [ordered]@{ state = [string]$s.Value.state; version = [string]$s.Value.version; at = [string]$at; made = $made }
       } }
-      $res[$c.Name] = [ordered]@{ installed = (ConvertTo-InstalledRun $c.Value.installed); lastRun = (ConvertTo-InstalledRun $c.Value.lastRun); steps = $st }
+      $sites = @(); foreach ($h in @($c.Value.sites)) { if ($h) { $sites += [string]$h } }
+      $res[$c.Name] = [ordered]@{ installed = (ConvertTo-InstalledRun $c.Value.installed); lastRun = (ConvertTo-InstalledRun $c.Value.lastRun); steps = $st; sites = $sites }
     }
   } catch { $res = @{} }   # a damaged file reads as nothing installed
   return $res
@@ -708,12 +708,14 @@ function Save-Installed([string]$State, [bool]$Whole, $StepRecs) {
     $key = Get-InstalledKey $script:app
     $run = [ordered]@{ version = [string]$script:app.Version; build = [string]$buildId; round = [string]$round; at = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }
     $inst = $null; if ($all.ContainsKey($key)) { $inst = $all[$key].installed }
-    # "site": a short hash of the site address this run used (never the address): an install record on the site is
-    # this account's own only when the hashes match (review, 15 Nov 26: one account, two sites).
+    # "sites": a short hash (never the address) of each site where a deploy of this app from this account reached a
+    # step. An install record on a site is this account's own only when that site is in the list (review, 14 Nov 26:
+    # one account on two sites; a run that reached no step does not count).
+    $sites = @(); if ($all.ContainsKey($key)) { $sites = @($all[$key].sites | Where-Object { $_ }) }
     $sm = Get-SiteMark (Get-SiteUrl (Get-BasePath))
-    if ($State -eq 'PASSED' -and $Whole) { $inst = [ordered]@{ version = $run.version; build = $run.build; round = $run.round; at = $run.at }; if ($sm) { $inst.site = $sm } }
+    if ($sm -and $StepRecs -and $StepRecs.Count -and $sites -notcontains $sm) { $sites += $sm }
+    if ($State -eq 'PASSED' -and $Whole) { $inst = [ordered]@{ version = $run.version; build = $run.build; round = $run.round; at = $run.at } }
     $run.state = $State
-    if ($sm) { $run.site = $sm }
     $st = [ordered]@{}; if ($all.ContainsKey($key) -and $all[$key].steps) { $st = $all[$key].steps }
     if ($StepRecs) { foreach ($n in @($StepRecs.Keys)) {
       $made = @(); $seen = @{}
@@ -721,11 +723,11 @@ function Save-Installed([string]$State, [bool]$Whole, $StepRecs) {
       foreach ($m in ($old + @($StepRecs[$n].made))) { if ($null -eq $m) { continue }; $id = [string]$m.kind + '|' + [string]$m.name; if (-not $seen[$id]) { $seen[$id] = $true; $made += [ordered]@{ kind = [string]$m.kind; name = [string]$m.name } } }
       $st[$n] = [ordered]@{ state = [string]$StepRecs[$n].state; version = $run.version; at = $run.at; made = $made }
     } }
-    $all[$key] = [ordered]@{ installed = $inst; lastRun = $run; steps = $st }
+    $all[$key] = [ordered]@{ installed = $inst; lastRun = $run; steps = $st; sites = @($sites) }
     $sorted = [ordered]@{}; foreach ($k in @($all.Keys | Sort-Object)) { $sorted[$k] = $all[$k] }
     $doc = [ordered]@{
       schema = 'rade-installed/1'
-      about = 'Versions RADE installed on this computer, by app (folder/name). "installed" is the last deploy in which every step ran and PASSED; "lastRun" is the last deploy run and its state; "steps" holds each step''s last state and what it made. No user, path or site is kept here.'
+      about = 'Versions RADE installed on this computer, by app (folder/name). "installed" is the last deploy in which every step ran and PASSED; "lastRun" is the last deploy run and its state; "steps" holds each step''s last state and what it made. No user, path or site address is kept here ("sites" holds short hashes).'
       apps = $sorted
     }
     $dir = Split-Path -Parent $p
@@ -739,6 +741,7 @@ function Get-StepPrior {
   $res = @{}
   if (-not (Test-Deploy)) { return $res }
   $e = (Read-Installed)[(Get-InstalledKey $script:app)]
+  if ($script:app.Marker -and -not (Test-InstalledHere)) { return $res }   # step records from another site do not count on this one
   if ($e -and $e.steps) { foreach ($n in @($e.steps.Keys)) { if ([string]$e.steps[$n].version -eq [string]$script:app.Version) { $res[[string]$n] = [string]$e.steps[$n].state } } }
   return $res
 }
@@ -889,7 +892,9 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     # A run that stops midway still leaves a report to send (summary so far + the log up to the stop).
     $summary[0] = '@@PREFIX@@ ' + $round + ' STOPPED'
     $summary += ('STOPPED: ' + (ConvertTo-Masked ([string]$_)))
-    if ($deploy) { $summary += (Get-HelpLine); & $sayRaw (Get-HelpLine); $sv = Save-Installed 'STOPPED' $whole $stepRecs; if ($sv) { $summary += ('NOTE: the installed-version record could not be saved: ' + $sv) } }
+    if ($deploy) { $summary += (Get-HelpLine); & $sayRaw (Get-HelpLine); $sv = Save-Installed 'STOPPED' $whole $stepRecs; if ($sv) { $summary += ('NOTE: the installed-version record could not be saved: ' + $sv) }
+      # A stopped run that reached a step is a part install too: record it on the site (never when the own record failed).
+      if ($script:app.Marker -and $stepRecs.Count -and -not $sv) { try { $mw = Write-SiteMarker $base $false; $summary += $mw; & $sayRaw $mw } catch { $null = $_ } } }
     [void](Export-RoundResult $base $summary)
     Add-RoundHistory $base 'ROUND' 'STOPPED' ([int]((Get-Date) - $started).TotalSeconds)
     throw
@@ -914,7 +919,8 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     else {
       & $speak ('Version ' + $script:app.Version + ' of ' + $script:app.Name + ' is recorded as installed.')
     }
-    if ($script:app.Marker -and ($whole -or $stepRecs.Count)) { $mw = Write-SiteMarker $base ([bool]($whole -and -not $bad)); & $speak $mw; $summary += $mw }
+    # Never when the own record could not be saved: the row would then stop this account's next run.
+    if ($script:app.Marker -and $stepRecs.Count -and -not $sv) { $mw = Write-SiteMarker $base ([bool]($whole -and -not $bad)); & $speak $mw; $summary += $mw }
     $ml = @(Get-MadeLine); if ($ml.Count) { foreach ($l in $ml) { & $speak $l }; $summary += $ml }
     [void](Export-RoundResult $base $summary)   # the report also holds the deploy notes and the made list
     & $speak ('DONE in ' + (Format-Duration ((Get-Date) - $started).TotalSeconds) + '. The report is in Rounds\' + $round + ' on this computer. Nothing was sent.')
@@ -959,7 +965,7 @@ $checkDefs = @(
 )
 # Short: the name in the window's narrow check column (the Administrator, 2026-11-14); the log and the e-mail keep Name.
 $dot = ' ' + [char]0x00B7 + ' '   # a middle dot between facts, made at run time so the bundle stays ASCII
-# ---- Environment guard (the Administrator, 15 Nov 26): RADE runs on NIPR computers only. It reads this computer's own
+# ---- Environment guard (the Administrator, 14 Nov 26): RADE runs on NIPR computers only. It reads this computer's own
 # domain names (two local values: nothing is sent and no host is contacted) and compares their endings with the
 # classified-network suffixes below. It cannot prove NIPR; it stops an honest mistake. The names are never shown or saved.
 $classifiedSuffixes = @('smil.mil', 'sgov.gov', 'ic.gov')
@@ -980,7 +986,7 @@ function Get-SiteUrl([string]$Base) {
   return ''
 }
 $sitePrefix = 'https://usaf.dps.mil/sites/'   # the DAF SharePoint address every site starts with; the box starts with it
-# Guardrail (the Administrator, 15 Nov 26): only a site on the DAF SharePoint host is accepted, so RADE never signs in to
+# Guardrail (the Administrator, 14 Nov 26): only a site on the DAF SharePoint host is accepted, so RADE never signs in to
 # or writes to another host.
 function Test-SiteUrl([string]$Url) { return ($Url -match ('^' + [regex]::Escape($sitePrefix) + '[^/\\\s"]+/?$')) }
 function Save-SiteUrl([string]$Base, [string]$Url) {
@@ -1114,7 +1120,7 @@ try {
 '@
 $rightWords = @{ ViewListItems = 'read items'; AddListItems = 'add items'; EditListItems = 'edit items'; ManageLists = 'manage lists'; ManageWeb = 'manage the site'; ManagePermissions = 'manage permissions' }
 $rightsNeeded = @('ManageLists', 'ManageWeb', 'ManagePermissions')   # what T16 site setup and list set-up use
-# ---- Install record on the site (the Administrator, 15 Nov 26: one install per site). An app with "marker" in the
+# ---- Install record on the site (the Administrator, 14 Nov 26: one install per site). An app with "marker" in the
 # manifest keeps one row (Title = Key) in its own list: the installed version and the date, no name. The record in
 # RADE\Config is per account; this row is what another account's RADE sees. A site that has the row and an account
 # that did not install it: the deploy is blocked (a second import would run every flow twice).
@@ -1128,11 +1134,11 @@ function Get-SiteMark([string]$Site) {
   return (Get-ShortHash $Site.Trim().TrimEnd('/').ToLowerInvariant())
 }
 function Test-InstalledHere {
-  # True when this account's record says it ran a deploy of the chosen app on this site (a whole install or a part of one).
+  # True when this account's record says a deploy of the chosen app reached a step on this site.
   $e = (Read-Installed)[(Get-InstalledKey $script:app)]
   $h = Get-SiteMark (Get-SiteUrl (Get-BasePath))
   if (-not $e -or -not $h) { return $false }
-  return [bool](($e.installed -and $e.installed.site -eq $h) -or ($e.lastRun -and $e.lastRun.site -eq $h))
+  return [bool](@($e.sites) -contains $h)
 }
 function Test-FirstInstall { return ((Test-Deploy) -and [bool]$script:app.Marker -and -not (Test-InstalledHere)) }
 $markerScript = @'
