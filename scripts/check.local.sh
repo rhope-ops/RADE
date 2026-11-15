@@ -10,5 +10,8 @@ python3 -m py_compile engine/rade_build.py
 python3 scripts/engine_files.py | grep -q '  engine/rade_build.py$'
 # RADE page (index.html): its application list is valid, and each entry names a repository and a manifest path.
 python3 -c "import json,re; c=json.load(open('apps.json')); assert c['apps'] and all(re.fullmatch(r'[\w.-]+/[\w.-]+', a['repo']) and a['manifest'].endswith('.json') for a in c['apps']), 'apps.json'"
+# App canary (the Administrator, 2026-11-15): this engine and schema still build every real application in apps.json
+# (a read-only copy of each app's main branch; needs network access to github.com).
+python3 scripts/check_apps.py
 # Engine behavior (deploy v1): build the sample bundle and run it in pwsh text mode.
 bash tests/engine_test.sh
