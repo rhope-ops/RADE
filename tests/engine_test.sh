@@ -136,6 +136,57 @@ b = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t 
 sys.exit(0 if a.returncode != 0 and 'comes after the hand step' in a.stderr and b.returncode != 0 and 'not an earlier step of this app' in b.stderr else 1)
 P
 
+# ---- Guardrails (the Administrator, 15 Nov 26; docs/engine.md "Guardrails").
+# 1. A classified-network domain suffix stops RADE before it writes anything.
+mkdir -p "$t/gu/test1234/OneDrive - United States Air Force"; sed "s#usersRoot = '$t/u'#usersRoot = '$t/gu'#" "$t/b.ps1" > "$t/g.ps1"
+printf '2\n\n\n\n' | USERDNSDOMAIN="AREA.EXAMPLE.SMIL.MIL" USERPROFILE="$t/gu/test1234" pwsh -NoProfile -File "$t/g.ps1" > "$t/outg.txt" 2>&1
+grep -q "^STOPPED: RADE runs on NIPR computers only" "$t/outg.txt" && ! grep -qi "example" "$t/outg.txt" && [ -z "$(find "$t/gu" -type f)" ] && [ ! -d "$t/gu/test1234/OneDrive - United States Air Force/RADE" ] && ok || { bad "guard: classified suffix must stop with nothing written"; head -5 "$t/outg.txt"; }
+printf '2\n\n\n\n' | USERDNSDOMAIN="notsmil.mil" USERPROFILE="$t/gu/test1234" pwsh -NoProfile -File "$t/g.ps1" > "$t/outg2.txt" 2>&1
+grep -q "PASSED: This computer is not on a classified network" "$t/outg2.txt" && ! grep -q "^STOPPED: RADE runs on NIPR" "$t/outg2.txt" && ok || { bad "guard: a look-alike suffix must pass"; head -5 "$t/outg2.txt"; }
+grep -q "PASSED: This computer is not on a classified network" "$t/out0.txt" && ok || bad "guard: the check line is in a normal run"
+# 2. Only a site on the DAF SharePoint host is accepted.
+python3 - <<'P' && ok || bad "site address rule"
+import re
+src = open('engine/rade_build.py').read()
+assert "function Test-SiteUrl([string]$Url) { return ($Url -match ('^' + [regex]::Escape($sitePrefix) + '[^/\\s\"]+/?$')) }" in src
+assert "$sitePrefix = 'https://usaf.dps.mil/sites/'" in src
+P
+# 3 and 4. Site rights with the admin flag (shown only), and the install record on the site (fake PnP: tests/fake-pnp).
+python3 - "$t" <<'P' && ok || bad "marker: build of the marker manifest"
+import json, subprocess, sys, pathlib, shutil
+t = pathlib.Path(sys.argv[1]); shutil.copytree(t / 'app', t / 'mk/app')
+p = t / 'mk/app/scripts/paste_bundles.json'; m = json.loads(p.read_text()); b = m['bundles'][0]
+b['apps'][1]['marker'] = {'list': 'Sample Settings', 'key': 'InstalledVersion', 'field': 'SettingValue'}
+p.write_text(json.dumps(m))
+r = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'mk/app')], capture_output=True, text=True)
+assert r.returncode != 0 and 'a marker needs mode deploy and a step that needs site-rights' in (r.stdout + r.stderr), r.stdout + r.stderr
+b['steps'][0]['needs'] = ['ps', 'site-rights']; p.write_text(json.dumps(m))
+r = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'mk/app')], capture_output=True, text=True)
+assert r.returncode == 0, r.stdout + r.stderr
+r = subprocess.run([sys.executable, 'scripts/check_manifest.py', str(p)], capture_output=True, text=True)
+assert r.returncode == 0, r.stdout + r.stderr
+P
+fake="$t/fake.json"; mods="$PWD/tests/fake-pnp"
+mkround() { # $1 = users root name; runs the marker bundle as the deploy app with the fake PnP
+  mkdir -p "$t/$1/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/$1/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
+  swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-$1.ps1" "$t/$1"
+  printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/$1/test1234" pwsh -NoProfile -File "$t/m-$1.ps1" > "$t/out-$1.txt" 2>&1; }
+echo '{ "admin": false, "rights": true, "list": true, "rows": {} }' > "$fake"; mkround m1
+grep -q "PASSED: You can change the site.*Site collection administrator: no (shown only, not required)" "$t/out-m1.txt" && ok || { bad "rights: admin flag shown, not required"; grep "change the site" "$t/out-m1.txt"; }
+grep -q '^On the site   when every step has passed, one row in the list "Sample Settings"' "$t/out-m1.txt" && grep -q "^First install from this account. Install Sample app (deploy) once for each wing" "$t/out-m1.txt" && ok || bad "marker: the plan names the row and gives the one-install notice"
+grep -q '^Install record on the site: "Sample Settings", row "InstalledVersion" now holds version [0-9.]* and the date (added)' "$t/out-m1.txt" && grep -q '"InstalledVersion": *"[0-9.]* 20[0-9-]*"' "$fake" && ok || { bad "marker: written after a whole install"; tail -5 "$t/out-m1.txt"; cat "$fake"; }
+# Another account (no record of its own) on the same site: the check fails. The installer's own second run passes.
+mkround m2
+grep -q "FAILED: You can change the site.*This site already has an install of this application \[version [0-9.]*\], made from another account" "$t/out-m2.txt" && ok || { bad "marker: a second account is stopped"; grep "change the site" "$t/out-m2.txt"; }
+mkdir -p "$t/m4/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/m4/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
+swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-m4.ps1" "$t/m4"; sed -i 's#\$checkGate = \$false#$checkGate = $true#' "$t/m-m4.ps1"   # a third account, with the gate on
+printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m4/test1234" pwsh -NoProfile -File "$t/m-m4.ps1" > "$t/out-m4.txt" 2>&1
+grep -q "^You cannot deploy yet" "$t/out-m4.txt" && ! grep -q "^Step 1 of" "$t/out-m4.txt" && [ ! -f "$t/m4/test1234/OneDrive - United States Air Force/RADE/Config/rade-installed.json" ] && ok || { bad "marker: with the gate on, another account runs no step"; tail -12 "$t/out-m4.txt"; }
+mkround m1
+grep -q "PASSED: You can change the site" "$t/out-m1.txt" && ! grep -q "^First install from this account" "$t/out-m1.txt" && ok || { bad "marker: the installer's own second run passes"; grep "change the site" "$t/out-m1.txt"; }
+echo '{ "admin": true, "rights": true, "list": false, "rows": {} }' > "$fake"; mkround m3
+grep -q "Site collection administrator: yes" "$t/out-m3.txt" && grep -q '^NOTE: the install record on the site ("Sample Settings", row "InstalledVersion") was not written: the list was not found' "$t/out-m3.txt" && ok || { bad "marker: a missing list gives a NOTE"; tail -5 "$t/out-m3.txt"; }
+
 # The tagline (the Administrator, 14 Nov 26): no "DoD".
 ! grep -q "for your DoD organization" engine/rade_build.py && grep -q "'Test and deploy apps for your organization'" engine/rade_build.py && ok || bad "tagline"
 echo "ENGINE pass=$pass fail=$fail"

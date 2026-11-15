@@ -626,6 +626,11 @@ function Get-RoundPlan {
   }
   $lines += ''
   $lines += ('Settings   RADE\Config (' + $(if (Test-Deploy) { 'the installed versions' } else { 'the e-mail address' }) + ' and the saved checks) and Config\@@PREFIX@@-site.txt (the site address).')
+  if ((Test-Deploy) -and $script:app.Marker) {
+    $lines += ''
+    $lines += ('On the site   when every step has passed, one row in the list "' + $script:app.Marker.List + '" (row "' + $script:app.Marker.Key + '": the installed version and the date, no name).')
+    if (Test-FirstInstall) { $lines += ('First install from this account. Install ' + $script:app.Name + ' once for each wing, on one site: RADE stops a second install on this site, but it cannot see an install on another site.') }
+  }
   $lines += ''
   $lines += 'Missing folders are created and files of the same name are replaced. Nothing else is changed, moved or deleted.'
   return @{ Shown = $shown; Found = $found; Lines = $lines }
@@ -901,7 +906,10 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     if ($sv) { & $speak ('NOTE: the installed-version record (RADE\Config\rade-installed.json) could not be saved: ' + $sv) }
     if ($bad) { & $speak ('Note: one or more items need review (see above). The report in Rounds\' + $round + ' shows what went wrong. Nothing was sent.'); & $speak (Get-HelpLine) }
     elseif (-not $whole) { & $speak ('Note: some steps were off or skipped, so version ' + $script:app.Version + ' is not recorded as installed. Run again with every step on.') }
-    else { & $speak ('Version ' + $script:app.Version + ' of ' + $script:app.Name + ' is recorded as installed.') }
+    else {
+      & $speak ('Version ' + $script:app.Version + ' of ' + $script:app.Name + ' is recorded as installed.')
+      if ($script:app.Marker) { $mw = Write-SiteMarker $base; & $speak $mw; $summary += $mw }
+    }
     $ml = @(Get-MadeLine); if ($ml.Count) { foreach ($l in $ml) { & $speak $l }; $summary += $ml }
     [void](Export-RoundResult $base $summary)   # the report also holds the deploy notes and the made list
     & $speak ('DONE in ' + (Format-Duration ((Get-Date) - $started).TotalSeconds) + '. The report is in Rounds\' + $round + ' on this computer. Nothing was sent.')
@@ -928,6 +936,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
 # Kind: auto = runs on its own when the Check screen opens; signin = needs a CAC sign-in (button); guide = the PFM looks
 # in another program and answers (button). Advisory: a problem is a WARNING, never a FAILED.
 $checkDefs = @(
+  @{ Id = 'nipr'; Group = 'Local'; Name = 'This computer is not on a classified network'; Kind = 'auto' },
   @{ Id = 'ps'; Group = 'Local'; Name = 'PowerShell is version 5.1 or newer'; Kind = 'auto' },
   @{ Id = 'lang'; Group = 'Local'; Name = 'PowerShell is not restricted'; Kind = 'auto' },
   @{ Id = 'onedrive'; Group = 'Local'; Name = 'Your OneDrive folder is set up'; Kind = 'auto' },
@@ -945,6 +954,19 @@ $checkDefs = @(
 )
 # Short: the name in the window's narrow check column (the Administrator, 2026-11-14); the log and the e-mail keep Name.
 $dot = ' ' + [char]0x00B7 + ' '   # a middle dot between facts, made at run time so the bundle stays ASCII
+# ---- Environment guard (the Administrator, 15 Nov 26): RADE runs on NIPR computers only. It reads this computer's own
+# domain names (two local values: nothing is sent and no host is contacted) and compares their endings with the
+# classified-network suffixes below. It cannot prove NIPR; it stops an honest mistake. The names are never shown or saved.
+$classifiedSuffixes = @('smil.mil', 'sgov.gov', 'ic.gov')
+function Get-OwnDomain {
+  $d = @([string]$env:USERDNSDOMAIN)
+  try { $d += [string][System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().DomainName } catch { $null = $_ }
+  return @($d | Where-Object { $_ } | ForEach-Object { $_.Trim().TrimEnd('.').ToLowerInvariant() })
+}
+function Test-ClassifiedDomain {
+  foreach ($n in @(Get-OwnDomain)) { foreach ($x in $classifiedSuffixes) { if ($n -eq $x -or $n.EndsWith('.' + $x, [System.StringComparison]::Ordinal)) { return $true } } }
+  return $false
+}
 function Get-CheckDef([string]$Id) { foreach ($d in $checkDefs) { if ($d.Id -eq $Id) { return $d } }; return $null }
 function Get-SiteUrl([string]$Base) {
   # Config\@@PREFIX@@-site.txt: the same file T16 site setup keeps (one place for the site address; never in the repo).
@@ -953,7 +975,9 @@ function Get-SiteUrl([string]$Base) {
   return ''
 }
 $sitePrefix = 'https://usaf.dps.mil/sites/'   # the DAF SharePoint address every site starts with; the box starts with it
-function Test-SiteUrl([string]$Url) { return ($Url -match '^https://[^/\s"]+/sites/[^/\s"]+/?$') }
+# Guardrail (the Administrator, 15 Nov 26): only a site on the DAF SharePoint host is accepted, so RADE never signs in to
+# or writes to another host.
+function Test-SiteUrl([string]$Url) { return ($Url -match ('^' + [regex]::Escape($sitePrefix) + '[^/\s"]+/?$')) }
 function Save-SiteUrl([string]$Base, [string]$Url) {
   $p = Get-ConfigFile $Base '@@PREFIX@@-site.txt'
   $dir = Split-Path -Parent $p
@@ -1042,9 +1066,11 @@ function Invoke-ChildScript([string]$Text, [string]$ArgText, [int]$Seconds, [scr
   return $res
 }
 $rightsScript = @'
-param([string]$Site)
-# RADE check (read-only): signs in with the CAC (web login, as T16 does) and prints your rights on the site.
-# Prints only right names and True/False, never the site, your name or an error message.
+param([string]$Site, [string]$MarkerList = '', [string]$MarkerKey = '', [string]$MarkerField = '')
+# RADE check (read-only): signs in with the CAC (web login, as T16 does) and prints your rights on the site, whether your
+# own account is a site collection administrator (one flag; no list of administrators) and, when the app keeps an install
+# record on the site, the version in that one row. Prints only right names, True/False and a version, never the site,
+# your name or an error message.
 try {
   $mod = @(Get-Module -ListAvailable -Name PnP.PowerShell | Sort-Object Version -Descending)
   if (-not $mod.Count) { 'RESULT no-pnp'; exit 3 }
@@ -1056,11 +1082,82 @@ try {
   $p = $script:web.EffectiveBasePermissions
   $k = [Microsoft.SharePoint.Client.PermissionKind]
   foreach ($n in 'ViewListItems', 'AddListItems', 'EditListItems', 'ManageLists', 'ManageWeb', 'ManagePermissions') { 'RIGHT ' + $n + ' ' + $p.Has($k::$n) }
+  try {
+    $script:adm = $null
+    $null = & { $script:adm = (Get-PnPWeb -Includes CurrentUser -ErrorAction Stop).CurrentUser.IsSiteAdmin } *>&1
+    if ($script:adm -is [bool]) { 'ADMIN ' + $script:adm } else { 'ADMIN unknown' }
+  } catch { 'ADMIN unknown' }
+  if ($MarkerList) {
+    try {
+      $script:mk = 'none'
+      $null = & {
+        $l = Get-PnPList -Identity $MarkerList -ErrorAction SilentlyContinue
+        if ($l) {
+          $q = "<View><Query><Where><Eq><FieldRef Name='Title'/><Value Type='Text'>" + $MarkerKey + "</Value></Eq></Where></Query><RowLimit>1</RowLimit></View>"
+          $it = @(Get-PnPListItem -List $l -Query $q -ErrorAction Stop)
+          if ($it.Count -and ([string]$it[0][$MarkerField]) -match '^\s*([0-9][0-9.]*)') { $script:mk = 'found ' + $Matches[1] }
+        }
+      } *>&1
+      'MARKER ' + $script:mk
+    } catch { 'MARKER unknown' }
+  }
   exit 0
 } catch { 'RESULT not-connected ' + $_.Exception.GetType().Name; exit 2 }
 '@
 $rightWords = @{ ViewListItems = 'read items'; AddListItems = 'add items'; EditListItems = 'edit items'; ManageLists = 'manage lists'; ManageWeb = 'manage the site'; ManagePermissions = 'manage permissions' }
 $rightsNeeded = @('ManageLists', 'ManageWeb', 'ManagePermissions')   # what T16 site setup and list set-up use
+# ---- Install record on the site (the Administrator, 15 Nov 26: one install per site). An app with "marker" in the
+# manifest keeps one row (Title = Key) in its own list: the installed version and the date, no name. The record in
+# RADE\Config is per account; this row is what another account's RADE sees. A site that has the row and an account
+# that did not install it: the deploy is blocked (a second import would run every flow twice).
+function Get-MarkerArg {
+  $m = $script:app.Marker
+  if (-not $m) { return '' }
+  return (' -MarkerList "' + $m.List + '" -MarkerKey "' + $m.Key + '" -MarkerField "' + $m.Field + '"')
+}
+function Test-InstalledHere {
+  # True when this account's record says it installed the chosen app.
+  $e = (Read-Installed)[(Get-InstalledKey $script:app)]
+  return [bool]($e -and $e.installed)
+}
+function Test-FirstInstall { return ((Test-Deploy) -and [bool]$script:app.Marker -and -not (Test-InstalledHere)) }
+$markerScript = @'
+param([string]$Site, [string]$MarkerList, [string]$MarkerKey, [string]$MarkerField, [string]$Value)
+# RADE (one write): signs in with the CAC and sets one row of the app's own list to the installed version and the date.
+# Adds the row when it is missing; changes nothing else. Prints one RESULT word, never the site, a name or an error message.
+try {
+  $mod = @(Get-Module -ListAvailable -Name PnP.PowerShell | Sort-Object Version -Descending)
+  if (-not $mod.Count) { 'RESULT no-pnp'; exit 3 }
+  $pin = @($mod | Where-Object { [string]$_.Version -eq '1.12.0' }); if ($pin.Count) { $mod = $pin }
+  $null = & { Import-Module PnP.PowerShell -RequiredVersion $mod[0].Version -DisableNameChecking } *>&1
+  $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1
+  $script:res = 'no-list'
+  $null = & {
+    $l = Get-PnPList -Identity $MarkerList -ErrorAction SilentlyContinue
+    if ($l) {
+      $q = "<View><Query><Where><Eq><FieldRef Name='Title'/><Value Type='Text'>" + $MarkerKey + "</Value></Eq></Where></Query><RowLimit>1</RowLimit></View>"
+      $it = @(Get-PnPListItem -List $l -Query $q -ErrorAction Stop)
+      if ($it.Count) { $null = Set-PnPListItem -List $l -Identity $it[0].Id -Values @{ $MarkerField = $Value } -ErrorAction Stop; $script:res = 'updated' }
+      else { $null = Add-PnPListItem -List $l -Values @{ Title = $MarkerKey; $MarkerField = $Value } -ErrorAction Stop; $script:res = 'added' }
+    }
+  } *>&1
+  'RESULT ' + $script:res
+  exit 0
+} catch { 'RESULT failed ' + $_.Exception.GetType().Name; exit 2 }
+'@
+function Write-SiteMarker([string]$Base) {
+  # After a whole install. Returns the one line for the log and the report.
+  $m = $script:app.Marker; $site = Get-SiteUrl $Base
+  $where = '"' + $m.List + '", row "' + $m.Key + '"'
+  $again = ' Until it is written, another account is not stopped from a second install on this site: run this deploy again'
+  if (-not (Test-SiteUrl $site)) { return ('NOTE: the install record on the site (' + $where + ') was not written: no site address.' + $again) }
+  $val = [string]$script:app.Version + ' ' + (Get-Date).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+  $r = Invoke-ChildScript $markerScript ('-Site "' + $site + '"' + (Get-MarkerArg) + ' -Value "' + $val + '"') 300 $null
+  $w = ''; foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $w = $Matches[1] } }
+  if ($w -in 'added', 'updated') { return ('Install record on the site: ' + $where + ' now holds version ' + $script:app.Version + ' and the date (' + $w + ').') }
+  $why = $(switch ($w) { 'no-list' { 'the list was not found' } 'no-pnp' { 'the SharePoint tool is not installed' } default { 'the sign-in or the write did not finish' } })
+  return ('NOTE: the install record on the site (' + $where + ') was not written: ' + $why + '.' + $again)
+}
 function Split-Sentence([string]$Text) {
   # One sentence per line on screen (PFM 14 Nov 26): a break after . ! or ? when a capital, a quote or a bracket follows.
   return ($Text -replace '(?<=[.!?])\s+(?=[A-Z"\[])', "`r`n")
@@ -1078,6 +1175,11 @@ function Invoke-Check($Def, [string]$Base, [string]$Site, [scriptblock]$Tick) {
   $one = $null
   try {
     switch ($Def.Id) {
+      'nipr' {
+        # Reads only this computer's own domain names (Test-ClassifiedDomain); the name itself is never shown or saved.
+        if (Test-ClassifiedDomain) { $one = Format-CheckResult 'FAILED' 'This computer''s domain name ends in a classified-network suffix' 'Close RADE. Use it on a NIPR computer only' }
+        else { $one = Format-CheckResult 'PASSED' 'Read this computer''s own domain name: no classified-network suffix' '' }
+      }
       'ps' {
         $v = $PSVersionTable.PSVersion
         if ($v -ge [version]'5.1') { $one = Format-CheckResult 'PASSED' ('version [' + $v + ']') '' }
@@ -1143,7 +1245,7 @@ function Invoke-Check($Def, [string]$Base, [string]$Site, [scriptblock]$Tick) {
         else { $one = Format-CheckResult 'WARNING' ('Not reached: ' + $w.Why) 'Optional: only the new-round notice uses it' }
       }
       'net-site' {
-        if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'No site address' 'Complete the "Site address" box, then select "Run checks again"' }
+        if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'No site address' ('Complete the "Site address" box (it starts with ' + $sitePrefix + '), then select "Run checks again"') }
         else {
           $w = Test-WebReach $Site
           if ($w.Ok) { $one = Format-CheckResult 'PASSED' ('Reached' + $(if ($w.Code -in 401, 403) { ', code [' + $w.Code + '] (sign-in required, as expected)' } elseif ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
@@ -1160,11 +1262,16 @@ function Invoke-Check($Def, [string]$Base, [string]$Site, [scriptblock]$Tick) {
         }
       }
       'site-rights' {
-        if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'No site address' 'Complete the "Site address" box first' }
+        if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'No site address' ('Complete the "Site address" box first (it starts with ' + $sitePrefix + ')') }
         else {
-          $r = Invoke-ChildScript $rightsScript ('-Site "' + $Site + '"') 300 $Tick
-          $have = @{}
-          foreach ($l in $r.Lines) { if ($l -match '^RIGHT (\w+) (True|False)$') { $have[$Matches[1]] = ($Matches[2] -eq 'True') } }
+          $r = Invoke-ChildScript $rightsScript ('-Site "' + $Site + '"' + (Get-MarkerArg)) 300 $Tick
+          $have = @{}; $adm = 'unknown'; $mk = ''
+          foreach ($l in $r.Lines) {
+            if ($l -match '^RIGHT (\w+) (True|False)$') { $have[$Matches[1]] = ($Matches[2] -eq 'True') }
+            if ($l -match '^ADMIN (True|False|unknown)$') { $adm = $Matches[1] }
+            if ($l -match '^MARKER (none|unknown|found [0-9.]+)$') { $mk = $Matches[1] }
+          }
+          $admText = 'Site collection administrator: ' + $(switch ($adm) { 'True' { 'yes' } 'False' { 'no' } default { 'not read' } }) + ' (shown only, not required)'
           if (-not $have.Count) {
             $why = 'Sign-in did not finish'; foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $why = $Matches[1] } }
             if ($why -eq 'not-connected') { $why = 'Sign-in did not finish' }
@@ -1174,7 +1281,9 @@ function Invoke-Check($Def, [string]$Base, [string]$Site, [scriptblock]$Tick) {
             $miss = @($rightsNeeded | Where-Object { -not $have[$_] } | ForEach-Object { $rightWords[$_] })
             $got = @($have.Keys | Sort-Object | Where-Object { $have[$_] } | ForEach-Object { $rightWords[$_] })
             if ($miss.Count) { $one = Format-CheckResult 'FAILED' ('Missing: ' + ($miss -join ', ')) 'Ask a site owner to add you to the site Owners group' }
-            else { $one = Format-CheckResult 'PASSED' ('Rights: ' + ($got -join ', ')) '' }
+            elseif ((Test-FirstInstall) -and $mk -like 'found *') { $one = Format-CheckResult 'FAILED' ('This site already has an install of this application [version ' + $mk.Substring(6) + '], made from another account') 'Do not install again: every flow would run twice. Ask the person who installed it to run RADE' }
+            elseif ((Test-FirstInstall) -and $mk -ne 'none') { $one = Format-CheckResult 'FAILED' 'The install record on the site could not be read' 'Select "Sign in and check site rights" again' }
+            else { $one = Format-CheckResult 'PASSED' ('Rights: ' + ($got -join ', ') + '. ' + $admText) '' }
           }
         }
       }
@@ -1233,7 +1342,7 @@ function Get-CheckBlock($Results) {
 $checkMaxDays = 7
 # Checks whose answer can change between two runs on the same day always run (review R17 MAJOR 2: "Word is open" blocks a
 # deploy, PFM 14 Nov 26 1B; free space; a test file in OneDrive).
-$checkNoSave = @('word', 'disk', 'write')
+$checkNoSave = @('nipr', 'word', 'disk', 'write')
 function Get-ShortHash([string]$Text) {
   if (-not $Text) { return '' }
   $sha = [System.Security.Cryptography.SHA256]::Create()
@@ -1320,6 +1429,7 @@ function Save-CheckCache($Results, [string]$Base, [string]$Site) {
 function Get-CheckToRun($Def, $Cache, [string]$Base, [string]$Site, [bool]$Force) {
   # $null = run it now; else the saved result to show.
   if ($Force) { return $null }
+  if ($Def.Id -eq 'site-rights' -and (Test-FirstInstall)) { return $null }   # a first install always reads the site's install record fresh
   return (Get-SavedCheck $Cache $Def.Id (Get-CheckScope $Def.Id $Base $Site))
 }
 # ---- Progress (PFM 14 Nov 26: two bars, overall and this step, so the finish time can be estimated). Weights are seconds:
@@ -1383,6 +1493,13 @@ function Get-CheckColor([string]$State) {
   $n = @{ PASSED = 'DarkGreen'; WARNING = 'SaddleBrown'; FAILED = 'DarkRed'; 'NOT RUN' = 'DimGray'; RUNNING = 'Navy' }[$State]
   if (-not $n) { $n = 'Black' }
   return (('System.Drawing.Color' -as [type])::FromName($n))
+}
+if (Test-ClassifiedDomain) {
+  # Before anything is written: no folder, no file, no saved check, no e-mail, no window.
+  Write-Host 'STOPPED: RADE runs on NIPR computers only.'
+  Write-Host 'This computer''s domain name ends in a classified-network suffix. RADE read only that name; it wrote nothing and sent nothing.'
+  Write-Host 'What to do: close this window. Do not copy RADE or its files to this network.'
+  return
 }
 $gui = $true
 try { Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing } catch { $gui = $false; $script:noWindowWhy = 'Windows Forms not available: ' + $_.Exception.Message }
@@ -2294,7 +2411,7 @@ try {
 '''
 
 # Checks every application runs (the rest come from its steps' "needs"). Ids must exist in the engine's $checkDefs.
-BASE_CHECKS = ['ps', 'lang', 'onedrive', 'disk', 'write', 'child', 'outlook', 'net-bookmark']
+BASE_CHECKS = ['nipr', 'ps', 'lang', 'onedrive', 'disk', 'write', 'child', 'outlook', 'net-bookmark']
 CHECK_IDS = re.findall(r"@\{ Id = '([a-z-]+)'", ENGINE)
 
 
@@ -2334,8 +2451,16 @@ def app_lines(b):
                 hand.append(names[i])
             elif mode == 'deploy' and hand and not (reach(names[i]) & set(hand)):
                 raise SystemExit('app %r: automatic step %r comes after the hand step %r but does not need it: move it before, or name the step it needs in "after"' % (a['name'], names[i], hand[0]))
-        out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s }'
-                   % (q(a['name']), q(a['summary']), ', '.join(str(i) for i in idx), ', '.join(q(c) for c in checks), q(mode), q(version)))
+        # "marker": the app's install record on the site (one row of its own list). Plain names only: they go into a
+        # command line and a CAML query. It needs the sign-in check, which reads it.
+        mk = a.get('marker')
+        marker = '$null'
+        if mk:
+            assert re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ]*', mk['list']) and re.fullmatch(r'[A-Za-z0-9]+', mk['key']) and re.fullmatch(r'[A-Za-z0-9_]+', mk['field']), 'app %r: marker list, key and field hold letters and digits only' % a['name']
+            assert mode == 'deploy' and 'site-rights' in need, 'app %r: a marker needs mode deploy and a step that needs site-rights' % a['name']
+            marker = '@{ List = %s; Key = %s; Field = %s }' % (q(mk['list']), q(mk['key']), q(mk['field']))
+        out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s; Marker = %s }'
+                   % (q(a['name']), q(a['summary']), ', '.join(str(i) for i in idx), ', '.join(q(c) for c in checks), q(mode), q(version), marker))
     return out
 
 

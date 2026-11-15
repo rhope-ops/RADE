@@ -28,6 +28,19 @@ Environment (the Administrator, 2026-11-14): what works on the owner's NIPR comp
 
 Preflight: RADE's checks are the one preflight; an app keeps a probe flow only for rights a script cannot see (for example the connector data policy, Send As). Updates: RADE compares the installed version with the newest one at each run; an app only shows its installed version.
 
+## Guardrails
+
+Decided by the Administrator, 2026-11-15. Each one stops an honest mistake; none is a security control.
+
+| Guardrail | What RADE does | What it reads or writes |
+|---|---|---|
+| NIPR only | Before anything is written, RADE compares the endings of this computer's own domain names with the classified-network suffixes (`$classifiedSuffixes` in the engine). On a match it prints STOPPED and ends: no folder, file, saved check, window or e-mail. The same test is the first check row (`nipr`, never saved). It cannot prove NIPR. | Reads two local values (the logon domain and the computer's domain). Contacts no host. The names are never shown or saved. |
+| Site address | Only an address that starts with the DAF SharePoint prefix (`$sitePrefix`) is accepted, so RADE never signs in to or writes to another host. | Nothing new. |
+| Site rights | Unchanged: manage lists, manage the site and manage permissions (Full Control). The sign-in check also shows whether the user's own account is a site collection administrator. Shown only, never required. | Reads one flag of the user's own account. No list of administrators. |
+| One install per site | An app with `marker` in the manifest (list, row key, column) keeps an install record on the site: after a whole install RADE writes the version and the date to that one row. In a deploy the sign-in check reads the row. A site that has it, and an account whose own record (rade-installed.json) has no install: the check is FAILED and no step runs (a second import would run every flow twice). A first install always reads the row fresh, and the plan shows a "once for each wing" notice. If the row cannot be written, the run says so. | Reads and writes one row of the app's own list. No name. |
+
+Limits: RADE cannot see an install on another site (that needs a tenant search, which "No reconnaissance" forbids). Until the Maintenance screen exists, only the account that installed an app can update it. Not verified on a device: the suffix list, the administrator read and the row read and write on PnP.PowerShell 1.12.0 (cloud tests use a fake module, tests/fake-pnp).
+
 ## Modes
 
 One engine, three modes per catalog app (`mode` in the manifest): **deploy** (install an app), **test** (a test round; the default) and **drift** (owner only). Test rounds are run by the owner only; other users only deploy (the Administrator, 2026-11-14).
