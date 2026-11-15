@@ -63,6 +63,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import unicodedata
 
 ZERO = re.compile(r"^0+$")
@@ -162,9 +163,18 @@ WARN_OPTION = "denylist: warn"  # .pii-guard option line; first_use_check.py rea
 #   - the word profile, unless a character of a name follows it (profile.example.org and profile-x stay allowed values);
 #   - or one word, at most one punctuation mark, and the value dod (a misspelt key such as "profil: dod").
 # Every form other than `profile: dod` is unknown and fails the scan.
-_TIER = r"[\W_]*(?:profile(?![A-Za-z0-9._/-])|(?!skip\b|denylist\b)[A-Za-z_-]+\s*[^\w\s.]?\s*dod[\W_]*$)"
+_TIER = r"[\W_]*(?:profile(?![A-Za-z0-9._/-])|(?!skip\b|denylist\b)[A-Za-z_-]{1,40}\s*[^\w\s.]?\s*dod[\W_]*$)"
 PROFILE_LINE = re.compile(r"(?i)^" + _TIER)
 OPTION_LINE = re.compile(r"(?i)^(?:" + _TIER + r"|denylist\s*:)")  # option lines, never allowed values
+OPTION_MAX = 200  # a longer line is never an option line: the patterns above only ever see short lines (no slow match)
+
+
+def is_tier_line(v):
+    return len(v) <= OPTION_MAX and bool(PROFILE_LINE.match(v))
+
+
+def is_option_line(v):
+    return len(v) <= OPTION_MAX and bool(OPTION_LINE.match(v))
 UNREADABLE = "profile: <.pii-guard is not UTF-8 text>"  # load_allow adds it; it reads as an unknown tier line
 UNKNOWN_PROFILE = ("unknown profile line in .pii-guard, or the file is not UTF-8 text: the only tier line is "
                    "`profile: dod`. Correct or remove the line, or save the file as UTF-8; the guard does not guess a tier.")
@@ -173,7 +183,7 @@ UNKNOWN_PROFILE = ("unknown profile line in .pii-guard, or the file is not UTF-8
 def profile_of(allow):
     """Tier from the .pii-guard lines: "minimum" (no profile line), "dod", or "unknown" (any other value: the caller
     fails, so a wrong spelling cannot lower the tier in silence). Case, and spacing around the colon, do not matter."""
-    lines = [v for v in allow if PROFILE_LINE.match(v)]
+    lines = [v for v in allow if is_tier_line(v)]
     if not lines:
         return "minimum"
     return "dod" if all(re.fullmatch(r"(?i)profile\s*:\s*dod", v) for v in lines) else "unknown"
@@ -488,6 +498,19 @@ def self_test():
         and profile_of({"denylist: warn", "x", "profile.example.org", "profile-x", "profile/x", "host.dod", "a.dod",
                         "skip: a/dod", "skip: profile dod", "skip: dod", "skip:dod"}) == "minimum"
     print(("ok   " if good else "FAIL ") + "profile line: any case, spacing around the colon; any other form is unknown")
+    ok = ok and good
+    slow = 0.0  # no line, however long or odd, may make the option-line patterns slow
+    hostile = [c * 100_000 + tail for c in "-_a. \t" for tail in ("", " dod", "dod")]
+    hostile += ["a" + " " * 100_000, "- " + " " * 100_000 + "x", "a" + " " * 50_000 + "dod" + " " * 50_000 + "x",
+                "profile" + " " * 100_000 + ": dod", "a" * 39 + ":" + " " * 100_000 + "dod"]
+    hostile += [h[:n] for h in list(hostile) for n in (OPTION_MAX, OPTION_MAX - 1)]  # the longest lines the patterns see
+    good = True
+    for h in hostile:
+        t0 = time.monotonic()
+        good = profile_of({h}) != "dod" and is_option_line(h) in (True, False) and good
+        slow = max(slow, time.monotonic() - t0)
+    good = good and slow < 1
+    print(("ok   " if good else "FAIL ") + f"option lines: {len(hostile)} long or odd lines, the slowest read in {slow:.3f} s")
     expect("dod id: a longer word that starts like the keyword is not one", "dodidentifier 12345" + "67890", [], dod=True)
     ok = ok and good
     expect("dod: 10 digits with no keyword", "ts 17312" + "34567", [], dod=True)
@@ -719,7 +742,7 @@ def main():
         return 1
     dod = prof == "dod"
     warn_only = WARN_OPTION in allow and not dod
-    allow = {v for v in allow if not OPTION_LINE.match(v)}
+    allow = {v for v in allow if not is_option_line(v)}
     revsets = [[a.range]] if a.range else []
     if a.push:
         revsets += push_revs(sys.stdin.read(), root)
