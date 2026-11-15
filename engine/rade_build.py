@@ -456,8 +456,15 @@ function Copy-TextToClipboard([string]$Text) {
   try { if (Get-Command Set-Clipboard -ErrorAction SilentlyContinue) { Set-Clipboard -Value $Text; return $true } } catch { $null = $_ }
   return $false
 }
+function ConvertTo-UserText([string]$Text) {
+  # Text a person typed (the "It failed" text, a text answer): one line, the DODID masked, no e-mail or site address.
+  $t = ((ConvertTo-Masked $Text) -replace '\s+', ' ').Trim()
+  $t = $t -replace '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', '<EMAIL>'   # e-mail first: the site rule would leave the name before @
+  return ($t -replace 'https?://\S+', '<SITE>' -replace '[A-Za-z0-9.-]+\.(sharepoint|sharepoint-mil|onmicrosoft)\.[A-Za-z.]+\S*', '<SITE>')   # no address reaches the e-mail
+}
 function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
-  $r = @{ Pass = 0; Fail = 0; Exit = 0; Skipped = $false; FailText = '' }
+  $r = @{ Pass = 0; Fail = 0; Exit = 0; Skipped = $false; FailText = ''; Answers = @() }
+  $script:guideAnswers = @{}
   $dir = Join-Path $Base $Step.Dir
   $file = $(if ($Step.File) { Join-Path $dir $Step.File } else { '' })   # R18: a guide step may need no file
   $url = $Step.Url
@@ -481,9 +488,7 @@ function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
   else { $res = 'Cancel' }
   $ok = ($res -eq 'OK')
   if ($res -eq 'Abort') {
-    $t = ((ConvertTo-Masked ([string]$script:guideError)) -replace '\s+', ' ').Trim()
-    $t = $t -replace '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', '<EMAIL>'   # e-mail first: the site rule would leave the name before @
-    $t = $t -replace 'https?://\S+', '<SITE>' -replace '[A-Za-z0-9.-]+\.(sharepoint|sharepoint-mil|onmicrosoft)\.[A-Za-z.]+\S*', '<SITE>'   # no address reaches the e-mail
+    $t = ConvertTo-UserText ([string]$script:guideError)
     if ($t.Length -gt 600) { $t = $t.Substring(0, 600) + ' ...' }
     if (-not $t) { $t = 'no error text given' }
     $r.Fail = 1; $r.FailText = $t
@@ -492,6 +497,15 @@ function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
     if ($Step.Marker) { try { Set-Content -LiteralPath (Join-Path $dir $Step.Marker) -Value (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') -Encoding UTF8 } catch { $null = $_ } }
     $r.Pass = 1
     & $Say ('    ' + $(if ($Step.DoneLog) { $Step.DoneLog } else { 'Confirmed by you: the flow is imported and its run has started.' }))
+    # The step's questions (manifest "answers"), asked after Done: one line each for the summary, under the step's line.
+    foreach ($q in @($Step.Answers | Where-Object { $_ })) {
+      $k = [string]$q.Key
+      if ($script:textMode) { $v = 'not asked (text mode)' }
+      elseif (-not $script:guideAnswers.ContainsKey($k)) { $v = 'not answered (the window closed)' }
+      elseif ($q.Kind -eq 'text') { $v = ConvertTo-UserText ([string]$script:guideAnswers[$k]); if ($v.Length -gt 120) { $v = $v.Substring(0, 120) }; if (-not $v) { $v = '(no text)' } }
+      else { $v = [string]$script:guideAnswers[$k] }   # yes/no and pick: the fixed words of the buttons
+      $r.Answers += ('  Answer ' + $k + ': ' + $v)
+    }
   } else { $r.Skipped = $true; & $Say '    Skipped by you.' }
   return $r
 }
@@ -878,6 +892,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     if (-not $need) { $stepRecs[[string]$steps[$k].Name] = @{ state = $state; made = $made } }   # a step skipped for a missing dependency keeps its older record
     $line = Get-StepLine $steps[$k] $r $secs
     $summary += $line
+    foreach ($al in @($r.Answers | Where-Object { $_ })) { $summary += [string]$al }   # a hand step's answers, under its line
     & $speak ('  Result: ' + ($line.Substring($steps[$k].Name.Length + 2)))
     if ($state -eq 'NEEDS REVIEW' -and $steps[$k].Help) { $hl = '  What to do: ' + $steps[$k].Help; & $speak $hl; $summary += $hl }   # the step's own help text (manifest "help")
     $script:prog.Done += $script:prog.Cur; $script:prog.Cur = 0; $script:prog.Frac = -1
@@ -1534,6 +1549,7 @@ if ($gui) {
     $ui.Form.Font = New-Object System.Drawing.Font('Segoe UI', 10)
     $ui.Form.ClientSize = New-Object System.Drawing.Size(1020, 760)   # no MinimumSize: scaled to 150 % it could be taller than a 1280 x 800 screen (R09)
     $ui.Form.StartPosition = 'CenterScreen'; $ui.Form.KeyPreview = $true; $ui.Form.BackColor = $ui.C.White
+    $ui.Form.ShowInTaskbar = $true; $ui.Form.MinimizeBox = $true   # its own taskbar button: a minimized window can be restored (R24)
     # Cosmetics never stop the window (R06: Font('Segoe UI', 10, 'Bold') failed with "Multiple ambiguous overloads"): a typed
     # style and size, and the window font when a font cannot be made.
     $ui.Bold = [Enum]::Parse(('System.Drawing.FontStyle' -as [type]), 'Bold')
@@ -1595,8 +1611,9 @@ if ($gui) {
     $ui.AppL.AutoSize = $false; $ui.AppL.AutoEllipsis = $true; $ui.AppL.Size = New-Object System.Drawing.Size(600, 22)   # a long name and version: cut with "..."; its width follows the window ($ui.Fit)
     [void]$ui.Top.Controls.Add($ui.WordL); [void]$ui.Top.Controls.Add($ui.AppL)
     $ui.Bottom = New-Object System.Windows.Forms.TableLayoutPanel
-    $ui.Bottom.Dock = 'Bottom'; $ui.Bottom.Height = 46; $ui.Bottom.ColumnCount = 4; $ui.Bottom.RowCount = 1; $ui.Bottom.Padding = (& $ui.Pad 28 3 32 3); $ui.Bottom.BackColor = $ui.C.White
+    $ui.Bottom.Dock = 'Bottom'; $ui.Bottom.Height = 46; $ui.Bottom.AutoSize = $true; $ui.Bottom.AutoSizeMode = 'GrowAndShrink'; $ui.Bottom.MinimumSize = New-Object System.Drawing.Size(0, 46); $ui.Bottom.ColumnCount = 4; $ui.Bottom.RowCount = 1; $ui.Bottom.Padding = (& $ui.Pad 28 3 32 3); $ui.Bottom.BackColor = $ui.C.White
     foreach ($cs in @('AutoSize', 'AutoSize', 'Percent', 'AutoSize')) { [void]$ui.Bottom.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle($cs, 100))) }
+    [void]$ui.Bottom.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('AutoSize')))   # as tall as the links with their margin and focus ring, 46 at least (R24: 1 px cut at 150 %)
     $ui.RecB = & $ui.LinkBtn 'Record (F2)'; $ui.RecB.AccessibleName = 'Record: all checks, steps, files and the log (F2)'
     $ui.BackB = & $ui.LinkBtn 'Back'; $ui.BackB.AccessibleName = 'Back (Esc)'; $ui.BackB.Visible = $false
     $ui.RightL = & $ui.Label $ui.F.Small $ui.C.Gray 0; $ui.RightL.Anchor = 'Right'; $ui.RightL.Visible = $true
@@ -1860,16 +1877,25 @@ if ($gui) {
           }
         }
       } catch { $ui.LayBad.Add('LAYOUT ' + $card + ' the self-check stopped: ' + (ConvertTo-Masked ([string]$_.Exception.Message))) } }
+    $ui.AutoPct = { try { [int][math]::Round($ui.Form.CurrentAutoScaleDimensions.Width / $ui.Form.AutoScaleDimensions.Width * 100) } catch { 0 } }   # the factor the form scaled by
+    $ui.Scale = {
+      # The scaling facts, numbers only (R24: the screen dpi said 100 % while every size was 1.5 x). DeviceDpi exists from .NET 4.7.
+      try { $f = $ui.Form; $dd = 'n/a'; try { $pp = $f.GetType().GetProperty('DeviceDpi'); if ($pp) { $dd = [string]$pp.GetValue($f, $null) } } catch { $null = $_ }
+        $as = $f.CurrentAutoScaleDimensions; $sn = [System.Windows.Forms.Screen]::FromControl($f)
+        return ('SCALE dpiX=' + [int]$ui.Dpi + ' deviceDpi=' + $dd + ' autoScale=' + [int]$as.Width + 'x' + [int]$as.Height + ' font=' + [int]$f.Font.Height + ' screen=' + $sn.Bounds.Width + 'x' + $sn.Bounds.Height +
+          ' work=' + $sn.WorkingArea.Width + 'x' + $sn.WorkingArea.Height + ' client=' + $f.ClientSize.Width + 'x' + $f.ClientSize.Height + ' state=' + [string]$f.WindowState)
+      } catch { return ('SCALE could not be read: ' + (ConvertTo-Masked ([string]$_.Exception.Message))) } }
     $ui.LayLine = {
       & $ui.Check
-      $size = [string]$ui.Form.ClientSize.Width + ' x ' + $ui.Form.ClientSize.Height + ' at ' + [int][math]::Round($ui.Dpi / 96.0 * 100) + ' %'
+      $pct = [int][math]::Round($ui.Dpi / 96.0 * 100); $ap = & $ui.AutoPct
+      $size = [string]$ui.Form.ClientSize.Width + ' x ' + $ui.Form.ClientSize.Height + ' at ' + $(if ($ap -gt 0 -and $ap -ne $pct) { [string]$ap + ' % (the form auto-scale; the screen dpi says ' + $pct + ' %)' } else { [string]$pct + ' %' })
       $sc = $(if ($ui.LayScroll.Count) { '; the text scrolls on: ' + ((@($ui.LayScroll.Keys) | Sort-Object) -join ', ') } else { '' })
-      if ($ui.LayBad.Count) { return ('Layout self-check: ' + $ui.LayBad.Count + ' defects in ' + $ui.LaySeen.Count + ' cards (' + $size + ')' + $sc + "`r`n" + (@($ui.LayBad) -join "`r`n")) }
-      return ('Layout self-check: PASS layout, ' + $ui.LaySeen.Count + ' cards (' + $size + ')' + $sc) }
+      if ($ui.LayBad.Count) { return ('Layout self-check: ' + $ui.LayBad.Count + ' defects in ' + $ui.LaySeen.Count + ' cards (' + $size + ')' + $sc + "`r`n" + (& $ui.Scale) + "`r`n" + (@($ui.LayBad) -join "`r`n")) }
+      return ('Layout self-check: PASS layout, ' + $ui.LaySeen.Count + ' cards (' + $size + ')' + $sc + "`r`n" + (& $ui.Scale)) }
     $ui.Show = { param($C, [string]$Text) $C.Text = $Text; $C.Visible = [bool]$Text }
     $ui.SetCard = { param($c)
       # Shows one card. $c names the parts: View, Light ('you' = yellow, 'bad' = dark red), Kicker, Sentence, Tick, P (up to 4
-      # paragraphs), Bold1, Options + OnOption, Lines, StepRow, Field (Label, Text, Name, Button, Do), Err, Links, Note, Help,
+      # paragraphs), Bold1, Options + OnOption, Lines, StepRow, Field (Label, Text, Name, Button, Do, Max), Err, Links, Note, Help,
       # Buttons (Text, Kind, Do, Apart), Foot, Test, Right, Back, NoAccept, Focus.
       & $ui.Check   # the card that goes away (test rounds only)
       if ($ui.RecOn -and ($c.Light -or $c.View -eq 'done')) { $ui.RecOn = $false; $ui.Rec.Visible = $false; $ui.Card.Visible = $true; $ui.RecB.Visible = $true }   # a card that needs you closes the Record
@@ -1884,7 +1910,7 @@ if ($gui) {
       & $ui.Show $ui.Lines ([string]$c.Lines)
       $ui.StepRow.Visible = [bool]$c.StepRow; $ui.LastLog.Visible = [bool]$c.StepRow; if ($c.StepRow) { $ui.LastLog.Text = '' }
       $ui.FieldRow.Visible = [bool]$c.Field; $ui.FieldDo = $null
-      if ($c.Field) { $ui.FieldL.Text = [string]$c.Field.Label; $ui.Field.Text = [string]$c.Field.Text; $ui.Field.AccessibleName = [string]$c.Field.Name; $ui.FieldB.Visible = [bool]$c.Field.Button; $ui.FieldBOn = [bool]$c.Field.Button; $ui.FieldB.Text = [string]$c.Field.Button; $ui.FieldDo = $c.Field.Act; & $ui.FitRow }
+      if ($c.Field) { $ui.FieldL.Text = [string]$c.Field.Label; $ui.Field.Text = [string]$c.Field.Text; $ui.Field.AccessibleName = [string]$c.Field.Name; $ui.FieldB.Visible = [bool]$c.Field.Button; $ui.FieldBOn = [bool]$c.Field.Button; $ui.FieldB.Text = [string]$c.Field.Button; $ui.FieldDo = $c.Field.Act; $ui.Field.MaxLength = $(if ($c.Field.Max) { [int]$c.Field.Max } else { 32767 }); & $ui.FitRow }
       $ui.ErrRow.Visible = [bool]$c.Err; if ($c.Err) { $ui.ErrBox.Text = '' }
       $ui.LinkRow.Visible = [bool]$c.Links
       & $ui.Show $ui.Note ([string]$c.Note); & $ui.Show $ui.Help ([string]$c.Help); & $ui.Show $ui.Foot ([string]$c.Foot)
@@ -1909,7 +1935,7 @@ if ($gui) {
       if (-not $f) { $f = $accept }; if (-not $f) { $f = $first }; if (-not $f) { $f = $ui.RecB }
       if (-not $ui.RecOn) { try { [void]$f.Focus() } catch { $null = $_ } }
       [System.Windows.Forms.Application]::DoEvents() }
-    $ui.ToFront = { try { $ui.Form.TopMost = $true; $ui.Form.Activate(); $ui.Form.TopMost = $false } catch { $null = $_ } }
+    $ui.ToFront = { try { if ([string]$ui.Form.WindowState -eq 'Minimized') { $ui.Form.WindowState = 'Normal' }; $ui.Form.TopMost = $true; $ui.Form.Activate(); $ui.Form.TopMost = $false } catch { $null = $_ } }
     $ui.Say1 = { param([string]$Text) $ui.Note.Text = $Text; $ui.Note.Visible = [bool]$Text }   # one gray line under the card's box or buttons
 
     # ---- When the window opens: the Local checks of every application in the paste run once (base checks before Choose).
@@ -2199,6 +2225,15 @@ if ($gui) {
     $ui.VHandFail = {
       & $ui.SetCard @{ View = 'handfail'; Light = 'you'; Kicker = 'It failed'; Sentence = 'What did the error say?'; P = @('Paste the error message here. Do not include names or a site address.'); Err = $true
         Buttons = @(@{ Text = 'Report the failure'; Kind = 'primary'; Act = { $script:guideError = [string]$ui.ErrBox.Text; $ui.Answer = 'Abort' } }, @{ Text = 'Back'; Act = { & $ui.VHand } }); Right = 'RADE waits for you'; NoAccept = $true; Focus = 'err' } }
+    # A question of a hand step (manifest "answers"), after Done: the prompt is the sentence; yes/no and pick answer with
+    # one button per word, a text with one line (120 characters at most; empty is allowed) and "Continue". No Back.
+    $ui.ReplyActs = @({ $ui.Reply = [string]$ui.B[0].Text }, { $ui.Reply = [string]$ui.B[1].Text }, { $ui.Reply = [string]$ui.B[2].Text }, { $ui.Reply = [string]$ui.B[3].Text })
+    $ui.VAnswer = { param($Q, [int]$I, [int]$N)
+      $ui.Reply = $null
+      $c = @{ View = 'answer'; Light = 'you'; Kicker = ($(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot } else { '' }) + 'Question ' + $I + ' of ' + $N); Sentence = [string]$Q.Prompt; Right = 'RADE waits for you' }
+      if ($Q.Kind -eq 'text') { $c.Field = @{ Label = 'Your answer'; Text = ''; Name = [string]$Q.Prompt; Max = 120 }; $c.Focus = 'field'; $c.Buttons = @(@{ Text = 'Continue'; Kind = 'primary'; Act = { $ui.Reply = [string]$ui.Field.Text } }) }
+      else { $ws = @($(if ($Q.Kind -eq 'yesno') { 'Yes', 'No' } else { $Q.Choices })); $c.Buttons = @(for ($k = 0; $k -lt $ws.Count; $k++) { @{ Text = [string]$ws[$k]; Act = $ui.ReplyActs[$k] } }) }
+      & $ui.SetCard $c }
     $ui.OpenUrl = {
       $u = $ui.Field.Text.Trim()
       if ($u -notmatch '^https://') { & $ui.Say1 'The address must start with https://'; return }
@@ -2210,6 +2245,13 @@ if ($gui) {
       $ui.G = @{ Step = $Step; File = $File; UrlFile = $UrlFile }; $ui.GUrl = $Url; $script:guideError = ''; $ui.Answer = ''; $was = $ui.Busy; $ui.Busy = $false
       $null = & $ui.VHand; $null = & $ui.ToFront
       while (-not $ui.Answer -and -not $script:closing -and -not $ui.Form.IsDisposed) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 25 }
+      # After Done (not after "It failed" or Skip): the step's questions, one card each, in order. Their time is the step's time.
+      $script:guideAnswers = @{}; $qs = @($(if ($ui.Answer -eq 'OK') { $Step.Answers }) | Where-Object { $_ })
+      for ($i = 0; $i -lt $qs.Count -and -not $script:closing -and -not $ui.Form.IsDisposed; $i++) {
+        $null = & $ui.VAnswer $qs[$i] ($i + 1) $qs.Count
+        while ($null -eq $ui.Reply -and -not $script:closing -and -not $ui.Form.IsDisposed) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 25 }
+        if ($null -ne $ui.Reply) { $script:guideAnswers[[string]$qs[$i].Key] = [string]$ui.Reply }
+      }
       $ui.Busy = $was; $res = [string]$ui.Answer; if (-not $res) { $res = 'Cancel' }
       $ui.Guides = @($ui.Guides | Where-Object { $_ -ne [string]$Step.Name })
       if ($ui.Running -and -not $script:closing) { $null = & $ui.ShowRun }
@@ -2322,6 +2364,7 @@ if ($gui) {
       elseif ($k -match '^(D|NumPad)([1-9])$' -and -not $ui.RecOn -and -not $ui.Busy -and $ui.Opts.Visible -and -not ($ui.Form.ActiveControl -is [System.Windows.Forms.TextBox])) {
         $n = [int]$Matches[2]; foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Key -eq $n) { $_.SuppressKeyPress = $true; $o.PerformClick(); break } } } })
     $ui.Form.Add_Shown({
+      $ui.Opened = $true
       # Fit the screen (R09: 1280 x 800 at 150 % scaling is smaller than the window).
       try { $wa = [System.Windows.Forms.Screen]::FromControl($ui.Form).WorkingArea
         $ui.Form.Width = [Math]::Min($ui.Form.Width, [int]($wa.Width * 0.95)); $ui.Form.Height = [Math]::Min($ui.Form.Height, [int]($wa.Height * 0.95))
@@ -2336,7 +2379,16 @@ if ($gui) {
       }
       $script:closing = $true; try { $ui.Anim.Stop() } catch { $null = $_ }
       if ($script:child -and -not $script:child.HasExited) { try { $script:child.Kill() } catch { $null = $_ } } })
-    [void]$ui.Form.ShowDialog()
+    # The window is the main form of this thread, with no owner (R24: shown with ShowDialog from PowerShell ISE, ISE owned
+    # it, so it had no taskbar button and could not be restored after it was minimized). When a message loop already runs
+    # on this thread, Application.Run cannot start one: then ShowDialog, as before. Run disposes the form when it closes.
+    $ui.Opened = $false
+    try { [System.Windows.Forms.Application]::Run($ui.Form) }
+    catch {
+      $ex = $_.Exception; while ($ex -and -not ($ex -is [System.InvalidOperationException])) { $ex = $ex.InnerException }
+      if (-not $ex -or $ui.Opened -or $ui.Form.IsDisposed) { throw }   # only a loop that could not start: the window never showed
+      [void]$ui.Form.ShowDialog()
+    }
     foreach ($o in @($ui.Trash)) { try { $o.Dispose() } catch { $null = $_ } }   # after the window has closed: no handler is running
     return
   } catch {
@@ -2458,6 +2510,44 @@ def app_lines(b):
     return out
 
 
+ANSWER_KINDS = ('yesno', 'pick', 'text')
+
+
+def answers_part(s):
+    """The "answers" of a guide step (questions asked after Done; docs/engine.md "Step contract") as the end of its
+    $steps line, or '' when it has none. A bad list stops the build (the schema says the same: scripts/check_manifest.py)."""
+    if 'answers' not in s:
+        return ''
+    qs = s['answers']
+    def no(why):
+        raise SystemExit('step %r: answers: %s' % (s['name'], why))
+    if s.get('kind', 'script') != 'guide':
+        no('only a guide step (kind "guide") can ask questions')
+    if not isinstance(qs, list) or not 1 <= len(qs) <= 4:
+        no('1 to 4 questions, not %s' % (len(qs) if isinstance(qs, list) else type(qs).__name__))
+    keys, out = set(), []
+    for i, a in enumerate(qs, 1):
+        if not isinstance(a, dict) or set(a) - {'key', 'prompt', 'kind', 'choices'}:
+            no('question %d: only key, prompt, kind and choices' % i)
+        key, prompt, kind, choices = a.get('key'), a.get('prompt'), a.get('kind'), a.get('choices')
+        if not isinstance(key, str) or not re.fullmatch(r'[a-z][a-z0-9-]{0,23}', key):
+            no('question %d: the key must be 1 to 24 lowercase letters, digits or "-", starting with a letter' % i)
+        if key in keys:
+            no('question %d: the key %r is used twice' % (i, key))
+        keys.add(key)
+        if not isinstance(prompt, str) or not 1 <= len(prompt) <= TEXT_LIMITS['answer prompt']:
+            no('question %r: the prompt must have 1 to %d characters' % (key, TEXT_LIMITS['answer prompt']))
+        if kind not in ANSWER_KINDS:
+            no('question %r: the kind must be yesno, pick or text' % key)
+        if kind == 'pick':
+            if not isinstance(choices, list) or not 2 <= len(choices) <= 4 or not all(isinstance(c, str) and 1 <= len(c) <= TEXT_LIMITS['answer choice'] for c in choices):
+                no('question %r: a pick needs 2 to 4 choices of 1 to %d characters' % (key, TEXT_LIMITS['answer choice']))
+        elif 'choices' in a:
+            no('question %r: only a pick has choices' % key)
+        out.append('@{ Key = %s; Prompt = %s; Kind = %s; Choices = @(%s) }' % (q(key), q(prompt), q(kind), ', '.join(q(c) for c in choices or [])))
+    return '; Answers = @(%s)' % ', '.join(out)
+
+
 def build(b):
     parts = []
     for f in b['files']:
@@ -2481,6 +2571,7 @@ def build(b):
                 ', '.join('@{ kind = %s; name = %s }' % (q(m['kind']), q(m['name'])) for m in s.get('makes', [])), ', '.join(q(a) for a in s.get('after', [])),
                 'true' if s.get('default', True) is False else 'false', q(s.get('help', '')))   # optional = "default": false only; a files-changed default is still a needed step
              for s in b['steps']]
+    steps = [line[:-2] + answers_part(s) + ' }' for line, s in zip(steps, b['steps'])]   # a step without "answers": the line as before
     apps = app_lines(b)
     # Data files the round downloads (not code, PFM 3A): repo files from raw main, checked by SHA-256; public pages as they are.
     fetch = []
@@ -2526,7 +2617,7 @@ def build(b):
 # failure; a later release makes it a failure. This table is the one source: tests/engine_test.sh checks that the
 # document has the same numbers.
 TEXT_LIMITS = {'application name': 48, 'version': 14, 'summary': 150, 'step name': 56, 'step note': 200,
-               'guide line': 160, 'doneText': 24, 'step help': 160}
+               'guide line': 160, 'doneText': 24, 'step help': 160, 'answer prompt': 120, 'answer choice': 40}
 
 
 def text_lengths(b):

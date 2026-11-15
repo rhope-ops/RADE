@@ -7,8 +7,9 @@ tests/window_real_driver.ps1 in front and runs it with powershell.exe. The drive
 lines for each card and saves one PNG of each card.
 
 Usage: python tests/window_real.py OUT_DIR
-Pass = every run ends with "WIN closed=True", prints no "LAYOUT " line (the engine's layout self-check) and no card
-scrolls at a size larger than the smallest (exit 0). Output: OUT_DIR/<run>/*.png, out.txt.
+Pass = every run ends with "WIN closed=True", prints no "LAYOUT " line (the engine's layout self-check), a SCALE line,
+and no card scrolls at a size larger than the smallest; the first run draws the 3 question cards of the hand step
+(exit 0). Output: OUT_DIR/<run>/*.png (NN-answer-yesno.png, NN-answer-pick.png, NN-answer-text.png among them), out.txt.
 """
 import importlib.util
 import json
@@ -55,6 +56,10 @@ def stretch(m, limits):
             if st.get("kind") == "guide":
                 st["guide"] = [fill(g, limits["guide line"]) for g in st.get("guide", [])]
                 st["doneText"] = fill(st.get("doneText", "Done"), limits["doneText"])
+            for a in st.get("answers", []):
+                a["prompt"] = fill(a["prompt"], limits["answer prompt"])
+                if "choices" in a:
+                    a["choices"] = [fill(c, limits["answer choice"]) for c in a["choices"]]
             st["after"] = [names.get(a, a) for a in st.get("after", [])]
             if not st["after"]:
                 del st["after"]
@@ -77,6 +82,8 @@ def bundle(t, long, keep=None):
     app = t / "app"
     shutil.copytree(ROOT / "tests" / "fixture-app", app)
     m = json.loads((ROOT / "schemas" / "examples" / "sample-manifest.json").read_text(encoding="utf-8"))
+    qa = json.loads((ROOT / "tests" / "fixture-app" / "answers.json").read_text(encoding="utf-8"))   # the hand step's questions, as in tests/engine_test.sh
+    [st for st in m["bundles"][0]["steps"] if st["name"] == qa["step"]][0]["answers"] = qa["answers"]
     names = [a["name"] for a in m["bundles"][0]["apps"]]
     if long:
         sp = importlib.util.spec_from_file_location("rade_build", str(ROOT / "engine" / "rade_build.py"))
@@ -153,6 +160,10 @@ def main():
             why.append("a card scrolls at a size where none may: " + scrolls[0][12:])
         if not any(l.startswith("WIN line Layout self-check: ") for l in lines):
             why.append("no line of the layout self-check")
+        if not any(l.startswith("WIN SCALE ") for l in lines):
+            why.append("no SCALE line of the layout self-check")
+        if first and len(list(d.glob("*-answer-*.png"))) != 3:
+            why.append("the 3 question cards (answer-yesno, answer-pick, answer-text) were not drawn")
         broken = [l for l in lines if l.startswith(("WIN PNG-FAILED", "WIN DRIVER-ERROR", "WIN TIMEOUT", "WIN BAD"))]
         if broken:
             why.append(broken[0][:120])

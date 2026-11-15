@@ -3,11 +3,14 @@
 # "WIN" line per card, runs every Paint handler, checks that each control has a name and a focus ring, and selects a button.
 # Set by the test: RADE_T_STUB (path of the stub), RADE_T_APP (index of the application), RADE_T_HAND (done, fail or
 # skip), RADE_T_RECORD (1 = open "Steps and files" and clear the Clean-up box before the run), RADE_T_TOUR (1 = the
-# application also gets the site, sign-in and Power Automate checks, and a base check of the test application is FAILED).
+# application also gets the site, sign-in and Power Automate checks, and a base check of the test application is FAILED),
+# RADE_T_LOOP (1 = Application.Run fails as when a message loop already runs: the window must open with ShowDialog).
+# On the hand step's questions (manifest "answers") it answers No, the second choice, and a text with a fake e-mail address.
 # A check that cannot pass on the test computer is set to PASSED after its card has shown (the test is of the window).
 Add-Type -TypeDefinition ([System.IO.File]::ReadAllText($env:RADE_T_STUB)) -ReferencedAssemblies @('System.Drawing.Primitives', 'System.Collections', 'System.Linq.Expressions', 'System.Management.Automation', 'System.Runtime', 'netstandard') -WarningAction SilentlyContinue
 function Start-Process { param($FilePath, $ArgumentList) Write-Host ('WIN start-process ' + $(if ($FilePath -match '^https://') { 'browser' } else { [string]$FilePath })) }
-$global:RadeT = @{ Seen = ''; App = [int]$env:RADE_T_APP; Hand = [string]$env:RADE_T_HAND; Record = ($env:RADE_T_RECORD -eq '1'); Forced = $false; Opened = $false; Tour = ($env:RADE_T_TOUR -eq '1'); Esc = $false; Again = $false; SignIn = $false }
+[RadeStub.Driver]::RunThrows = ($env:RADE_T_LOOP -eq '1')
+$global:RadeT = @{ Min = $false; Seen = ''; App = [int]$env:RADE_T_APP; Hand = [string]$env:RADE_T_HAND; Record = ($env:RADE_T_RECORD -eq '1'); Forced = $false; Opened = $false; Tour = ($env:RADE_T_TOUR -eq '1'); Esc = $false; Again = $false; SignIn = $false }
 function global:Show-RadeCard {
   $ps = @($ui.P | Where-Object { $_.Shown } | ForEach-Object { $_.Text }) -join ' / '
   $bs = @($ui.B | Where-Object { $_.Shown } | ForEach-Object { $(if ($_.Enabled) { '[' } else { '(' }) + $_.Text + $(if ($_.Enabled) { ']' } else { ')' }) }) -join ' '
@@ -69,6 +72,10 @@ function global:Push-RadeButton([string]$Text) {
     & $ui.Next
   }
   elseif ($v -eq 'ready') {
+    if (-not $global:RadeT.Min) {   # a minimized window: RADE brings it back when it needs the person; it has its own taskbar button
+      $global:RadeT.Min = $true; $ui.Form.WindowState = 'Minimized'; & $ui.ToFront
+      Write-Host ('WIN restored=' + $ui.Form.WindowState + ' taskbar=' + $ui.Form.Values['ShowInTaskbar'] + ' minbox=' + $ui.Form.Values['MinimizeBox'] + ' shown-by=' + [RadeStub.Driver]::ShownBy)
+    }
     if ($global:RadeT.Record -and -not $global:RadeT.Opened) {
       $global:RadeT.Opened = $true
       $script:checkResults['ps'] = @{ State = 'PASSED'; Detail = 'Last check: 14-11-26'; Fix = 'Version [5.1]'; Saved = $true }   # a reused check, as Get-SavedCheck gives it
@@ -90,11 +97,16 @@ function global:Push-RadeButton([string]$Text) {
     if ($ui.B[1].Text -ne 'It failed') { $ui.B[0].PerformClick() }   # a look-and-answer check: Yes
     elseif ($global:RadeT.Hand -eq 'fail') { Push-RadeButton 'It failed' } elseif ($global:RadeT.Hand -eq 'skip') { $ui.B[2].PerformClick() } else { $ui.B[0].PerformClick() }
   }
+  elseif ($v -eq 'answer') {
+    if ($ui.FieldRow.Shown) { Write-Host ('WIN answer-box max=' + $ui.Field.Values['MaxLength'] + ' enter=' + $ui.Form.Values['AcceptButton'].Text + ' focus=' + $ui.Field.Focused); $ui.Field.Text = '  Mail someone@example.com about it  '; $ui.Form.Values['AcceptButton'].PerformClick() }
+    elseif ($ui.B[0].Text -eq 'Yes') { Push-RadeButton 'No' } else { $ui.B[1].PerformClick() }
+  }
   elseif ($v -eq 'handfail') { $ui.ErrBox.Text = 'Import failed: flow https://usaf.dps.mil/sites/fake/x not found'; $ui.B[0].PerformClick() }
   elseif ($v -in 'done', 'review', 'stopped') {
     [RadeStub.Driver]::Clip = ''
     foreach ($b in $ui.B) { if ($b.Shown -and $b.Text -eq 'What it made') { $b.PerformClick(); Write-Host ('WIN made=' + [bool]($ui.RecText.Text -match "Made by this app's installs") + ' log=' + [bool]($ui.RecText.Text -match '(?m)^LOG') + ' locked=' + (-not @($ui.RecSteps.Controls | Where-Object { $_ -is [System.Windows.Forms.CheckBox] })[0].Enabled)); $ui.RecClose.PerformClick() } }
     $ui.Form.Key('F2'); $ui.Form.Repaint(); $ui.Form.Key('F2')
+    Write-Host ('WIN layline=' + ((& $ui.LayLine) -replace "`r`n", ' ~ '))
     foreach ($b in $ui.B) { if ($b.Shown -and $b.Text -in 'Copy summary', 'Copy the log') { $b.PerformClick() } }
     Write-Host ('WIN copied=' + [bool]([RadeStub.Driver]::Clip -match 'Application: ') + ' note=' + $ui.Note.Text)
     if ($ui.TestRow.Shown) { $ui.DraftB.PerformClick(); Write-Host ('WIN draft-note=' + $ui.Note.Text) }

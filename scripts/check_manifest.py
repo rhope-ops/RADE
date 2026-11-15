@@ -17,7 +17,7 @@ VALIDATOR = Draft202012Validator(SCHEMA)
 
 
 def refs(m):
-    """Errors the schema cannot find: step files, unique step names, app and collect step names."""
+    """Errors the schema cannot find: step files, unique step names and answer keys, app and collect step names."""
     out = []
     for b in m.get('bundles', []):
         r = b.get('round', '?')
@@ -30,6 +30,12 @@ def refs(m):
                 out.append('%s: step %r: only a guide step may have no file' % (r, s['name']))
             elif s['file'] and (s['dir'], s['file']) not in have:
                 out.append('%s: step %r: %s/%s is not in files' % (r, s['name'], s['dir'], s['file']))
+            if 'answers' in s and s.get('kind') != 'guide':
+                out.append('%s: step %r: answers: only a guide step (kind "guide") can ask questions' % (r, s['name']))
+            qs = s.get('answers') if isinstance(s.get('answers'), list) else []
+            keys = [a['key'] for a in qs if isinstance(a, dict) and isinstance(a.get('key'), str)]
+            for k in sorted({k for k in keys if keys.count(k) > 1}):
+                out.append('%s: step %r: answers: the key %r is used twice' % (r, s['name'], k))
         for a in b.get('apps', []):
             for n in a['steps']:
                 if n not in names:

@@ -6,6 +6,8 @@
 # fail), RADE_T_TOUR (1 = the application also gets the site, sign-in and Power Automate checks), RADE_T_SIZE
 # ("811x469" = the window is set to this size: 1280 x 800 at 150 % scaling, in 100 % pixels; empty = as the engine sets it).
 # A check that cannot pass on the test computer is set to PASSED after its card has shown (the test is of the window).
+# The hand step's questions (manifest "answers"): one picture per kind (NN-answer-yesno, NN-answer-pick, NN-answer-text),
+# for the owner's approval of the look; the driver selects the first button (a text gets a short fake note).
 Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing
 $env:RADE_LAYOUT = '1'   # the layout self-check runs for a deploy too
 function Start-Process { param($FilePath, $ArgumentList) Write-Host ('WIN start-process ' + $(if ([string]$FilePath -match '^https://') { 'browser' } else { [string]$FilePath })) }
@@ -45,7 +47,8 @@ function global:Step-Rade {
   if ($key -eq $global:RadeT.Seen) { return }
   $global:RadeT.Seen = $key
   $v = [string]$ui.View
-  Save-RadeCard $v
+  $tag = $v; if ($v -eq 'answer') { $tag = 'answer-' + $(if ($ui.FieldRow.Visible) { 'text' } elseif ($ui.B[0].Text -eq 'Yes') { 'yesno' } else { 'pick' }) }
+  Save-RadeCard $tag
   if ($v -eq 'choose') {
     if ($ui.Blocked.Count -and -not $global:RadeT.Forced) {
       $global:RadeT.Forced = $true; Write-Host ('WIN blocked=' + $ui.Blocked.Count)
@@ -75,11 +78,13 @@ function global:Step-Rade {
     if ($ui.B[1].Text -ne 'It failed') { $ui.B[0].PerformClick() }
     elseif ($global:RadeT.Hand -eq 'fail') { $ui.B[1].PerformClick() } else { $ui.B[0].PerformClick() }
   }
+  elseif ($v -eq 'answer') { if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }; $ui.B[0].PerformClick() }
   elseif ($v -eq 'handfail') { $ui.ErrBox.Text = 'Import failed: flow https://usaf.dps.mil/sites/fake/x not found'; $ui.B[0].PerformClick() }
   elseif ($v -in 'done', 'review', 'stopped') {
     foreach ($l in @($ui.Log)) { if ([string]$l -match 'failed|FAILED|STOPPED|could not') { Write-Host ('WIN log ' + ([string]$l).Trim()) } }
     & $ui.VRecord; Save-RadeCard ($v + '-record'); & $ui.CloseRecord
-    Write-Host ('WIN line ' + ((& $ui.LayLine) -split "`r`n")[0]); Write-Host 'WIN closed=True'; $ui.Form.Close()
+    $ll = @((& $ui.LayLine) -split "`r`n"); Write-Host ('WIN line ' + $ll[0]); foreach ($l in $ll) { if ($l -like 'SCALE *') { Write-Host ('WIN ' + $l) } }   # the scaling facts (numbers only)
+    Write-Host 'WIN closed=True'; $ui.Form.Close()
   }
 }
 $global:RadeTimer = New-Object System.Windows.Forms.Timer

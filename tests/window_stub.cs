@@ -34,6 +34,7 @@ namespace RadeStub {
     public static ScriptBlock Pump; public static System.Windows.Forms.Control Focus; public static string Clip = "";
     public static List<System.Windows.Forms.Timer> Timers = new List<System.Windows.Forms.Timer>();
     public static int Pumps = 0;
+    public static bool RunThrows = false; public static string ShownBy = "";   // RunThrows: Application.Run fails as when a message loop already runs
   }
 }
 // PowerShell 7 on Linux has System.Drawing.Common, whose Font, Pen and the like throw there: the test copy of the bundle
@@ -87,11 +88,14 @@ namespace System.Windows.Forms {
   public class Timer : RadeStub.Dyn { public bool On; public void Start() { On = true; if (!RadeStub.Driver.Timers.Contains(this)) RadeStub.Driver.Timers.Add(this); } public void Stop() { On = false; } }
   public class Form : Control {
     public bool Closed; public Form() { Width = 1020; Height = 760; }
+    public string WindowState = "Normal";
+    public System.Drawing.SizeF CurrentAutoScaleDimensions = new System.Drawing.SizeF(144f, 144f);   // as on the R24 device: the form scaled 1.5 x while the screen dpi said 96
     public Control ActiveControl { get { return RadeStub.Driver.Focus; } }
     public void Activate() { }
     public void Close() { if (Closed) return; RadeStub.Dyn e = new RadeStub.Dyn(); e.Values["Cancel"] = false; Fire("FormClosing", e); if (!(e.Values["Cancel"] is bool && (bool)e.Values["Cancel"])) { Closed = true; IsDisposed = true; } }
     public void Key(string code) { RadeStub.Dyn e = new RadeStub.Dyn(); e.Values["KeyCode"] = code; e.Values["SuppressKeyPress"] = false; Fire("KeyDown", e); }
-    public string ShowDialog() {   // the window "runs": the Shown handlers, then the test user until it closes the window
+    public string ShowDialog() { RadeStub.Driver.ShownBy = "ShowDialog"; return Loop(); }
+    public string Loop() {   // the window "runs": the Shown handlers, then the test user until it closes the window
       Fire("Shown", new RadeStub.Dyn());
       for (int i = 0; i < 400 && !Closed; i++) Application.DoEvents();
       if (!Closed) throw new InvalidOperationException("the test user did not close the window");
@@ -100,6 +104,10 @@ namespace System.Windows.Forms {
   }
   public static class Application {
     public static void EnableVisualStyles() { }
+    public static void Run(Form f) {
+      if (RadeStub.Driver.RunThrows) throw new InvalidOperationException("Starting a second message loop on a single thread is not a valid operation. Use Form.ShowDialog instead.");
+      RadeStub.Driver.ShownBy = "Run"; f.Loop();
+    }
     public static void DoEvents() {
       RadeStub.Driver.Pumps++;
       if (RadeStub.Driver.Pumps > 20000) throw new InvalidOperationException("the window waits and the test user has no answer");
@@ -114,6 +122,6 @@ namespace System.Windows.Forms {
     public static void DrawText(object g, string t, object f, Rectangle r, Color c, TextFormatFlags fl) { if (t == null) throw new ArgumentNullException("text"); }
   }
   public static class Clipboard { public static void SetText(string t) { if (string.IsNullOrEmpty(t)) throw new ArgumentNullException("text"); RadeStub.Driver.Clip = t; } }
-  public class Screen { public Rectangle WorkingArea = new Rectangle(0, 0, 1280, 720); public static Screen FromControl(Control c) { return new Screen(); } }
+  public class Screen { public Rectangle Bounds = new Rectangle(0, 0, 1280, 800); public Rectangle WorkingArea = new Rectangle(0, 0, 1280, 720); public static Screen FromControl(Control c) { return new Screen(); } }
   public static class MessageBox { public static string Show(object owner, string text, string caption, MessageBoxButtons b, MessageBoxIcon i, MessageBoxDefaultButton d) { return "Yes"; } }
 }

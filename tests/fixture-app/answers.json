@@ -1,0 +1,26 @@
+{
+  "_doc": "Fake sample: the questions of the hand step T02 (manifest field \"answers\", one of each kind). tests/engine_test.sh and tests/window_real.py add them to that step of schemas/examples/sample-manifest.json in their test copy.",
+  "step": "T02 Sample import r1",
+  "answers": [
+    {
+      "key": "run-started",
+      "prompt": "Did the flow run start?",
+      "kind": "yesno"
+    },
+    {
+      "key": "flow-count",
+      "prompt": "How many flows does the import page show?",
+      "kind": "pick",
+      "choices": [
+        "One",
+        "Two",
+        "Three or more"
+      ]
+    },
+    {
+      "key": "note",
+      "prompt": "Anything else to report? Do not type names or addresses.",
+      "kind": "text"
+    }
+  ]
+}
