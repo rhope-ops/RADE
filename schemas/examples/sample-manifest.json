@@ -48,7 +48,8 @@
             "ps"
           ],
           "estimate": 2,
-          "note": "Reads this computer only."
+          "note": "Reads this computer only.",
+          "help": "Close other PowerShell windows, then run again."
         },
         {
           "name": "T04 Sample optional r1",
@@ -125,6 +126,13 @@
             "T02 Sample import r1",
             "T03 Sample verify r1"
           ]
+        }
+      ],
+      "release": "v1.0.0",
+      "fetch": [
+        {
+          "dir": "T02",
+          "src": "flow/SAMPLE-data-r1.txt"
         }
       ]
     }

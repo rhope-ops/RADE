@@ -12,11 +12,13 @@ command -v pwsh >/dev/null || { echo "FAIL pwsh is missing (PowerShell 7: see ht
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 od="$t/u/test1234/OneDrive - United States Air Force"; cfg="$od/RADE/Config"; inst="$cfg/rade-installed.json"
 mkdir -p "$od" "$t/app/scripts"; cp -r tests/fixture-app/. "$t/app/"; cp schemas/examples/sample-manifest.json "$t/app/scripts/paste_bundles.json"
-: > "$t/go.md"
+: > "$t/go.md"; echo '{ "apps": { "Sample app (deploy)": "9.0.0", "Sample app": "9.0.0" } }' > "$t/rel.json"
 mkdir -p "$od/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$od/RADE/SampleApp/Config/SAMPLE-site.txt"
+# swap IN OUT USERS: the test copy of a bundle: users root, repository addresses and the check gate swapped for local ones.
+swap() { sed -e "s#^\$usersRoot = 'C:\\\\Users'#\$usersRoot = '$3'#" -e "s#^\$goUrl = '.*'#\$goUrl = 'file://$t/go.md'#" -e "s#^\$releaseUrl = '.*'#\$releaseUrl = 'file://$t/rel.json'#" -e "s#\$checkGate = \$true#\$checkGate = \$false#" \
+    -e "s#https://raw.githubusercontent.com/example-org/sample-app/v1.0.0/#file://$t/app/#" -e "s#https://example-org.github.io/sample-app#file://$t/go.md#g" -e "s#https://example.invalid/import#file://$t/go.md#" "$1" > "$2"; }
 build() { python3 engine/rade_build.py --app-root "$t/app" > "$t/build.txt" 2>&1 || { cat "$t/build.txt"; return 1; }
-  sed -e "s#^\$usersRoot = 'C:\\\\Users'#\$usersRoot = '$t/u'#" -e "s#^\$goUrl = '.*'#\$goUrl = 'file://$t/go.md'#" -e "s#\$checkGate = \$true#\$checkGate = \$false#" \
-    -e "s#https://example-org.github.io/sample-app#file://$t/go.md#g" -e "s#https://example.invalid/import#file://$t/go.md#" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" > "$t/b.ps1"; }
+  swap "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/b.ps1" "$t/u"; }
 # $1 = the number typed on the Choose question (1 = test app, 2 = deploy app); $2 = the answer in the guide step
 # (empty = done, S = skip); the other questions get Enter. Not tested here: the window (Windows Forms) and Windows PowerShell 5.1.
 round() { printf '%s\n\n%s\n\n' "$1" "${2:-}" | USERPROFILE="$t/u/test1234" pwsh -NoProfile -File "$t/b.ps1" > "$t/out.txt" 2>&1; }
@@ -32,7 +34,7 @@ round 2 S; cp "$t/out.txt" "$t/out0.txt"
 grep -q "^Note: some steps were off or skipped, so version 1.0.0 is not recorded as installed" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 None 1.0.0 PASSED" ] && ok || { bad "deploy 0: skipped step ($(js))"; tail -8 "$t/out.txt"; }
 
 # Optional = "default": false only (review): T04 is optional, the other steps are needed.
-[ "$(grep -c '^\$steps += .*Optional = \$false }$' "$b")" = 3 ] && grep -q "^\$steps += @{ Name = 'T04 Sample optional r1'.*Default = \$false.*Optional = \$true }$" "$b" && ok || bad "catalog: Optional flags"
+[ "$(grep -c '^\$steps += .*Optional = \$false; Help = ' "$b")" = 3 ] && grep -q "^\$steps += @{ Name = 'T04 Sample optional r1'.*Default = \$false.*Optional = \$true; Help = '' }$" "$b" && ok || bad "catalog: Optional flags"
 # A files-changed default that the build turns off is still a needed step: in a deploy it runs (review).
 python3 - "$t" <<'P' && ok || bad "item 3: a step with a files-changed default must stay needed in a deploy"
 import json, subprocess, sys, pathlib, shutil, os, re
@@ -43,12 +45,20 @@ paths = ['scripts/gov/SAMPLE-T01-check-r1.ps1']
 m['bundles'][0]['steps'][0]['default'] = {'passed': ns['files_hash'](paths), 'paths': paths}; p.write_text(json.dumps(m))
 r = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'cond/app')], capture_output=True, text=True)
 line = [l for l in (t / 'cond/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1').read_text().split('\n') if l.startswith("$steps += @{ Name = 'T01 Sample check r1'")][0]
-assert r.returncode == 0 and 'Default = $false' in line and line.endswith('Optional = $false }'), line
+assert r.returncode == 0 and 'Default = $false' in line and 'Optional = $false; Help = ' in line, line
 P
-sed -e "s#^\$usersRoot = 'C:\\\\Users'#\$usersRoot = '$t/cu'#" -e "s#^\$goUrl = '.*'#\$goUrl = 'file://$t/go.md'#" -e "s#\$checkGate = \$true#\$checkGate = \$false#" -e "s#https://example-org.github.io/sample-app#file://$t/go.md#g" -e "s#https://example.invalid/import#file://$t/go.md#" "$t/cond/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" > "$t/c.ps1"
+swap "$t/cond/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/c.ps1" "$t/cu"
 mkdir -p "$t/cu/test1234/OneDrive - United States Air Force"
 printf '2\n\n\n\n' | USERPROFILE="$t/cu/test1234" pwsh -NoProfile -File "$t/c.ps1" > "$t/outc.txt" 2>&1
 grep -q "^Step 1 of 3: T01 Sample check r1" "$t/outc.txt" && grep -q "is recorded as installed" "$t/outc.txt" && ok || { bad "item 3: files-changed default step did not run in a deploy"; grep "^Step \|installed" "$t/outc.txt"; }
+
+# Item 5: a fetch file comes from the bundle's release tag; with a failed download a deploy runs no step.
+grep -q "Url = 'https://raw.githubusercontent.com/example-org/sample-app/v1.0.0/flow/SAMPLE-data-r1.txt'; Sha = '[0-9a-f]\{64\}'" "$b" && grep -q "^  Downloaded   T02.SAMPLE-data-r1.txt" "$t/out0.txt" && ok || bad "item 5: fetch from the release tag"
+sed "s#file://$t/app/flow/SAMPLE-data#file://$t/app/flow/NOPE#" "$t/b.ps1" | sed "s#usersRoot = '$t/u'#usersRoot = '$t/fu'#" > "$t/f.ps1"; mkdir -p "$t/fu/test1234/OneDrive - United States Air Force"
+printf '2\n\n\n\n' | USERPROFILE="$t/fu/test1234" pwsh -NoProfile -File "$t/f.ps1" > "$t/outf.txt" 2>&1
+grep -q "could not be downloaded, so no step ran" "$t/outf.txt" && ! grep -q "^Step 1 of" "$t/outf.txt" && grep -q "^For help, ask in the Teams channel" "$t/outf.txt" && grep -q '"state":  *"STOPPED"' "$t/fu/test1234/OneDrive - United States Air Force/RADE/Config/rade-installed.json" && ok || { bad "item 5: a failed download must stop a deploy before its steps"; tail -8 "$t/outf.txt"; }
+# A newer version in rade-release.json is named in a deploy only.
+grep -q "^A newer version, 9.0.0, of Sample app (deploy) is on the app page" "$t/out0.txt" && ok || bad "newer-version notice in a deploy"
 
 # 1. First deploy: every step on, PASSED, version recorded, nothing sent.
 round 2
@@ -90,14 +100,19 @@ P
 ! grep -rq "fake.example\|sites/fake\|test1234" "$inst" "$od/RADE/SampleApp/Rounds" && ! grep -v "^Working folder: " "$t/out.txt" | grep -q "fake.example\|sites/fake\|test1234" && ok || bad "contract: a site address or the ID reached the record, the report or the screen log"
 grep -q "^    MADE backup of nothing (prose, not a record)" "$t/out.txt" && grep -q "^  Result: PASSED (1 passed, 0 failed" "$t/out.txt" && ok || { bad "contract: a MADE name with FAIL changed the counts, or a prose line was taken as a record"; grep "Result:" "$t/out.txt"; }
 
+# Fallback result, and the made list in the report (item 4).
+grep -q "^  Result: PASSED (fallback: read the list in the browser view at <SITE>) (1 passed, 0 failed" "$t/out.txt" && ok || { bad "fallback result line"; grep "Result:" "$t/out.txt"; }
+rp="$od/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt"
+grep -q "^Made by this app's installs" "$rp" && grep -q "^  flow: Sample flow  (T02 Sample import r1)" "$rp" && grep -q "^  file: SAMPLE-T01-result-r1.txt  (T01 Sample check r1)" "$t/out.txt" && ok || { bad "item 4: made list in the report and the log"; grep -A4 "^Made by" "$rp"; }
+
 # 3. A test round: the draft path is unchanged and the record is not touched.
 cp "$inst" "$t/inst.before"; round 1
-grep -q "Outlook draft could not be created" "$t/out.txt" && ! grep -q "^Mode: deploy" "$t/out.txt" && cmp -s "$inst" "$t/inst.before" && ok || { bad "test round: draft path or record changed"; tail -15 "$t/out.txt"; }
+grep -q "Outlook draft could not be created" "$t/out.txt" && ! grep -q "^Mode: deploy\|newer version\|^Made by" "$t/out.txt" && cmp -s "$inst" "$t/inst.before" && ok || { bad "test round: draft path or record changed"; tail -15 "$t/out.txt"; }
 
 # 4. A newer version whose step fails: lastRun changes, installed stays 1.0.0.
 sed -i 's/"version": "1.0.0"/"version": "1.1.0"/' "$t/app/scripts/paste_bundles.json"; echo "Write-Output 'FAIL sample check: forced by the test'" >> "$t/app/scripts/gov/SAMPLE-T01-check-r1.ps1"
 build; round 2
-grep -q "^Mode: deploy, version 1.1.0 (installed now: 1.0.0)" "$t/out.txt" && grep -q "^Note: one or more items need review.*Nothing was sent\.$" "$t/out.txt" && grep -q "^For help, ask in the Teams channel RHOPE-OPS\.$" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 1.0.0 1.1.0 NEEDS REVIEW" ] && ok || { bad "deploy 4: failed upgrade ($(js))"; tail -15 "$t/out.txt"; }
+grep -q "^Mode: deploy, version 1.1.0 (installed now: 1.0.0)" "$t/out.txt" && grep -q "^Note: one or more items need review.*Nothing was sent\.$" "$t/out.txt" && grep -q "^For help, ask in the Teams channel RHOPE-OPS\.$" "$t/out.txt" && grep -q "^  What to do: Close other PowerShell windows, then run again\.$" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 1.0.0 1.1.0 NEEDS REVIEW" ] && ok || { bad "deploy 4: failed upgrade ($(js))"; tail -15 "$t/out.txt"; }
 
 # 5. A damaged record is kept as .damaged and replaced by a valid file.
 echo '{ not json' > "$inst"; round 2
