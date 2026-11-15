@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # RADE engine tests (run by scripts/check.local.sh). Pass = last line "ENGINE pass=N fail=0".
 # Builds the sample manifest (schemas/examples/sample-manifest.json + tests/fixture-app) into a bundle and runs it in
-# pwsh text mode (Linux has no Windows Forms: the window path is not tested here), with C:\Users swapped for a temp root.
+# pwsh text mode, with C:\Users swapped for a temp root. Linux has no Windows Forms: the window's logic runs against
+# stand-in types with a scripted user (section "window" below); what the window looks like is not tested here.
 # Covers deploy v1 (docs/engine.md): a deploy sends nothing and keeps RADE\Config\rade-installed.json; a test round is unchanged.
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -20,7 +21,7 @@ swap() { sed -e "s#^\$usersRoot = 'C:\\\\Users'#\$usersRoot = '$3'#" -e "s#^\$go
 build() { python3 engine/rade_build.py --app-root "$t/app" > "$t/build.txt" 2>&1 || { cat "$t/build.txt"; return 1; }
   swap "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/b.ps1" "$t/u"; }
 # $1 = the number typed on the Choose question (1 = test app, 2 = deploy app); $2 = the answer in the guide step
-# (empty = done, S = skip); the other questions get Enter. Not tested here: the window (Windows Forms) and Windows PowerShell 5.1.
+# (empty = done, S = skip); the other questions get Enter. Not tested here: Windows PowerShell 5.1.
 round() { printf '%s\n\n%s\n\n' "$1" "${2:-}" | USERPROFILE="$t/u/test1234" pwsh -NoProfile -File "$t/b.ps1" > "$t/out.txt" 2>&1; }
 js() { python3 -c "import json,sys; d=json.load(open(sys.argv[1])); a=d['apps']['SampleApp/Sample app (deploy)']; print(d['schema'], len(d['apps']), (a['installed'] or {}).get('version'), a['lastRun']['version'], a['lastRun']['state'])" "$inst" 2>&1; }
 
@@ -28,6 +29,37 @@ build && ok || bad "build of the sample bundle"
 b="$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1"
 grep -q "Name = 'Sample app (deploy)'.*Mode = 'deploy'; Version = '1.0.0'" "$b" && ! grep "Name = 'Sample app (deploy)'" "$b" | grep -q "'outlook'" && ok || bad "catalog: deploy app has Mode, Version and no outlook check"
 grep "Name = 'Sample app'" "$b" | grep -q "'outlook'.*Mode = 'test'; Version = ''" && ok || bad "catalog: test app keeps the outlook check and Mode test"
+
+# ---- window: the "One thing" window (docs/window-design.md) with stand-in Windows Forms types (tests/window_stub.cs) and
+# a scripted user (tests/window_driver.ps1) that prints one WIN line per card, runs every Paint handler and checks names.
+# win APP HAND RECORD TOUR [BUNDLE]: runs the window for application APP (0 = test, 1 = deploy); output in $t/win.txt.
+mkdir -p "$t/wu/test1234/OneDrive - United States Air Force"
+swap "$b" "$t/wb.ps1" "$t/wu"
+win() { sed -E -e 's#Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing#$null = 0#' -e "s#^\\\$sitePrefix = 'https://usaf.dps.mil/sites/'#\$sitePrefix = 'https://rade-test.invalid/sites/'#" -e 's#System\.Drawing\.(FontStyle|Font|Pen|SolidBrush|Image|Graphics)\b#RadeDraw.\1#g' "${5:-$t/wb.ps1}" > "$t/wb2.ps1"
+  cat tests/window_driver.ps1 "$t/wb2.ps1" > "$t/w.ps1"
+  RADE_T_STUB="$PWD/tests/window_stub.cs" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$t/wu/test1234" timeout 180 pwsh -NoProfile -File "$t/w.ps1" < /dev/null > "$t/win.txt" 2>&1; }
+# has TEXT...: every text is in the window output, and the window did not fall back to text mode or miss a name.
+has() { local x; grep -q "No window could open\|WIN NONAME\|WIN BAD" "$t/win.txt" && return 1; for x in "$@"; do grep -qF -- "$x" "$t/win.txt" || { echo "  missing: $x"; return 1; }; done; grep -q "^WIN closed=True" "$t/win.txt"; }
+# 1. A first deploy: boot, choose with the newer-version notice, ready, the Record (boxes can change, Clean-up off), the hand step, done.
+win 1 done 1 0
+has "view=boot" "view=choose light=off kick= sent=Which application do you want to install?" "2 Sample app (deploy) 1.0.0 NOTE Version 9.0.0 is on the app page" "view=ready light=off kick=ALL 8 CHECKS PASSED sent=Ready to install Sample app (deploy) 1.0.0." \
+  "WIN record on=True rows=10 boxes=5 enabled=True text=True name=True reused=Last check: 14-11-26 / Version [5.1] tall=True" "WIN paged=" "WIN record on=False clean=False" "view=hand light=RADE waits for you kick=STEP 2 OF 3 · YOUR TURN sent=T02 Sample import r1" "btn=[Imported] [It failed] [Skip]" \
+  "view=done light=off kick=ALL STEPS PASSED sent=Sample app (deploy) 1.0.0 is installed. p=Nothing was sent." "btn=[Close] [What it made] [Open results folder] [Copy summary]" "WIN made=True log=True locked=True" "WIN copied=True" && ok || { bad "window 1: first deploy"; tail -5 "$t/win.txt" | cut -c1-300; }
+# 2. A second deploy with a blocked application, Maintenance (Esc = Back, then the same choice: 2 Maintenance cards),
+# the site address, a failed check that runs again (2 cards), a sign-in check that failed (its card offers the sign-in),
+# the look-and-answer check, and a hand step that failed: needs review with the help line.
+win 1 fail 0 1
+has "opts=OFF Sample app; 1 Sample app (deploy) 1.0.0" "btn=[Check this computer again]" "view=maint light=off kick=SAMPLE APP (DEPLOY) 1.0.0 · INSTALLED " "sent=Maintenance" "btn=[Repair] (Diagnose) (Back up) (Restore) (Uninstall)" \
+  "view=site light=off kick= sent=Which site does the application go to?" "WIN site-note=The address must look like https://rade-test.invalid/sites/name" "view=fail light=failed kick=CHECK 9 OF 11 · FAILED sent=One check failed. p=Your SharePoint site can be reached" "btn=[Run checks again] [Change the site address]" "WIN esc" "WIN again" "sent=One check failed. p=You can change the site (sign in with your CAC) / Sign-in was not finished" "btn=[Sign in and check site rights] [Change the site address]" \
+  "view=need light=RADE waits for you kick=CHECK 10 OF 11 · YOUR TURN sent=One check needs you." "btn=[Sign in and check site rights]" "btn=[Check Power Automate]" "sent=Check Power Automate" "btn=[Yes: I see both] [No: one is missing] [Not now]" "kick=ALL 11 CHECKS PASSED" \
+  "view=handfail" "view=review light=failed kick=NEEDS REVIEW sent=The install is not complete. p=T02 Sample import r1: FAILED (reported by you)" "flow <SITE> not found" "help=For help, ask in the Teams channel" "btn=[Copy summary] [Open results folder] [What it made] [Close]" && [ "$(grep -c "^WIN view=maint" "$t/win.txt")" = 2 ] && [ "$(grep -c "^WIN view=fail .*CHECK 9 OF 11" "$t/win.txt")" = 2 ] && ok || { bad "window 2: Maintenance, checks that fail or need you, needs review"; tail -5 "$t/win.txt" | cut -c1-300; }
+# 3. A test round: the owner's test extras show on Done; a deploy never shows them (1 and 2 have no "test=shown").
+win 0 done 0 0
+has "sent=Ready to run round R01." "view=done light=off kick=ALL STEPS PASSED sent=Round R01 is done." "test=shown" "WIN draft-note=The Outlook draft could not be created" && ! grep -q "Sample app (deploy).*test=shown" "$t/win.txt" && ok || { bad "window 3: test round"; tail -5 "$t/win.txt" | cut -c1-300; }
+# 4. A deploy whose download fails: stopped, with the help line.
+sed "s#file://$t/app/flow/SAMPLE-data#file://$t/app/flow/NOPE#" "$t/wb.ps1" > "$t/wf.ps1"
+win 1 done 0 0 "$t/wf.ps1"
+has "view=stopped light=failed kick=STOPPED sent=The install stopped. p=A file this install needs could not be downloaded" "help=For help, ask in the Teams channel" "btn=[Copy the log] [Try again] [Close]" && ok || { bad "window 4: stopped"; tail -5 "$t/win.txt" | cut -c1-300; }
 
 # 0. A skipped step: the run is PASSED but the version is not recorded as installed (review of deploy v1).
 round 2 S; cp "$t/out.txt" "$t/out0.txt"
