@@ -7,7 +7,7 @@ Usage:
     python3 scripts/pii_guard.py --range A..B      # commits in A..B: added lines, messages, author and committer
     python3 scripts/pii_guard.py --push            # pre-push hook mode: reads the hook's stdin lines
     python3 scripts/pii_guard.py FILE ...          # these files
-    python3 scripts/pii_guard.py --status          # where the denylist comes from and how many entries (never the names)
+    python3 scripts/pii_guard.py --status          # denylist source, entry count and fingerprint (never the names), profile
     --require-denylist                             # fail when no denylist is found (the hook and the Action use it),
                                                    # or only warn when .pii-guard has the line `denylist: warn`
     python3 scripts/pii_guard.py --test            # self-test; prints PII GUARD TEST PASS
@@ -18,11 +18,19 @@ That file lists exact strings that are allowed (one per line, `#` comments), and
 `denylist: warn` (starter tier; kit default since 2026-11-13): with no denylist, --require-denylist warns instead of failing. Only the Administrator adds entries;
 agents never add one to get past a block (AGENTS.md "Personal data").
 
+Two tiers (the Administrator, 2026-11-15), set in `.pii-guard`:
+    minimum    no option line: the checks under "Checks".
+    DoD        the option line `profile: dod`: the minimum checks plus the checks under "DoD checks"; a missing
+               denylist always blocks (`denylist: warn` is ignored). In the Action the line is read from the
+               pull-request base (--allow-from), so a pull request cannot lower its own tier.
+
 Name denylist (never committed): one name or word per line, `#` comments, matched whole-word, any case.
     - env PII_GUARD_DENYLIST: the list itself (newline or comma separated); the GitHub Action reads it from the
       Actions secret of the same name.
     - env PII_GUARD_DENYLIST_FILE, else ~/.config/pii-guard/denylist.txt
 With no denylist, names are not checked and the guard says so (exit code unchanged).
+Fingerprint: 8 hex characters of SHA-256 over the list (lower case, no duplicates, sorted). Every copy of the same
+list prints the same fingerprint, whatever its order or separators: compare the places to find a copy that differs.
 
 Checks:
     email      any address, except *@users.noreply.github.com, noreply@ / no-reply@ addresses, and the
@@ -31,11 +39,20 @@ Checks:
     id         SSN shape (NNN-NN-NNNN), or 9 digits next to SSN / social security
     secret     API tokens (GitHub, GitLab, AWS, Anthropic, OpenAI, Google, Slack, Stripe) and private-key headers
     name       denylist words
+DoD checks (only with `profile: dod`):
+    milhost    a host name in the US military top-level domain (also inside a URL), and the DoD cloud hosts in MILHOST
+    marking    controlled-information and classification banner marks (the list: MARKING below)
+    dodid      10 digits next to a DoD ID keyword (the list: DODID below)
+    unscanned  a file the guard cannot read: a SKIP_SUFFIX type, a binary file (Office files too) or one over
+               MAX_BYTES. It blocks unless a `skip: <path or glob>` line names it.
+Known limits of the DoD checks: the scanner reads one line at a time, so a keyword on one line and its number on
+the next pass; a binary file that enters only through a merge resolution is found by --all, not by the commit scan.
 Matches are printed masked (names and secrets as a length only), so CI logs do not repeat them. Exit 1 when anything is found.
 Standard library only. Needs git (except for FILE mode).
 """
 import argparse
 import fnmatch
+import hashlib
 import os
 import pathlib
 import re
@@ -66,6 +83,18 @@ SECRET = [re.compile(r) for r in (
     r"\b[rs]k_live_[0-9A-Za-z]{24,}",                   # Stripe live key
     r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----",  # PEM, OpenSSH and PGP private keys
 )]
+# DoD tier (`profile: dod`). The marks are split in the source so this file does not flag itself.
+MILHOST = re.compile(
+    r"(?i)(?<![A-Za-z0-9-])(?:(?:[a-z0-9-]+\.)+mil(?![A-Za-z0-9-]|\.[A-Za-z0-9])"   # any host under the military domain
+    r"|(?:[a-z0-9-]+\.)*sharepoint-mil\.us\b|dod\.teams\.microsoft\.us\b)")          # DoD cloud tenant hosts
+MARKING = [re.compile(r) for r in (
+    r"\bCUI/" r"/", r"^[^A-Za-z0-9]*CU" r"I[^A-Za-z0-9]*$", r"(?i)\bcontrolled\s+unclassified\s+" r"information\b",
+    r"^[^A-Za-z0-9]*(?:TOP SEC" r"RET|SEC" r"RET|CONFID" r"ENTIAL)[^A-Za-z0-9]*$",   # a banner alone on its line
+    r"\bFO" r"UO\b", r"(?i)\bfor\s+official\s+use\s+" r"only\b", r"\bNOF" r"ORN\b",
+    r"\b(?:SECRET|CONFIDENTIAL|UNCLASSIFIED)/" r"/",
+)]
+DODID = [re.compile(r"(?i)\b(?:DOD[ -]?ID|EDIPI|CAC)\b\D{0,20}?(\d{10})\b"),       # keyword, then the number
+         re.compile(r"(?i)(?<!\d)(\d{10})\b\D{0,20}?\b(?:DOD[ -]?ID|EDIPI|CAC)\b")]  # the number, then the keyword
 ALLOWED_EMAIL = re.compile(
     r"(?i)(@users\.noreply\.github\.com$|^(no-?reply)@|@example\.(com|org|net)$|\.(example|invalid|test|localhost)$)")
 SKIP_SUFFIX = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf", ".zip", ".gz", ".woff", ".woff2", ".ttf")
@@ -74,7 +103,9 @@ MAX_BYTES = 2_000_000
 
 def mask(kind, s):
     """Show the kind and a length, never enough to rebuild the value (CI logs may be public)."""
-    if kind in ("name", "secret"):
+    if kind == "unscanned":
+        return s  # a reason, not a value
+    if kind in ("name", "secret", "milhost", "marking"):
         return f"<{len(s)} chars>"
     if kind == "email" and "@" in s:
         return "***@" + "*" * len(s.split("@", 1)[1])
@@ -120,9 +151,25 @@ MISSING_HELP = ("no denylist found. Add your names (comma or newline separated),
 WARN_OPTION = "denylist: warn"  # .pii-guard option line; first_use_check.py reads it too
 
 
+DOD_OPTION = "profile: dod"     # .pii-guard option line: the DoD tier
+OPTION_PREFIX = ("denylist:", "profile:")  # option lines, never allowed values
+
+
+def dod_mode(root):
+    """True when .pii-guard in the working tree has the option line `profile: dod`."""
+    return DOD_OPTION in load_allow(root)
+
+
 def warn_mode(root):
-    """True when .pii-guard in the working tree has the option line `denylist: warn`."""
-    return WARN_OPTION in load_allow(root)
+    """True when .pii-guard in the working tree has the option line `denylist: warn` and is not in the DoD tier."""
+    allow = load_allow(root)
+    return WARN_OPTION in allow and DOD_OPTION not in allow
+
+
+def fingerprint(words):
+    """8 hex characters over the normalized list: equal for every copy of the same list, and shows no entry."""
+    norm = sorted({w.lower() for w in words})
+    return hashlib.sha256("\n".join(norm).encode()).hexdigest()[:8]
 
 
 def load_denylist():
@@ -149,10 +196,11 @@ def skipped(path, allow):
     return any(fnmatch.fnmatchcase(path, g) or path.startswith(g.rstrip("/") + "/") for g in globs if g)
 
 
-def scan_text(text, where, deny, allow):
-    """Return findings (where, line_no, kind, masked) for one text."""
+def scan_text(text, where, deny, allow, dod=False):
+    """Return findings (where, line_no, kind, masked) for one text. dod: also run the DoD checks."""
     found = []
     name_re = re.compile(r"(?i)(?<![A-Za-z0-9])(" + "|".join(re.escape(w) for w in deny) + r")(?![A-Za-z0-9])") if deny else None
+    hosts_ok = {v.lower() for v in allow} if dod else set()  # a host name has no case
     for n, line in enumerate(text.splitlines(), 1):
         hits = []
         for m in EMAIL.finditer(line):
@@ -164,6 +212,14 @@ def scan_text(text, where, deny, allow):
             hits += [("phone", m.group(m.lastindex or 0)) for m in rx.finditer(line)]
         hits += [("id", m.group()) for m in SSN.finditer(line)]
         hits += [("id", m.group(1)) for m in SSN_KW.finditer(line)]
+        if dod:
+            mails = [m.span() for m in EMAIL.finditer(line)]  # the host of a mail address is part of that finding
+            hits += [("milhost", m.group()) for m in MILHOST.finditer(line)
+                     if not any(a <= m.start() and m.end() <= b for a, b in mails)]
+            for rx in DODID:
+                hits += [("dodid", m.group(1)) for m in rx.finditer(line)]
+            for rx in MARKING:
+                hits += [("marking", m.group().strip()) for m in rx.finditer(line)]
         if name_re:
             spans = [(s.start(), s.end()) for v in allow if not v.startswith("skip:")
                      for s in re.finditer(re.escape(v), line, re.IGNORECASE)]
@@ -171,7 +227,8 @@ def scan_text(text, where, deny, allow):
                      if not any(a <= m.start(1) and m.end(1) <= b for a, b in spans)]  # inside an allowed string
         seen = set()
         for kind, val in hits:
-            if val in allow or (kind, val) in seen or any(val == v for _, v in seen):
+            if val in allow or (kind == "milhost" and val.lower() in hosts_ok) or (kind, val) in seen \
+                    or any(val == v for _, v in seen):
                 continue
             seen.add((kind, val))
             found.append((where, n, kind, mask(kind, val)))
@@ -183,21 +240,33 @@ def git(*args, root="."):
                           errors="replace").stdout
 
 
-def scan_files(paths, root, deny, allow):
+def scan_files(paths, root, deny, allow, dod=False):
+    """dod: a file that cannot be scanned is a finding (kind unscanned) unless a `skip:` line names it."""
     found = []
     for p in paths:
         f = pathlib.Path(root) / p
-        if skipped(str(p), allow) or not f.is_file() or f.suffix.lower() in SKIP_SUFFIX or f.stat().st_size > MAX_BYTES:
+        if skipped(str(p), allow) or not f.is_file():
             continue
-        data = f.read_bytes()
-        if b"\0" in data[:8192]:
+        why = None
+        if f.suffix.lower() in SKIP_SUFFIX:
+            why = f"file type {f.suffix.lower()} is not scanned"
+        elif f.stat().st_size > MAX_BYTES:
+            why = f"larger than {MAX_BYTES} bytes"
+        else:
+            data = f.read_bytes()
+            if b"\0" in data[:8192]:
+                why = "binary file"
+        if why:
+            if dod:
+                found.append((str(p), 0, "unscanned", why))
             continue
-        found += scan_text(data.decode("utf-8", "replace"), str(p), deny, allow)
+        found += scan_text(data.decode("utf-8", "replace"), str(p), deny, allow, dod)
     return found
 
 
-def scan_commits(revs, root, deny, allow):
-    """revs: arguments for git rev-list. Scan each commit's identity, message and added lines."""
+def scan_commits(revs, root, deny, allow, dod=False):
+    """revs: arguments for git rev-list. Scan each commit's identity, message and added lines.
+    dod: an added or changed file that cannot be scanned is a finding unless a `skip:` line names it."""
     found = []
     shas = git("rev-list", *revs, root=root).split()
     for sha in shas:
@@ -205,8 +274,27 @@ def scan_commits(revs, root, deny, allow):
         meta = git("show", "-s", "--format=%an%n%ae%n%cn%n%ce%n%B", sha, root=root)
         lines = meta.split("\n")
         ident = "\n".join(lines[:4])
-        found += [(f"commit {short} author/committer", n, k, v) for _, n, k, v in scan_text(ident, "", deny, allow)]
-        found += [(f"commit {short} message", n, k, v) for _, n, k, v in scan_text("\n".join(lines[4:]), "", deny, allow)]
+        found += [(f"commit {short} author/committer", n, k, v) for _, n, k, v in scan_text(ident, "", deny, allow, dod)]
+        found += [(f"commit {short} message", n, k, v) for _, n, k, v in scan_text("\n".join(lines[4:]), "", deny, allow, dod)]
+        if dod:  # numstat marks a binary file with "-"; the patch below has no added lines for it
+            stat = git("-c", "core.quotepath=off", "show", "--format=", "--numstat", "-z", "--no-renames",
+                       "--diff-filter=AM", sha, root=root)
+            sizes = {}
+            for rec in filter(None, git("ls-tree", "-r", "-l", "-z", sha, root=root).split("\0")):
+                info, _, name = rec.partition("\t")
+                size = info.split()[-1]
+                if size.isdigit():
+                    sizes[name] = int(size)
+            for rec in filter(None, stat.split("\0")):
+                parts = rec.split("\t", 2)
+                if len(parts) != 3 or skipped(parts[2], allow):
+                    continue
+                if sizes.get(parts[2], 0) > MAX_BYTES:
+                    found.append((f"commit {short} {parts[2]}", "+", "unscanned", f"larger than {MAX_BYTES} bytes"))
+                elif parts[2].lower().endswith(SKIP_SUFFIX):
+                    found.append((f"commit {short} {parts[2]}", "+", "unscanned", "file type is not scanned"))
+                elif parts[0] == "-":
+                    found.append((f"commit {short} {parts[2]}", "+", "unscanned", "binary file"))
         patch = git("-c", "core.quotepath=off", "show", "--format=", "--unified=0", "--no-color", "--no-ext-diff",
                     "--src-prefix=a/", "--dst-prefix=b/", sha, root=root)
         cur, in_header = "?", False
@@ -223,7 +311,7 @@ def scan_commits(revs, root, deny, allow):
                     name = name[1:-1].replace('\\"', '"').replace("\\\\", "\\")
                 cur = name[2:] if name.startswith("b/") else name
             elif line.startswith("+") and not cur.endswith(SKIP_SUFFIX) and not skipped(cur, allow):
-                found += [(f"commit {short} {cur}", "+", k, v) for _, _, k, v in scan_text(line[1:], "", deny, allow)]
+                found += [(f"commit {short} {cur}", "+", k, v) for _, _, k, v in scan_text(line[1:], "", deny, allow, dod)]
     return found, len(shas)
 
 
@@ -241,11 +329,13 @@ def push_revs(stdin_text, root):
     return out
 
 
-def report(found, what, deny):
+def report(found, what, deny, dod=False):
     for where, n, kind, val in found:
         print(f"pii-guard: {where}:{n}: {kind}: {val}")
-    names = f"names checked ({len(deny)} denylist entries)" if deny else "names NOT checked (no denylist)"
-    print(f"PII GUARD {'FAIL' if found else 'PASS'}: {len(found)} finding(s) in {what}; {names}")
+    names = (f"names checked ({len(deny)} denylist entries, fingerprint {fingerprint(deny)})" if deny
+             else "names NOT checked (no denylist)")
+    print(f"PII GUARD {'FAIL' if found else 'PASS'}: {len(found)} finding(s) in {what}; {names}; "
+          f"profile {'dod' if dod else 'minimum'}")
     return 1 if found else 0
 
 
@@ -253,9 +343,9 @@ def self_test():
     at, dot = "@", "."
     ok = True
 
-    def expect(name, text, kinds, deny=(), allow=()):
+    def expect(name, text, kinds, deny=(), allow=(), dod=False):
         nonlocal ok
-        got = sorted({k for _, _, k, _ in scan_text(text, "t", list(deny), set(allow))})
+        got = sorted({k for _, _, k, _ in scan_text(text, "t", list(deny), set(allow), dod)})
         good = got == sorted(kinds)
         print(("ok   " if good else "FAIL ") + f"{name}: {got}")
         ok = ok and good
@@ -316,6 +406,46 @@ def self_test():
     good = mask("name", "Sam") == "<3 chars>" and mask("email", "a" + at + "b" + dot + "io") == "***@****"
     print(("ok   " if good else "FAIL ") + "masking hides names and email users")
     ok = ok and good
+    # DoD tier. Test values are built at run time, so this file holds no host, mark or ID shape itself.
+    mil = "portal" + dot + "unit" + dot + "mi" + "l"
+    for label, text in (("host", "see " + mil), ("URL", "https://" + mil + "/sites/x"),
+                        ("host, upper case", "see " + mil.upper()), ("host at sentence end", "open " + mil + "."),
+                        ("cloud tenant host", "x" + dot + "sharepoint-mi" + "l" + dot + "us/sites/y"),
+                        ("cloud meeting host", "dod" + dot + "teams" + dot + "microsoft" + dot + "us")):
+        expect("dod milhost: " + label, text, ["milhost"], dod=True)
+    for label, text in (("wildcard", "*" + dot + "unit" + dot + "mi" + "l"), ("leading dot", "domain=" + dot + "unit" + dot + "mi" + "l"),
+                        ("handle", at + "unit" + dot + "mi" + "l team")):
+        expect("dod milhost: " + label, text, ["milhost"], dod=True)
+    expect("minimum tier: host not checked", "see " + mil, [])
+    expect("dod: mail address is one finding, kind email", "ann" + at + "unit" + dot + "mi" + "l", ["email"], dod=True)
+    expect("dod: not a host: other domain after it", "x" + dot + "mi" + "l" + dot + "example" + dot + "org", [], dod=True)
+    expect("dod: not a host: the words family and mil alone", "a family of 3 mil units", [], dod=True)
+    expect("dod: allowed host", "see " + mil, [], allow=[mil], dod=True)
+    expect("dod: allowed host in any case", "see " + mil.upper(), [], allow=[mil], dod=True)
+    expect("dod: allowed host does not allow another host", "see other" + dot + "unit" + dot + "mi" + "l", ["milhost"], allow=[mil], dod=True)
+    for label, text in (("banner", "CU" + "I//SP-PRVCY"), ("lone line", "  CU" + "I  "), ("long form", "Controlled Unclassified " + "Information"),
+                        ("old mark", "UNCLASSIFIED/" + "/FO" + "UO"), ("old mark, long form", "For Official Use " + "Only"),
+                        ("dissemination", "NOF" + "ORN"), ("classification banner", "TOP SECRET/" + "/SI")):
+        expect("dod marking: " + label, text, ["marking"], dod=True)
+    for label, text in (("in brackets", "(CU" + "I)"), ("bold", "**CU" + "I**"), ("heading", "# CU" + "I"),
+                        ("bare banner", "TOP SEC" + "RET"), ("bare banner, one word", "  SEC" + "RET  ")):
+        expect("dod marking: " + label, text, ["marking"], dod=True)
+    expect("dod: the word in a sentence, upper case, is not a banner", "THE SEC" + "RET IS OUT", [], dod=True)
+    expect("minimum tier: marks not checked", "CU" + "I//SP-PRVCY", [])
+    expect("dod: the acronym inside a sentence is not a mark", "the CU" + "I program office", [], dod=True)
+    expect("dod: the word secret alone is not a mark", "a secret in the settings", [], dod=True)
+    expect("dod id: keyword and 10 digits", "DoD ID: 12345" + "67890", ["dodid"], dod=True)
+    expect("dod id: EDIPI", "EDIPI 12345" + "67890", ["dodid"], dod=True)
+    expect("dod id: number, then keyword", "12345" + "67890 (DoD ID)", ["dodid"], dod=True)
+    expect("dod: 10 digits with no keyword", "ts 17312" + "34567", [], dod=True)
+    expect("minimum tier: DoD ID not checked", "EDIPI 12345" + "67890", [])
+    good = mask("milhost", mil) == f"<{len(mil)} chars>" and mask("dodid", "12345" + "67890") == "********90"
+    print(("ok   " if good else "FAIL ") + "dod: hosts print as a length, IDs as the last 2 digits")
+    ok = ok and good
+    good = fingerprint(parse_denylist("Alex, Sam,River")) == fingerprint(parse_denylist("river\nSAM\nalex\nAlex")) \
+        and fingerprint(["Alex"]) != fingerprint(["Sam"]) and re.fullmatch(r"[0-9a-f]{8}", fingerprint(["Alex"]))
+    print(("ok   " if good else "FAIL ") + "fingerprint: same list in any order, case or separator; other list differs")
+    ok = ok and good
     saved = {k: os.environ.pop(k, None) for k in ("PII_GUARD_DENYLIST", "PII_GUARD_DENYLIST_FILE")}
     try:
         os.environ["PII_GUARD_DENYLIST_FILE"] = os.devnull + ".missing"
@@ -362,6 +492,53 @@ def self_test():
         r = subprocess.run(me + ["--all", "--require-denylist"], cwd=d, env=env, capture_output=True, text=True)
         good = good and r.returncode == 1
         print(("ok   " if good else "FAIL ") + "denylist: warn: no denylist only warns; an email still blocks")
+        ok = ok and good
+        pathlib.Path(d, "a.txt").write_text("clean\n")
+        pathlib.Path(d, ".pii-guard").write_text("denylist: warn\nprofile: dod\n")
+        r = subprocess.run(me + ["--all", "--require-denylist"], cwd=d, env=env, capture_output=True, text=True)
+        good = r.returncode == 1 and "no denylist" in r.stdout and dod_mode(d) and not warn_mode(d)
+        print(("ok   " if good else "FAIL ") + "dod: no denylist blocks although the file says denylist: warn")
+        ok = ok and good
+        env["PII_GUARD_DENYLIST"] = "Alex"
+        r = subprocess.run(me + ["--status"], cwd=d, env=env, capture_output=True, text=True)
+        good = r.returncode == 0 and "fingerprint " + fingerprint(["alex"]) in r.stdout and "profile: dod" in r.stdout
+        print(("ok   " if good else "FAIL ") + "status: fingerprint and profile")
+        ok = ok and good
+        pathlib.Path(d, "doc.pdf").write_bytes(b"%PDF-1.4 x")
+        pathlib.Path(d, "blob.dat").write_bytes(b"a\0b")
+        pathlib.Path(d, "notes.txt").write_text("see " + mil + "\n")
+        subprocess.run(["git", "add", "a.txt", "doc.pdf", "blob.dat", "notes.txt"], cwd=d, check=True, capture_output=True)
+        r = subprocess.run(me + ["--all"], cwd=d, env=env, capture_output=True, text=True)
+        good = r.returncode == 1 and r.stdout.count("unscanned") == 2 and "milhost" in r.stdout and "profile dod" in r.stdout \
+            and mil not in r.stdout
+        print(("ok   " if good else "FAIL ") + "dod --all: a PDF, a binary file and a host block")
+        ok = ok and good
+        pathlib.Path(d, ".pii-guard").write_text("profile: dod\nskip: doc.pdf\nskip: blob.dat\n" + mil + "\n")
+        r = subprocess.run(me + ["--all"], cwd=d, env=env, capture_output=True, text=True)
+        good = r.returncode == 0
+        print(("ok   " if good else "FAIL ") + "dod --all: skip lines and an allowed host clear them")
+        ok = ok and good
+        pathlib.Path(d, ".pii-guard").write_text("# minimum\n")
+        r = subprocess.run(me + ["--all"], cwd=d, env=env, capture_output=True, text=True)
+        good = r.returncode == 0 and "profile minimum" in r.stdout
+        print(("ok   " if good else "FAIL ") + "minimum --all: the same files pass")
+        ok = ok and good
+        idn = ["-c", "user.name=t", "-c", "user.email=1+t" + at + "users.noreply.github" + dot + "com"]
+        subprocess.run(["git", *idn, "commit", "-q", "-m", "files"], cwd=d, check=True, capture_output=True)
+        found, _ = scan_commits(["HEAD"], d, [], set(), dod=True)
+        got = sorted((w.split()[-1], k) for w, _, k, _ in found)
+        good = got == [("blob.dat", "unscanned"), ("doc.pdf", "unscanned"), ("notes.txt", "milhost")]
+        found, _ = scan_commits(["HEAD"], d, [], {"skip: doc.pdf", "skip: blob.dat", mil}, dod=True)
+        good = good and found == [] and scan_commits(["HEAD"], d, [], set())[0] == []
+        print(("ok   " if good else "FAIL ") + f"dod commits: binary and PDF files block; skip clears; minimum passes: {got}")
+        ok = ok and good
+        pathlib.Path(d, "big.txt").write_text("clean line\n" * (MAX_BYTES // 11 + 10))
+        subprocess.run(["git", "add", "big.txt"], cwd=d, check=True, capture_output=True)
+        subprocess.run(["git", *idn, "commit", "-q", "-m", "big"], cwd=d, check=True, capture_output=True)
+        found, _ = scan_commits(["HEAD~1..HEAD"], d, [], set(), dod=True)
+        good = [(w.split()[-1], k) for w, _, k, _ in found] == [("big.txt", "unscanned")] \
+            and scan_commits(["HEAD~1..HEAD"], d, [], {"skip: big.txt"}, dod=True)[0] == []
+        print(("ok   " if good else "FAIL ") + "dod commits: a text file over the size limit blocks; skip clears")
         ok = ok and good
     with tempfile.TemporaryDirectory() as d:
         env = {**os.environ, "GIT_AUTHOR_NAME": "Sam", "GIT_COMMITTER_NAME": "Sam",
@@ -434,8 +611,15 @@ def main():
         return self_test()
     if a.status:
         raw, src = denylist_source()
-        n = len(load_denylist())
-        print(f"denylist: {n} entries from {src}" if src and n else "denylist: none (" + MISSING_HELP + ")")
+        deny = load_denylist()
+        n = len(deny)
+        try:
+            top = git("rev-parse", "--show-toplevel").strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            top = "."
+        print(f"denylist: {n} entries from {src}; fingerprint {fingerprint(deny)}" if src and n
+              else "denylist: none (" + MISSING_HELP + ")")
+        print("profile: " + ("dod" if dod_mode(top) else "minimum"))
         return 0 if n else 1
     if not (a.files or a.all or a.range or a.push):
         ap.error("give --all, --range, --push, --status or files")
@@ -444,8 +628,9 @@ def main():
     except (subprocess.CalledProcessError, FileNotFoundError):
         root = "."
     deny, allow = load_denylist(), load_allow(root, a.allow_from)
-    warn_only = WARN_OPTION in allow
-    allow = {v for v in allow if not v.startswith("denylist:")}
+    dod = DOD_OPTION in allow
+    warn_only = WARN_OPTION in allow and not dod
+    allow = {v for v in allow if not v.startswith(OPTION_PREFIX)}
     revsets = [[a.range]] if a.range else []
     if a.push:
         revsets += push_revs(sys.stdin.read(), root)
@@ -459,15 +644,15 @@ def main():
     found, what = [], []
     if a.all:
         files = git("ls-files", "-z", root=root).split("\0")
-        found += scan_files([f for f in files if f], root, deny, allow)
+        found += scan_files([f for f in files if f], root, deny, allow, dod)
         what.append(f"{len([f for f in files if f])} tracked files")
     if a.files:
         rel = [os.path.relpath(os.path.abspath(f), root) for f in a.files]
-        found += scan_files(rel, root, deny, allow)
+        found += scan_files(rel, root, deny, allow, dod)
         what.append(f"{len(a.files)} file(s)")
     n = 0
     for revs in revsets:
-        f, k = scan_commits(revs, root, deny, allow)
+        f, k = scan_commits(revs, root, deny, allow, dod)
         found += f
         n += k
     if revsets:
@@ -475,7 +660,7 @@ def main():
     skips = sorted(a[5:].strip() for a in allow if a.startswith("skip:"))
     if skips:
         what.append(f"{len(skips)} skip rule(s): {', '.join(skips)}")
-    return report(found, ", ".join(what) or "nothing", deny)
+    return report(found, ", ".join(what) or "nothing", deny, dod)
 
 
 if __name__ == "__main__":
