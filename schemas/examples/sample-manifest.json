@@ -33,6 +33,10 @@
         {
           "dir": "T03",
           "src": "scripts/gov/SAMPLE-T03-verify-r1.ps1"
+        },
+        {
+          "dir": "T04",
+          "src": "scripts/gov/SAMPLE-T04-optional-r1.ps1"
         }
       ],
       "steps": [
@@ -45,6 +49,14 @@
           ],
           "estimate": 2,
           "note": "Reads this computer only."
+        },
+        {
+          "name": "T04 Sample optional r1",
+          "dir": "T04",
+          "file": "SAMPLE-T04-optional-r1.ps1",
+          "default": false,
+          "estimate": 1,
+          "note": "Optional: off unless the user ticks it."
         },
         {
           "name": "T02 Sample import r1",
@@ -109,6 +121,7 @@
           "version": "1.0.0",
           "steps": [
             "T01 Sample check r1",
+            "T04 Sample optional r1",
             "T02 Sample import r1",
             "T03 Sample verify r1"
           ]

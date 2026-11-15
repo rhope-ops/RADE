@@ -731,7 +731,8 @@ function Get-StepDefault([int]$K) {
   $d = [bool]$steps[$K].Default
   if (-not $d -or -not (Test-Deploy)) { return $d }
   $prior = Get-StepPrior
-  $all = $true; foreach ($j in $script:appSteps) { if ($prior[[string]$steps[$j].Name] -ne 'PASSED') { $all = $false } }
+  # Only the steps that are on by default count: an optional step that never ran must not block the repair (review).
+  $all = $true; foreach ($j in $script:appSteps) { if ([bool]$steps[$j].Default -and $prior[[string]$steps[$j].Name] -ne 'PASSED') { $all = $false } }
   if ($all) { return $true }
   return ($prior[[string]$steps[$K].Name] -ne 'PASSED')
 }
@@ -752,7 +753,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   $deploy = Test-Deploy
   $prior = Get-StepPrior   # empty in a test round
   # A step that is off still counts when the record says it PASSED at this version (safe second run).
-  $whole = $true; foreach ($k in $script:appSteps) { if (-not $Selected[$k] -and $prior[[string]$steps[$k].Name] -ne 'PASSED') { $whole = $false } }
+  $whole = $true; foreach ($k in $script:appSteps) { if ([bool]$steps[$k].Default -and -not $Selected[$k] -and $prior[[string]$steps[$k].Name] -ne 'PASSED') { $whole = $false } }   # an optional step (default off) is not needed for "installed"
   $stepRecs = @{}
   $modeLine = ''; if ($deploy) { $modeLine = 'Mode: deploy, ' + (Get-InstalledText $script:app); $summary += $modeLine }
   if ($CheckLines) { $summary += $CheckLines }
@@ -818,9 +819,9 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     $secs = ((Get-Date) - $t0).TotalSeconds
     $state = Get-StepState $r
     if ($state -eq 'NEEDS REVIEW') { $script:roundBad = $true }
-    if ($state -ne 'PASSED') { $whole = $false }   # a skipped step is not installed (review, deploy v1)
+    if ($state -ne 'PASSED' -and [bool]$steps[$k].Default) { $whole = $false }   # a skipped step is not installed (review, deploy v1); an optional step that fails makes the run NEEDS REVIEW
     $made = @($r.Made | Where-Object { $_ }); if ($state -eq 'PASSED') { foreach ($m in @($steps[$k].Makes)) { $made += @{ kind = [string]$m.kind; name = [string]$m.name } } }
-    $stepRecs[[string]$steps[$k].Name] = @{ state = $state; made = $made }
+    if (-not $need) { $stepRecs[[string]$steps[$k].Name] = @{ state = $state; made = $made } }   # a step skipped for a missing dependency keeps its older record
     $line = Get-StepLine $steps[$k] $r $secs
     $summary += $line
     & $speak ('  Result: ' + ($line.Substring($steps[$k].Name.Length + 2)))

@@ -56,7 +56,7 @@ P
 
 # 2. Same version again: the record says it is installed.
 round 2
-grep -q "^Step 1 of 3: T01 Sample check r1" "$t/out.txt" && ok || bad "item 3: with every step done, a run is a repair and every step is on"
+grep -q "^Step 1 of 3: T01 Sample check r1" "$t/out.txt" && ! grep -q "^Step .*T04 Sample optional" "$t/out.txt" && ok || bad "item 3: with every default step done, a run is a repair: every default step is on and the optional step stays off"
 grep -q "^Mode: deploy, version 1.0.0 is installed" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 1.0.0 1.0.0 PASSED" ] && ok || bad "deploy 2: installed text ($(js))"
 
 # Step contract (docs/engine.md): inputs as environment variables, MADE lines and "makes" in the record.
@@ -85,20 +85,19 @@ echo '{ not json' > "$inst"; round 2
 [ -f "$inst.damaged" ] && [ "$(js)" = "rade-installed/1 1 None 1.1.0 NEEDS REVIEW" ] && ok || bad "deploy 5: damaged record ($(js))"
 
 # 6. Item 3: the failed step is fixed; the next run does only that step and the version becomes installed.
-sed -i '/forced by the test/d' "$t/app/scripts/gov/SAMPLE-T01-check-r1.ps1"; build; round 2; round 2 > /dev/null
-round_a=$(js)
+sed -i '/forced by the test/d' "$t/app/scripts/gov/SAMPLE-T01-check-r1.ps1"; build; round 2
 sed -i 's/"version": "1.1.0"/"version": "1.2.0"/' "$t/app/scripts/paste_bundles.json"; echo "Write-Output 'FAIL sample check: forced by the test'" >> "$t/app/scripts/gov/SAMPLE-T01-check-r1.ps1"; build; round 2
 sed -i '/forced by the test/d' "$t/app/scripts/gov/SAMPLE-T01-check-r1.ps1"; build; round 2
-grep -q "^Step 1 of 1: T01 Sample check r1" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 1.2.0 1.2.0 PASSED" ] && ok || { bad "item 3: resume after a failed step ($round_a -> $(js))"; grep "^Step \|Result" "$t/out.txt"; }
+grep -q "^Step 1 of 1: T01 Sample check r1" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 1.2.0 1.2.0 PASSED" ] && ok || { bad "item 3: resume after a failed step ($(js))"; grep "^Step \|Result" "$t/out.txt"; }
 
 # Item 3, automatic first: in a deploy, a script step after a hand step must need it ("after"); else the build fails.
 python3 - "$t" <<'P' && ok || bad "item 3: a deploy with an automatic step after a hand step it does not need must fail the build"
 import json, subprocess, sys, pathlib, shutil
 t = pathlib.Path(sys.argv[1]); shutil.copytree(t / 'app', t / 'order/app')
 p = t / 'order/app/scripts/paste_bundles.json'; m = json.loads(p.read_text())
-del m['bundles'][0]['steps'][2]['after']; p.write_text(json.dumps(m))
+del m['bundles'][0]['steps'][3]['after']; p.write_text(json.dumps(m))
 a = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'order/app')], capture_output=True, text=True)
-m['bundles'][0]['steps'][2]['after'] = ['T09 no such step']; p.write_text(json.dumps(m))
+m['bundles'][0]['steps'][3]['after'] = ['T09 no such step']; p.write_text(json.dumps(m))
 b = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'order/app')], capture_output=True, text=True)
 sys.exit(0 if a.returncode != 0 and 'comes after the hand step' in a.stderr and b.returncode != 0 and 'not an earlier step of this app' in b.stderr else 1)
 P
