@@ -17,7 +17,7 @@ What an application repository must hold so that RADE can test and deploy it. RA
 ## The manifest
 
 - `application` (all required): `name` (shown in the window), `folder` (the app's folder under `OneDrive\RADE`), `prefix` (starts file names and the e-mail subject), `repo` (`owner/name` on GitHub), `home` (the app's page), `own` (file patterns the app owns; clean-up may recycle only these), `knownDirs`.
-- Each bundle (required: `out`, `round`, `title`, `files`, `steps`, `collect`): one round. `files` are written to the computer, `steps` run in order, `collect` names the result files for the e-mail draft. Optional: `fetch`, `cleanup`, `apps`, `release`.
+- Each bundle (required: `out`, `round`, `title`, `files`, `steps`, `collect`): one round. `files` are written to the computer, `steps` run in order, `collect` names the result files for the e-mail draft. Optional: `app`, `fetch`, `cleanup`, `apps`, `release`.
 - Each step (required: `name`, `dir`, `file`): a script step, or `kind: guide` for a step the user does by hand. `needs` names the RADE checks the step depends on.
 - The schema is the authority for every field. Check a manifest with `python3 scripts/check_manifest.py <file>` in a RADE checkout.
 
