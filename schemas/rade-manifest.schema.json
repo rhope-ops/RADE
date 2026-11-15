@@ -352,7 +352,10 @@
               "key": {
                 "type": "string",
                 "pattern": "^[a-z][a-z0-9-]{0,23}$",
-                "description": "Unique in the step; the report line is \"  Answer <key>: <value>\"."
+                "not": {
+                  "pattern": "\n"
+                },
+                "description": "Unique in the step; the report line is \"  Answer <key>: <value>\". No line break (a regex $ also matches before a last line break)."
               },
               "prompt": {
                 "type": "string",
@@ -372,12 +375,13 @@
                 "type": "array",
                 "minItems": 2,
                 "maxItems": 4,
+                "uniqueItems": true,
                 "items": {
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 40
                 },
-                "description": "The words of the buttons of a pick; only a pick has them."
+                "description": "The words of the buttons of a pick, each different; only a pick has them."
               }
             },
             "allOf": [

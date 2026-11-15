@@ -44,6 +44,7 @@ function global:Push-RadeButton([string]$Text) {
 }
 [RadeStub.Driver]::Pump = {
   if (-not $ui -or -not $ui.Form -or $ui.Form.Closed -or -not $ui.View) { return }
+  if (-not $global:RadeT.Quick) { $global:RadeT.Quick = $true; $ui.GuardMs = 0 }   # the test user acts at once, as if it had waited (the guard is tested on the first question)
   $key = [string]$ui.View + '|' + $ui.Sent.Text + '|' + $ui.Kick.Text
   if ($key -eq $global:RadeT.Seen) { return }
   $global:RadeT.Seen = $key
@@ -114,6 +115,11 @@ function global:Push-RadeButton([string]$Text) {
   }
   elseif ($v -eq 'answer') {
     Write-Host ('WIN sent-pt=' + $ui.Sent.Font.SizeInPoints + ' for "' + $ui.Sent.Text + '"')
+    if (-not $global:RadeT.Guard) {   # a click at once after the card changed (the second click of a double-click on Done) is not an answer
+      $global:RadeT.Guard = $true; $ui.GuardMs = 400; $ui.CardAt = Get-Date; $ui.B[0].PerformClick(); $held = ($null -eq $ui.Reply); $ui.GuardMs = 0
+      Write-Host ('WIN guard held=' + $held + ' then=' + $ui.B[0].Text)
+      Write-Host ('WIN break=' + ((& $ui.BreakLong 'abcdefghij' $ui.F.Body 21) -replace "`n", '|') + ' word-bad=' + (& $ui.WordBad 'fixture' 'P0' 'abcdefghij' $ui.F.Body 50) + ' word-ok=' + ($null -eq (& $ui.WordBad 'fixture' 'P0' 'abc def ghi' $ui.F.Body 50)))
+    }
     if ($ui.FieldRow.Shown) { $m = { param($C) $(if ($C.AutoSize) { $C.Margin.Top + $C.PreferredSize.Height / 2.0 } else { $C.Margin.Top + $C.Height / 2.0 }) }; Write-Host ('WIN mid answer label=' + (& $m $ui.FieldL) + ' box=' + (& $m $ui.FieldBox) + ' h=' + $ui.FieldBox.Height) }
     if ($ui.FieldRow.Shown) { Write-Host ('WIN answer-box max=' + $ui.Field.Values['MaxLength'] + ' enter=' + $ui.Form.Values['AcceptButton'].Text + ' focus=' + $ui.Field.Focused); $ui.Field.Text = '  Mail someone@example.com about it  '; $ui.Form.Values['AcceptButton'].PerformClick() }
     elseif ($ui.B[0].Text -eq 'Yes') { Push-RadeButton 'No' } else { $ui.B[1].PerformClick() }

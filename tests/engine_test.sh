@@ -63,12 +63,16 @@ case('script', on_script, "step 'T01 Sample check r1': answers: only a guide ste
 case('pick', no_choices, "'choices' is a required property", "question 'n': a pick needs 2 to 4 choices")
 case('five', five, 'is too long', 'answers: 1 to 4 questions, not 5')
 case('twice', twice, "answers: the key 'run-started' is used twice", "question 2: the key 'run-started' is used twice")
+def newline(st): st[2]['answers'] = [dict(qs[0], key='abc\n')]
+def same(st): st[2]['answers'] = [dict(qs[1], choices=['One', 'One'])]
+case('newline', newline, "should not be valid under {'pattern': '\\n'}", 'question 1: the key must be 1 to 24 lowercase')
+case('same', same, 'has non-unique elements', "question 'flow-count': the choices of a pick must differ")
 P
 
 # ---- sizes and text lengths (docs/window-design.md "Sizes", "Text lengths"; the Administrator, 2026-11-15)
 # Every button is made with a named kind (its size is in $ui.Z), and no other place sets a button's size.
-# (The bottom line's own minimum height, 46, is not a button size: R24.)
-[ "$(grep -o '& \$ui\.Btn [^;)]*' engine/rade_build.py | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep 'MinimumSize = ' engine/rade_build.py | grep -vc '\$ui\.Bottom\.MinimumSize = New-Object System\.Drawing\.Size(0, 46)')" = 2 ] && ok || bad "sizes: a button is made without a kind, or sets its own size"
+# (The bottom line's own minimum height, 46, is not a button size: R24. Only that one expression is left out of the count.)
+[ "$(grep -o '& \$ui\.Btn [^;)]*' engine/rade_build.py | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_build.py | grep -vxc 'MinimumSize = New-Object System\.Drawing\.Size(0, 46)')" = 2 ] && ok || bad "sizes: a button is made without a kind, or sets its own size"
 # The limits in the document are the limits of the build.
 python3 - <<'P' && ok || bad "text lengths: docs/window-design.md and TEXT_LIMITS (engine/rade_build.py) differ"
 import importlib.util, re, pathlib
@@ -113,7 +117,7 @@ has "view=answer light=RADE waits for you kick=STEP 2 OF 3 · QUESTION 1 OF 3 se
 # 1c. A minimized window comes back when RADE needs the person; it has its own taskbar button (Application.Run: no owner).
 # The layout line and the SCALE line at 100 %; the sizes RADE sets after the form has scaled, at 100 % (the same numbers as
 # before the one scale source: tests/window_driver.ps1 "WIN measure").
-has "WIN restored=Normal taskbar=True minbox=True shown-by=Run" "WIN layline=Layout self-check: PASS layout, 0 cards (1020 x 684 at 100 %) ~ SCALE dpiX=96 deviceDpi=n/a autoScale=96x96 font=17 screen=1280x800 work=1280x720 client=1020x684 state=Normal logo=40x40 btn=400x40" \
+has "WIN restored=Normal taskbar=True minbox=True shown-by=Run" "WIN layline=Layout self-check: PASS layout, 0 cards (1020 x 684 at 100 %) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=96x96 font=17 fontPt=10 aware=n/a screen=1280x800 work=1280x720 client=1020x684 state=Normal logo=40x40 btn=400x40" \
   "WIN measure choice h=110 gap=8 plan-x=54" "WIN measure record box=5,4 label=5,6 rows=268" && ok || { bad "window 1c: restore, taskbar, the scale line"; grep "restored=\|layline=" "$t/win.txt" | cut -c1-300; }
 # 1d. Polish after the R24 pictures (docs/window-design.md "Sizes"): the header and the label-box-button rows share one
 # midpoint within 1 px (from margins and sizes; an odd height gives a half pixel; the stand-ins have no layout), a box is as tall as a compact button, gaps of 8; the
@@ -123,6 +127,10 @@ has "WIN restored=Normal taskbar=True minbox=True shown-by=Run" "WIN layline=Lay
 has "WIN mid hand label=18.5 box=19 button=19 box-h=30 button-h=30 gaps=8,8 inner=148/160 tick=0" "WIN mid header logo=20 word=20 app=19.5" "WIN mid answer label=18.5 box=19 h=30" \
   'WIN sent-pt=22 for "Did the flow run start?"' 'WIN sent-pt=22 for "Anything else to report?"' 'WIN sent-pt=13.2 for "How many flows does the import page show?"' \
   "WIN rule aligned=0 misaligned=4 ~ LAYOUT fixture FieldRow FieldBox midpoint: 15.5, the row midpoint is 22 ~ LAYOUT fixture FieldRow FieldB midpoint: 19, the row midpoint is 22 ~ LAYOUT fixture FieldRow heights: box FieldBox 23, button FieldB 30 ~ LAYOUT fixture Sent edge: starts at 126, the card edge is 123 (Kick)" && ok || { bad "window 1d: alignment, question headline, alignment rules"; grep "WIN mid\|sent-pt\|WIN rule" "$t/win.txt" | cut -c1-300; }
+# 1f. Review of b093036: a click within 400 ms of a new card does nothing (a double-click on Done answers no question
+# unseen; Enter clicks the same buttons); a word wider than the line is cut into pieces that fit, and the self-check
+# reports a word of a wrapping label that is wider than the label.
+has "WIN guard held=True then=Yes" "WIN break=abc|def|ghi|j word-bad=LAYOUT fixture P0 text: the word \"abcdefghij\" needs 70, the line is 50 word-ok=True" && ok || { bad "window 1f: click guard, long words"; grep "WIN guard\|WIN break" "$t/win.txt" | cut -c1-300; }
 # 1e. R24 job on b093036: a box's text box fills its frame (frame - 2 x 6) also when the frame's size never changed, and the
 # box is as tall as the compact button measured; a row that wraps is aligned line by line (the check box alone on the
 # second line of the test extras is no defect; on the first line, 39 px low, it is).
@@ -149,7 +157,7 @@ has "view=stopped light=failed kick=STOPPED sent=The install stopped. p=A file t
 # no fonts: text heights, the logo and the buttons made before the form scaled stay at their coded sizes here, and the
 # layout self-check does not run (the Windows job and a round on a work computer measure those).
 scale=150 win 1 done 1 0
-has "WIN measure choice h=120 gap=12 plan-x=81" "WIN measure record box=8,6 label=8,9 " "(1020 x 684 at 150 % (the form auto-scale; the screen dpi says 100 %)) ~ SCALE dpiX=96 deviceDpi=n/a autoScale=144x144 " && ok || { bad "window 5: scale 150 % with a 96 dpi screen"; grep "measure\|layline" "$t/win.txt" | cut -c1-300; }
+has "WIN measure choice h=120 gap=12 plan-x=81" "WIN measure record box=8,6 label=8,9 " "(1020 x 684 at 150 % (the form auto-scale; the screen dpi says 100 %)) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=144x144 " && ok || { bad "window 5: scale 150 % with a 96 dpi screen"; grep "measure\|layline" "$t/win.txt" | cut -c1-300; }
 
 # 0. A skipped step: the run is PASSED but the version is not recorded as installed (review of deploy v1).
 round 2 S; cp "$t/out.txt" "$t/out0.txt"
