@@ -49,7 +49,9 @@ def leaves(p):
 def unsafe_paths(manifest):
     """Every path the engine reads or writes for this manifest that is not a plain path inside the app folder:
     bundle out, files[].src, fetch[].src, steps[].default.paths and application.knownDirs (engine/rade_build.py)."""
-    paths = [d[0] if isinstance(d, list) and d else d for d in manifest['application'].get('knownDirs', [])]
+    paths = []
+    for d in manifest['application'].get('knownDirs', []):
+        paths += list(d) if isinstance(d, list) and len(d) == 2 else [None]   # the folder and its file pattern (the engine globs it)
     for b in manifest['bundles']:
         paths.append(b['out'])
         paths += [f['src'] for f in b.get('files', [])] + [f['src'] for f in b.get('fetch', []) if 'src' in f]
@@ -81,8 +83,8 @@ def read_lock(app_dir, manifest_rel):
         raise LookupError('the lock cannot be read (%s)' % type(e).__name__)
     if not (isinstance(commit, str) and len(commit) == 40 and all(c in '0123456789abcdef' for c in commit)):
         raise LookupError('the lock names no commit id')
-    if engine not in files or any(leaves(f) for f in files):
-        raise LookupError('the lock has a bad file path, or its engine is not one of its files')
+    if engine != 'engine/rade_build.py' or engine not in files or any(leaves(f) for f in files):
+        raise LookupError('the lock has a bad file path, or its engine is not engine/rade_build.py among its files')
     return commit, engine, files
 
 

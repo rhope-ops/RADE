@@ -14,6 +14,8 @@ m = {'application': {'knownDirs': [['scripts/gov', '*.ps1']]},
 assert c.unsafe_paths(m) == [], c.unsafe_paths(m)
 muts = [lambda x: x['application']['knownDirs'].append(['../x', '*']),
         lambda x: x['application']['knownDirs'].append(['/etc', '*']),
+        lambda x: x['application']['knownDirs'].append(['scripts', '../../*']),
+        lambda x: x['application']['knownDirs'].append(['scripts']),
         lambda x: x['bundles'][0].__setitem__('out', '../o'),
         lambda x: x['bundles'][0]['files'].append({'src': '/etc/passwd'}),
         lambda x: x['bundles'][0]['fetch'].append({'src': 'a/../../b'}),
@@ -29,7 +31,7 @@ with tempfile.TemporaryDirectory() as t:
     good = {'commit': 'a' * 40, 'engine': 'engine/rade_build.py', 'files': {'engine/rade_build.py': 'x'}}
     lk.write_text(json.dumps(good))
     assert c.read_lock(t, 'scripts/m.json') == ('a' * 40, 'engine/rade_build.py', ['engine/rade_build.py'])
-    bads = [{**good, 'engine': '../evil.py'}, {**good, 'engine': '/tmp/evil.py'}, {**good, 'engine': 'other.py'},
+    bads = [{**good, 'engine': '../evil.py'}, {**good, 'engine': '/tmp/evil.py'}, {**good, 'engine': 'other.py'}, {**good, 'engine': 'scripts/check.sh', 'files': {'scripts/check.sh': 'x'}},
             {**good, 'files': {'engine/rade_build.py': 'x', '../y': 'z'}}, {**good, 'commit': 'main'}, {'x': 1}]
     for bad in bads:
         lk.write_text(json.dumps(bad))
