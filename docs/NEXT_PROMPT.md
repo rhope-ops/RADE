@@ -16,6 +16,8 @@ Updated: 2026-11-14 by Claude (deploy v1). Keep this file at 40 lines or fewer. 
 4. R21 window notes W1-W10 and the pre-check before Choose (not built): docs/reviews/2026-11-15-r21-window-notes.md. Three proposals (A Refine, B Quiet, C Command) are in that file ("UI pass 3 proposals"); the Administrator has not chosen one (agent REC: B) and gives the build prompt after the current RADE expansion (14 Nov 26, evening). Do not build before that.
 5. Before the first drift run: a one-page report field list for the ISSM (Administrator hands it over).
 
+6. RADE and the app (docs/engine.md, 15 Nov 26): move the base checks from rhope-ops/90-161.Z scripts/build_paste_bundles.py (`BASE_CHECKS`) into the engine; then the maintenance run types (function list not approved yet).
+
 ## Needs the Administrator
 
 - The final Teams channel name (placeholder RHOPE-OPS in the engine, DECISIONS 14 Nov).

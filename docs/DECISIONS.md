@@ -4,6 +4,10 @@ Newest first. Why the kit defaults are what they are: https://github.com/rhope-o
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-15 | RADE and the app: RADE owns the computer and the run; the app owns the product and the site. RADE may know a platform, never an app's objects. Table: docs/engine.md "RADE and the app". | the Administrator | — |
+| 2026-11-15 | Maintenance run types: RADE offers Install, Diagnose, Restore and Uninstall and keeps its record right for each; the app supplies the steps for each. Detail: docs/engine.md "Maintenance run types". Not built. | the Administrator | — |
+| 2026-11-15 | One preflight: RADE's checks. An app keeps a probe flow only for rights a script cannot see (connector data policy, Send As). | the Administrator | — |
+| 2026-11-15 | Updates: RADE compares the installed version with the newest at each run; an app only shows its installed version and does not check by itself. | the Administrator | — |
 | 2026-11-14 | Bundle size limit: 600 KB (614,400 bytes), up from 300 KB. The 300 KB number was an agent guess; its reason "readable for the ISSM" no longer applies and paste time was never measured. The next 90-161.Z round times a paste of 500 KB and 1 MB, and the limit is then set from that. The limit and its test live in rhope-ops/90-161.Z (tests/run.sh). | the Administrator | 300 KB bundle size test (engine row, 2026-11-14) |
 | 2026-11-14 | UI pass 3: (1) colors stay the approved Wing Master Version II values (navy #0B2545, Air Force blue #00539F, yellow #FFD520); (2) an application whose base checks cannot pass is marked FAILED on the Choose screen with the reason and what to do, and cannot be selected. Proposal A, B or C: not decided (agent REC: B); detail: docs/reviews/2026-11-15-r21-window-notes.md "UI pass 3 proposals". | the Administrator | — |
 | 2026-11-14 | Teams channel name for help text: RHOPE-OPS, a placeholder for now (one place: `$helpChannel` in engine/rade_build.py). | the Administrator | — |

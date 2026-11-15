@@ -2,6 +2,26 @@
 
 Status: decided by the Administrator, 2026-11-14 (docs/DECISIONS.md); not all built. The engine is [../engine/rade_build.py](../engine/rade_build.py) (moved from rhope-ops/90-161.Z on 2026-11-14; apps pin it by sha256). Drift check: [drift-check.md](drift-check.md). Input contract: [../schemas/rade-manifest.schema.json](../schemas/rade-manifest.schema.json).
 
+## RADE and the app
+
+Decided by the Administrator, 2026-11-15. RADE owns the computer and the run. The app owns the product and the site. RADE may know a platform (SharePoint, Power Automate, Word, Outlook), never an app's objects (a list, column, flow or setting by name). Test for any line of code or text: would it be the same for a different app? If yes, it is RADE's.
+
+| Subject | RADE | The selected app |
+|---|---|---|
+| Window, screens, bars, log, report | Owns all of it | Supplies its name, summary, step notes and help text |
+| Checks | Runs them; owns the check library | Declares which checks each step needs (`needs`) |
+| Files on the computer | Makes folders, writes and downloads files, verifies sha256, recycles old files | Declares the files and the clean-up patterns |
+| Order and gating | Runs steps in manifest order, applies `after`, blocks on a failed check | The author sets the order and the dependencies |
+| What is created on the site or in Power Automate | Never writes there; its only contact is the read-only rights check | Every list, column, permission, flow and setting, through its step scripts |
+| Steps done by hand | Opens the address, shows the numbered steps, waits for Done or It failed | Writes the guide text; owns what the user imports |
+| Values asked from the user | Asks what the install needs (site address), passes it once (`RADE_SITE`) | Asks its own settings in its own setup screen |
+| Record of the install | Keeps the version, each step's state and the made list | Prints `PASS`, `FAIL` and `MADE` lines; each script is safe to run again |
+| App data (rows, files, backups) | Never reads or writes it | Owns it, including backup and restore content |
+| After the install | Not present; the app works if RADE is deleted | Flows, the Power App, health and its own alerts |
+| Help | Names the Teams channel | Says what to do when one of its steps needs review |
+
+Preflight: RADE's checks are the one preflight; an app keeps a probe flow only for rights a script cannot see (for example the connector data policy, Send As). Updates: RADE compares the installed version with the newest one at each run; an app only shows its installed version.
+
 ## Modes
 
 One engine, three modes per catalog app (`mode` in the manifest): **deploy** (install an app), **test** (a test round; the default) and **drift** (owner only). Test rounds are run by the owner only; other users only deploy (the Administrator, 2026-11-14).
@@ -68,3 +88,7 @@ Newer version: in a deploy RADE reads `rade-release.json` at the root of the app
 Not in v1: environment values in the manifest (the OneDrive folder name and the site prefix stay in the engine: NIPR is the same everywhere, the Administrator, 2026-11-14). Rights are not the same for every user, so each step that needs extra rights keeps a documented fallback.
 
 After the owner's test rounds end, the test branch and its results e-mail (draft, address box, "window displayed correctly" box) are removed from the engine in one change (the Administrator, 2026-11-14).
+
+## Maintenance run types
+
+Decided by the Administrator, 2026-11-15: RADE offers Install, Diagnose, Restore and Uninstall as run types and keeps the record right for each (version, step states, made list); the app supplies the steps for each run type. Not built. The functions each run type needs are under discussion (no list is approved yet).
