@@ -62,14 +62,14 @@ Decided by the Administrator, 2026-11-15. The RADE page picks the app, and each 
 | `rade-checks.json` | Saved checks (a cache). Contract: [../schemas/rade-checks.schema.json](../schemas/rade-checks.schema.json) | Every run of every app | A check runs again |
 | `rade-mail-to.txt` | The results address (test rounds) | A test round | The owner types it again |
 
-- S1. An engine writes only its own app's record file.
+- S1. An engine writes only its own app's record file. A file that holds a whole record with another app's key (two keys gave one file name), or that cannot be read at the moment, is not written and that app is not deployed.
 - S2. A record with a schema number higher than the engine knows is not read and not written, and that app is not deployed: "a newer RADE installed this application: get the newest script from the RADE page".
 - S3. `rade-checks.json` is a cache: nothing goes in it whose loss matters.
 - S4. A record or cache write goes to a temporary file in the same folder, which then replaces the final file in one step.
 - S5. Only a file with the exact name is read: a conflict copy that OneDrive makes is ignored.
 - A change to a record that an older engine cannot read gets the next schema number (S2 then stops the older engine).
 
-Engine-v1 (the engine in the field on 2026-11-15) kept all apps in one file, `rade-installed.json`. No deploy ran with it, so the file is not read or moved. tests/engine_test.sh runs engine-v1 and this engine on one folder ("cross-version"). A test round runs a self-test of the record functions on a scratch folder and prints 4 `PASS shared files` lines: that is the proof on Windows PowerShell 5.1. Not verified on a device: all of this section, and the file replace inside a OneDrive folder.
+Engine-v1 (the engine in the field on 2026-11-15) kept all apps in one file, `rade-installed.json`. No deploy ran with it, so the file is not read or moved. tests/engine_test.sh runs engine-v1 and this engine on one folder ("cross-version"). A test round runs a self-test of the record functions on a scratch folder and prints 4 `PASS shared files` lines: that is the proof on Windows PowerShell 5.1. Not verified on a device: all of this section, and the file replace inside a OneDrive folder. Not tested anywhere: a record that another program holds open (no such lock on the Linux test computer).
 
 ## Modes
 

@@ -311,10 +311,18 @@ rm -f "$inst.damaged"; head -c 150 "$inst" > "$t/cut.json"; cp "$t/cut.json" "$i
 cmp -s "$inst.damaged" "$t/cut.json" && valid schemas/rade-installed.schema.json "$inst" && ok || { bad "shared files: a cut record"; ls "$cfg/installed"; }
 # S2. A record from a newer RADE (a higher schema number): not written, and no step runs.
 cp "$inst" "$t/inst.good"; echo '{ "schema": "rade-installed/3", "key": "SampleApp/Sample app (deploy)", "later": true }' > "$inst"; h0=$(sha "$inst"); round 2
-[ "$(sha "$inst")" = "$h0" ] && grep -q "^Mode: deploy, version 1.2.0 (a newer RADE installed this application: get the newest script from the RADE page)" "$t/out.txt" && grep -q "^STOPPED: a newer RADE installed this application.*No step ran" "$t/out.txt" && ! grep -q "^Step 1 of\|^  Wrote\|^  Written\|^  Downloaded" "$t/out.txt" && [ ! -e "$inst.tmp" ] && ok || { bad "shared files: a record of a newer RADE must stop the deploy and stay as it is"; grep "^Mode\|^STOPPED\|^Step\|record" "$t/out.txt"; }
+[ "$(sha "$inst")" = "$h0" ] && grep -q "^Mode: deploy, version 1.2.0 (a newer RADE installed this application: get the newest script from the RADE page)" "$t/out.txt" && grep -q "^STOPPED: a newer RADE installed this application.*No step ran" "$t/out.txt" && ! grep -q "^Step 1 of\|^  Wrote\|^  Written\|^  Downloaded" "$t/out.txt" && [ -z "$(find "$cfg" -name '*.tmp*')" ] && ok || { bad "shared files: a record of a newer RADE must stop the deploy and stay as it is"; grep "^Mode\|^STOPPED\|^Step\|record" "$t/out.txt"; }
+# S1. Two record keys that give one file name: the file holds a whole record of another app. Not written, no step runs.
+sed 's#"key": *"SampleApp/Sample app (deploy)"#"key": "SampleApp/Another app"#' "$t/inst.good" > "$inst"; h0=$(sha "$inst"); round 2
+grep -q '"key": "SampleApp/Another app"' "$inst" && [ "$(sha "$inst")" = "$h0" ] && grep -q "^STOPPED: the install record file of this application holds the record of another application.*No step ran" "$t/out.txt" && ! grep -q "^Step 1 of" "$t/out.txt" && [ ! -e "$inst.damaged-"* ] && ok || { bad "shared files: a record with another app's key must stay as it is"; grep "^Mode\|^STOPPED\|^Step\|record" "$t/out.txt"; ls "$cfg/installed"; }
+# A second damaged record does not replace the first .damaged copy.
+echo '{ cut' > "$inst"; round 2
+cmp -s "$inst.damaged" "$t/cut.json" && [ "$(ls "$cfg/installed" | grep -c '\.damaged-[0-9]\{8\}-[0-9]\{6\}$')" = 1 ] && ok || { bad "shared files: a second damaged record must keep the first copy"; ls "$cfg/installed"; }
 cp "$t/inst.good" "$inst"
 # Cross-version: the engine in the field (engine-v1) and this engine on one computer. Run this engine, then v1, then this
-# engine: v1 does not change this engine's record, and this engine still uses the saved checks after v1 wrote them.
+# engine. The two keep their records in different files, so the first check shows that v1 really ran a deploy on the same
+# folder and left this engine's file alone; the second can fail: this engine reads the saved checks that v1 wrote.
+# Not tested here: a record that cannot be read while another program holds it (no such lock on Linux).
 v1=ba1b64e1a728c7aea0ab9b4ff53890e7c34c8151   # tag engine-v1: the engine in rhope-ops/90-161.Z scripts/rade.lock.json on 2026-11-15
 git cat-file -e "$v1^{commit}" 2>/dev/null || git fetch -q origin "$v1" 2>/dev/null
 mkdir -p "$t/v1/engine" "$t/v1/assets/logo" "$t/xv/app/scripts"

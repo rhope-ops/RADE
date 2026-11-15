@@ -618,19 +618,33 @@ function Write-FileWhole([string]$Path, [string]$Text) {
 }
 function Get-InstalledFile([string]$Key) { return (Join-Path (Get-RadeConfigFile 'installed') ((Get-ShortHash $Key) + '.json')) }
 function Read-InstalledRaw([string]$Key) {
-  # State: none (no file), ok, damaged (not JSON, or not this app's record) or newer (a higher schema number: S2).
+  # State: none (no file), ok, damaged (not JSON, or no record of this schema), newer (a higher schema number: S2),
+  # foreign (a whole record with another app's key: two keys gave one file name) or unreadable (the file is there but
+  # cannot be read now, for example while another program holds it). Only none, ok and damaged may be written (S1).
   $p = Get-InstalledFile $Key
   if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { return @{ State = 'none'; Path = $p } }
+  $text = $null
+  try { $text = [System.IO.File]::ReadAllText($p) } catch { return @{ State = 'unreadable'; Path = $p } }
   try {
-    $j = [System.IO.File]::ReadAllText($p) | ConvertFrom-Json
+    $j = $text | ConvertFrom-Json
     if ([string]$j.schema -notmatch '^rade-installed/(\d{1,6})$') { return @{ State = 'damaged'; Path = $p } }
     if ([int]$Matches[1] -gt $installedSchema) { return @{ State = 'newer'; Path = $p } }
-    if ([string]$j.key -ne $Key) { return @{ State = 'damaged'; Path = $p } }
+    if ([int]$Matches[1] -lt $installedSchema) { return @{ State = 'damaged'; Path = $p } }
+    if ([string]$j.key -cne $Key) { return @{ State = $(if ([string]$j.key) { 'foreign' } else { 'damaged' }); Path = $p } }
     return @{ State = 'ok'; Path = $p; Json = $j }
   } catch { return @{ State = 'damaged'; Path = $p } }
 }
 function Test-InstalledNewer($A) { return ((Read-InstalledRaw (Get-InstalledKey $A)).State -eq 'newer') }
 $newerRadeText = 'a newer RADE installed this application: get the newest script from the RADE page'
+function Get-InstalledBlock($A) {
+  # '' or why this app's record must not be written, so the app is not deployed (S1, S2).
+  switch ((Read-InstalledRaw (Get-InstalledKey $A)).State) {
+    'newer' { return $newerRadeText }
+    'foreign' { return 'the install record file of this application holds the record of another application (RADE\Config\installed). RADE did not change it: ask for help before you install' }
+    'unreadable' { return 'the install record of this application could not be read (another program may be using the file). Wait a minute, then run again' }
+  }
+  return ''
+}
 function Read-Installed([string]$Key) {
   # This app's record, or $null (no file, a damaged file, or a record from a newer RADE).
   $r = Read-InstalledRaw $Key
@@ -665,8 +679,12 @@ function Save-Installed([string]$State, [bool]$Whole, $StepRecs) {
   try {
     $key = Get-InstalledKey $script:app
     $raw = Read-InstalledRaw $key
-    if ($raw.State -eq 'newer') { return $newerRadeText }   # S2: never write a record of a newer RADE
-    if ($raw.State -eq 'damaged') { Copy-Item -LiteralPath $raw.Path -Destination ($raw.Path + '.damaged') -Force }   # keep what was there before it is replaced
+    $blk = Get-InstalledBlock $script:app; if ($blk) { return $blk }   # S1, S2: never write a record of a newer RADE or of another app, or one that cannot be read
+    if ($raw.State -eq 'damaged') {
+      # Keep what was there before it is replaced; an older .damaged copy is kept too.
+      $keep = $raw.Path + '.damaged'; if (Test-Path -LiteralPath $keep) { $keep += '-' + (Get-Date).ToString('yyyyMMdd-HHmmss', [System.Globalization.CultureInfo]::InvariantCulture) }
+      Copy-Item -LiteralPath $raw.Path -Destination $keep -Force
+    }
     $old = Read-Installed $key
     $run = [ordered]@{ version = [string]$script:app.Version; build = [string]$buildId; round = [string]$round; at = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }
     $inst = $null; if ($old) { $inst = $old.installed }
@@ -805,7 +823,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   $base = Move-ToRade $speak
   & $speak ('Working folder: ' + (ConvertTo-Masked $base))
   if ($modeLine) { & $speak $modeLine; $nv = Get-NewerVersionText; if ($nv) { & $speak $nv; $summary += $nv } }
-  if ($deploy -and (Test-InstalledNewer $script:app)) { throw ($newerRadeText + '. No step ran') }   # S2, before any file is written
+  if ($deploy) { $blk = Get-InstalledBlock $script:app; if ($blk) { throw ($blk + '. No step ran') } }   # S1, S2: before any step
   if ($script:noWindowWhy) { & $speak ('Note: no window could open, so the round runs in text mode. Reason: ' + (ConvertTo-Masked $script:noWindowWhy)) }
   if (Test-WordOpen) { & $speak 'Note: Word is open. Renders use Word: save your documents and close Word if a step stops.' }
   & $speak ''
