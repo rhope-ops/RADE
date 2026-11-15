@@ -1,117 +1,59 @@
 # RADE window design
 
-Status: the one place for the RADE window's UI decisions (the Administrator, 2026-11-14: consolidate them). Each row cites the decision; the decision text itself stays in its decisions table. Built in [engine/rade_build.py](../engine/rade_build.py) (WinForms, Windows PowerShell 5.1). "Built" = in the R18 bundle; "Not built" = decided, waiting for its build.
+Status: the one place for the RADE window's UI decisions (the Administrator, 2026-11-14: consolidate them). The window is the "One thing" design (the Administrator, 2026-11-14, [DECISIONS.md](DECISIONS.md)); it replaced layout B, layout A, layout P1 and the UI pass 3 proposals. Built in [engine/rade_build.py](../engine/rade_build.py) (WinForms drawn in code, Windows PowerShell 5.1); the window code is the part from `function Get-AppFacts` to the text-mode block. **Not verified on a device**: its logic runs in [tests/engine_test.sh](../tests/engine_test.sh) (section "window") against stand-in types; what it looks like is checked first by a round on a work computer.
 
-Sources: RADE = [docs/DECISIONS.md](DECISIONS.md); Z = [rhope-ops/90-161.Z docs/DECISIONS.md](https://github.com/rhope-ops/90-161.Z/blob/main/docs/DECISIONS.md).
+Mockups: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "Redesign: One thing (14 Nov)". How the three concepts compared: [reviews/2026-11-14-window-redesign-proposals.md](reviews/2026-11-14-window-redesign-proposals.md). Sources of older rows: RADE = [docs/DECISIONS.md](DECISIONS.md); Z = [rhope-ops/90-161.Z docs/DECISIONS.md](https://github.com/rhope-ops/90-161.Z/blob/main/docs/DECISIONS.md).
 
-## Screens and flow
+## The idea
 
-| Rule | State | Source |
-|---|---|---|
-| One window, three screens: 1 Choose the application, 2 Check, 3 Deploy. The catalog is embedded in the paste (no fetch). | Built | Z 2026-11-14 ("Deployer window: Choose app > Check > Deploy") |
-| Base checks before Choose; app checks (each step's `needs`) after an app is chosen. | Partly built (all checks run after Choose) | RADE 2026-11-14 (engine), [engine.md](engine.md) |
-| No deploy unless every check passes: FAILED or NOT RUN blocks, WARNING does not; no "deploy anyway". | Built | Z 2026-11-14 |
-| Saved checks in RADE\Config\rade-checks.json: fast checks fresh, slow checks reused 7 days. | Built as 7 days for all; split not built | RADE 2026-11-14 (saved checks) |
-| Enter (or Run) starts the run; the window uses the Windows profile folder and asks for no DODID. | Built | Z 2026-11-13 (R03, R04 rows) |
-| Exit button; it asks first only while a step runs. | Built | Z 2026-11-14 (R17 window row) |
-| First screen stays minimal. No application is selected when the window opens; Next stays off until one is chosen. | Built (engine, PR); first check is the next round's "Window: OK" | Z 2026-11-14 (plain-English sweep); RADE 2026-11-14 (UI pass P1) |
+The window shows one statement or one question at a time (a "card"). It is quiet when things are fine and speaks only when it needs the person. Everything else is one key away, in the Record (F2). Each answer moves on: there is no Next / Back row and no Exit button.
 
-## Layout and brand
+## Fixed parts
 
-| Rule | State | Source |
-|---|---|---|
-| Layout B (side rail, 220 px, navy #0B2545 to Air Force blue #00539F, AF yellow #FFD520 edge), Wing Master Version II colors; preview https://claude.ai/artifact/SU4ghsQWy7EBzaLiZWNEMy. The rail holds the three screens as steps (this one in yellow bold) and the round and build. | Built (R18); first gov-device check is R18 "Window: OK" | RADE 2026-11-14 |
-| Logo K (PNG in WinForms, 56 px from logo-K-128.png) replaces the yellow "RADE" circle; the word RADE to its right on the logo's midpoint; tagline "Test and deploy apps for your organization" below (DoD removed: the Administrator, 2026-11-14); one left edge. Master: [assets/logo](../assets/logo), yellow edge 2.8 units (K+2). | Built (R18) | RADE 2026-11-14 (logo K, layout B, edge rows) |
-| Main area: layout A "Quiet table" (proposals https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld). White main area; title (Segoe UI Semibold 15, navy) and one gray line on each screen; borderless grids with row lines only and bold gray headers; Check column = small gray group over the name; Result and step Status = tinted chips with the word; counts as "12 passed", zero counts hidden; check buttons secondary (white, gray border), "Run checks again" a link; one hairline over Next, Back and Exit. Deploy: "Writes to" and the path, then both bars right under it, then the steps (Run, Step, Status); log visible with Hide log. Choose: the same style; the last round under the title. Layout P1 changes Choose, Check and Deploy as in "Layout P1" below. | Built (engine 2026-11-14, R20 bundle); P1 built (engine, PR) | RADE 2026-11-14 (layout A row); RADE 2026-11-14 (UI pass P1) |
-| Darker status-chip text in RADE only; 90-161.Z gets its own scheme later. | Not built | RADE 2026-11-14 |
-| Primary buttons (Next, Run) Air Force blue with white bold text, navy on hover, light gray (#E9ECF0, text 6.3:1) when disabled. Next, Back, Exit and Run are one size: 132 x 34 px, whatever the text. Run takes Next's place at the bottom right. | Built (R18; engine fix 2026-11-14); Run place: P1 | layout B preview; the Administrator, 2026-11-14 (size, lighter disabled); RADE 2026-11-14 (UI pass P1) |
-| 1020 x 760 at 100 % scaling (minimum 680 x 540), Segoe UI 10, DPI scaling; rows in table layouts, no fixed positions. | Built | Z 2026-11-14; engine comments (R02) |
-| Every check and step row is two lines high, so nothing moves while checks and steps run. | Built | Z 2026-11-14 (R17 window row) |
-| No scroll and no clipping at 100 % and at 150 % on 1920 x 1080 (main body 680 and 536 px): pixel budget in "Layout P1". | Built (engine, PR); not verified on a device | RADE 2026-11-14 (UI pass P1) |
-
-## Progress bars
-
-| Rule | State | Source |
-|---|---|---|
-| Two bars: overall (weighted by expected seconds, with time left; Air Force blue) and this step ("PROGRESS n/m" lines, else time; green #2E8540, the Administrator 2026-11-14). Overall 8 px, step 4 px, rounded ends, no border, track #EEF1F5; one line over each bar (what on the left, how far on the right). | Built (colors R18); sizes and labels: P1 | Z 2026-11-14; RADE 2026-11-14 (UI pass P1) |
-| RADE draws its own bars (smooth fill, one soft light band); still when Windows animations are off. | Built | Z 2026-11-14 (R17 window row) |
-| Overall bar Air Force blue; step bar green #2E8540 (the Administrator, 2026-11-14). Both bars fill left to right; the back-and-forth block for a step with unknown progress is gone (the step bar follows time against the step's weight, at most 90 %). | Built (R18) | Z 2026-11-14 (R18 window row); the Administrator, 2026-11-14 |
-| Neither bar moves back inside a run (overall) or a step (step bar). | Built | engine (R18) |
-
-## Text and status
-
-| Rule | State | Source |
-|---|---|---|
-| All text a user sees is plain, simple English; the log reads professionally. | Built | Z 2026-11-14 (two rows) |
-| Check text: sentence case, screen names in "quotes", reported values in [brackets]. | Built | Z 2026-11-14 (no-deploy row) |
-| Details lines: one fact per line, no full stop, never joined with ";"; a reused check reads "Last check: DD-MM-YY" over what it found. Column headers bold. Window (P1): the group is a heading over its checks; a check row shows its details on one line, the facts joined by a middle dot, cut with "..." to fit; the full lines are in the tooltip, the log and the e-mail. | Built (engine 2026-11-14, R20 bundle); window line: P1 | RADE 2026-11-14 (text and grid row); RADE 2026-11-14 (UI pass P1) |
-| All text (window, guides, step notes, flow inputs) is professional and polished; formatted where the control allows. | Partly built (engine texts 2026-11-14; step notes and flow inputs per round) | RADE 2026-11-14 (text and grid row) |
-| Results: PASSED, PASSED (fallback), WARNING, FAILED, NOT RUN; one meaning per color and the word always shown (dark green, saddle brown, dark red, dim gray; running navy; all at least 4.5:1). | Built except PASSED (fallback) | RADE 2026-11-14 (engine); engine Get-CheckColor |
-| Each problem has a "What to do" line under it (window P1: after the finding on the row's second line). | Built | Z 2026-11-13 (R06 row) |
-| A check that needs you (sign-in, look and answer) has its link in its own row: "Sign in and check site rights", "Check Power Automate". "Run checks again" is a link right of the counts. | Built (engine, PR) | RADE 2026-11-14 (UI pass P1) |
-| One hint left of the nav buttons on every screen says what to do next, colored by meaning (gray, or the result colors). | Built (engine, PR) | RADE 2026-11-14 (UI pass P1) |
-| Short names in the window for 3 checks: "The SharePoint tool (PnP 1.12.0) is installed", "You can change the site (CAC sign-in)", "You can import flows (you look)"; the log and the e-mail keep the full names. | Built (engine, PR) | RADE 2026-11-14 (UI pass P1) |
-| The real path is on screen in bold ("Writes to"); before Run the window lists every file as New, Replace or Recycle. | Built | Z 2026-11-13 (R06 row) |
-
-## Steps done by hand
-
-| Rule | State | Source |
-|---|---|---|
-| A by-hand step (for example a flow import) opens a normal, minimizable window at the right edge of the screen (never always-on-top), with numbered steps, Open in browser (address editable, remembered in Config) and the file path on the clipboard. | Built | Z 2026-11-14 (R13, R14) |
-| Buttons: Done / It failed / Skip. It failed takes the error text from a box; the e-mail line reads FAILED with the masked text. A skipped step expects no result files. | Built (R18) | Z 2026-11-14 (R18 window row); the Administrator, 2026-11-14 |
-| A check done by eye has Yes / No / Not now. | Built | engine (Power Automate check) |
-
-## Results e-mail
-
-| Rule | State | Source |
-|---|---|---|
-| One results folder Rounds\<round> of plain files (no zip); an Outlook draft with subject PASSED or NEEDS REVIEW, never sent; fallback: folder plus clipboard. | Built | Z 2026-11-13 (usability bar, R05, R06) |
-| "Window: OK" box: the user says whether anything overlapped or was cut off. | Built | Z 2026-11-13 (R06 row) |
-| Not built yet (after R17): bundle size in the summary, hash-pinned engine (version + sha256 in the window), JSON results block. | Not built | RADE 2026-11-14 (engine work row) |
-
-## Layout P1 (the Administrator, 2026-11-14)
-
-Mockups: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld (row P1). Audit and the rejected P2: [reviews/2026-11-14-window-ui-audit.md](reviews/2026-11-14-window-ui-audit.md). Sizes are at 100 % scaling (logical px); the window scales them.
-
-| Part | Spec |
+| Part | Rule |
 |---|---|
-| Type scale | Word mark 20 pt bold; title Segoe UI Semibold 15 pt navy; rail steps 11 pt (this screen bold); body 10 pt; labels, buttons, headers, step names 10 pt bold; secondary lines, hints, group headings 9 pt (headings bold, capitals); chips 8.5 pt bold; log Consolas 9 pt |
-| Colors | Navy #0B2545; AF blue #00539F (primary, links, selection, overall bar); yellow #FFD520 (rail edge, this screen); green #2E8540 (step bar); ink #1B2430 (15.6:1); secondary text #5A6573 (5.9:1); control edge #7A8794 (3.7:1); card edge #C9D2DC; hairlines #E3E8EE, row lines #EEF1F4; bar track #EEF1F5; selected card #F3F8FD; newer-round box #8B1A1A with white text (9.3:1); result colors: Get-CheckColor in the engine |
-| Spacing | Scale 4, 8, 12, 16, 24. Main area: 24 left and right, 20 top (the logo's top), 14 bottom; 12 between blocks; 24 between the check columns; 16 between check groups |
-| Buttons | All 34 high. Primary and nav 132 wide; secondary (white, #7A8794 edge) at least 132; links AF blue, bold, underlined, 28 high (24 in a check row) |
-| Rail steps | 22 px circle: this screen = yellow fill, navy number, yellow bold name; done = white ring, check mark, white name; later = mist ring and number |
-| Choose | One card per app, 72 high + 8 gap, radius 6: radio (18 px; ring #5A6573, selected AF blue with a dot), name bold, facts and summary 9 pt; selected = 2 px AF blue edge + #F3F8FD. Nothing selected on open; Next off until a choice |
-| Check | Site address row (label and box on one line). Two columns: the first group (Local) left, the others right. Group heading 24; row 40 (name / details), 64 with a link; chip column 84 at the right. Counts and "Run checks again" under the columns |
-| Deploy | "Writes to" + path (10 pt, path bold); overall line + 8 px bar; step line (9 pt) + 4 px bar; steps grid, rows 44; log (hides itself below 80 px; "Show log"); "Results to"; "Window" check box with the result buttons, which show at DONE |
-| Nav | Hairline, then the hint (9 pt, up to 2 lines) on the left and Exit, Back, Next or Run on the right; Tab reaches the primary first |
+| Light | 6 px on the top edge. Yellow #FFD520 = RADE waits for you. Dark red #8B1A1A = FAILED, NEEDS REVIEW or STOPPED. Else off. The words on the card always say it too |
+| Logo line | Logo K 40 px, the word RADE 15 pt bold navy, then the chosen application and version in gray. The tagline "Test and deploy apps for your organization" is in the title bar |
+| Card | One block: its left edge at 12 % of the width, 40 % of the spare height above it. Parts, top to bottom, each shown only when the card names it: a line in capitals, the sentence (Segoe UI Semibold 22 pt, navy), up to 4 paragraphs (11 pt), the choices, the numbered lines of a hand step, the step line with its bar and the last log line, a box with its label, the error box, two file links, a note, the help line (13.5 pt), up to 5 buttons, a last gray line, the owner's test extras |
+| Bottom line | "Record (F2)" and "Back" as links on the left; on the right one gray text (progress, time, state) |
+| Bottom edge | The bar for all steps, 4 px, Air Force blue; green when a run passed. The bar for this step is 200 x 4 px beside the step name |
+| Size | 1020 x 760 at 100 % scaling; at most 95 % of the screen; no minimum size (a scaled minimum could be taller than a small screen). Text wraps at the card's width; nothing scrolls except the log box and a long step list in the Record |
 
-Pixel budget (main body: 680 at 100 %; 536 at 150 % on 1920 x 1080, where the window is cut to 95 % of the screen):
+Colors, one meaning each: navy #0B2545 = text and focus; Air Force blue #00539F = the action and progress; yellow = your turn; dark red = failed and the one destructive action (Uninstall); green #2E8540 = passed; gray #5A6573 = second lines. Buttons: primary blue with white bold text; others white with a gray edge (#7A8794); not available = gray (#E9ECF0, text #555555). Links are blue, bold and underlined. Focus is a 2 px navy ring around the control that has it, also after a mouse click.
 
-| Screen | Height | Spare at 100 % / 150 % |
+## Cards
+
+| Card | Shows | Engine function or data |
 |---|---|---|
-| Choose | 57 + 80 per app | 2 apps: 463 / 319; no scroll up to 7 / 5 apps |
-| Check (14 checks, site row) | 57 + 40 + 384 (Local: 24 + 9 x 40) + 40 = 521; right column 24 + 120 + 16 + 24 + 2 x 64 = 312 | 159 / 15 |
-| Deploy | 60 + 83 + 26 + 44 per step + log (80 or more) + 40 + 46 | 3 steps: 213 / 69; the log hides above 7 / 4 steps |
+| Boot | "Checking this computer." The Local checks of every application in the paste run once (base checks before Choose). Their PASSED results are used for the chosen application, except Word, disk and write, which run again | `$ui.RunBase`, `Get-CheckToRun`, `Invoke-Check` |
+| Choose | One button per application: name, version, summary; steps, time and checks; for a deploy what is installed; a notice when a newer version is on the app page. Keys 1 to 9 choose. None is chosen for you. An application with a FAILED Local check is not a button: a red cross, the reason, what to do, and FAILED; "Check this computer again" then shows. A newer round (test) is a paragraph; the last round is the gray line | `$apps`, `Get-AppFacts`, `Get-InstalledText`, `Get-NewerVersion`, `Get-NewerRound`, `Get-LastRoundText`, `Select-App` |
+| Maintenance | For an application that is installed: name, installed version and date; "Update to <version>" or "Repair" (it goes on to the checks); Diagnose, Back up, Restore and Uninstall are shown off (no engine function yet), Uninstall set apart. Mockups for Restore and Uninstall are on the canvas | `Read-Installed`; [engine.md "Maintenance run types"](engine.md#maintenance-run-types) |
+| Site | "Which site does the application go to?" with one box, when a check needs the address and none is saved | `Get-SiteUrl`, `Test-SiteUrl`, `Save-SiteUrl` |
+| Checking | The name of the check that runs; the bottom bar counts the checks | `Invoke-Check`, `Save-CheckCache` |
+| A check failed (red) | The first FAILED check: its name, what was found, "What to do"; "Run checks again" (a sign-in or look-and-answer check that failed has its own button instead); "Change the site address" when the application has a site | `Get-CheckDef`, `$script:checkResults` |
+| A check needs you (yellow) | The first check that waits: "Sign in and check site rights" (CAC) or "Check Power Automate" (you look and answer: Yes / No / Not now on a hand card) | `Invoke-Check` |
+| Ready | "Ready to install <name> <version>." Then: where RADE writes and how many files are new, replaced or recycled; how many steps, the time, which step needs you; Word open; the first warning. "Install" (a test round: "Run") and "Steps and files" (the Record, where each step has its box). OneDrive not found is its own red card | `Get-RoundPlan`, `Get-StepDefault`, `Get-StepWeight` |
+| Run | "Installing <name>." with "Step k of n", the step name, its bar and count, the last log line, and when RADE needs you next. Bottom right: percent, and the time left only when earlier runs give one (R21 W6). A step that asks for a folder shows the Windows folder dialog before the run | `Invoke-Round`, `Get-Progress` |
+| Your turn (yellow) | A step done by hand: its lines, the address (it can be changed; saved in Config), "Open in browser", the file path on the clipboard with "Copy file path" and "Show file in folder", then Done / It failed / Skip. "It failed" asks for the error text on its own card. Enter never answers this card | `Invoke-GuideStep`, `$script:guideUi` |
+| Done | A green tick and "<name> <version> is installed." Nothing was sent; what the installs made, by kind. Close, "What it made" (the Record), "Open results folder", "Copy summary". A test round also shows the owner's test extras (results address, "Make e-mail draft", "The window displayed correctly") | `Get-InstalledText`, `Read-Installed`, `Save-RoundDraft` |
+| Needs review (red) | The first step that needs review with its help line; that passed steps stay done; the help line with the Teams channel; "Copy summary" first | `Get-HelpLine`, the summary from `Invoke-Round` |
+| Stopped (red) | Why the run stopped and what to do; the help line; "Copy the log", "Try again", Close | `Get-WhatToDo` |
 
-Below the budget (1280 x 800 at 150 %: body about 364) the check columns scroll and the log hides; nothing is cut off. Not verified on a device until the next round's "Window: OK" line.
+The Record (F2, or its links): three columns. Checks by group (Local, Network, Access) with the result word; under a check that did not pass, what was found and what to do; under a reused check, "Last check: DD-MM-YY" and, on the next row, what it found. This column scrolls only when it is taller than the window (Page Down, Page Up). Steps, each with a box ("needs you", "asks for a folder", its note or result; a Clean-up row when the bundle has one); the boxes can be changed only from Ready. One text box: each file as New, Replace or Recycle, the list of what the application's installs made, and the log.
 
-## For a GUI redesign: what the window must do
+## Rules that stay
 
-Status: written 2026-11-14, when the engine became function complete for deploy v1 (docs/engine.md). A redesign may change every look and layout rule above with the Administrator's approval; it must keep each function below. The window code is the part of engine/rade_build.py after `Add-Type -AssemblyName System.Windows.Forms`; the functions before it hold the behavior and are tested in text mode (tests/engine_test.sh). The same steps must still run as text when no window can open.
+| Rule | Source |
+|---|---|
+| No deploy unless every check passes: FAILED or NOT RUN blocks, WARNING does not; no "deploy anyway" | Z 2026-11-14 |
+| Saved checks in RADE\Config\rade-checks.json; which are reused: [engine.md "Results"](engine.md#results) | RADE 2026-11-14 |
+| The window uses the Windows profile folder and asks for no DODID | Z 2026-11-13 |
+| The window's X asks first only while a step runs; closing stops the running step | Z 2026-11-14 (R17); no Exit button: RADE 2026-11-14 |
+| All text a user sees is plain, simple English; screen names in "quotes", reported values in [brackets]; each problem has a "What to do" line | Z 2026-11-13, 2026-11-14 |
+| Results: PASSED, PASSED (fallback), WARNING, FAILED, NOT RUN; the word is always shown, never color alone | RADE 2026-11-14 |
+| RADE draws its own bars; no bar moves back inside a run or a step; still when Windows animations are off | Z 2026-11-14 (R17, R18) |
+| A deploy sends nothing; a test round makes an Outlook draft that is never sent (fallback: folder and clipboard) | [engine.md "Deploy v1"](engine.md#deploy-v1); Z 2026-11-13 |
+| No tooltips; AccessibleName on every control; every control by keyboard (Tab, Enter, F2 = Record, Page Down and Page Up = the Record's check list, 1 to 9 = a choice; Esc = close the Record, else Back, and on Choose, which has no Back, it exits) | R21 W9; RADE 2026-11-14 |
+| The same steps run as text when no window can open | Z 2026-11-13 |
 
-| Screen | The window must | Engine function or data |
-|---|---|---|
-| Choose | List the apps in the paste: name, summary, steps, time, checks; for a deploy the version and what is installed. One choice, none pre-selected. | `$apps`, `Get-AppText`, `Get-InstalledText`, `Select-App` |
-| Choose | Show the last run and a newer round (test) or a newer version (deploy). | `Get-LastRoundText`, `Get-NewerRound`, `Get-NewerVersionText` (not in the window yet) |
-| Check | Run the chosen app's checks, in groups Local, Network and Access; show state, one details line and the fix; reuse a saved check; "Run checks again". | `$script:appChecks`, `Get-CheckToRun`, `Invoke-Check`, `Save-CheckCache`, `Get-CheckSummary` |
-| Check | Take the site address when a check needs it; save it. | `Get-SiteUrl`, `Test-SiteUrl`, `Save-SiteUrl` |
-| Check | Ask the look-and-answer checks (Power Automate). Block Deploy while a check is FAILED or NOT RUN. | `Get-CheckBlock` |
-| Deploy | Show where RADE writes, each file as New, Replace or Recycle, and a warning when OneDrive is not found. | `Get-RoundPlan` |
-| Deploy | List the steps with a tick each: "(needs you)", "(asks for a folder)", the note; in a deploy a step that is done starts off. A Clean-up row when the bundle has one. | `$steps`, `Get-StepDefault`, `Get-StepPrior` |
-| Deploy | Run; two progress values (all, this step) with time left; a live log; ask for a folder for an `ask` step. | `Invoke-Round`, `Get-Progress`, `Get-ProgressText` |
-| Deploy | For a hand step: numbered lines, open the address, show the file, Done / It failed (with an error box) / Skip. | `Show-GuideDialog`, `Invoke-GuideStep` |
-| Deploy, at the end (test) | The results address box, "window displayed correctly" box, Make e-mail draft, Copy summary, Open results folder. Goes away with the test branch. | `Save-RoundDraft`, `Get-MailTo` |
-| Deploy, at the end (deploy) | Say that nothing was sent; Open results folder, Copy summary; the list of what the app's installs made; the help line. | `Get-MadeLine` (in the log and report; no screen yet), `Get-HelpLine` |
-| All | Exit asks first only while a step runs; closing stops the running step. | `$script:closing`, `$script:child` |
-
-Decided but not in the window: base checks when the window opens, with an app that cannot pass marked on Choose ("Screens and flow"); the R21 notes W1-W10 (docs/reviews/2026-11-15-r21-window-notes.md).
+Not in the window yet: bundle size in the summary, engine version and sha256 in the window, a JSON results block (RADE 2026-11-14, engine work row); the Maintenance actions other than Install.
