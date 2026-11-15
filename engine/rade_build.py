@@ -2058,13 +2058,18 @@ if ($gui) {
       }
       $ids = @($script:appChecks); $warn = @($ids | Where-Object { $script:checkResults[$_].State -eq 'WARNING' })
       $w1 = ''; if ($warn.Count) { $w1 = 'Warning: ' + (Get-CheckDef $warn[0]).Name + '. ' + $script:checkResults[$warn[0]].Detail + $(if ($warn.Count -gt 1) { ' (and ' + ($warn.Count - 1) + ' more in the Record)' } else { '' }) }
+      # The saved site, by name, before anything is written (the Administrator, 2026-11-15): the steps use it with no
+      # question, so a wrong site must show here. On the card only: a card's text never enters the log or the report.
+      $siteName = ''; if ((& $ui.NeedSite) -and (Test-SiteUrl (Get-SiteUrl (Get-BasePath)))) { $siteName = ([string](Get-SiteUrl (Get-BasePath))).TrimEnd('/') -replace '^.*/', '' }
       & $ui.SetCard @{ View = 'ready'
         Kicker = $(if ($warn.Count) { [string]($ids.Count - $warn.Count) + ' checks passed' + $dot + $warn.Count + $(if ($warn.Count -eq 1) { ' warning' } else { ' warnings' }) } else { 'All ' + $ids.Count + ' checks passed' })
         Sentence = $(if ($dep) { 'Ready to install ' + $script:app.Name + ' ' + $script:app.Version + '.' } else { 'Ready to run round ' + $round + '.' })
         P = @(('Writes to ' + $plan.Shown + ': ' + $new + ' new files, ' + $rep + ' replaced, ' + $rec + ' moved to the Recycle Bin.'),
           ([string]$n + $(if ($n -eq 1) { ' step' } else { ' steps' }) + ', about ' + [math]::Max(1, [int][math]::Round($est / 60)) + ' min. ' + $you + $(if ($done) { ' ' + $done + ' already done for this version and off.' } else { '' })),
           $(if (Test-WordOpen) { 'Word is open. Save your documents and close Word before you start.' } else { '' }), $w1)
-        Buttons = @(@{ Text = $(if ($dep) { 'Install' } else { 'Run' }); Kind = $(if ($n -or ($cleanup.Count -and $ui.Clean)) { 'primary' } else { 'off' }); Act = { & $ui.Run } }, @{ Text = 'Steps and files'; Act = { $ui.Edit = $true; & $ui.VRecord } })
+        Buttons = @(@{ Text = $(if ($dep) { 'Install' } else { 'Run' }); Kind = $(if ($n -or ($cleanup.Count -and $ui.Clean)) { 'primary' } else { 'off' }); Act = { & $ui.Run } }, @{ Text = 'Steps and files'; Act = { $ui.Edit = $true; & $ui.VRecord } },
+          $(if ($siteName) { @{ Text = 'Change the site address'; Act = { & $ui.VSite } } } else { $null }))
+        Foot = $(if ($siteName) { 'Site: ' + $siteName } else { '' })
         Back = { & $ui.VChoose } } }
 
     # ---- The run. Invoke-Round calls back: a log line ($ui.Say), a tick ($ui.Tick), a step that starts ($ui.OnStatus) and
