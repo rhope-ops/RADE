@@ -96,7 +96,7 @@ function global:Push-RadeButton([string]$Text) {
       foreach ($c in $all) { $t = $c.GetType().Name; if ($t -in 'Button', 'TextBox', 'CheckBox' -and -not ($c.Parent -and $c.Parent.Events.ContainsKey('Paint'))) { Write-Host ('WIN NOFOCUS ' + $t + ' "' + $c.Text + '" in the Record') } }
       $boxes = @($ui.RecSteps.Controls | Where-Object { $_ -is [System.Windows.Forms.CheckBox] })
       $lab = @($ui.RecSteps.Controls | Where-Object { $_ -is [System.Windows.Forms.Label] })[0]
-      Write-Host ('WIN measure record box=' + $boxes[0].Margin.Left + ',' + $boxes[0].Margin.Top + ' label=' + $lab.Margin.Left + ',' + $lab.Margin.Bottom + ' rows=' + (& $ui.RecPlan 400).Tall + ' one-line=' + (-not $boxes[0].AutoSize -and $boxes[0].AutoEllipsis))
+      Write-Host ('WIN measure record box=' + $boxes[0].Margin.Left + ',' + $boxes[0].Margin.Top + ' label=' + $lab.Margin.Left + ',' + $lab.Margin.Bottom + ' rows=' + (& $ui.RecPlan 400).Tall + ' one-line=' + (-not $boxes[0].AutoSize -and -not $boxes[0].Values.ContainsKey('AutoEllipsis')))
       Write-Host ('WIN record on=' + $ui.RecOn + ' rows=' + @($ui.RecData).Count + ' boxes=' + $boxes.Count + ' enabled=' + $boxes[0].Enabled + ' text=' + [bool]($ui.RecText.Text -match 'Files this round saves') + ' name=' + [bool]($ui.RecChecks.Values['AccessibleName'] -match 'PASSED') + ' reused=' + (@($ui.RecData | Where-Object { $_.Name -match '^PowerShell is version' })[0].More -join ' / ') + ' tall=' + ($ui.RecChecks.Height -gt 100))
       $ui.Form.Key('Next'); Write-Host ('WIN paged=' + $ui.RecScroll.Values['AutoScrollPosition'].Y); $ui.Form.Key('Prior')   # the names Windows gives Page Down and Page Up
       foreach ($b in $boxes) { if ([int]$b.Tag -lt 0) { $b.Checked = $false } }
@@ -116,8 +116,15 @@ function global:Push-RadeButton([string]$Text) {
   elseif ($v -eq 'answer') {
     Write-Host ('WIN sent-pt=' + $ui.Sent.Font.SizeInPoints + ' for "' + $ui.Sent.Text + '"')
     if (-not $global:RadeT.Guard) {   # a click at once after the card changed (the second click of a double-click on Done) is not an answer
-      $global:RadeT.Guard = $true; $ui.GuardMs = 400; $ui.CardAt = Get-Date; $ui.B[0].PerformClick(); $held = ($null -eq $ui.Reply); $ui.GuardMs = 0
+      $global:RadeT.Guard = $true; $ui.GuardMs = 400; $ui.CardAt = $ui.Clock.Elapsed.TotalMilliseconds; $ui.B[0].PerformClick(); $held = ($null -eq $ui.Reply)
       Write-Host ('WIN guard held=' + $held + ' then=' + $ui.B[0].Text)
+      $now = $ui.Clock.Elapsed.TotalMilliseconds; $ui.CardAt = $now + 1000000; $fut = [bool](& $ui.Settled); $ui.CardAt = $now - 401; $aft = [bool](& $ui.Settled); $ui.CardAt = $ui.Clock.Elapsed.TotalMilliseconds - 100; $win = [bool](& $ui.Settled); $ui.GuardMs = 0
+      Write-Host ('WIN clock future=' + $fut + ' after400=' + $aft + ' within=' + $win)
+      $sp = 'ab' + [char]::ConvertFromUtf32(0x1F600) + 'cd'; $pcs = @((& $ui.BreakLong $sp $ui.F.Body 21) -split "`n")
+      Write-Host ('WIN surrogate pieces=' + $pcs.Count + ' whole=' + (-not @($pcs | Where-Object { $_ -match '[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]' }).Count -and ($pcs -join '') -eq $sp))
+      $pl = New-Object System.Windows.Forms.Label; & $ui.Shorten $pl 'abcdefghij' 50
+      $ui.P[1].MaximumSize = New-Object System.Drawing.Size(50, 0); $ui.P[1].Text = 'see abcdefghijkl'; & $ui.BreakAll; $bb = ($ui.P[1].Text -eq "see abcdefg`nhijkl"); $ui.P[1].Text = ''
+      Write-Host ('WIN shorten=' + $pl.Text + ' body-break=' + $bb)
       Write-Host ('WIN break=' + ((& $ui.BreakLong 'abcdefghij' $ui.F.Body 21) -replace "`n", '|') + ' word-bad=' + (& $ui.WordBad 'fixture' 'P0' 'abcdefghij' $ui.F.Body 50) + ' word-ok=' + ($null -eq (& $ui.WordBad 'fixture' 'P0' 'abc def ghi' $ui.F.Body 50)))
     }
     if ($ui.FieldRow.Shown) { $m = { param($C) $(if ($C.AutoSize) { $C.Margin.Top + $C.PreferredSize.Height / 2.0 } else { $C.Margin.Top + $C.Height / 2.0 }) }; Write-Host ('WIN mid answer label=' + (& $m $ui.FieldL) + ' box=' + (& $m $ui.FieldBox) + ' h=' + $ui.FieldBox.Height) }

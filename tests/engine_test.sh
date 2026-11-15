@@ -67,6 +67,8 @@ def newline(st): st[2]['answers'] = [dict(qs[0], key='abc\n')]
 def same(st): st[2]['answers'] = [dict(qs[1], choices=['One', 'One'])]
 case('newline', newline, "should not be valid under {'pattern': '\\n'}", 'question 1: the key must be 1 to 24 lowercase')
 case('same', same, 'has non-unique elements', "question 'flow-count': the choices of a pick must differ")
+def case_sp(st): st[2]['answers'] = [dict(qs[1], choices=['One', 'one ', 'Two'])]
+case('case', case_sp, "answers: the choices of 'flow-count' must differ (case and spaces ignored)", "question 'flow-count': the choices of a pick must differ (case and spaces ignored)")
 P
 
 # ---- sizes and text lengths (docs/window-design.md "Sizes", "Text lengths"; the Administrator, 2026-11-15)
@@ -130,8 +132,14 @@ has "WIN mid hand label=18.5 box=19 button=19 box-h=30 button-h=30 gaps=8,8 inne
 # 1f. Review of b093036: a click within 400 ms of a new card does nothing (a double-click on Done answers no question
 # unseen; Enter clicks the same buttons); a word wider than the line is cut into pieces that fit, and the self-check
 # reports a word of a wrapping label that is wider than the label; the Record's step boxes are one line that ends with
-# "..." (R24 job: "(needs you)" was cut to "(ne").
+# "..." (R24 job: "(needs you)" was cut to "(ne"), shortened by RADE (no AutoEllipsis: no tooltip); the click guard runs on a
+# monotonic clock (a reference "in the future", as after the clock stepped back, never blocks; 401 ms after a card the click
+# is taken, 100 ms after it is not); long words break by text element (a surrogate pair stays whole) and in body lines too.
 has "WIN measure record box=5,4 label=5,6 rows=268 one-line=True" "WIN guard held=True then=Yes" "WIN break=abc|def|ghi|j word-bad=LAYOUT fixture P0 text: the word \"abcdefghij\" needs 70, the line is 50 word-ok=True" && ok || { bad "window 1f: click guard, long words"; grep "WIN guard\|WIN break" "$t/win.txt" | cut -c1-300; }
+# 1g. Second review of 9d71b28: the click guard on a monotonic clock, breaks by text element and in body lines, and a step
+# name shortened by RADE with "..." (no AutoEllipsis).
+has "WIN clock future=True after400=True within=False" && ok || { bad "window 1g: monotonic click guard"; grep "WIN clock" "$t/win.txt"; }
+has "WIN surrogate pieces=3 whole=True" "WIN shorten=abcd... body-break=True" && ok || { bad "window 1g: text elements, body lines, shortened step names"; grep "WIN surrogate\|WIN shorten" "$t/win.txt"; }
 # 1e. R24 job on b093036: a box's text box fills its frame (frame - 2 x 6) also when the frame's size never changed, and the
 # box is as tall as the compact button measured; a row that wraps is aligned line by line (the check box alone on the
 # second line of the test extras is no defect; on the first line, 39 px low, it is).

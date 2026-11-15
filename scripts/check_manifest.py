@@ -36,6 +36,11 @@ def refs(m):
             keys = [a['key'] for a in qs if isinstance(a, dict) and isinstance(a.get('key'), str)]
             for k in sorted({k for k in keys if keys.count(k) > 1}):
                 out.append('%s: step %r: answers: the key %r is used twice' % (r, s['name'], k))
+            for a in qs:
+                cs = a.get('choices') if isinstance(a, dict) and isinstance(a.get('choices'), list) else []
+                low = [c.strip().lower() for c in cs if isinstance(c, str)]
+                if len(set(low)) != len(low):
+                    out.append('%s: step %r: answers: the choices of %r must differ (case and spaces ignored)' % (r, s['name'], a.get('key')))
         for a in b.get('apps', []):
             for n in a['steps']:
                 if n not in names:
