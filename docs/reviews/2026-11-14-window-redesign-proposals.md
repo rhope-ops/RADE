@@ -1,8 +1,8 @@
 # Window redesign: three concepts (14 Nov 26)
 
-Status: **concept 1 (One thing) goes forward as the mockup** (the Administrator, 14 Nov 26); no build is approved. Agent proposals for the Administrator's request of 14 Nov 26 (a redesign from zero, not a refinement of layout P1 or of UI pass 3 A, B, C). The contract is [window-design.md "For a GUI redesign"](../window-design.md#for-a-gui-redesign-what-the-window-must-do). The engine is not changed.
+Status: **concept 1 (One thing) is approved for the build** (the Administrator, 14 Nov 26). Concepts 2 and 3 are not built; their mockups were removed from the canvas the same day, and this file keeps their description. Agent proposals for the Administrator's request of 14 Nov 26 (a redesign from zero, not a refinement of layout P1 or of UI pass 3 A, B, C). The contract is [window-design.md "For a GUI redesign"](../window-design.md#for-a-gui-redesign-what-the-window-must-do). The engine is not changed.
 
-Mockups: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "Redesign: 3 concepts (14 Nov)", 28 artboards at 1020 x 760. Each row has two notes: thesis and cost, and where each contract function lives.
+Mockups: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "Redesign: One thing (14 Nov)", 12 artboards at 1020 x 760, with notes on the thesis, the cost and where each contract function lives.
 
 ## The three
 
@@ -30,7 +30,7 @@ Same in all three (agent choices, not decided): no Exit button (Esc or the windo
 
 Decided by the Administrator, 14 Nov 26 ([DECISIONS.md](../DECISIONS.md)): FAILED and NEEDS REVIEW are dark red #8B1A1A, so yellow means "your turn" only; the redesign has no Exit button. Concept 1 is the one to mock up further; its logo is 40 px and the word RADE 15 pt (was 24 px and 10.5 pt).
 
-Maintenance: one artboard for each concept shows the screen of [engine.md "Maintenance run types"](../engine.md#maintenance-run-types) (the five buttons are decided, 14 Nov 26; the function lists are an agent recommendation) after Diagnose, with no backup yet: Back up is the primary button, Restore and Uninstall are off, Uninstall is set apart. Concept 1 also shows Restore (the source, then the dry run with counts and the confirm button) and Uninstall (the button is off until the typed name matches; a backup runs first). The Uninstall button is blue: dark red means FAILED only. "Back" and "Copy summary" stay; "Exit" follows the decision above.
+Maintenance: one artboard for each concept shows the screen of [engine.md "Maintenance run types"](../engine.md#maintenance-run-types) (the five buttons are decided, 14 Nov 26; the function lists are an agent recommendation) after Diagnose, with no backup yet: Back up is the primary button, Restore and Uninstall are off, Uninstall is set apart. Concept 1 also shows Restore (the source, then the dry run with counts and the confirm button) and Uninstall (the button is off until the typed name matches; a backup runs first). The Uninstall button is dark red (the Administrator, 14 Nov 26): dark red means FAILED, NEEDS REVIEW and the one destructive action. "Back" and "Copy summary" stay; "Exit" follows the decision above.
 
 ## Measured
 
@@ -55,6 +55,6 @@ By hand: the focus ring is 2 px navy on white (15.6:1) or white on navy (15.6:1)
 - 3: the lamp outlines are about 2.1:1 (computed; decorative; the mark and the label carry the state). A label and its word together must stay below about 22 characters. At 150 % the Choose panel holds 4 applications.
 - 3: it shares the navy ground with the earlier C. The layout is different, but it is the nearest of the three to prior art.
 
-## Recommendation (agent, not a decision)
+## Recommendation (agent; the Administrator chose concept 1)
 
 **REC: 1 One thing.** Reasons: it is the direct form of "quiet when fine, one question at a time"; when a run fails, the cause, the fix and the channel name are the only text on screen; it has the smallest code (about 30 KB less than today) and no manifest change. Confidence: medium. The main cost is the hidden overview; if the Administrator wants the run visible at all times, 2 Ledger is the better choice. 3 has the strongest "issued equipment" look and the highest cost and risk.
