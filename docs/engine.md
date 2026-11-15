@@ -22,9 +22,9 @@ Decided by the Administrator, 2026-11-14. RADE owns the computer and the run. Th
 
 Hard rule (the Administrator, 2026-11-14): users cannot write data across the DoD365 boundary through any of the Administrator's apps, RADE included. Inside DoD365 (the site, the user's OneDrive) RADE may read and write. The first version of the two rows above said RADE never writes to the site or touches app data; that was agent wording and is replaced.
 
-No reconnaissance (the Administrator, 2026-11-14; cannot be changed): nothing like network reconnaissance may occur, in RADE or in any app. RADE and a step contact only the fixed hosts the engine or the manifest names, the one site the user gave, and the user's own flows and app; they never search for or list hosts, ports, sites, tenants, accounts or groups beyond those.
+No reconnaissance (the Administrator, 2026-11-14; cannot be changed): RADE and every app do nothing that is malicious in nature or could be misconstrued as such. Never: finding or pinging hosts on the network, port checks, or working out network or logical boundaries by probing. Not reconnaissance: reading SharePoint and Power Platform data with the user's own account, including to record what that account can do so an app can be deployed.
 
-Environment (the Administrator, 2026-11-14): what works on the owner's NIPR computer works on every NIPR computer, PnP.PowerShell included; the owner's account has no special flag. Windows PowerShell 5.1 is the least that is always there: all engine and step code runs on it, and tests run on it.
+Environment (the Administrator, 2026-11-14): what works on the owner's NIPR computer works on every NIPR computer, PnP.PowerShell included; the owner's account has no special flag. Windows PowerShell 5.1 is the least that is always there: all engine and step code runs on it. The work-computer rounds are the 5.1 test; the cloud tests stay on PowerShell 7, and a 5.1 fault is fixed when a round finds it.
 
 Preflight: RADE's checks are the one preflight; an app keeps a probe flow only for rights a script cannot see (for example the connector data policy, Send As). Updates: RADE compares the installed version with the newest one at each run; an app only shows its installed version.
 
@@ -97,4 +97,22 @@ After the owner's test rounds end, the test branch and its results e-mail (draft
 
 ## Maintenance run types
 
-Decided by the Administrator, 2026-11-14: RADE offers Install, Diagnose, Restore and Uninstall as run types and keeps the record right for each (version, step states, made list); the app supplies the steps for each run type. Not built. The functions each run type needs are under discussion (no list is approved yet).
+Decided by the Administrator, 2026-11-14: RADE offers Install, Diagnose, Restore and Uninstall as run types and keeps the record right for each (version, step states, made list); the app supplies what each needs. Not built.
+
+Everything below is an agent recommendation (2026-11-14), not approved.
+
+Screen: title "Maintenance", shown for an app that is installed. Five action buttons:
+
+| Button | Does | Writes | Asks first |
+|---|---|---|---|
+| Install (reads "Update to <version>" or "Repair" by state) | Adds what is missing, updates flows and app, keeps data | Site, Power Automate (hand steps), the record | No |
+| Diagnose | Read-only checks; each finding names its fix | A report on the computer | No |
+| Back up | Saves every app list as JSON plus a CSV copy | The backup folder | No |
+| Restore | Puts rows back: Recycle Bin first, else a backup the user picks | Site rows | Yes, after a dry run with counts |
+| Uninstall | Backs up, then removes all that the made list names | Site, Power Automate (hand steps), the record | Yes: the user types the app name |
+
+Diagnose functions: D1 installed record against the newest version; D2 schema compare (lists, columns, types, choices, indexes, views, list settings); D3 permission compare; D4 required settings rows; D5 empty required lookups and item counts against the 5,000 view threshold; D6 flow health from rows the flows write; D7 backup age and counts; D8 hand checks (co-owner, sharing, connections).
+
+Restore functions: R1 Recycle Bin restore; R2 pause flows before, resume after; R3 fresh backup before any write; R4 dry run with counts; R5 load in dependency order and remap lookup IDs; R6 resolve Person fields, report missing accounts; R7 verify, then clear the pause. Version 1: an empty list, or missing rows only; no overwrite of rows.
+
+What an app supplies: one schema file; a settings list with standard keys (app version, schema version, flows paused, test mode); a health list and a heartbeat step in each flow; the backup folder.
