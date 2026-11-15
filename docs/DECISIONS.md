@@ -4,6 +4,7 @@ Newest first. Why the kit defaults are what they are: https://github.com/rhope-o
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-15 | UI pass 3: (1) colors stay the approved Wing Master Version II values (navy #0B2545, Air Force blue #00539F, yellow #FFD520); (2) an application whose base checks cannot pass is marked FAILED on the Choose screen with the reason and what to do, and cannot be selected. Proposal A, B or C: not decided (agent REC: B); detail: docs/reviews/2026-11-15-r21-window-notes.md "UI pass 3 proposals". | the Administrator | — |
 | 2026-11-14 | Teams channel name for help text: RHOPE-OPS, a placeholder for now (one place: `$helpChannel` in engine/rade_build.py). | the Administrator | — |
 | 2026-11-14 | Deploy payload: the paste carries the engine and the scripts; large data files (flow zips, templates) download from a tagged release and are checked by sha256. Reason: the 90-161.Z payload files are about 628 KB (about 860 KB as text) against the 300 KB paste limit. | the Administrator | — |
 | 2026-11-14 | Order: the step contract (docs/engine.md "Step contract") comes before the safe second run and the undo list. | the Administrator | — |

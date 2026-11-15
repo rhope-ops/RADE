@@ -18,3 +18,19 @@ Source: the Administrator's notes after 90-161.Z round R21 (engine pinned at eb5
 ## Related question from the same notes
 
 - **Pre-check before an app is selectable** (the Administrator's idea): decided 14 Nov 26 (docs/DECISIONS.md "base checks before Choose, app checks after"; docs/engine.md "Check stages" 1: "An app whose checks cannot pass is marked on the Choose screen"). **Not built**: docs/window-design.md says "Partly built (all checks run after Choose)". It belongs in the same pass or the one after it: run the base checks when the window opens, then mark or disable an app card whose needs cannot pass, with the reason on the card.
+
+## UI pass 3 proposals (15 Nov 26)
+
+Mockups: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "15 Nov: UI pass 3" (15 artboards, 1020 x 760: Choose, Check, Deploy running, Deploy done, by-hand step panel and parts, for each proposal). Status: **not chosen** (the Administrator, 15 Nov 26: no preference yet; the build waits for the Administrator's prompt). Decided the same day: [DECISIONS.md](../DECISIONS.md) 2026-11-15. All three build W1-W10 and the pre-check before Choose.
+
+| | A Refine | B Quiet (agent REC) | C Command |
+|---|---|---|---|
+| Shell | 220 px rail, flat navy, yellow edge, step text as in R18 | Rail, flat navy, no edge; a yellow tick marks this screen | No rail: a 56 px navy band; navy window |
+| Check rows | Two lines, tinted chip | One line (30 px), mark + word; one "Needs you" list holds the finding, what to do and the button | As B (28 px); the title is the status |
+| Deploy | "58 %" block as option B (W7), 8 px blue and 4 px green bars | One number, one 6 px bar; the step bar is in the running row | As B, yellow bar on navy |
+| Decisions it changes | Rail gradient only | Two-line rows, chips, two labelled bars and the green step bar, yellow rail edge | Those of B, plus the side rail, the white main area and the blue primary button |
+| Check height at 150 % (body 536; C 480) | 521 | About 503 with 4 items in "Needs you" | About 473 with 4 items |
+| Risk | A long finding is cut with "..." and has no tooltip | A fifth "Needs you" item scrolls the list | WinForms has no dark theme: scroll bars, system dialogs and check box glyphs stay light unless RADE draws them |
+| Engine work (agent estimate, low confidence) | Small | Medium | Large |
+
+Measured on the mockups in Chromium at 1020 x 760 (15 Nov 26; not on a device, fonts differ from Segoe UI): 0 clipped texts, 0 parts outside the window, 0 targets under 24 x 24 px, lowest text contrast 5.55:1 (A, B) and 7.58:1 (C). The heights above are arithmetic, not measured on a device.
