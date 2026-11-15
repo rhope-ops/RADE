@@ -45,6 +45,8 @@ DoD checks (only with `profile: dod`):
     dodid      10 digits next to a DoD ID keyword (the list: DODID below)
     unscanned  a file the guard cannot read: a SKIP_SUFFIX type, a binary file (Office files too) or one over
                MAX_BYTES. It blocks unless a `skip: <path or glob>` line names it.
+Known limits of the DoD checks: the scanner reads one line at a time, so a keyword on one line and its number on
+the next pass; a binary file that enters only through a merge resolution is found by --all, not by the commit scan.
 Matches are printed masked (names and secrets as a length only), so CI logs do not repeat them. Exit 1 when anything is found.
 Standard library only. Needs git (except for FILE mode).
 """
@@ -83,14 +85,16 @@ SECRET = [re.compile(r) for r in (
 )]
 # DoD tier (`profile: dod`). The marks are split in the source so this file does not flag itself.
 MILHOST = re.compile(
-    r"(?i)(?<![A-Za-z0-9.@-])(?:(?:[a-z0-9-]+\.)+mil(?![A-Za-z0-9-]|\.[A-Za-z0-9])"   # any host under the military domain
+    r"(?i)(?<![A-Za-z0-9-])(?:(?:[a-z0-9-]+\.)+mil(?![A-Za-z0-9-]|\.[A-Za-z0-9])"   # any host under the military domain
     r"|(?:[a-z0-9-]+\.)*sharepoint-mil\.us\b|dod\.teams\.microsoft\.us\b)")          # DoD cloud tenant hosts
 MARKING = [re.compile(r) for r in (
-    r"\bCUI/" r"/", r"^\s*CU" r"I\s*$", r"(?i)\bcontrolled\s+unclassified\s+" r"information\b",
+    r"\bCUI/" r"/", r"^[^A-Za-z0-9]*CU" r"I[^A-Za-z0-9]*$", r"(?i)\bcontrolled\s+unclassified\s+" r"information\b",
+    r"^[^A-Za-z0-9]*(?:TOP SEC" r"RET|SEC" r"RET|CONFID" r"ENTIAL)[^A-Za-z0-9]*$",   # a banner alone on its line
     r"\bFO" r"UO\b", r"(?i)\bfor\s+official\s+use\s+" r"only\b", r"\bNOF" r"ORN\b",
     r"\b(?:SECRET|CONFIDENTIAL|UNCLASSIFIED)/" r"/",
 )]
-DODID = re.compile(r"(?i)\b(?:DOD[ -]?ID|EDIPI|CAC)\b\D{0,20}?(\d{10})\b")
+DODID = [re.compile(r"(?i)\b(?:DOD[ -]?ID|EDIPI|CAC)\b\D{0,20}?(\d{10})\b"),       # keyword, then the number
+         re.compile(r"(?i)(?<!\d)(\d{10})\b\D{0,20}?\b(?:DOD[ -]?ID|EDIPI|CAC)\b")]  # the number, then the keyword
 ALLOWED_EMAIL = re.compile(
     r"(?i)(@users\.noreply\.github\.com$|^(no-?reply)@|@example\.(com|org|net)$|\.(example|invalid|test|localhost)$)")
 SKIP_SUFFIX = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf", ".zip", ".gz", ".woff", ".woff2", ".ttf")
@@ -209,8 +213,11 @@ def scan_text(text, where, deny, allow, dod=False):
         hits += [("id", m.group()) for m in SSN.finditer(line)]
         hits += [("id", m.group(1)) for m in SSN_KW.finditer(line)]
         if dod:
-            hits += [("milhost", m.group()) for m in MILHOST.finditer(line)]
-            hits += [("dodid", m.group(1)) for m in DODID.finditer(line)]
+            mails = [m.span() for m in EMAIL.finditer(line)]  # the host of a mail address is part of that finding
+            hits += [("milhost", m.group()) for m in MILHOST.finditer(line)
+                     if not any(a <= m.start() and m.end() <= b for a, b in mails)]
+            for rx in DODID:
+                hits += [("dodid", m.group(1)) for m in rx.finditer(line)]
             for rx in MARKING:
                 hits += [("marking", m.group().strip()) for m in rx.finditer(line)]
         if name_re:
@@ -272,11 +279,19 @@ def scan_commits(revs, root, deny, allow, dod=False):
         if dod:  # numstat marks a binary file with "-"; the patch below has no added lines for it
             stat = git("-c", "core.quotepath=off", "show", "--format=", "--numstat", "-z", "--no-renames",
                        "--diff-filter=AM", sha, root=root)
+            sizes = {}
+            for rec in filter(None, git("ls-tree", "-r", "-l", "-z", sha, root=root).split("\0")):
+                info, _, name = rec.partition("\t")
+                size = info.split()[-1]
+                if size.isdigit():
+                    sizes[name] = int(size)
             for rec in filter(None, stat.split("\0")):
                 parts = rec.split("\t", 2)
                 if len(parts) != 3 or skipped(parts[2], allow):
                     continue
-                if parts[2].lower().endswith(SKIP_SUFFIX):
+                if sizes.get(parts[2], 0) > MAX_BYTES:
+                    found.append((f"commit {short} {parts[2]}", "+", "unscanned", f"larger than {MAX_BYTES} bytes"))
+                elif parts[2].lower().endswith(SKIP_SUFFIX):
                     found.append((f"commit {short} {parts[2]}", "+", "unscanned", "file type is not scanned"))
                 elif parts[0] == "-":
                     found.append((f"commit {short} {parts[2]}", "+", "unscanned", "binary file"))
@@ -398,6 +413,9 @@ def self_test():
                         ("cloud tenant host", "x" + dot + "sharepoint-mi" + "l" + dot + "us/sites/y"),
                         ("cloud meeting host", "dod" + dot + "teams" + dot + "microsoft" + dot + "us")):
         expect("dod milhost: " + label, text, ["milhost"], dod=True)
+    for label, text in (("wildcard", "*" + dot + "unit" + dot + "mi" + "l"), ("leading dot", "domain=" + dot + "unit" + dot + "mi" + "l"),
+                        ("handle", at + "unit" + dot + "mi" + "l team")):
+        expect("dod milhost: " + label, text, ["milhost"], dod=True)
     expect("minimum tier: host not checked", "see " + mil, [])
     expect("dod: mail address is one finding, kind email", "ann" + at + "unit" + dot + "mi" + "l", ["email"], dod=True)
     expect("dod: not a host: other domain after it", "x" + dot + "mi" + "l" + dot + "example" + dot + "org", [], dod=True)
@@ -409,11 +427,16 @@ def self_test():
                         ("old mark", "UNCLASSIFIED/" + "/FO" + "UO"), ("old mark, long form", "For Official Use " + "Only"),
                         ("dissemination", "NOF" + "ORN"), ("classification banner", "TOP SECRET/" + "/SI")):
         expect("dod marking: " + label, text, ["marking"], dod=True)
+    for label, text in (("in brackets", "(CU" + "I)"), ("bold", "**CU" + "I**"), ("heading", "# CU" + "I"),
+                        ("bare banner", "TOP SEC" + "RET"), ("bare banner, one word", "  SEC" + "RET  ")):
+        expect("dod marking: " + label, text, ["marking"], dod=True)
+    expect("dod: the word in a sentence, upper case, is not a banner", "THE SEC" + "RET IS OUT", [], dod=True)
     expect("minimum tier: marks not checked", "CU" + "I//SP-PRVCY", [])
     expect("dod: the acronym inside a sentence is not a mark", "the CU" + "I program office", [], dod=True)
     expect("dod: the word secret alone is not a mark", "a secret in the settings", [], dod=True)
     expect("dod id: keyword and 10 digits", "DoD ID: 12345" + "67890", ["dodid"], dod=True)
     expect("dod id: EDIPI", "EDIPI 12345" + "67890", ["dodid"], dod=True)
+    expect("dod id: number, then keyword", "12345" + "67890 (DoD ID)", ["dodid"], dod=True)
     expect("dod: 10 digits with no keyword", "ts 17312" + "34567", [], dod=True)
     expect("minimum tier: DoD ID not checked", "EDIPI 12345" + "67890", [])
     good = mask("milhost", mil) == f"<{len(mil)} chars>" and mask("dodid", "12345" + "67890") == "********90"
@@ -508,6 +531,14 @@ def self_test():
         found, _ = scan_commits(["HEAD"], d, [], {"skip: doc.pdf", "skip: blob.dat", mil}, dod=True)
         good = good and found == [] and scan_commits(["HEAD"], d, [], set())[0] == []
         print(("ok   " if good else "FAIL ") + f"dod commits: binary and PDF files block; skip clears; minimum passes: {got}")
+        ok = ok and good
+        pathlib.Path(d, "big.txt").write_text("clean line\n" * (MAX_BYTES // 11 + 10))
+        subprocess.run(["git", "add", "big.txt"], cwd=d, check=True, capture_output=True)
+        subprocess.run(["git", *idn, "commit", "-q", "-m", "big"], cwd=d, check=True, capture_output=True)
+        found, _ = scan_commits(["HEAD~1..HEAD"], d, [], set(), dod=True)
+        good = [(w.split()[-1], k) for w, _, k, _ in found] == [("big.txt", "unscanned")] \
+            and scan_commits(["HEAD~1..HEAD"], d, [], {"skip: big.txt"}, dod=True)[0] == []
+        print(("ok   " if good else "FAIL ") + "dod commits: a text file over the size limit blocks; skip clears")
         ok = ok and good
     with tempfile.TemporaryDirectory() as d:
         env = {**os.environ, "GIT_AUTHOR_NAME": "Sam", "GIT_COMMITTER_NAME": "Sam",
