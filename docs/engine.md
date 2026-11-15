@@ -1,6 +1,6 @@
 # RADE engine requirements
 
-Status: decided by the Administrator, 2026-11-14 (docs/DECISIONS.md); not all built. The engine is [../engine/rade_build.py](../engine/rade_build.py) (moved from rhope-ops/90-161.Z on 2026-11-14; apps pin it by sha256). Drift check: [drift-check.md](drift-check.md). Input contract: [../schemas/rade-manifest.schema.json](../schemas/rade-manifest.schema.json).
+Status: decided by the Administrator, 2026-11-14 (docs/DECISIONS.md); not all built. The engine is [../engine/rade_build.py](../engine/rade_build.py) (moved from rhope-ops/90-161.Z on 2026-11-14; apps fetch it by commit: "How an app gets the engine"). Drift check: [drift-check.md](drift-check.md). Input contract: [../schemas/rade-manifest.schema.json](../schemas/rade-manifest.schema.json).
 
 ## RADE and the app
 
@@ -28,6 +28,15 @@ Environment (the Administrator, 2026-11-14): what works on the owner's NIPR comp
 
 Preflight: RADE's checks are the one preflight; an app keeps a probe flow only for rights a script cannot see (for example the connector data policy, Send As). Updates: RADE compares the installed version with the newest one at each run; an app only shows its installed version.
 
+## How an app gets the engine
+
+The Administrator, 2026-11-15. An app repo builds alone: it needs no RADE checkout.
+
+- The app keeps a lock file that names a RADE commit and every file the engine reads at that commit, each with its SHA-256. Today the engine reads 2 files: `engine/rade_build.py` and `assets/logo/logo-K-128.png`. Find the list with a trace of the engine's file opens (Python `sys.addaudithook`, event `open`), not with a search: a new engine can read a new file.
+- The app's build downloads those files from `raw.githubusercontent.com/rhope-ops/RADE/<commit>/<path>`, checks each SHA-256, and runs the engine with `--app-root`. A commit never changes, so the same lock always gives the same bundle.
+- The app owns its lock. A RADE session never edits an app repo: it reports the new commit, and a session of the app changes the lock, rebuilds and tests. Rollback = the app keeps its old lock.
+- First app and working example: rhope-ops/90-161.Z `scripts/rade.lock.json`, `scripts/build_paste_bundles.py`, docs/dev-setup.md "RADE engine".
+
 ## Guardrails
 
 Decided by the Administrator, 2026-11-14. Each one stops an honest mistake; none is a security control.
@@ -47,7 +56,7 @@ One engine, three modes per catalog app (`mode` in the manifest): **deploy** (in
 
 ## Check stages
 
-1. **Base checks** when the window opens, before Choose: can RADE work on this computer at all (today: `BASE_CHECKS` in rhope-ops/90-161.Z scripts/build_paste_bundles.py). An app whose checks cannot pass is marked on the Choose screen.
+1. **Base checks** when the window opens, before Choose: can RADE work on this computer at all (`BASE_CHECKS` in the engine). An app whose checks cannot pass is marked on the Choose screen.
 2. **App checks** after an app is chosen: each step's `needs` (for example site-rights, flow-guide, pnp).
 3. **Drift**: every run compares the check values with the saved baseline; the drift check app forces every check.
 
