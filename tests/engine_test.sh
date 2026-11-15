@@ -129,8 +129,9 @@ has "WIN mid hand label=18.5 box=19 button=19 box-h=30 button-h=30 gaps=8,8 inne
   "WIN rule aligned=0 misaligned=4 ~ LAYOUT fixture FieldRow FieldBox midpoint: 15.5, the row midpoint is 22 ~ LAYOUT fixture FieldRow FieldB midpoint: 19, the row midpoint is 22 ~ LAYOUT fixture FieldRow heights: box FieldBox 23, button FieldB 30 ~ LAYOUT fixture Sent edge: starts at 126, the card edge is 123 (Kick)" && ok || { bad "window 1d: alignment, question headline, alignment rules"; grep "WIN mid\|sent-pt\|WIN rule" "$t/win.txt" | cut -c1-300; }
 # 1f. Review of b093036: a click within 400 ms of a new card does nothing (a double-click on Done answers no question
 # unseen; Enter clicks the same buttons); a word wider than the line is cut into pieces that fit, and the self-check
-# reports a word of a wrapping label that is wider than the label.
-has "WIN guard held=True then=Yes" "WIN break=abc|def|ghi|j word-bad=LAYOUT fixture P0 text: the word \"abcdefghij\" needs 70, the line is 50 word-ok=True" && ok || { bad "window 1f: click guard, long words"; grep "WIN guard\|WIN break" "$t/win.txt" | cut -c1-300; }
+# reports a word of a wrapping label that is wider than the label; the Record's step boxes are one line that ends with
+# "..." (R24 job: "(needs you)" was cut to "(ne").
+has "WIN measure record box=5,4 label=5,6 rows=268 one-line=True" "WIN guard held=True then=Yes" "WIN break=abc|def|ghi|j word-bad=LAYOUT fixture P0 text: the word \"abcdefghij\" needs 70, the line is 50 word-ok=True" && ok || { bad "window 1f: click guard, long words"; grep "WIN guard\|WIN break" "$t/win.txt" | cut -c1-300; }
 # 1e. R24 job on b093036: a box's text box fills its frame (frame - 2 x 6) also when the frame's size never changed, and the
 # box is as tall as the compact button measured; a row that wraps is aligned line by line (the check box alone on the
 # second line of the test extras is no defect; on the first line, 39 px low, it is).

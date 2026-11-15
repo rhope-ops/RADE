@@ -1818,15 +1818,19 @@ if ($gui) {
     $ui.SentFonts = @{}
     # A word wider than the line (no space in it) is cut into pieces that fit, one per line: it wraps by character and is
     # never clipped (R7 review). Only what the window shows changes; the report keeps the text.
+    # The width a label needs to show a text in one line: asked of a label that is never shown, with the same font and flags
+    # as the window's labels (R24 job: TextRenderer's default flags gave 3 to 9 px more than a label uses).
+    $ui.Probe = New-Object System.Windows.Forms.Label; $ui.Probe.AutoSize = $true; $ui.Probe.UseMnemonic = $false
+    $ui.WordW = { param([string]$T, $F) try { $ui.Probe.Font = $F; $ui.Probe.Text = $T; return [int]$ui.Probe.PreferredSize.Width } catch { return [int][System.Windows.Forms.TextRenderer]::MeasureText($T, $F).Width } }
     $ui.BreakLong = { param([string]$T, $F, [int]$W)
       if ($W -le 0) { return $T }
       $ws = foreach ($wd in ($T -split ' ')) {
-        if ([System.Windows.Forms.TextRenderer]::MeasureText($wd, $F).Width -le $W) { $wd; continue }
-        $pc = @(); $cur = ''; foreach ($ch in $wd.ToCharArray()) { if ($cur -and [System.Windows.Forms.TextRenderer]::MeasureText($cur + $ch, $F).Width -gt $W) { $pc += $cur; $cur = '' }; $cur += $ch }; $pc += $cur; $pc -join "`n" }
+        if ((& $ui.WordW $wd $F) -le $W) { $wd; continue }
+        $pc = @(); $cur = ''; foreach ($ch in $wd.ToCharArray()) { if ($cur -and (& $ui.WordW ($cur + $ch) $F) -gt $W) { $pc += $cur; $cur = '' }; $cur += $ch }; $pc += $cur; $pc -join "`n" }
       return (@($ws) -join ' ') }
     # The self-check's rule for it: a word of a label that wraps is never wider than the label (else the word is cut).
     $ui.WordBad = { param([string]$Card, [string]$Name, [string]$Text, $F, [int]$W)
-      foreach ($wd in ($Text -split '\s+')) { if ($wd) { $ww = [System.Windows.Forms.TextRenderer]::MeasureText($wd, $F).Width; if ($ww -gt $W + 1) { return ('LAYOUT ' + $Card + ' ' + $Name + ' text: the word "' + $(if ($wd.Length -gt 20) { $wd.Substring(0, 20) + '...' } else { $wd }) + '" needs ' + $ww + ', the line is ' + $W) } } }
+      foreach ($wd in ($Text -split '\s+')) { if ($wd) { $ww = & $ui.WordW $wd $F; if ($ww -gt $W + 1) { return ('LAYOUT ' + $Card + ' ' + $Name + ' text: the word "' + $(if ($wd.Length -gt 20) { $wd.Substring(0, 20) + '...' } else { $wd }) + '" needs ' + $ww + ', the line is ' + $W) } } }
       return $null }
     $ui.FitSent = { try {
         $f = $ui.F.Sent; $w = [int]$ui.Sent.MaximumSize.Width; $t = [string]$ui.SentRaw
@@ -1994,8 +1998,10 @@ if ($gui) {
             $c = $kids[$i]; $r = $c.RectangleToScreen($c.ClientRectangle); if ($r.Width -le 0 -or $r.Height -le 0) { continue }
             if (-not $scroll -and -not $clip.Contains($r)) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' cut: needs ' + $r.Width + 'x' + $r.Height + ' at ' + ($r.Left - $clip.Left) + ',' + ($r.Top - $clip.Top) + ' in ' + $clip.Width + 'x' + $clip.Height) }
             if ($c -is [System.Windows.Forms.Label] -and $c.AutoSize -and $c.MaximumSize.Width -gt 0 -and $c.Text) { $wb = & $ui.WordBad $card (& $ui.NameOf $c) ([string]$c.Text) $c.Font $c.Width; if ($wb) { $ui.LayBad.Add($wb) } }
+            if ($c -is [System.Windows.Forms.CheckBox] -and $c.Text -and -not $c.AutoEllipsis) {   # a one-line check box whose text alone is wider than it is cut (the Record's step boxes before R24 fix round 3)
+              $tw = [System.Windows.Forms.TextRenderer]::MeasureText([string]$c.Text, $c.Font).Width; if ($tw -gt $c.ClientSize.Width + 1) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' text cut: needs ' + $tw + ' has ' + $c.ClientSize.Width) } }
             $isText = ($c -is [System.Windows.Forms.Label] -or $c -is [System.Windows.Forms.ButtonBase])
-            if ($isText -and $c.Text -and -not ($c -is [System.Windows.Forms.Label] -and $c.AutoEllipsis)) {   # a label that ends with "..." by rule is not a defect
+            if ($isText -and $c.Text -and -not $c.AutoEllipsis) {   # a label or box that ends with "..." by rule is not a defect
               $want = $c.GetPreferredSize((New-Object System.Drawing.Size($c.Width, 0)))
               if ($want.Width -gt $c.Width + 1 -or $want.Height -gt $c.Height + 1) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' text: needs ' + $want.Width + 'x' + $want.Height + ' has ' + $c.Width + 'x' + $c.Height) }
             }
@@ -2440,7 +2446,7 @@ if ($gui) {
     $ui.RecTall = { if (-not $ui.Scaled) { return }; try { $t = (& $ui.RecPlan $ui.RecChecks.ClientSize.Width).Tall + (& $ui.Sc 4); if ($ui.RecChecks.Height -ne $t) { $ui.RecChecks.Height = $t } } catch { $null = $_ } }
     $ui.RecChecks.Add_Resize({ if ($ui.RecOn -and [int]$ui.RecW -ne [int]$this.ClientSize.Width) { $ui.RecW = [int]$this.ClientSize.Width; & $ui.RecTall }; $this.Invalidate() })
     # The step list: a label or a long step name wraps at the column's width, also after the window changes its size.
-    $ui.RecFit = { if (-not $ui.Scaled) { return }; try { $mw = [math]::Max((& $ui.Sc 120), ($ui.RecSteps.ClientSize.Width - (& $ui.Sc 28))); foreach ($l in @($ui.RecSteps.Controls)) { $l.MaximumSize = New-Object System.Drawing.Size($mw, 0) } } catch { $null = $_ } }
+    $ui.RecFit = { if (-not $ui.Scaled) { return }; try { $mw = [math]::Max((& $ui.Sc 120), ($ui.RecSteps.ClientSize.Width - (& $ui.Sc 28))); foreach ($l in @($ui.RecSteps.Controls)) { if ($l -is [System.Windows.Forms.CheckBox]) { $l.Size = New-Object System.Drawing.Size($mw, $l.PreferredSize.Height) } else { $l.MaximumSize = New-Object System.Drawing.Size($mw, 0) } } } catch { $null = $_ } }   # a step box is one line, as wide as the column, and ends with "..." when its text is longer
     $ui.RecSteps.Add_SizeChanged({ & $ui.RecFit })
     & $ui.Ring $ui.RecSteps; & $ui.Ring $ui.Rec; & $ui.Cue $ui.RecText   # focus is always visible: the step boxes and the text box too
     $ui.VRecord = {
@@ -2457,7 +2463,7 @@ if ($gui) {
         $list = @(); if ($cleanup.Count) { $list += -1 }; $list += @($script:appSteps); $n = 0
         foreach ($k in $list) {
           $cb = New-Object System.Windows.Forms.CheckBox
-          $cb.AutoSize = $true; $cb.UseMnemonic = $false; $cb.Margin = (& $ui.Pad (& $ui.Sc 5) (& $ui.Sc 4) (& $ui.Sc 4) (& $ui.Sc 4)); & $ui.Cue $cb; $cb.Enabled = [bool]$ui.Edit; $cb.Tag = [int]$k; $cb.Font = $ui.F.SmallB; $cb.ForeColor = $ui.C.Ink
+          $cb.AutoSize = $false; $cb.AutoEllipsis = $true; $cb.UseMnemonic = $false; $cb.Margin = (& $ui.Pad (& $ui.Sc 5) (& $ui.Sc 4) (& $ui.Sc 4) (& $ui.Sc 4)); & $ui.Cue $cb; $cb.Enabled = [bool]$ui.Edit; $cb.Tag = [int]$k; $cb.Font = $ui.F.SmallB; $cb.ForeColor = $ui.C.Ink
           if ($k -lt 0) { $cb.Text = 'Clean-up'; $cb.Checked = [bool]$ui.Clean; $more = 'Moves finished files to the Recycle Bin' }
           else {
             $n++; $s1 = $steps[$k]; $cb.Checked = [bool]$ui.Sel[[int]$k]
