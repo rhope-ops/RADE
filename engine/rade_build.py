@@ -1514,8 +1514,7 @@ if ($gui) {
         if ($o.R2) { & $ui.Word $G ([string]$o.R2) $ui.F.Small $ui.C.Gray $rx ($y + $h1) $rw $h2 'Right, Top, NoPrefix, SingleLine' }
       } catch { $null = $_ } }
     $ui.FillOpts = { param($List)
-      foreach ($o in @($ui.Trash)) { try { $o.Dispose() } catch { $null = $_ } }   # the choices of the card before last: a button is not disposed inside its own Click
-      $ui.Trash = @($ui.Opts.Controls); $ui.Opts.Controls.Clear()
+      $ui.Trash = @($ui.Trash) + @($ui.Opts.Controls); $ui.Opts.Controls.Clear()   # old choices are disposed when the window closes: a button is never disposed inside its own Click
       $n = 0
       foreach ($o in @($List | Where-Object { $_ })) {
         $said = (@($o.Name, $o.Ver, $o.Sub, $o.Note, $o.R1, $o.R2) | Where-Object { $_ }) -join '. '
@@ -1832,7 +1831,7 @@ if ($gui) {
         P = @(($Why.Substring(0, 1).ToUpperInvariant() + $Why.Substring(1)), $What, 'The report in the results folder says STOPPED.'); Help = $(if ($dep) { Get-HelpLine } else { '' })
         Buttons = @(@{ Text = 'Copy the log'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Try again'; Act = { & $ui.VReady } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } }); Back = { & $ui.VReady } }
       & $ui.ToFront }
-    $ui.OkBox.Add_CheckedChanged({ if (-not $ui.OkBox.Checked) { & $ui.Say1 'The draft made at the end says "Window: OK". Select "Make e-mail draft" for one that says NOT OK.' } })
+    $ui.OkBox.Add_CheckedChanged({ & $ui.Say1 $(if ($ui.OkBox.Checked) { '' } else { 'Select "Make e-mail draft" to make a draft that says "Window: NOT OK".' }) })
     $ui.DraftB.Add_Click({
       $to = $ui.ToBox.Text.Trim()
       if ($to -and -not (Test-MailTo $to)) { & $ui.Say1 'The e-mail address does not look right.'; return }
@@ -1880,7 +1879,7 @@ if ($gui) {
         $d = Get-CheckDef $id; $r = $(if ($ui.Picked) { $script:checkResults[$id] } else { $ui.BaseRes[$id] }); if (-not $r) { $r = @{ State = 'NOT RUN'; Detail = ''; Fix = '' } }
         if ([string]$d.Group -ne $g0) { $g0 = [string]$d.Group; $rows += @{ Head = $g0.ToUpperInvariant() } }
         $nm = [string]$d.Short; if (-not $nm) { $nm = [string]$d.Name }
-        $rows += @{ Name = $nm; State = [string]$r.State; More = $(if ($r.State -ne 'PASSED' -or $r.Saved) { @(@($r.Detail, $r.Fix) | Where-Object { $_ }) } else { @() }) }
+        $rows += @{ Name = $nm; State = [string]$r.State; More = $(if ($r.State -ne 'PASSED') { @(@($r.Detail, $r.Fix) | Where-Object { $_ }) } else { @() }) }   # a check that passed is one row, so the column fits; the report has its detail
       }
       return $rows }
     $ui.RecChecks.Add_Paint({
@@ -1926,8 +1925,8 @@ if ($gui) {
         $t += $ui.Plan.Lines
         if (Test-Deploy) { $ml = @(Get-MadeLine); if ($ml.Count) { $t += ''; $t += $ml } else { $t += @('', 'The installs of this application have made nothing yet.') } }
       }
-      if ($ui.Log.Count) { $t += @('', 'LOG'); $t += @($ui.Log) }
-      $ui.RecText.Text = ($t -join "`r`n")
+      if ($ui.Log.Count -or $ui.Running) { $t += @('', 'LOG'); $t += @($ui.Log) }
+      $ui.RecText.Text = ($t -join "`r`n") + "`r`n"   # ends with a line break: a live log line is added below
       $ui.RecTitle.Text = 'Record' + $(if ($ui.Picked) { $dot + $script:app.Name } else { '' })
       $ui.Card.Visible = $false; $ui.Rec.Visible = $true; $ui.RecChecks.Invalidate(); $ui.RecB.Visible = $false; $ui.BackB.Visible = $false
       try { [void]$ui.RecClose.Focus() } catch { $null = $_ } }
@@ -1960,6 +1959,7 @@ if ($gui) {
         if ([string]$a -ne 'Yes') { $_.Cancel = $true; return }
       }
       $script:closing = $true; try { $ui.Anim.Stop() } catch { $null = $_ }
+      foreach ($o in @($ui.Trash)) { try { $o.Dispose() } catch { $null = $_ } }
       if ($script:child -and -not $script:child.HasExited) { try { $script:child.Kill() } catch { $null = $_ } } })
     [void]$ui.Form.ShowDialog()
     return

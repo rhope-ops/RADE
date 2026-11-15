@@ -53,7 +53,7 @@ The Record (F2, or its links): three columns. Checks by group (Local, Network, A
 | Results: PASSED, PASSED (fallback), WARNING, FAILED, NOT RUN; the word is always shown, never color alone | RADE 2026-11-14 |
 | RADE draws its own bars; no bar moves back inside a run or a step; still when Windows animations are off | Z 2026-11-14 (R17, R18) |
 | A deploy sends nothing; a test round makes an Outlook draft that is never sent (fallback: folder and clipboard) | [engine.md "Deploy v1"](engine.md#deploy-v1); Z 2026-11-13 |
-| No tooltips; AccessibleName on every control; every control by keyboard (Tab, Enter, Esc = Back and on Choose exit, F2 = Record, 1 to 9 = a choice) | R21 W9; RADE 2026-11-14 |
+| No tooltips; AccessibleName on every control; every control by keyboard (Tab, Enter, F2 = Record, 1 to 9 = a choice; Esc = Back, and on Choose, which has no Back, it exits: as built, an agent choice that waits for the Administrator, DECISIONS 2026-11-14) | R21 W9; RADE 2026-11-14 |
 | The same steps run as text when no window can open | Z 2026-11-13 |
 
 Not in the window yet: bundle size in the summary, engine version and sha256 in the window, a JSON results block (RADE 2026-11-14, engine work row); the Maintenance actions other than Install.
