@@ -18,10 +18,11 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-# name, application (0 = test, 1 = deploy), hand step, tour, window size ("" = as the engine sets it;
-# 811x469 = 95 % of the work area of 1280 x 800 at 150 % scaling, in 100 % pixels)
+# name, application (0 = test, 1 = deploy), hand step, tour, window size in 100 % pixels ("" = as the engine sets it;
+# 1020x616 = 1920 x 1080 at 150 % scaling; 811x469 = 95 % of the work area of 1280 x 800 at 150 % scaling)
 RUNS = [
     ("deploy-full", 1, "done", "0", ""),
+    ("deploy-616", 1, "done", "1", "1020x616"),
     ("deploy-tour-small", 1, "fail", "1", "811x469"),
     ("test-small", 0, "done", "0", "811x469"),
 ]
@@ -81,13 +82,14 @@ def main():
         closed = any(l.startswith("WIN closed=True") for l in lines)
         cards = sum(1 for l in lines if l.startswith("WIN card="))
         print("== %s: cards=%d layout-lines=%d closed=%s png=%d" % (name, cards, len(layout), closed, len(list(d.glob("*.png")))))
+        first = name == RUNS[0][0]
         for l in lines:
-            if l.startswith(("WIN", "LAYOUT", "MEASURE", "No window could open")):
-                print("   " + l[:400])
-        print("::group::%s: all output" % name)
-        for l in lines:
-            print("   " + l[:400])
-        print("::endgroup::")
+            if l.startswith(("WIN", "LAYOUT ", "No window could open")) or (first and l.startswith("MEASURE")):
+                print("   " + l[:300])
+        if not closed:
+            print("   --- last lines ---")
+            for l in lines[-25:]:
+                print("   " + l[:300])
         if layout or not closed:
             bad += 1
         shutil.rmtree(t, ignore_errors=True)

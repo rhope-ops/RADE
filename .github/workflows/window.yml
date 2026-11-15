@@ -18,6 +18,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
+      - name: Keep line ends as they are in the repository (a fetched file is checked by its SHA-256)
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
