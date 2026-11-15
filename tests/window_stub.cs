@@ -73,6 +73,10 @@ namespace System.Windows.Forms {
     public Size Size { get { return new Size(Width, Height); } set { Width = value.Width; Height = value.Height; } }
     public Rectangle Bounds { get { return new Rectangle(Left, Top, Width, Height); } }
     public bool Focused { get { return RadeStub.Driver.Focus == this; } }
+    public bool ContainsFocus { get { for (Control c = RadeStub.Driver.Focus; c != null; c = c.Parent) { if (c == this) return true; } return false; } }
+    // The size the control asks for (no layout here): its own size; a label: its text in one line at its font; a button: its
+    // text with 12 px padding, at least its MinimumSize (as Windows Forms AutoSize does).
+    public virtual Size PreferredSize { get { return new Size(Width, Height); } }
     public bool Shown { get { for (Control c = this; c != null; c = c.Parent) { if (!c.Visible) return false; } return true; } }   // visible with every parent
     public bool Focus() { if (!Shown || !Enabled) return false; Control old = RadeStub.Driver.Focus; RadeStub.Driver.Focus = this; if (old != null && old != this) old.Fire("LostFocus", null); Fire("GotFocus", null); return true; }
     public void Invalidate() { } public void Dispose() { IsDisposed = true; } public void SuspendLayout() { } public void ResumeLayout() { } public void ResumeLayout(bool b) { } public void PerformLayout() { }
@@ -80,10 +84,12 @@ namespace System.Windows.Forms {
     public void Repaint() { RadeStub.Dyn e = new RadeStub.Dyn(); e.Values["Graphics"] = new Graphics(); Fire("Paint", e); foreach (Control c in Controls) c.Repaint(); }
     public void Walk(List<Control> all) { all.Add(this); foreach (Control c in Controls) c.Walk(all); }
   }
-  public class Panel : Control { } public class FlowLayoutPanel : Control { } public class Label : Control { } public class PictureBox : Control { }
+  public class Panel : Control { } public class FlowLayoutPanel : Control { } public class PictureBox : Control { }
+  public class Label : Control { public override Size PreferredSize { get { object f; int h = 18; if (Values.TryGetValue("Font", out f) && f is PSObject) f = ((PSObject)f).BaseObject; if (f is RadeDraw.Font) h = ((RadeDraw.Font)f).Height; return new Size((Text ?? "").Length * 7, h); } } }
   public class Bag { public int Count; public void Add(object o) { Count++; } public void Clear() { Count = 0; } }
   public class TableLayoutPanel : Control { public Bag ColumnStyles = new Bag(); public Bag RowStyles = new Bag(); public void SetColumnSpan(Control c, int n) { } }
-  public class Button : Control { } public class TextBox : Control { }
+  public class Button : Control { public override Size PreferredSize { get { object m; Size min = new Size(0, 0); if (Values.TryGetValue("MinimumSize", out m) && m is PSObject) m = ((PSObject)m).BaseObject; if (m is Size) min = (Size)m; return new Size(Math.Max((Text ?? "").Length * 7 + 24, min.Width), Math.Max(23, min.Height)); } } }
+  public class TextBox : Control { }
   public class CheckBox : Control { bool on; public bool Checked { get { return on; } set { bool ch = on != value; on = value; if (ch) Fire("CheckedChanged", new RadeStub.Dyn()); } } }
   public class FolderBrowserDialog : RadeStub.Dyn { public string ShowDialog(object owner) { return "Cancel"; } public void Dispose() { } }
   public class Timer : RadeStub.Dyn { public bool On; public void Start() { On = true; if (!RadeStub.Driver.Timers.Contains(this)) RadeStub.Driver.Timers.Add(this); } public void Stop() { On = false; } }

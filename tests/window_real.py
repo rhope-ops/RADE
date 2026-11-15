@@ -9,7 +9,8 @@ lines for each card and saves one PNG of each card.
 Usage: python tests/window_real.py OUT_DIR
 Pass = every run ends with "WIN closed=True", prints no "LAYOUT " line (the engine's layout self-check), a SCALE line,
 and no card scrolls at a size larger than the smallest; the first run draws the 3 question cards of the hand step
-(exit 0). Output: OUT_DIR/<run>/*.png (NN-answer-yesno.png, NN-answer-pick.png, NN-answer-text.png among them), out.txt.
+and it and each run in the smallest window draw the text question in both reworks (exit 0). Output: OUT_DIR/<run>/*.png
+(NN-answer-yesno, NN-answer-pick, NN-answer-text = shrink to fit, NN-answer-text-split = the second rework), out.txt.
 """
 import importlib.util
 import json
@@ -162,8 +163,11 @@ def main():
             why.append("no line of the layout self-check")
         if not any(l.startswith("WIN SCALE ") for l in lines):
             why.append("no SCALE line of the layout self-check")
-        if first and len(list(d.glob("*-answer-*.png"))) != 3:
-            why.append("the 3 question cards (answer-yesno, answer-pick, answer-text) were not drawn")
+        got = {re.sub(r"^\d+-", "", p.stem) for p in d.glob("*-answer-*.png")}
+        if first and got != {"answer-yesno", "answer-pick", "answer-text", "answer-text-split"}:
+            why.append("the question cards (answer-yesno, answer-pick, answer-text, answer-text-split) were not all drawn: %s" % sorted(got))
+        if size == SMALLEST and hand == "done" and not {"answer-text", "answer-text-split"} <= got:
+            why.append("the two reworks of the text question (answer-text, answer-text-split) were not drawn in the smallest window")
         broken = [l for l in lines if l.startswith(("WIN PNG-FAILED", "WIN DRIVER-ERROR", "WIN TIMEOUT", "WIN BAD"))]
         if broken:
             why.append(broken[0][:120])

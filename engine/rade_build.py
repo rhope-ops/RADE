@@ -1573,7 +1573,7 @@ if ($gui) {
     # Focus is always visible: a 2 px navy ring around the control that has it, drawn by its parent ($ui.Ring), also after a
     # mouse click. Each focusable control tells its parent to repaint ($ui.Cue) and keeps a 4 px margin for the ring.
     $ui.Cue = { param($C) $C.Add_GotFocus({ try { $this.Parent.Invalidate() } catch { $null = $_ } }); $C.Add_LostFocus({ try { $this.Parent.Invalidate() } catch { $null = $_ } }) }
-    $ui.Ring = { param($P) $P.Add_Paint({ try { foreach ($c in $this.Controls) { if ($c.Focused -and $c.Visible) { $pn = New-Object System.Drawing.Pen($ui.C.Navy, [single](& $ui.Sc 2)); $b = $c.Bounds; $o = & $ui.Sc 2; $_.Graphics.DrawRectangle($pn, ($b.Left - $o), ($b.Top - $o), ($b.Width + 2 * $o - 1), ($b.Height + 2 * $o - 1)); $pn.Dispose() } } } catch { $null = $_ } }) }
+    $ui.Ring = { param($P) $P.Add_Paint({ try { foreach ($c in $this.Controls) { if (($c.Focused -or ($ui.Boxes -contains $c -and $c.ContainsFocus)) -and $c.Visible) { $pn = New-Object System.Drawing.Pen($ui.C.Navy, [single](& $ui.Sc 2)); $b = $c.Bounds; $o = & $ui.Sc 2; $_.Graphics.DrawRectangle($pn, ($b.Left - $o), ($b.Top - $o), ($b.Width + 2 * $o - 1), ($b.Height + 2 * $o - 1)); $pn.Dispose() } } } catch { $null = $_ } }) }
     $ui.Style = { param($B, [string]$Kind)
       # primary = Air Force blue; danger = dark red; off = not available (gray, text 6.3:1); dangeroff = the destructive
       # action while it is not available (gray, dark red text and edge, 8:1); else white with a gray edge. The colors under
@@ -1587,18 +1587,24 @@ if ($gui) {
       else { $B.BackColor = $ui.C.White; $B.ForeColor = $ui.C.Ink; $B.FlatAppearance.BorderColor = $ui.C.Edge; $B.Font = $ui.F.Small; $over = $ui.C.Hair; $down = $ui.C.Off }
       if (-not $over) { $over = $B.BackColor; $down = $B.BackColor }
       try { $B.FlatAppearance.MouseOverBackColor = $over; $B.FlatAppearance.MouseDownBackColor = $down } catch { $null = $_ } }
-    # A button that is not available: Windows draws its text in its own gray, whatever ForeColor says. RADE draws the
-    # face again with the colors $ui.Style gave it, so the text has the contrast the design names.
-    $ui.OffFace = { param($B, $G) try { if ($B.Enabled -or -not $B.Text) { return }
-        $w = $B.ClientSize.Width; $h = $B.ClientSize.Height; $G.Clear($B.BackColor)
-        $pn = New-Object System.Drawing.Pen($B.FlatAppearance.BorderColor); $G.DrawRectangle($pn, 0, 0, ($w - 1), ($h - 1)); $pn.Dispose()
+    # Every button draws its own face, border and text in every state (normal, under the pointer, pressed, focused, default,
+    # not available), over what Windows drew: no theme border, no black default-button border, no dotted focus rectangle
+    # (R24: a black or gray outline on a work computer). The focus is the navy ring its parent draws ($ui.Ring).
+    $ui.Hot = $null; $ui.Down = $null
+    $ui.Face = { param($B, $G) try { if (-not $B.Text) { return }
+        $w = $B.ClientSize.Width; $h = $B.ClientSize.Height; $fa = $B.FlatAppearance
+        $G.Clear($(if (-not $B.Enabled) { $B.BackColor } elseif ([object]::ReferenceEquals($ui.Down, $B)) { $fa.MouseDownBackColor } elseif ([object]::ReferenceEquals($ui.Hot, $B)) { $fa.MouseOverBackColor } else { $B.BackColor }))
+        if ([int]$fa.BorderSize -gt 0) { $pn = New-Object System.Drawing.Pen($fa.BorderColor); $G.DrawRectangle($pn, 0, 0, ($w - 1), ($h - 1)); $pn.Dispose() }
         & $ui.Word $G ([string]$B.Text) $B.Font $B.ForeColor 0 0 $w $h 'HorizontalCenter, VerticalCenter, NoPrefix, SingleLine' } catch { $null = $_ } }
+    $ui.Own = { param($B) $B.UseVisualStyleBackColor = $false; $B.Add_Paint({ & $ui.Face $this $_.Graphics })
+      $B.Add_MouseEnter({ $ui.Hot = $this; $this.Invalidate() }); $B.Add_MouseLeave({ if ([object]::ReferenceEquals($ui.Hot, $this)) { $ui.Hot = $null }; $this.Invalidate() })
+      $B.Add_MouseDown({ $ui.Down = $this; $this.Invalidate() }); $B.Add_MouseUp({ $ui.Down = $null; $this.Invalidate() }) }
     # $Kind: 'action' (a card's buttons) or 'compact' (beside a box; the Record's "Back"). Sizes: $ui.Z.
     $ui.Btn = { param([string]$Kind) $b = New-Object System.Windows.Forms.Button; $b.AutoSize = $true; $b.AutoSizeMode = 'GrowAndShrink'   # a button that showed a long text shrinks back for the next card
       $b.MinimumSize = $(if ($Kind -eq 'compact') { New-Object System.Drawing.Size($ui.Z.CompactW, $ui.Z.CompactH) } else { New-Object System.Drawing.Size($ui.Z.ActionW, $ui.Z.ActionH) })
-      $b.Padding = (& $ui.Pad 12 0 12 0); $b.Margin = (& $ui.Pad $ui.Z.M $ui.Z.M $ui.Z.M $ui.Z.M); $b.UseMnemonic = $false; & $ui.Style $b ''; & $ui.Cue $b; $b.Add_Paint({ & $ui.OffFace $this $_.Graphics }); $b }
+      $b.Padding = (& $ui.Pad 12 0 12 0); $b.Margin = (& $ui.Pad $ui.Z.M $ui.Z.M $ui.Z.M $ui.Z.M); $b.UseMnemonic = $false; & $ui.Style $b ''; & $ui.Cue $b; & $ui.Own $b; $b }
     $ui.LinkBtn = { param([string]$Text) $b = New-Object System.Windows.Forms.Button; $b.Text = $Text; $b.AutoSize = $true; $b.MinimumSize = New-Object System.Drawing.Size(0, $ui.Z.LinkH); $b.Margin = (& $ui.Pad $ui.Z.M $ui.Z.M $ui.Z.M $ui.Z.M); $b.UseMnemonic = $false
-      $b.FlatStyle = 'Flat'; $b.FlatAppearance.BorderSize = 0; $b.BackColor = $ui.C.White; $b.ForeColor = $ui.C.Blue; $b.Font = $ui.F.Link; try { $b.FlatAppearance.MouseOverBackColor = $ui.C.White; $b.FlatAppearance.MouseDownBackColor = $ui.C.Hair } catch { $null = $_ }; & $ui.Cue $b; $b }   # a link: Air Force blue, bold and underlined (not color alone), 28 high
+      $b.FlatStyle = 'Flat'; $b.FlatAppearance.BorderSize = 0; $b.BackColor = $ui.C.White; $b.ForeColor = $ui.C.Blue; $b.Font = $ui.F.Link; try { $b.FlatAppearance.MouseOverBackColor = $ui.C.White; $b.FlatAppearance.MouseDownBackColor = $ui.C.Hair } catch { $null = $_ }; & $ui.Cue $b; & $ui.Own $b; $b }   # a link: Air Force blue, bold and underlined (not color alone), 28 high
 
     # ---- The fixed parts: the light (6 px), the logo line, the card, the bottom line and the bar on the bottom edge.
     $ui.Light = New-Object System.Windows.Forms.Panel
@@ -1677,11 +1683,20 @@ if ($gui) {
     $ui.LastLog.AutoSize = $false; $ui.LastLog.AutoEllipsis = $true; $ui.LastLog.UseMnemonic = $false; $ui.LastLog.Height = 20; $ui.LastLog.Width = 780; $ui.LastLog.Font = $ui.F.Mono; $ui.LastLog.ForeColor = $ui.C.Gray; $ui.LastLog.Margin = (& $ui.Pad 0 $ui.Z.G2 0 0); $ui.LastLog.Visible = $false; $ui.LastLog.AccessibleName = 'Last log line'
     $ui.FieldRow = & $ui.Flow $ui.Z.G2; $ui.FieldRow.WrapContents = $true; & $ui.Ring $ui.FieldRow
     $ui.FieldL = & $ui.Label $ui.F.SmallB $ui.C.Gray 9; $ui.FieldL.Visible = $true
+    # A one-line box: a frame as tall as a compact button with RADE's own 1 px edge, the text box inside it with no border,
+    # in the middle (a text box cannot be made taller with its text in the middle). The ring goes around the frame.
+    $ui.Boxes = @()
+    $ui.BoxFit = { param($P) try { $tb = $P.Controls[0]; $in = & $ui.Sc 6; $tb.Width = [math]::Max(10, $P.ClientSize.Width - 2 * $in); $tb.Location = New-Object System.Drawing.Point($in, [int][math]::Floor(($P.ClientSize.Height - $tb.Height) / 2)) } catch { $null = $_ } }
+    $ui.MkBox = { param($Tb, [int]$W)
+      $p = New-Object System.Windows.Forms.Panel; $p.Size = New-Object System.Drawing.Size($W, $ui.Z.CompactH); $p.BackColor = $ui.C.White; $p.AccessibleName = 'Text box'
+      $Tb.BorderStyle = 'None'; [void]$p.Controls.Add($Tb); $Tb.Add_GotFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } }); $Tb.Add_LostFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } })
+      $p.Add_Paint({ try { $pn = New-Object System.Drawing.Pen($ui.C.Edge); $_.Graphics.DrawRectangle($pn, 0, 0, ($this.ClientSize.Width - 1), ($this.ClientSize.Height - 1)); $pn.Dispose() } catch { $null = $_ } })
+      $p.Add_SizeChanged({ & $ui.BoxFit $this }); $p.Add_Click({ try { [void]$this.Controls[0].Focus() } catch { $null = $_ } }); $ui.Boxes += $p; $p }
     $ui.Field = New-Object System.Windows.Forms.TextBox
-    $ui.Field.Width = 420; $ui.Field.Margin = (& $ui.Pad 12 6 8 4); $ui.Field.BorderStyle = 'FixedSingle'; & $ui.Cue $ui.Field
+    $ui.FieldBox = & $ui.MkBox $ui.Field 420; $ui.FieldBox.Margin = (& $ui.Pad $ui.Z.G2 $ui.Z.M $ui.Z.M $ui.Z.M)   # 8 from the label; 4 + the button's 4 = 8 to the button
     $ui.FieldB = & $ui.Btn 'compact'
     $ui.FieldB.Add_Click({ if ($ui.FieldDo) { & $ui.FieldDo } })
-    foreach ($c in @($ui.FieldL, $ui.Field, $ui.FieldB)) { [void]$ui.FieldRow.Controls.Add($c) }
+    foreach ($c in @($ui.FieldL, $ui.FieldBox, $ui.FieldB)) { [void]$ui.FieldRow.Controls.Add($c) }
     $ui.ErrRow = & $ui.Flow $ui.Z.G2; & $ui.Ring $ui.ErrRow
     $ui.ErrBox = New-Object System.Windows.Forms.TextBox
     $ui.ErrBox.Multiline = $true; $ui.ErrBox.ScrollBars = 'Vertical'; $ui.ErrBox.Size = New-Object System.Drawing.Size(600, 96); $ui.ErrBox.Margin = (& $ui.Pad 4 4 4 4); $ui.ErrBox.BorderStyle = 'FixedSingle'; $ui.ErrBox.AccessibleName = 'Error message'; & $ui.Cue $ui.ErrBox
@@ -1699,11 +1714,11 @@ if ($gui) {
     $ui.TestRow = & $ui.Flow ($ui.Z.G6 - $ui.Z.M); $ui.TestRow.WrapContents = $true; & $ui.Ring $ui.TestRow
     $ui.TestL = & $ui.Label $ui.F.SmallB $ui.C.Gray 10; $ui.TestL.Text = 'Test rounds only'; $ui.TestL.Visible = $true
     $ui.ToBox = New-Object System.Windows.Forms.TextBox
-    $ui.ToBox.Width = 240; $ui.ToBox.Margin = (& $ui.Pad 12 7 8 4); $ui.ToBox.BorderStyle = 'FixedSingle'; $ui.ToBox.AccessibleName = 'Send results to (e-mail)'; & $ui.Cue $ui.ToBox
+    $ui.ToBox.AccessibleName = 'Send results to (e-mail)'; $ui.ToBoxF = & $ui.MkBox $ui.ToBox 240; $ui.ToBoxF.Margin = (& $ui.Pad $ui.Z.G2 $ui.Z.M $ui.Z.M $ui.Z.M)
     $ui.DraftB = & $ui.LinkBtn 'Make e-mail draft'
     $ui.OkBox = New-Object System.Windows.Forms.CheckBox
     $ui.OkBox.AutoSize = $true; $ui.OkBox.Checked = $true; $ui.OkBox.Text = 'The window displayed correctly'; $ui.OkBox.ForeColor = $ui.C.Gray; $ui.OkBox.Margin = (& $ui.Pad 4 9 4 4); $ui.OkBox.AccessibleName = 'The window displayed correctly (nothing overlapped or cut off)'
-    foreach ($c in @($ui.TestL, $ui.ToBox, $ui.DraftB, $ui.OkBox)) { [void]$ui.TestRow.Controls.Add($c) }
+    foreach ($c in @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox)) { [void]$ui.TestRow.Controls.Add($c) }
     $ui.Fill = { param($T, $Parts) $row = 0; foreach ($c in @($Parts)) { [void]$T.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('AutoSize'))); $T.Controls.Add($c, 0, $row); $row++ }; $T.RowCount = $row }
     & $ui.Fill $ui.Body @($ui.Kick, $ui.SentRow, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.Opts, $ui.Lines, $ui.StepRow, $ui.LastLog, $ui.FieldRow, $ui.ErrRow, $ui.LinkRow, $ui.Note, $ui.Help)
     & $ui.Fill $ui.Tail @($ui.BtnRow, $ui.Foot, $ui.TestRow)
@@ -1749,14 +1764,49 @@ if ($gui) {
       foreach ($r in @($ui.BtnRow, $ui.LinkRow, $ui.TestRow, $ui.FieldRow, $ui.StepRow)) { $r.MaximumSize = New-Object System.Drawing.Size(($cw + 2 * $mm), 0) }
       $ui.StepName.MaximumSize = $mx; $ui.ErrBox.Width = [math]::Min((& $ui.Sc 600), ($cw - 2 * $mm))
       try { $ui.AppL.Width = [math]::Max((& $ui.Sc 60), ($ui.Top.ClientSize.Width - $ui.AppL.Left - (& $ui.Sc 32))) } catch { $null = $_ }
-      & $ui.FitRow; & $ui.Apart
+      try { $ui.AppL.Height = $ui.AppL.PreferredSize.Height } catch { $null = $_ }
+      & $ui.FitRow; & $ui.Apart; & $ui.FitSent; & $ui.FitEdges; & $ui.AlignRows
       foreach ($o in @($ui.Opts.Controls)) { $o.Width = $cw; try { $o.Height = (& $ui.OptPlan $o.Tag $cw).H } catch { $null = $_ } }
       & $ui.Squeeze }
+    # ---- Alignment (the Administrator, 2026-11-15, after the R24 pictures; docs/window-design.md "Sizes"). An aligned row:
+    # its parts share one vertical midpoint (each part's top margin is set from the tallest part). One left edge per card:
+    # a label draws its text after a padding that grows with its font (Windows text padding: about 1/6 of the line), so a
+    # 22 pt headline started about 3 px right of a 9 pt line and of the buttons. Each part moves by its own padding.
+    $ui.Pads = @{}
+    $ui.PadOf = { param($F) try { $k = [string]$F.Name + '|' + $F.SizeInPoints + '|' + $F.Style
+        if (-not $ui.Pads.ContainsKey($k)) { $big = New-Object System.Drawing.Size(9999, 999); $ui.Pads[$k] = [int][math]::Round(([System.Windows.Forms.TextRenderer]::MeasureText('x', $F, $big, [System.Windows.Forms.TextFormatFlags]'SingleLine').Width - [System.Windows.Forms.TextRenderer]::MeasureText('x', $F, $big, [System.Windows.Forms.TextFormatFlags]'SingleLine, NoPadding').Width) / 2.0) }
+        return [int]$ui.Pads[$k] } catch { return 0 } }
+    $ui.SetLeft = { param($C, [int]$L) $L = [math]::Max(0, $L); $m = $C.Margin; if ($m.Left -ne $L) { $C.Margin = New-Object System.Windows.Forms.Padding($L, $m.Top, $m.Right, $m.Bottom) } }
+    $ui.FitEdges = { try {
+        $mm = & $ui.Sc $ui.Z.M; $x = $mm; foreach ($l in @($ui.Kick, $ui.Sent, $ui.P[0], $ui.P[1], $ui.Lines, $ui.Note, $ui.Help, $ui.Foot, $ui.FieldL, $ui.TestL, $ui.StepName, $ui.LastLog)) { $x = [math]::Max($x, (& $ui.PadOf $l.Font)) }
+        $ui.EdgeX = $x
+        foreach ($l in @($ui.Kick, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.Lines, $ui.Note, $ui.Help, $ui.Foot, $ui.LastLog, $ui.FieldL, $ui.TestL)) { & $ui.SetLeft $l ($x - (& $ui.PadOf $l.Font)) }
+        $ps = & $ui.PadOf $ui.Sent.Font; & $ui.SetLeft $ui.SentRow ($x - $ps); & $ui.SetLeft $ui.TickP ($ps - [int][math]::Round(0.09 * $ui.TickP.Width))   # the tick's stroke starts 9 % into its box
+        & $ui.SetLeft $ui.StepRow ($x - (& $ui.PadOf $ui.StepName.Font)); & $ui.SetLeft $ui.ErrRow ($x - $ui.ErrBox.Margin.Left)
+        foreach ($r in @($ui.BtnRow, $ui.LinkRow)) { & $ui.SetLeft $r ($x - $mm) }   # a button's own 4 px margin (room for the ring)
+        & $ui.SetLeft $ui.Opts $x } catch { $null = $_ } }
+    $ui.AlignRow = { param($Parts, [int]$Base)
+      try { $hs = @($Parts | ForEach-Object { if ($_.AutoSize) { [int]$_.PreferredSize.Height } else { [int]$_.Height } }); $hh = [int]($hs | Measure-Object -Maximum).Maximum
+        for ($i = 0; $i -lt $Parts.Count; $i++) { $m = $Parts[$i].Margin; $t = $Base + [int][math]::Floor(($hh - $hs[$i]) / 2); $b = $Base + $hh - $hs[$i] - ($t - $Base)
+          if ($m.Top -ne $t -or $m.Bottom -ne $b) { $Parts[$i].Margin = New-Object System.Windows.Forms.Padding($m.Left, $t, $m.Right, $b) } } } catch { $null = $_ } }
+    $ui.RowParts = { param([string]$Row) switch ($Row) { 'Top' { @(@($ui.Logo) + @($ui.WordL, $ui.AppL) | Where-Object { $_ }) } 'FieldRow' { @($ui.FieldL, $ui.FieldBox) + @($(if ($ui.FieldBOn) { $ui.FieldB })) } 'TestRow' { @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox) } } }
+    $ui.AlignRows = { & $ui.AlignRow (& $ui.RowParts 'Top') 0; $mm = & $ui.Sc $ui.Z.M; & $ui.AlignRow (& $ui.RowParts 'FieldRow') $mm; & $ui.AlignRow (& $ui.RowParts 'TestRow') $mm }
+    # The question headline (manifest "answers") shrinks to fit one line: from the headline size in 0.5 pt steps to 60 % of
+    # it (never under the body size); only at that size does it wrap. Other cards keep the headline size.
+    $ui.SentFonts = @{}
+    $ui.FitSent = { try {
+        $f = $ui.F.Sent
+        if ($ui.View -eq 'answer' -and -not $ui.NoShrink) {
+          $w = [int]$ui.Sent.MaximumSize.Width; $t = [string]$ui.Sent.Text; $pt = [double]$ui.F.Sent.SizeInPoints; $floor = [math]::Max($pt * 0.6, [double]$ui.F.Body.SizeInPoints)
+          while ($w -gt 0 -and $pt -gt $floor -and [System.Windows.Forms.TextRenderer]::MeasureText($t, $f).Width -gt $w) {
+            $pt = [math]::Max($floor, $pt - 0.5); $k = [string]$pt; if (-not $ui.SentFonts.ContainsKey($k)) { $ui.SentFonts[$k] = & $ui.Font ([string]$ui.F.Sent.Name) $pt $null }; $f = $ui.SentFonts[$k] }
+        }
+        if (-not [object]::ReferenceEquals($ui.Sent.Font, $f)) { $ui.Sent.Font = $f } } catch { $null = $_ } }
     $ui.FitRow = {
       # The box of a box row takes the width that is left beside its label and its button (at most 420).
-      try { $cw = $ui.ContentW; $left = $cw - $ui.FieldL.PreferredSize.Width - (& $ui.Sc 24)
+      try { $cw = $ui.ContentW; $left = $cw - $ui.FieldL.PreferredSize.Width - (& $ui.Sc 20)
         if ($ui.FieldBOn) { $left -= ($ui.FieldB.PreferredSize.Width + (& $ui.Sc 8)) }
-        $ui.Field.Width = [math]::Max((& $ui.Sc 160), [math]::Min((& $ui.Sc 420), [int]$left)) } catch { $null = $_ } }
+        $ui.FieldBox.Width = [math]::Max((& $ui.Sc 160), [math]::Min((& $ui.Sc 420), [int]$left)) } catch { $null = $_ } }
     $ui.Apart = {
       # The destructive button (Buttons: Apart) is alone at the right end of the row. When the row is too narrow for
       # that, it starts its own row at the left edge.
@@ -1810,7 +1860,7 @@ if ($gui) {
           $cp = New-Object System.Drawing.Pen($ui.C.Red, [single](& $ui.Sc 2)); $d = & $ui.Sc 12; $cx = $pad + (& $ui.Sc 6); $cy = [int](($h - $d) / 2)
           $G.DrawLine($cp, $cx, $cy, ($cx + $d), ($cy + $d)); $G.DrawLine($cp, ($cx + $d), $cy, $cx, ($cy + $d)); $cp.Dispose()
         } else {
-          $foc = [bool]$P.Focused; $t = $(if ($foc) { & $ui.Sc 3 } else { 1 })
+          $foc = [bool]$P.Focused; $t = $(if ($foc) { & $ui.Sc 2 } else { 1 })
           $pn = New-Object System.Drawing.Pen($(if ($foc) { $ui.C.Navy } else { $ui.C.Edge }), [single]$t); $i = [int]($t / 2); $G.DrawRectangle($pn, $i, $i, ($w - 1 - 2 * $i), ($h - 1 - 2 * $i)); $pn.Dispose()
           $k = & $ui.Sc 24; $ky = [int](($h - $k) / 2); $kp = New-Object System.Drawing.Pen($ui.C.Edge); $G.DrawRectangle($kp, $pad, $ky, $k, $k); $kp.Dispose()
           & $ui.Word $G ([string]$o.Key) $ui.F.Cap $ui.C.Gray $pad $ky $k $k 'HorizontalCenter, VerticalCenter, NoPrefix, SingleLine'
@@ -1837,7 +1887,7 @@ if ($gui) {
         if ($o.Off) { $c = New-Object System.Windows.Forms.Panel; $c.AccessibleRole = 'StaticText'; $c.AccessibleName = $said }
         else {
           $n++; $o.Key = $n
-          $c = New-Object System.Windows.Forms.Button; $c.FlatStyle = 'Flat'; $c.FlatAppearance.BorderSize = 0; $c.Text = ''; $c.AccessibleName = ('Choice ' + $n + ': ' + $said)
+          $c = New-Object System.Windows.Forms.Button; $c.FlatStyle = 'Flat'; $c.FlatAppearance.BorderSize = 0; $c.UseVisualStyleBackColor = $false; $c.Text = ''; $c.AccessibleName = ('Choice ' + $n + ': ' + $said)
           $c.Add_Click({ if ($ui.OnOpt -and -not $ui.Busy) { & $ui.OnOpt ([int]$this.Tag.Index) } }); $c.Add_GotFocus({ $this.Invalidate() }); $c.Add_LostFocus({ $this.Invalidate() })
         }
         $c.Tag = $o; $c.BackColor = $ui.C.White; $c.Margin = (& $ui.Pad 0 0 0 (& $ui.Sc 8))
@@ -1856,6 +1906,38 @@ if ($gui) {
       foreach ($k in @($ui.Keys)) { if ([object]::ReferenceEquals($ui[$k], $C)) { return [string]$k } }
       foreach ($k in 'B', 'P') { for ($i = 0; $i -lt @($ui[$k]).Count; $i++) { if ([object]::ReferenceEquals($ui[$k][$i], $C)) { return ($k + $i) } } }
       return $C.GetType().Name }
+    # The alignment rules (docs/window-design.md "Sizes"), on measured numbers so the tests can give them a layout:
+    # RowBad: the parts of an aligned row (@{ N; Top; H; Kind }) share one midpoint within 1 px, and a box and a button in
+    # it are as tall as each other. EdgeBad: the visible left edges of a card's parts (@{ N; X }) are within 1 px.
+    $ui.RowBad = { param([string]$Card, [string]$Row, $Parts)
+      $out = @(); $tol = [math]::Max(1, (& $ui.Sc 1)); $ps = @($Parts | Where-Object { $_ }); if ($ps.Count -lt 2) { return $out }
+      $m0 = $ps[0].Top + $ps[0].H / 2.0
+      foreach ($q in $ps) { $m = $q.Top + $q.H / 2.0; if ([math]::Abs($m - $m0) -gt $tol) { $out += ('LAYOUT ' + $Card + ' ' + $Row + ' ' + $q.N + ' midpoint: ' + $m + ', the row midpoint is ' + $m0) } }
+      $bx = @($ps | Where-Object { $_.Kind -eq 'box' }); $bt = @($ps | Where-Object { $_.Kind -eq 'button' })
+      foreach ($a in $bx) { foreach ($b in $bt) { if ([math]::Abs($a.H - $b.H) -gt $tol) { $out += ('LAYOUT ' + $Card + ' ' + $Row + ' heights: box ' + $a.N + ' ' + $a.H + ', button ' + $b.N + ' ' + $b.H) } } }
+      return $out }
+    $ui.EdgeBad = { param([string]$Card, $Edges)
+      $out = @(); $tol = [math]::Max(1, (& $ui.Sc 1)); $es = @($Edges | Where-Object { $_ }); if ($es.Count -lt 2) { return $out }
+      foreach ($e in $es) { if ([math]::Abs($e.X - $es[0].X) -gt $tol) { $out += ('LAYOUT ' + $Card + ' ' + $e.N + ' edge: starts at ' + $e.X + ', the card edge is ' + $es[0].X + ' (' + $es[0].N + ')') } }
+      return $out }
+    $ui.Measure = { param([string]$Card)
+      # The numbers for RowBad and EdgeBad, from the real layout (screen pixels).
+      $out = @(); $sr = { param($C) $C.RectangleToScreen($C.ClientRectangle) }
+      foreach ($row in 'Top', 'FieldRow', 'TestRow') {
+        $ps = @(& $ui.RowParts $row | Where-Object { $_.Visible }); if ($ps.Count -lt 2) { continue }
+        $out += & $ui.RowBad $Card $row @($ps | ForEach-Object { $rr = & $sr $_; @{ N = (& $ui.NameOf $_); Top = $rr.Top; H = $rr.Height; Kind = $(if ($ui.Boxes -contains $_) { 'box' } elseif ($_ -is [System.Windows.Forms.Button] -and $_.FlatAppearance.BorderSize -gt 0) { 'button' } else { 'other' }) } })
+      }
+      if (-not $ui.RecOn) {
+        $tx = { param($C) (& $sr $C).Left + (& $ui.PadOf $C.Font) }   # where a label's text starts
+        $es = @()
+        if ($ui.Kick.Visible) { $es += @{ N = 'Kick'; X = (& $tx $ui.Kick) } }
+        if ($ui.TickP.Visible) { $es += @{ N = 'TickP'; X = (& $sr $ui.TickP).Left + [int][math]::Round(0.09 * $ui.TickP.Width) } } elseif ($ui.Sent.Visible -and $ui.Sent.Text) { $es += @{ N = 'Sent'; X = (& $tx $ui.Sent) } }
+        $p1 = @(@($ui.P) + @($ui.Lines) | Where-Object { $_.Visible -and $_.Text })[0]; if ($p1) { $es += @{ N = (& $ui.NameOf $p1); X = (& $tx $p1) } }
+        $o1 = @($ui.Opts.Controls | Where-Object { $_.Visible })[0]; if ($o1) { $es += @{ N = 'choice 1'; X = (& $sr $o1).Left } }
+        $b1 = @($ui.B | Where-Object { $_.Visible })[0]; if ($b1) { $es += @{ N = (& $ui.NameOf $b1); X = (& $sr $b1).Left } }
+        $out += & $ui.EdgeBad $Card $es
+      }
+      return $out }
     $ui.Check = {
       if (-not $ui.LayOn -or -not $ui.View) { return }
       if ($ui.Picked -and (Test-Deploy) -and $env:RADE_LAYOUT -ne '1') { return }   # a deploy does not run it, also when the paste has a test application
@@ -1881,6 +1963,7 @@ if ($gui) {
             if ($c.Controls.Count) { $todo.Push(@($c, [System.Drawing.Rectangle]::Intersect($clip, $r), ($scroll -or $sc2))) }
           }
         }
+        foreach ($l in @(& $ui.Measure $card)) { $ui.LayBad.Add([string]$l) }
       } catch { $ui.LayBad.Add('LAYOUT ' + $card + ' the self-check stopped: ' + (ConvertTo-Masked ([string]$_.Exception.Message))) } }
     $ui.Scale = {
       # The scaling facts, numbers only (R24: the screen dpi said 100 % while every size was 1.5 x). DeviceDpi exists from .NET 4.7.
@@ -1932,6 +2015,7 @@ if ($gui) {
       $ui.TestRow.Visible = [bool]$c.Test
       $ui.Form.AcceptButton = $(if ($c.NoAccept) { $null } else { $accept })   # Enter = the primary button, except on a hand step
       $ui.Back = $c.Back; $ui.BackB.Visible = ([bool]$c.Back -and -not $ui.RecOn); $ui.RightL.Text = [string]$c.Right
+      & $ui.FitSent; & $ui.FitEdges; & $ui.AlignRows
       $ui.Card.ResumeLayout(); try { $ui.Card.PerformLayout() } catch { $null = $_ }
       try { $ui.Scroll.AutoScrollPosition = New-Object System.Drawing.Point(0, 0) } catch { $null = $_ }; & $ui.Squeeze   # a new card starts at its top
       $f = $null
@@ -2236,6 +2320,10 @@ if ($gui) {
     $ui.VAnswer = { param($Q, [int]$I, [int]$N)
       $ui.Reply = $null
       $c = @{ View = 'answer'; Light = 'you'; Kicker = ($(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot } else { '' }) + 'Question ' + $I + ' of ' + $N); Sentence = [string]$Q.Prompt; Right = 'RADE waits for you' }
+      # TEST ONLY (tests/window_real_driver.ps1 sets RADE_T_SPLIT=1 for one picture, the Administrator's second rework): the first
+      # sentence at the headline size and the rest as a body line. Off by default: the shipped card shrinks the prompt to fit ($ui.FitSent).
+      $ui.QNow = @($Q, $I, $N); $ui.NoShrink = $false
+      if ($env:RADE_T_SPLIT -eq '1' -and [string]$Q.Prompt -match '^(.+?[?.:])\s+(\S.*)$') { $c.Sentence = $Matches[1]; $c.P = @($Matches[2]); $ui.NoShrink = $true }
       if ($Q.Kind -eq 'text') { $c.Field = @{ Label = 'Your answer'; Text = ''; Name = [string]$Q.Prompt; Max = 120 }; $c.Focus = 'field'; $c.Buttons = @(@{ Text = 'Continue'; Kind = 'primary'; Act = { $ui.Reply = [string]$ui.Field.Text } }) }
       else { $ws = @($(if ($Q.Kind -eq 'yesno') { 'Yes', 'No' } else { $Q.Choices })); $c.Buttons = @(for ($k = 0; $k -lt $ws.Count; $k++) { @{ Text = [string]$ws[$k]; Act = $ui.ReplyActs[$k] } }) }
       & $ui.SetCard $c }
