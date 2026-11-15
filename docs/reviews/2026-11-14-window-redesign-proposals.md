@@ -30,7 +30,7 @@ Same in all three (agent choices, not decided): no Exit button (Esc or the windo
 
 Decided by the Administrator, 14 Nov 26 ([DECISIONS.md](../DECISIONS.md)): FAILED and NEEDS REVIEW are dark red #8B1A1A, so yellow means "your turn" only; the redesign has no Exit button. Concept 1 is the one to mock up further; its logo is 40 px and the word RADE 15 pt (was 24 px and 10.5 pt).
 
-Maintenance: one artboard for each concept shows the screen of [engine.md "Maintenance run types"](../engine.md#maintenance-run-types) (an agent recommendation, not approved) after Diagnose, with no backup yet: Back up is the primary button, Restore and Uninstall are off, Uninstall is set apart. Concept 1 also shows Restore (the source, then the dry run with counts and the confirm button) and Uninstall (the button is off until the typed name matches; a backup runs first). The Uninstall button is blue: dark red means FAILED only. "Back" and "Copy summary" stay; "Exit" follows the decision above.
+Maintenance: one artboard for each concept shows the screen of [engine.md "Maintenance run types"](../engine.md#maintenance-run-types) (the five buttons are decided, 14 Nov 26; the function lists are an agent recommendation) after Diagnose, with no backup yet: Back up is the primary button, Restore and Uninstall are off, Uninstall is set apart. Concept 1 also shows Restore (the source, then the dry run with counts and the confirm button) and Uninstall (the button is off until the typed name matches; a backup runs first). The Uninstall button is blue: dark red means FAILED only. "Back" and "Copy summary" stay; "Exit" follows the decision above.
 
 ## Measured
 
