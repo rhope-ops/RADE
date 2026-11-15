@@ -7,7 +7,7 @@ RADE's own logo comes from this repo (assets/logo/logo-K-128.png). The history n
 
 A bundle is one PowerShell text (RADE, the Redacted Application Deployment Engine, PFM 14 Nov 26; formerly the
 "90-161.Z Deployer" and the "runner") (Windows PowerShell 5.1) that the PFM copies from its raw page, pastes into
-Windows PowerShell ISE and runs with F5 (ISSM approved paste and run in writing, PFM 2026-11-12). It is a
+Windows PowerShell ISE and runs with F5. It is a
 bootstrapper for fast test rounds (PFM 1A, 6A: function over form):
   1. uses the Windows profile folder as the DODID (no question: PFM 13 Nov, the empty-box default worked) and shows
      the real path on screen (reports and e-mails still mask it);
@@ -43,7 +43,7 @@ A catalog app of mode deploy (deploy v1, docs/engine.md; the Administrator 14 No
 address; it updates RADE\\Config\\rade-installed.json (the version installed and the last deploy run).
 It runs only the steps embedded in it and never fetches code (PFM 3A). If no window can open (no Windows Forms),
 it runs the same steps as text.
-Text files are embedded as readable single-quoted here-strings, so the PFM and the ISSM can read the code.
+Text files are embedded as readable single-quoted here-strings, so anyone can read the code.
 The build id (first 8 hex of the sha256 of the bundle body) shows in the window title and the summary.
 Usage: python3 engine/rade_build.py --app-root DIR [--manifest scripts/paste_bundles.json] [--check] [--sha]
   --check: exit 1 if a bundle is out of date. --sha: print this file's sha256 (apps pin it).
@@ -345,6 +345,26 @@ function Save-RoundDownload([string]$Base, [scriptblock]$Say) {
   & $Say $line
   return $line
 }
+function Get-StepEnv([string]$Base, $Step) {
+  # Step contract (docs/engine.md "Step contract"): what RADE tells a step, as environment variables of the child process.
+  # Variables, not parameters: a script that does not know them still runs.
+  $inst = ''; $last = ''
+  if (Test-Deploy) {
+    $e = (Read-Installed)[(Get-InstalledKey $script:app)]
+    if ($e) {
+      if ($e.installed) { $inst = [string]$e.installed.version }
+      $s = $e.steps[[string]$Step.Name]; if ($s -and [string]$s.version -eq [string]$script:app.Version) { $last = [string]$s.state }
+    }
+  }
+  return [ordered]@{ RADE_CONTRACT = '1'; RADE_MODE = [string]$script:app.Mode; RADE_APP = [string]$script:app.Name; RADE_APP_VERSION = [string]$script:app.Version
+    RADE_INSTALLED_VERSION = $inst; RADE_STEP_LAST = $last; RADE_SITE = [string](Get-SiteUrl $Base) }
+}
+function ConvertTo-MadeName([string]$Name) {
+  # A made item's name goes into the record: no address, no ID, one line, 200 characters at most.
+  $t = (ConvertTo-Masked $Name) -replace 'https?://\S+', '<SITE>' -replace '\s+', ' '
+  $t = $t.Trim(); if ($t.Length -gt 200) { $t = $t.Substring(0, 200) }
+  return $t
+}
 function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]$Tick, [string]$Answer) {
   $exe = 'powershell.exe'
   if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) { $exe = 'pwsh' }
@@ -363,7 +383,8 @@ function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]
   $psi.WorkingDirectory = $dir
   $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true
   $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
-  $r = @{ Pass = 0; Fail = 0; Skip = 0; Exit = $null }
+  try { $envs = Get-StepEnv $Base $Step; foreach ($k in @($envs.Keys)) { $psi.EnvironmentVariables[[string]$k] = [string]$envs[$k] } } catch { & $Say ('    NOTE: the step inputs could not be set: ' + (ConvertTo-Masked $_.Exception.Message)) }
+  $r = @{ Pass = 0; Fail = 0; Skip = 0; Exit = $null; Made = @() }
   $p = [System.Diagnostics.Process]::Start($psi)
   $script:child = $p
   $limit = $stepMinutes; if ($Step.Minutes) { $limit = [int]$Step.Minutes }   # a step that waits for a person sets its own limit
@@ -386,6 +407,8 @@ function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]
     }
     # Lines that may name a unit or a file (for example seal details) never reach the report (data boundary).
     if ($Step.ScreenOnly -and $line -match $Step.ScreenOnly) { $line = ($line -replace '^(\S+).*$', '$1') + ' (detail hidden: it may hold a name; run the step script by hand to see it)' }
+    # "MADE <kind> <name>": something the step created (a list, a flow, a file); kept for the undo list (step contract).
+    if ($line -cmatch '^\s*MADE\s+([a-z][a-z-]{0,30})\s+(\S.*)$') { $mk = $Matches[1]; $mn = ConvertTo-MadeName $Matches[2]; $r.Made += @{ kind = $mk; name = $mn }; $line = 'MADE ' + $mk + ' ' + $mn }   # the log shows the cleaned name
     if ($line -match '(^|\s)PASS(\s|$)') { $r.Pass++ }
     if ($line -cmatch '(^|\s)SKIP(\s|$)') { $r.Skip++ }   # upper case only: prose such as "skip this" is not a result
     if ($line -match '(^|\s)(FAIL|FORMAT-FAIL|RENDER-ERROR|MEASURE-ERROR|STOPPED:)(\s|$)') { $r.Fail++ }
@@ -625,7 +648,15 @@ function Read-Installed {
   if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { return $res }
   try {
     $j = [System.IO.File]::ReadAllText($p) | ConvertFrom-Json
-    foreach ($c in @($j.apps.PSObject.Properties)) { $res[$c.Name] = [ordered]@{ installed = (ConvertTo-InstalledRun $c.Value.installed); lastRun = (ConvertTo-InstalledRun $c.Value.lastRun) } }
+    foreach ($c in @($j.apps.PSObject.Properties)) {
+      $st = [ordered]@{}
+      if ($c.Value.steps) { foreach ($s in @($c.Value.steps.PSObject.Properties)) {
+        $at = $s.Value.at; if ($at -is [datetime]) { $at = $at.ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }
+        $made = @(); foreach ($m in @($s.Value.made)) { if ($null -ne $m) { $made += [ordered]@{ kind = [string]$m.kind; name = [string]$m.name } } }
+        $st[$s.Name] = [ordered]@{ state = [string]$s.Value.state; version = [string]$s.Value.version; at = [string]$at; made = $made }
+      } }
+      $res[$c.Name] = [ordered]@{ installed = (ConvertTo-InstalledRun $c.Value.installed); lastRun = (ConvertTo-InstalledRun $c.Value.lastRun); steps = $st }
+    }
   } catch { $res = @{} }   # a damaged file reads as nothing installed
   return $res
 }
@@ -639,9 +670,11 @@ function Get-InstalledText($A) {
   }
   return ('version ' + $A.Version + ' (not installed yet)')
 }
-function Save-Installed([string]$State, [bool]$Whole) {
+function Save-Installed([string]$State, [bool]$Whole, $StepRecs) {
   # Every deploy run is the app's lastRun. "installed" changes only when every step of the app ran and PASSED (none off,
   # none skipped). Clean-up is not a step: it only recycles old files, so it may be off.
+  # $StepRecs: name -> @{ state; made } for the steps this run reached; a step it did not reach keeps its older record.
+  # A step's "made" list adds up over runs (the undo list): an item stays until an undo removes it.
   # Returns '' or the reason the record could not be saved (the caller says it: the record is the upgrade path).
   try {
     $p = Get-RadeConfigFile 'rade-installed.json'
@@ -655,16 +688,23 @@ function Save-Installed([string]$State, [bool]$Whole) {
     $inst = $null; if ($all.ContainsKey($key)) { $inst = $all[$key].installed }
     if ($State -eq 'PASSED' -and $Whole) { $inst = [ordered]@{ version = $run.version; build = $run.build; round = $run.round; at = $run.at } }
     $run.state = $State
-    $all[$key] = [ordered]@{ installed = $inst; lastRun = $run }
+    $st = [ordered]@{}; if ($all.ContainsKey($key) -and $all[$key].steps) { $st = $all[$key].steps }
+    if ($StepRecs) { foreach ($n in @($StepRecs.Keys)) {
+      $made = @(); $seen = @{}
+      $old = @(); if ($st.Contains($n)) { $old = @($st[$n].made) }
+      foreach ($m in ($old + @($StepRecs[$n].made))) { if ($null -eq $m) { continue }; $id = [string]$m.kind + '|' + [string]$m.name; if (-not $seen[$id]) { $seen[$id] = $true; $made += [ordered]@{ kind = [string]$m.kind; name = [string]$m.name } } }
+      $st[$n] = [ordered]@{ state = [string]$StepRecs[$n].state; version = $run.version; at = $run.at; made = $made }
+    } }
+    $all[$key] = [ordered]@{ installed = $inst; lastRun = $run; steps = $st }
     $sorted = [ordered]@{}; foreach ($k in @($all.Keys | Sort-Object)) { $sorted[$k] = $all[$k] }
     $doc = [ordered]@{
       schema = 'rade-installed/1'
-      about = 'Versions RADE installed on this computer, by app (folder/name). "installed" is the last deploy that PASSED with every step on; "lastRun" is the last deploy run and its state. No user, path or site is kept here.'
+      about = 'Versions RADE installed on this computer, by app (folder/name). "installed" is the last deploy in which every step ran and PASSED; "lastRun" is the last deploy run and its state; "steps" holds each step''s last state and what it made. No user, path or site is kept here.'
       apps = $sorted
     }
     $dir = Split-Path -Parent $p
     if (-not (Test-Path -LiteralPath $dir -PathType Container)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
-    [System.IO.File]::WriteAllText($p, ($doc | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding $false))
+    [System.IO.File]::WriteAllText($p, ($doc | ConvertTo-Json -Depth 9), (New-Object System.Text.UTF8Encoding $false))
     return ''
   } catch { return (ConvertTo-Masked $_.Exception.Message) }
 }
@@ -683,6 +723,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   $summary += ('Application: ' + $script:app.Name)
   $deploy = Test-Deploy
   $whole = $true; foreach ($k in $script:appSteps) { if (-not $Selected[$k]) { $whole = $false } }
+  $stepRecs = @{}
   $modeLine = ''; if ($deploy) { $modeLine = 'Mode: deploy, ' + (Get-InstalledText $script:app); $summary += $modeLine }
   if ($CheckLines) { $summary += $CheckLines }
   $units = 0
@@ -740,6 +781,8 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     $state = Get-StepState $r
     if ($state -eq 'NEEDS REVIEW') { $script:roundBad = $true }
     if ($state -ne 'PASSED') { $whole = $false }   # a skipped step is not installed (review, deploy v1)
+    $made = @($r.Made | Where-Object { $_ }); if ($state -eq 'PASSED') { foreach ($m in @($steps[$k].Makes)) { $made += @{ kind = [string]$m.kind; name = [string]$m.name } } }
+    $stepRecs[[string]$steps[$k].Name] = @{ state = $state; made = $made }
     $line = Get-StepLine $steps[$k] $r $secs
     $summary += $line
     & $speak ('  Result: ' + ($line.Substring($steps[$k].Name.Length + 2)))
@@ -754,7 +797,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     # A run that stops midway still leaves a report to send (summary so far + the log up to the stop).
     $summary[0] = '@@PREFIX@@ ' + $round + ' STOPPED'
     $summary += ('STOPPED: ' + (ConvertTo-Masked ([string]$_)))
-    if ($deploy) { $sv = Save-Installed 'STOPPED' $whole; if ($sv) { $summary += ('NOTE: the installed-version record could not be saved: ' + $sv) } }
+    if ($deploy) { $sv = Save-Installed 'STOPPED' $whole $stepRecs; if ($sv) { $summary += ('NOTE: the installed-version record could not be saved: ' + $sv) } }
     [void](Export-RoundResult $base $summary)
     Add-RoundHistory $base 'ROUND' 'STOPPED' ([int]((Get-Date) - $started).TotalSeconds)
     throw
@@ -772,7 +815,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   if ($deploy) {
     # Deploy v1: nothing leaves this computer. The report stays in Rounds\<round>; the version record is updated.
     $script:draftMade = $false
-    $sv = Save-Installed $state $whole
+    $sv = Save-Installed $state $whole $stepRecs
     if ($sv) { & $speak ('NOTE: the installed-version record (RADE\Config\rade-installed.json) could not be saved: ' + $sv) }
     if ($bad) { & $speak ('Note: one or more items need review (see above). The report in Rounds\' + $round + ' shows what went wrong. Nothing was sent.') }
     elseif (-not $whole) { & $speak ('Note: some steps were off or skipped, so version ' + $script:app.Version + ' is not recorded as installed. Run again with every step on.') }
@@ -2206,12 +2249,13 @@ def build(b):
         parts.append("$files += @{ Dir = %s; Name = %s; Kind = '%s'; Sha = '%s'; Data = %s }"
                      % (q(f['dir']), q(src.name), kind, sha, body))
     # kind "guide": a step the PFM does in another program (guide lines, an address to open, a marker file on Done).
-    steps = ['$steps += @{ Name = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s }'
+    steps = ['$steps += @{ Name = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s; Makes = @(%s) }'
              % (q(s['name']), q(s['dir']), q(s['file']), 'true' if step_default(s) else 'false',
                 q(s.get('ask', {}).get('param', '')), q(s.get('ask', {}).get('prompt', '')), q(s.get('screenOnly', '')),
                 int(s.get('minutes', 30)), q(s.get('args', '')), q(s.get('note', '')), q(s.get('kind', 'script')),
                 ', '.join(q(g) for g in s.get('guide', [])), q(s.get('url', '')), q(s.get('urlConfig', '')), q(s.get('marker', '')),
-                int(s.get('estimate', 0)) * 60, q(s.get('doneText', '')), q(s.get('doneLog', '')))
+                int(s.get('estimate', 0)) * 60, q(s.get('doneText', '')), q(s.get('doneLog', '')),
+                ', '.join('@{ kind = %s; name = %s }' % (q(m['kind']), q(m['name'])) for m in s.get('makes', [])))
              for s in b['steps']]
     apps = app_lines(b)
     # Data files the round downloads (not code, PFM 3A): repo files from raw main, checked by SHA-256; public pages as they are.

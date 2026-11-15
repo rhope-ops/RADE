@@ -294,6 +294,29 @@
         "doneLog": {
           "type": "string",
           "description": "Log line on Done."
+        },
+        "makes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "pattern": "^[a-z][a-z-]{0,30}$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            }
+          },
+          "description": "What the step creates when it PASSES (for example a flow a guide step imports), for the undo list. A script step can also print \"MADE <kind> <name>\" lines (docs/engine.md \"Step contract\"). No site address, no person."
         }
       },
       "allOf": [

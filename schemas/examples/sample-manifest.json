@@ -53,7 +53,13 @@
             "Select Import."
           ],
           "url": "https://example.invalid/import",
-          "doneText": "Imported"
+          "doneText": "Imported",
+          "makes": [
+            {
+              "kind": "flow",
+              "name": "Sample flow"
+            }
+          ]
         }
       ],
       "collect": [
