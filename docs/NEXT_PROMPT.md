@@ -1,6 +1,6 @@
 # Next prompt: RADE
 
-Updated: 2026-11-14 by Claude (RADE page). Keep this file at 40 lines or fewer. The current request overrides it.
+Updated: 2026-11-15 by Claude (shared files). Keep this file at 40 lines or fewer. The current request overrides it.
 
 ## State
 
@@ -23,6 +23,7 @@ Updated: 2026-11-14 by Claude (RADE page). Keep this file at 40 lines or fewer. 
 7. Maintenance (decided 14 Nov 26: 5 buttons, docs/engine.md "Maintenance run types"; the function lists D1-D8 and R1-R7 are still an agent REC): the window shows the screen with only Install on; Diagnose, Back up, Restore and Uninstall need their engine functions. Mockups for Restore and Uninstall: the canvas in docs/window-design.md.
 
 8. Guardrails (DECISIONS 14 Nov 26; docs/engine.md "Guardrails"): built and tested in text mode with a fake PnP module (tests/engine_test.sh, 60 checks with the window tests). Not verified on a device: the classified suffix list, the site collection administrator read and the install-record row on PnP.PowerShell 1.12.0. Next: 90-161.Z bumps its lock and adds `marker`; the window shows a failed start-up guard only as console text.
+9. Shared files (DECISIONS 15 Nov 26; docs/engine.md "Shared files"): built; tests/engine_test.sh has 74 checks with the cross-version test (engine-v1, then this engine, on one folder). Not verified on a device. Next: release engine-v2; a 90-161.Z session moves its lock and builds a round; its report must show 4 `PASS shared files` lines (the 5.1 proof). Open REC: a "bump lock" workflow in each app repo (DECISIONS 15 Nov, Agent). Left from 2 reviews (MINOR, for the next engine change): a record that is blocked for another app's key or cannot be read shows "not installed yet" on Choose, and the reason only after Run (show `Get-InstalledBlock` in `Get-InstalledText`); two `.damaged` copies in one second share a name; `Save-Installed` reads the file twice; a lower-schema record with another app's key is damaged, not foreign; the cross-version test joins two counts (`$n0$n1`); no test for an unreadable record or a lower schema.
 
 ## Needs the Administrator
 

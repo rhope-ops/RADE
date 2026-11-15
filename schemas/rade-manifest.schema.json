@@ -421,7 +421,7 @@
             "drift"
           ],
           "default": "test",
-          "description": "deploy: install an app; the run sends nothing (no e-mail draft) and updates RADE\\Config\\rade-installed.json (docs/engine.md \"Deploy v1\"). test: a test round (the default; owner only). drift: the owner-only drift check (docs/drift-check.md)."
+          "description": "deploy: install an app; the run sends nothing (no e-mail draft) and updates the app's record file in RADE\\Config\\installed (docs/engine.md \"Shared files\"). test: a test round (the default; owner only). drift: the owner-only drift check (docs/drift-check.md)."
         },
         "marker": {
           "type": "object",
