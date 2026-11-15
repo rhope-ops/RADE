@@ -158,10 +158,12 @@ MISSING_HELP = ("no denylist found. Add your names (comma or newline separated),
 WARN_OPTION = "denylist: warn"  # .pii-guard option line; first_use_check.py reads it too
 
 
-# A tier line, also in a wrong form: `profile` with : or =, the bare word, or any one-word key with the value dod
-# (a misspelt key such as "profil: dod"). Every form other than `profile: dod` is unknown and fails the scan.
-_TIER = r"profile\s*[:=]|profile$|[A-Za-z_-]+\s*[:=]?\s*dod$"
-PROFILE_LINE = re.compile(r"(?i)^(?:" + _TIER + r")")
+# A tier line, also in a wrong form. After any leading punctuation (a bullet, a quote, a bracket):
+#   - the word profile, unless a character of a name follows it (profile.example.org and profile-x stay allowed values);
+#   - or one word, at most one punctuation mark, and the value dod (a misspelt key such as "profil: dod").
+# Every form other than `profile: dod` is unknown and fails the scan.
+_TIER = r"[\W_]*(?:profile(?![A-Za-z0-9._/-])|(?!skip\b|denylist\b)[A-Za-z_-]+\s*[^\w\s.]?\s*dod[\W_]*$)"
+PROFILE_LINE = re.compile(r"(?i)^" + _TIER)
 OPTION_LINE = re.compile(r"(?i)^(?:" + _TIER + r"|denylist\s*:)")  # option lines, never allowed values
 UNREADABLE = "profile: <.pii-guard is not UTF-8 text>"  # load_allow adds it; it reads as an unknown tier line
 UNKNOWN_PROFILE = ("unknown profile line in .pii-guard, or the file is not UTF-8 text: the only tier line is "
@@ -480,7 +482,11 @@ def self_test():
         and profile_of({"profile: dodd"}) == profile_of({"profile: dod", "profile: min"}) == profile_of({"profile:"}) == "unknown" \
         and profile_of({"profile: d o d"}) == profile_of({"profile = dod"}) == profile_of({"profile dod"}) == "unknown" \
         and profile_of({"profil: dod"}) == profile_of({"tier=dod"}) == profile_of({"profile"}) == "unknown" \
-        and profile_of({"denylist: warn", "x", "profile.example.org", "profile-x", "host.dod", "skip: a/dod"}) == "minimum"
+        and all(profile_of({v}) == "unknown" for v in ("profile\uff1adod", "- profile: dod", "* profile: dod", '"profile: dod"',
+                                                         "[profile: dod]", "$profile: dod", "profile; dod", "profile - dod",
+                                                         "profile dod", "tier; dod", "'profile:dod'")) \
+        and profile_of({"denylist: warn", "x", "profile.example.org", "profile-x", "profile/x", "host.dod", "a.dod",
+                        "skip: a/dod", "skip: profile dod", "skip: dod", "skip:dod"}) == "minimum"
     print(("ok   " if good else "FAIL ") + "profile line: any case, spacing around the colon; any other form is unknown")
     expect("dod id: a longer word that starts like the keyword is not one", "dodidentifier 12345" + "67890", [], dod=True)
     ok = ok and good
