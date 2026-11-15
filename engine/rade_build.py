@@ -39,6 +39,8 @@ sign-in, Power Automate by a look-and-answer window; each step's "needs" adds it
 the PFM sees is plain, simple English (PFM 14 Nov 26). R17 (PFM 14 Nov 26): every check and step row is two lines high
 (the screen does not move while checks run), the bars are drawn by RADE (smooth, still when Windows animations are off),
 and an Exit button closes the window (it asks first only while a step runs).
+A catalog app of mode deploy (deploy v1, docs/engine.md; the Administrator 14 Nov 26) sends nothing: no draft, no saved
+address; it updates RADE\\Config\\rade-installed.json (the version installed and the last deploy run).
 It runs only the steps embedded in it and never fetches code (PFM 3A). If no window can open (no Windows Forms),
 it runs the same steps as text.
 Text files are embedded as readable single-quoted here-strings, so the PFM and the ISSM can read the code.
@@ -584,7 +586,7 @@ function Get-RoundPlan {
     else { $lines += ''; $lines += 'Clean-up: nothing to recycle.' }
   }
   $lines += ''
-  $lines += 'Settings   RADE\Config (the e-mail address and the saved checks) and Config\@@PREFIX@@-site.txt (the site address).'
+  $lines += ('Settings   RADE\Config (' + $(if (Test-Deploy) { 'the installed versions' } else { 'the e-mail address' }) + ' and the saved checks) and Config\@@PREFIX@@-site.txt (the site address).')
   $lines += ''
   $lines += 'Missing folders are created and files of the same name are replaced. Nothing else is changed, moved or deleted.'
   return @{ Shown = $shown; Found = $found; Lines = $lines }
@@ -605,6 +607,66 @@ function Save-RoundDraft([string]$Dir, [string[]]$Summary, [string]$To, [string]
     return ''
   } catch { return (ConvertTo-Masked $_.Exception.Message) }
 }
+function Test-Deploy { return ([string]$script:app.Mode -eq 'deploy') }
+# ---- Installed versions (the Administrator, 14 Nov 26, deploy v1): RADE\Config\rade-installed.json keeps, per app, the
+# version a deploy last installed and the last deploy run. It holds no user name, path, site or DODID. A deploy run sends
+# nothing: no e-mail draft, no saved address; its report stays in Rounds\<round> on this computer.
+function Get-InstalledKey($A) { return ($appFolder + '/' + [string]$A.Name) }
+function ConvertTo-InstalledRun($V) {
+  if ($null -eq $V) { return $null }
+  $at = $V.at; if ($at -is [datetime]) { $at = $at.ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }   # PowerShell 7 reads it as a date
+  $o = [ordered]@{ version = [string]$V.version; build = [string]$V.build; round = [string]$V.round; at = [string]$at }
+  if ($null -ne $V.state) { $o.state = [string]$V.state }
+  return $o
+}
+function Read-Installed {
+  $res = @{}
+  $p = Get-RadeConfigFile 'rade-installed.json'
+  if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { return $res }
+  try {
+    $j = [System.IO.File]::ReadAllText($p) | ConvertFrom-Json
+    foreach ($c in @($j.apps.PSObject.Properties)) { $res[$c.Name] = [ordered]@{ installed = (ConvertTo-InstalledRun $c.Value.installed); lastRun = (ConvertTo-InstalledRun $c.Value.lastRun) } }
+  } catch { $res = @{} }   # a damaged file reads as nothing installed
+  return $res
+}
+function Get-InstalledText($A) {
+  # One short text for the Choose card and the log; '' for an app that is not a deploy.
+  if ([string]$A.Mode -ne 'deploy') { return '' }
+  $e = (Read-Installed)[(Get-InstalledKey $A)]
+  if ($e -and $e.installed) {
+    if ($e.installed.version -eq [string]$A.Version) { return ('version ' + $A.Version + ' is installed') }
+    return ('version ' + $A.Version + ' (installed now: ' + $e.installed.version + ')')
+  }
+  return ('version ' + $A.Version + ' (not installed yet)')
+}
+function Save-Installed([string]$State, [bool]$Whole) {
+  # Every deploy run is the app's lastRun. "installed" changes only when the run PASSED with every step of the app on.
+  # Returns '' or the reason the record could not be saved (the caller says it: the record is the upgrade path).
+  try {
+    $p = Get-RadeConfigFile 'rade-installed.json'
+    if ((Test-Path -LiteralPath $p -PathType Leaf)) {
+      $bad = $false; try { $null = [System.IO.File]::ReadAllText($p) | ConvertFrom-Json } catch { $bad = $true }
+      if ($bad) { Copy-Item -LiteralPath $p -Destination ($p + '.damaged') -Force }   # keep what was there before it is replaced
+    }
+    $all = Read-Installed
+    $key = Get-InstalledKey $script:app
+    $run = [ordered]@{ version = [string]$script:app.Version; build = [string]$buildId; round = [string]$round; at = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }
+    $inst = $null; if ($all.ContainsKey($key)) { $inst = $all[$key].installed }
+    if ($State -eq 'PASSED' -and $Whole) { $inst = [ordered]@{ version = $run.version; build = $run.build; round = $run.round; at = $run.at } }
+    $run.state = $State
+    $all[$key] = [ordered]@{ installed = $inst; lastRun = $run }
+    $sorted = [ordered]@{}; foreach ($k in @($all.Keys | Sort-Object)) { $sorted[$k] = $all[$k] }
+    $doc = [ordered]@{
+      schema = 'rade-installed/1'
+      about = 'Versions RADE installed on this computer, by app (folder/name). "installed" is the last deploy that PASSED with every step on; "lastRun" is the last deploy run and its state. No user, path or site is kept here.'
+      apps = $sorted
+    }
+    $dir = Split-Path -Parent $p
+    if (-not (Test-Path -LiteralPath $dir -PathType Container)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
+    [System.IO.File]::WriteAllText($p, ($doc | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding $false))
+    return ''
+  } catch { return (ConvertTo-Masked $_.Exception.Message) }
+}
 function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock]$Say, [scriptblock]$Tick, [scriptblock]$OnStep, [scriptblock]$OnStatus, [scriptblock]$WindowLine, [string[]]$Answers, [string[]]$CheckLines) {
   $script:ranSteps = @()
   $script:roundBad = $false
@@ -618,6 +680,9 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   # Line 1 is the e-mail subject (PFM 13 Nov); PASSED or NEEDS REVIEW is added at the end (R06; words R13).
   $summary = @(('@@PREFIX@@ ' + $round), ('Round ' + $round + ', build ' + $buildId + ', started ' + (Get-Date -Format 'yyyy-MM-dd HH:mm')))
   $summary += ('Application: ' + $script:app.Name)
+  $deploy = Test-Deploy
+  $whole = $true; foreach ($k in $script:appSteps) { if (-not $Selected[$k]) { $whole = $false } }
+  $modeLine = ''; if ($deploy) { $modeLine = 'Mode: deploy, ' + (Get-InstalledText $script:app); $summary += $modeLine }
   if ($CheckLines) { $summary += $CheckLines }
   $units = 0
   # Overall bar: each unit weighs its expected seconds (Get-StepWeight); files and clean-up weigh little.
@@ -635,6 +700,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   & $speak ('RADE (Redacted Application Deployment Engine), round ' + $round + ' (build ' + $buildId + '), started ' + (Get-Date -Format 'yyyy-MM-dd HH:mm'))
   $base = Move-ToRade $speak
   & $speak ('Working folder: ' + (ConvertTo-Masked $base))
+  if ($modeLine) { & $speak $modeLine }
   if ($script:noWindowWhy) { & $speak ('Note: no window could open, so the round runs in text mode. Reason: ' + (ConvertTo-Masked $script:noWindowWhy)) }
   if (Test-WordOpen) { & $speak 'Note: Word is open. Renders use Word: save your documents and close Word if a step stops.' }
   & $speak ''
@@ -643,7 +709,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   $fl = Save-RoundDownload $base $speak
   if ($fl) { $summary += $fl }
   # An empty box clears the saved address (review R06 #5).
-  try { if ($To -or (Get-MailTo $base)) { Save-MailTo $base $To } } catch { & $speak ('NOTE: could not save the e-mail address: ' + (ConvertTo-Masked $_.Exception.Message)) }
+  if (-not $deploy) { try { if ($To -or (Get-MailTo $base)) { Save-MailTo $base $To } } catch { & $speak ('NOTE: could not save the e-mail address: ' + (ConvertTo-Masked $_.Exception.Message)) } }
   if ($cleanup.Count) {
     if ($Clean) {
       $n++; $script:prog.Index = $n; $script:prog.Cur = 10; $script:prog.CurKnown = $false; $script:prog.Frac = -1; $script:prog.Start = Get-Date
@@ -686,6 +752,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     # A run that stops midway still leaves a report to send (summary so far + the log up to the stop).
     $summary[0] = '@@PREFIX@@ ' + $round + ' STOPPED'
     $summary += ('STOPPED: ' + (ConvertTo-Masked ([string]$_)))
+    if ($deploy) { $sv = Save-Installed 'STOPPED' $whole; if ($sv) { $summary += ('NOTE: the installed-version record could not be saved: ' + $sv) } }
     [void](Export-RoundResult $base $summary)
     Add-RoundHistory $base 'ROUND' 'STOPPED' ([int]((Get-Date) - $started).TotalSeconds)
     throw
@@ -700,6 +767,17 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   Add-RoundHistory $base 'ROUND' $(if ($bad) { 'CHECK' } else { 'OK' }) ([int]((Get-Date) - $started).TotalSeconds)
   $script:resultsDir = $z.Dir
   & $speak ''
+  if ($deploy) {
+    # Deploy v1: nothing leaves this computer. The report stays in Rounds\<round>; the version record is updated.
+    $script:draftMade = $false
+    $sv = Save-Installed $state $whole
+    if ($sv) { & $speak ('NOTE: the installed-version record (RADE\Config\rade-installed.json) could not be saved: ' + $sv) }
+    if ($bad) { & $speak ('Note: one or more items need review (see above). The report in Rounds\' + $round + ' shows what went wrong. Nothing was sent.') }
+    elseif (-not $whole) { & $speak ('Note: some steps were off, so version ' + $script:app.Version + ' is not recorded as installed. Run again with every step on.') }
+    else { & $speak ('Version ' + $script:app.Version + ' of ' + $script:app.Name + ' is recorded as installed.') }
+    & $speak ('DONE in ' + (Format-Duration ((Get-Date) - $started).TotalSeconds) + '. The report is in Rounds\' + $round + ' on this computer. Nothing was sent.')
+    return ,$summary
+  }
   if ($bad) { & $speak 'Note: one or more items need review (see above). Send the results anyway; they show what went wrong.' }
   # R05: an Outlook draft with everything in it; if Outlook cannot make one, the folder opens and the summary is on the clipboard.
   $why = Save-RoundDraft $z.Dir $summary $To (& $WindowLine)
@@ -1167,7 +1245,7 @@ function Get-AppText($A, $Hist) {
   foreach ($k in $A.Steps) { $w = Get-StepWeight $Hist $steps[$k]; $est += $w.Seconds; if (-not $w.Known) { $known = $false }; if ($steps[$k].Kind -eq 'guide') { $you++ } }
   $min = [math]::Max(1, [int][math]::Round($est / 60))
   return @{ Summary = $A.Summary
-    Meta = (@($A.Steps).Count.ToString() + ' steps' + $(if ($you) { ' (' + $you + $(if ($you -eq 1) { ' needs you)' } else { ' need you)' }) } else { '' }) + $dot + 'about ' + $min + ' min' + $(if ($known) { '' } else { ' (a guess)' }) + $dot + @($A.Checks).Count + ' checks before you deploy') }
+    Meta = (@($A.Steps).Count.ToString() + ' steps' + $(if ($you) { ' (' + $you + $(if ($you -eq 1) { ' needs you)' } else { ' need you)' }) } else { '' }) + $dot + 'about ' + $min + ' min' + $(if ($known) { '' } else { ' (a guess)' }) + $dot + @($A.Checks).Count + ' checks before you deploy' + $(if ([string]$A.Mode -eq 'deploy') { $dot + (Get-InstalledText $A) } else { '' })) }
 }
 function Get-CheckColor([string]$State) {
   # One meaning per color, with the word always shown too. Contrast PASSED, WARNING, FAILED, NOT RUN: on white 7.4, 7.1,
@@ -1691,7 +1769,7 @@ if ($gui) {
       try { $word.Font = New-Object System.Drawing.Font($form.Font.FontFamily, [single]20, $bold) } catch { $null = $_ }
       $lock.Controls.Add($logoBox, 0, 0); $lock.Controls.Add($word, 1, 0)
       $tag = New-Object System.Windows.Forms.Label
-      $tag.AutoSize = $true; $tag.MaximumSize = New-Object System.Drawing.Size(180, 0); $tag.Text = 'Test and deploy apps for your DoD organization'
+      $tag.AutoSize = $true; $tag.MaximumSize = New-Object System.Drawing.Size(180, 0); $tag.Text = 'Test and deploy apps for your organization'
       $tag.ForeColor = $mist; $tag.BackColor = [System.Drawing.Color]::Transparent; $tag.Margin = New-Object System.Windows.Forms.Padding(0, 10, 0, 16)
       $rule = New-Object System.Windows.Forms.Panel
       $rule.Height = 1; $rule.Width = 178; $rule.BackColor = [System.Drawing.Color]::FromArgb(70, 105, 150); $rule.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 14)
@@ -1775,6 +1853,7 @@ if ($gui) {
       $stepView.ClearSelection()
       $first = Get-RoundPlan
       $deployHead.Text = 'Deploy ' + $script:app.Name
+      $dep = Test-Deploy; $toLabel.Visible = -not $dep; $toBox.Visible = -not $dep; $okBox.Visible = -not $dep   # a deploy sends nothing
       $where.Text = $first.Shown + $(if ($first.Found) { '' } else { '   (NOT found)' })
       $warnings = @()
       if (-not $first.Found) { $warnings += 'OneDrive folder NOT found in this Windows profile: open OneDrive from the Start menu and sign in, then paste and run again.' }
@@ -1790,6 +1869,14 @@ if ($gui) {
         '  3. At DONE, an Outlook draft opens with the summary and all result files. Review it, then select Send.',
         '     If no draft opens, the results folder opens and the summary is on the clipboard.',
         '  Closing this window stops the running step.', '')
+      if ($dep) {
+        $howTo = @('HOW TO USE THIS SCREEN',
+          '  1. Confirm that "Writes to" shows your OneDrive folder.',
+          '  2. Press Enter or select Run. Keep this window open until the log shows DONE.',
+          '     Steps marked "(needs you)" open a short guide. Complete it, then select "Done".',
+          '  3. At DONE, the report is in the results folder on this computer. Nothing is sent.',
+          '  Closing this window stops the running step.', '')
+      }
       $log.Text = (($howTo + $first.Lines) -join "`r`n") + "`r`n"
     }
     $setRow = { param([int]$I, $R)
@@ -1883,7 +1970,7 @@ if ($gui) {
         # Enter starts the run (PFM 13 Nov). Focus: the address box when it is empty, else Run.
         $form.AcceptButton = $run
         try { $pDeploy.PerformLayout(); & $fitLog } catch { $null = $_ }
-        if ($toBox.Text) { $run.Focus() | Out-Null } else { $toBox.Focus() | Out-Null }
+        if ($toBox.Text -or (Test-Deploy)) { $run.Focus() | Out-Null } else { $toBox.Focus() | Out-Null }
       } }
     $appList.Add_SelectedIndexChanged({
       if ($appList.SelectedIndex -ge 0) { Select-App $appList.SelectedIndex; & $setHint 0 ($script:app.Name + ' selected. Press Enter or select "Next: check"') '' }
@@ -1943,7 +2030,7 @@ if ($gui) {
       $run.Enabled = $false; $draft.Enabled = $false; $copy.Enabled = $false; $open.Enabled = $false; $back.Enabled = $false; $script:running = $true
       & $setHint 2 'Running. Keep this window open until the log shows DONE' 'RUNNING'
       foreach ($sr in $stepView.Rows) { $sr.Cells[2].Value = $(if ([bool]$sr.Cells[0].Value) { 'WAITING' } else { 'OFF' }) }; $stepView.Invalidate()   # a second run starts clean
-      $to = $toBox.Text.Trim()
+      $to = $(if (Test-Deploy) { '' } else { $toBox.Text.Trim() })
       if ($to -and -not (Test-MailTo $to)) {
         $script:helped = @{}; & $say 'The e-mail address does not look right.'; & $say (Get-WhatToDo 'e-mail address does not look right')
         $run.Enabled = $true; $back.Enabled = $true; $script:running = $false; & $setHint 2 'The e-mail address does not look right. Correct it, then select Run' 'FAILED'; $toBox.Focus() | Out-Null; return
@@ -1970,9 +2057,15 @@ if ($gui) {
         $allLabel.Text = 'DONE in ' + (Format-Duration ((Get-Date) - $script:roundStart).TotalSeconds); $allRight.Text = [string]$script:lastSummary[0]
         $stepLabel.Text = $(if ($script:draftMade) { 'The Outlook draft is open' } else { 'The results folder is open and the summary is copied' }); $stepRight.Text = ''
         & $setHint 2 $(if ($script:draftMade) { 'Done. Review the Outlook draft, then select Send' } else { 'Done. Paste the summary into an e-mail and attach the results files' }) $(if ([string]$script:lastSummary[0] -match 'NEEDS REVIEW') { 'FAILED' } else { 'PASSED' })
+        if (Test-Deploy) {
+          $stepLabel.Text = 'The report is in the results folder'
+          & $setHint 2 'Done. Nothing was sent' $(if ([string]$script:lastSummary[0] -match 'NEEDS REVIEW') { 'FAILED' } else { 'PASSED' })
+          $copy.Enabled = $true; $open.Enabled = $true; & $toFront; $open.Focus() | Out-Null
+        } else {
         $copy.Enabled = $true; $open.Enabled = $true; $draft.Enabled = $true
         $copy.PerformClick()
         if (-not $script:draftMade) { $open.PerformClick(); & $toFront; $copy.Focus() | Out-Null }
+        }
       }
       catch {
         $script:stepStart = $null
@@ -1990,7 +2083,7 @@ if ($gui) {
       if ($why) { $script:helped = @{}; $m = 'The Outlook draft could not be created (' + $why + ').'; & $say $m; & $say (Get-WhatToDo $m) } else { & $say 'The Outlook draft is open.' }
     })
     $copy.Add_Click({
-      try { [System.Windows.Forms.Clipboard]::SetText(($script:lastSummary -join "`r`n")); & $say 'Summary copied. Paste it into the e-mail body; its first line is the subject.' }
+      try { [System.Windows.Forms.Clipboard]::SetText(($script:lastSummary -join "`r`n")); & $say $(if (Test-Deploy) { 'Summary copied.' } else { 'Summary copied. Paste it into the e-mail body; its first line is the subject.' }) }
       catch { & $say ('The clipboard is busy. Select Copy summary again. (' + $_.Exception.Message + ')') }
     })
     $open.Add_Click({ if ($script:resultsDir) { Start-Process -FilePath 'explorer.exe' -ArgumentList ('"' + $script:resultsDir + '"') } })
@@ -2051,7 +2144,7 @@ try {
   }
   foreach ($l in (Get-RoundPlan).Lines) { Write-Host $l }
   if (Test-WordOpen) { Write-Host 'Word is open. Save your documents and close Word before you run (renders use Word).' }
-  $to = Get-MailTo (Get-BasePath)
+  $to = $(if (Test-Deploy) { '' } else { Get-MailTo (Get-BasePath) })
   # The plan above shows first; Enter starts the run (PFM 13 Nov), N stops before anything is written.
   $go = ([string](Read-Host 'Press Enter to start the round, or type N and press Enter to stop with no changes')).Trim()
   if ($go -match '^[Nn]') { Write-Host 'Stopped. Only the saved checks (RADE\Config\rade-checks.json) were written.'; return }
@@ -2059,6 +2152,7 @@ try {
   $onStatusText = { param($i, $count, $name, $estimate) $null = $name; $null = $estimate; $g = Get-Progress; Write-Host ('  Overall: step ' + $i + ' of ' + $count + ', ' + [int]($g.All * 100) + ' % done, about ' + (Format-Duration $g.Left) + ' left (a guess)') }
   $checkLines = Get-CheckSummary $script:checkResults
   $sum = Invoke-Round $true $sel $to $say { } { } $onStatusText { 'Window: text mode (no window opened)' } @() $checkLines
+  if (Test-Deploy) { return }   # a deploy sends nothing: no folder pop-up, no clipboard
   if ($script:resultsDir -and $env:OS -eq 'Windows_NT' -and -not $script:draftMade) { Start-Process -FilePath 'explorer.exe' -ArgumentList ('"' + $script:resultsDir + '"') }
   if (Get-Command Set-Clipboard -ErrorAction SilentlyContinue) { try { Set-Clipboard -Value ($sum -join "`r`n"); Write-Host 'Summary copied to the clipboard.' } catch { Write-Host 'The clipboard is not available.' } }
 } catch {
@@ -2082,14 +2176,17 @@ def app_lines(b):
     out = []
     for a in apps:
         idx = [names.index(n) for n in a['steps']]
-        need = set(BASE_CHECKS)
+        mode, version = a.get('mode', 'test'), a.get('version', '')
+        assert mode != 'deploy' or version, 'app %r: a deploy needs a version' % a['name']
+        # A deploy sends nothing (deploy v1, the Administrator 14 Nov 26), so it needs no Outlook check.
+        need = set(BASE_CHECKS) - ({'outlook'} if mode == 'deploy' else set())
         for i in idx:
             for n in b['steps'][i].get('needs', []):
                 assert n in CHECK_IDS, 'unknown check %r in step %r' % (n, names[i])
                 need.add(n)
         checks = [c for c in CHECK_IDS if c in need]
-        out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s) }'
-                   % (q(a['name']), q(a['summary']), ', '.join(str(i) for i in idx), ', '.join(q(c) for c in checks)))
+        out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s }'
+                   % (q(a['name']), q(a['summary']), ', '.join(str(i) for i in idx), ', '.join(q(c) for c in checks), q(mode), q(version)))
     return out
 
 
@@ -2138,13 +2235,15 @@ def build(b):
     body = ('$goUrl = %s\n$webAgent = \'Mozilla/5.0 (Windows NT 10.0; Win64; x64) RADE\'\n$logoPng = \'%s\'\n%s$round = %s\n$appFolder = %s\n$usersRoot = \'C:\\Users\'\n$files = @()\n%s\n$fetch = @()\n%s\n$steps = @()\n%s\n$collect = @()\n%s\n$cleanup = @()\n%s\n$known = @(%s)\n$apps = @()\n%s\n%s'
             % (go, logo, own, q(b['round']), q(APP['folder']), '\n'.join(parts), '\n'.join(fetchs), '\n'.join(steps), '\n'.join(collect), '\n'.join(cleanup), ', '.join(q(k) for k in known), '\n'.join(apps), engine))
     build_id = hashlib.sha256(body.encode('ascii')).hexdigest()[:8]
+    modes = {a.get('mode', 'test') for a in b.get('apps', [])} or {'test'}
+    sends = ' on this computer. It sends nothing.' if modes == {'deploy'} else ', then opens an Outlook draft with them (never sent; a deploy makes no draft).' if 'deploy' in modes else ', then opens an Outlook draft with them (never sent).'
     head = ('<#\n  RADE (Redacted Application Deployment Engine), round bundle: %s.\n'
             '  GENERATED by the RADE engine (rhope-ops/RADE engine/rade_build.py, sha256 %s) from %s; do not edit.\n'
             '  How to run: open Windows PowerShell ISE, File > New, paste all of this text into the script pane, press F5.\n'
             '  The RADE window opens: press Enter (or Run); it uses your Windows profile folder. It writes the files below into the task folders under\n'
             '  C:\\Users\\<DODID>\\OneDrive - United States Air Force\\RADE\\%s (replacing older copies), runs the steps,\n'
-            '  and saves its results in Rounds\\%s, then opens an Outlook draft with them (never sent). No download, no admin rights.\n'
-            '#>\n$buildId = \'%s\'\n' % (b['title'], ENGINE_SHA[:12], MANIFEST, APP['folder'], b['round'], build_id))
+            '  and saves its results in Rounds\\%s%s No download, no admin rights.\n'
+            '#>\n$buildId = \'%s\'\n' % (b['title'], ENGINE_SHA[:12], MANIFEST, APP['folder'], b['round'], sends, build_id))
     return head + body
 
 

@@ -380,7 +380,12 @@
             "drift"
           ],
           "default": "test",
-          "description": "deploy: install an app. test: a test round (the default; a permanent mode, the Administrator 2026-11-14). drift: the owner-only drift check (docs/drift-check.md)."
+          "description": "deploy: install an app; the run sends nothing (no e-mail draft) and updates RADE\\Config\\rade-installed.json (docs/engine.md \"Deploy v1\"). test: a test round (the default; owner only). drift: the owner-only drift check (docs/drift-check.md)."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$",
+          "description": "The app version this bundle installs (for example 1.0.0). Required for mode deploy; written to the installed-version record."
         },
         "steps": {
           "type": "array",
@@ -390,6 +395,21 @@
           },
           "description": "Step names, in run order."
         }
+      },
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "deploy"
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "then": {
+        "required": [
+          "version"
+        ]
       }
     },
     "application": {

@@ -83,7 +83,9 @@
           "name": "Sample app (deploy)",
           "summary": "The same fake app as a deploy.",
           "mode": "deploy",
+          "version": "1.0.0",
           "steps": [
+            "T01 Sample check r1",
             "T02 Sample import r1"
           ]
         }
