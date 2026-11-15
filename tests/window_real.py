@@ -26,6 +26,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SMALLEST = "811x469"   # the only size at which the text of a card may scroll (the buttons stay in view)
 RUNS = [
     ("deploy-full", 1, "done", "0", "", False),
+    # the next two start where "deploy-full" ended (the same user folder): the application is installed, so the
+    # Maintenance card shows, with "Uninstall" at the right end (1020 wide) and on its own row (811 wide)
     ("deploy-616", 1, "done", "1", "1020x616", False),
     ("deploy-tour-small", 1, "fail", "1", "811x469", False),
     ("test-small", 0, "done", "0", "811x469", False),
@@ -61,6 +63,8 @@ def stretch(m, limits):
         for a in b["apps"]:
             a["name"] = fill(a["name"], limits["application name"])
             a["summary"] = fill(a["summary"], limits["summary"])
+            if a.get("version"):
+                a["version"] = (a["version"] + "-rc.1234567890")[:limits["version"]]
             a["steps"] = [names[x] for x in a["steps"]]
     return m
 
@@ -69,7 +73,7 @@ def file_url(p):
     return pathlib.Path(p).resolve().as_uri()
 
 
-def bundle(t, long):
+def bundle(t, long, keep=None):
     app = t / "app"
     shutil.copytree(ROOT / "tests" / "fixture-app", app)
     m = json.loads((ROOT / "schemas" / "examples" / "sample-manifest.json").read_text(encoding="utf-8"))
@@ -86,8 +90,8 @@ def bundle(t, long):
         sys.exit("FAIL build of the sample bundle\n" + r.stdout + r.stderr)
     (t / "go.md").write_text("", encoding="utf-8")
     (t / "rel.json").write_text(json.dumps({"apps": dict((n, "9.0.0") for n in names)}), encoding="utf-8")   # a newer version on the app page: the notice shows
-    users = t / "wu"
-    (users / "test1234" / "OneDrive - United States Air Force").mkdir(parents=True)
+    users = (keep or t) / "wu"
+    (users / "test1234" / "OneDrive - United States Air Force").mkdir(parents=True, exist_ok=True)
     s = (app / "scripts" / "gov" / "paste" / "SAMPLE-R01-round-r1.ps1").read_text(encoding="utf-8")
     go = file_url(t / "go.md")
     for pat, new in [
@@ -110,9 +114,11 @@ def bundle(t, long):
 def main():
     out = pathlib.Path(sys.argv[1]).resolve()
     bad = 0
+    home = pathlib.Path(tempfile.mkdtemp())   # the user folder the three "deploy" runs share
+    maint = 0
     for name, app, hand, tour, size, long in RUNS:
         t = pathlib.Path(tempfile.mkdtemp())
-        users = bundle(t, long)
+        users = bundle(t, long, home if name.startswith("deploy-") else None)
         d = out / name
         d.mkdir(parents=True, exist_ok=True)
         env = dict(os.environ, RADE_T_OUT=str(d), RADE_T_APP=str(app), RADE_T_HAND=hand, RADE_T_TOUR=tour, RADE_T_SIZE=size, USERPROFILE=str(users / "test1234"))
@@ -145,11 +151,21 @@ def main():
             why.append("a card scrolls at a size where none may: " + scrolls[0][12:])
         if not any(l.startswith("WIN line Layout self-check: ") for l in lines):
             why.append("no line of the layout self-check")
+        broken = [l for l in lines if l.startswith(("WIN PNG-FAILED", "WIN DRIVER-ERROR", "WIN TIMEOUT", "WIN BAD"))]
+        if broken:
+            why.append(broken[0][:120])
+        flat = [l for l in lines if l.startswith("WIN png=") and int(l.rsplit("=", 1)[1]) < 20]
+        if flat:
+            why.append("a picture with fewer than 20 colors (the window was not drawn): " + flat[0])
+        maint += sum(1 for l in lines if l.startswith("WIN card=") and " view=maint " in l)
         if why:
             bad += 1
             print("   FAIL " + name + ": " + "; ".join(why))
         shutil.rmtree(t, ignore_errors=True)
-    print("WINDOW runs=%d bad=%d" % (len(RUNS), bad))
+    if maint < 2:
+        bad += 1
+        print("   FAIL the Maintenance card showed %d times, 2 at least are needed (1020 and 811 wide)" % maint)
+    print("WINDOW runs=%d bad=%d maintenance-cards=%d" % (len(RUNS), bad, maint))
     return 1 if bad else 0
 
 

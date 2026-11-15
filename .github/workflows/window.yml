@@ -20,14 +20,14 @@ jobs:
     steps:
       - name: Keep line ends as they are in the repository (a fetched file is checked by its SHA-256)
         run: git config --global core.autocrlf false
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
         with:
           persist-credentials: false
       - name: Draw each card and check the layout
         run: python tests/window_real.py window-out
       - name: Keep the pictures and the output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: window
           path: window-out

@@ -57,8 +57,8 @@ RADE's own texts follow the same rule: a text the window draws wraps to 2 lines 
 
 | What | Where | Proves |
 |---|---|---|
-| Layout self-check | the engine (`$ui.Check`), in a test round and in the Windows job; a deploy does not run it | For each card shown: no text needs more room than its control has, no parent cuts a control, no two parts overlap. One line under "Window: OK" in the results e-mail draft: "Layout self-check: PASS layout, N cards (width x height at scale)" or the defects |
-| Windows job | [.github/workflows/window.yml](../.github/workflows/window.yml) with [tests/window_real.py](../tests/window_real.py): each pull request that changes the engine or the tests | Draws the real window of the sample bundle on Windows PowerShell 5.1 at 4 sizes (as the engine sets it, 1020 x 616, 811 x 469 twice), keeps one picture of each card, and fails on a layout defect or on a card that scrolls above 811 x 469. The runner has 100 % scaling only: 150 % is tested as the same size in 100 % pixels |
+| Layout self-check | the engine (`$ui.Check`), in a test round and in the Windows job; a deploy does not run it | For each card shown: no text needs more room than its control has, no parent cuts a control, no two parts overlap. It measures controls only: text that RADE draws itself (the choices on Choose, the check list of the Record) wraps or ends with "..." by its drawing rule and is not measured, and a part inside a scrolling text is not tested for a cut. One line under "Window: OK" in the results e-mail draft: "Layout self-check: PASS layout, N cards (width x height at scale)" or the defects |
+| Windows job | [.github/workflows/window.yml](../.github/workflows/window.yml) with [tests/window_real.py](../tests/window_real.py): each pull request that changes the engine or the tests | Draws the real window of the sample bundle on Windows PowerShell 5.1 in 6 runs at 3 sizes (as the engine sets it on the runner's 1024 x 768 screen: 973 x 684; 1020 x 616; 811 x 469), two of them with every text at its limit, keeps one picture of each card, and fails on a layout defect, on a card that scrolls above 811 x 469, on a picture that was not drawn, or when the Maintenance card did not show. The runner has 100 % scaling only: 150 % is tested as the same size in 100 % pixels |
 | Work computer | a test round | The same self-check at the real scaling, and the person's "The window displayed correctly" box |
 
 ## Cards
@@ -93,7 +93,7 @@ The Record (F2, or its links): three columns. Checks by group (Local, Network, A
 | Results: PASSED, PASSED (fallback), WARNING, FAILED, NOT RUN; the word is always shown, never color alone | RADE 2026-11-14 |
 | RADE draws its own bars; no bar moves back inside a run or a step; still when Windows animations are off | Z 2026-11-14 (R17, R18) |
 | A deploy sends nothing; a test round makes an Outlook draft that is never sent (fallback: folder and clipboard) | [engine.md "Deploy v1"](engine.md#deploy-v1); Z 2026-11-13 |
-| No tooltips; AccessibleName on every control; every control by keyboard (Tab, Enter, F2 = Record, Page Down and Page Up = the Record's check list, 1 to 9 = a choice; Esc = close the Record, else Back, and on Choose, which has no Back, it exits) | R21 W9; RADE 2026-11-14 |
+| No tooltips; AccessibleName on every control; every control by keyboard (Tab, Enter, F2 = Record, Page Down and Page Up = the Record's check list and the text of a card that is taller than the window, 1 to 9 = a choice; Esc = close the Record, else Back, and on Choose, which has no Back, it exits) | R21 W9; RADE 2026-11-14 |
 | The same steps run as text when no window can open | Z 2026-11-13 |
 
 Not in the window yet: bundle size in the summary, engine version and sha256 in the window, a JSON results block (RADE 2026-11-14, engine work row); the Maintenance actions other than Install.
