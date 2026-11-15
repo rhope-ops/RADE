@@ -7,8 +7,8 @@
 # ("811x469" = the window is set to this size: 1280 x 800 at 150 % scaling, in 100 % pixels; empty = as the engine sets it).
 # A check that cannot pass on the test computer is set to PASSED after its card has shown (the test is of the window).
 # The hand step's questions (manifest "answers"): one picture per kind (NN-answer-yesno, NN-answer-pick, NN-answer-text),
-# for the owner's approval of the look, and NN-answer-text-split (the second rework: the first sentence as the headline,
-# the rest as a body line; drawn only here); the driver selects the first button (a text gets a short fake note).
+# for the owner's approval of the look (the long-text run draws a first sentence that shrinks in the smallest window);
+# the driver selects the first button (a text gets a short fake note).
 Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing
 $env:RADE_LAYOUT = '1'   # the layout self-check runs for a deploy too
 function Start-Process { param($FilePath, $ArgumentList) Write-Host ('WIN start-process ' + $(if ([string]$FilePath -match '^https://') { 'browser' } else { [string]$FilePath })) }
@@ -80,9 +80,7 @@ function global:Step-Rade {
     elseif ($global:RadeT.Hand -eq 'fail') { $ui.B[1].PerformClick() } else { $ui.B[0].PerformClick() }
   }
   elseif ($v -eq 'answer') {
-    if ($ui.FieldRow.Visible) {   # the Administrator's second rework of the text question, for its picture only (test switch RADE_T_SPLIT), then the shipped card again
-      $q = $ui.QNow; $env:RADE_T_SPLIT = '1'; & $ui.VAnswer $q[0] $q[1] $q[2]; Save-RadeCard 'answer-text-split'; $env:RADE_T_SPLIT = ''; & $ui.VAnswer $q[0] $q[1] $q[2]
-      $ui.Field.Text = 'Sample note' }
+    if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }
     $ui.B[0].PerformClick() }
   elseif ($v -eq 'handfail') { $ui.ErrBox.Text = 'Import failed: flow https://usaf.dps.mil/sites/fake/x not found'; $ui.B[0].PerformClick() }
   elseif ($v -in 'done', 'review', 'stopped') {

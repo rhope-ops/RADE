@@ -1772,31 +1772,48 @@ if ($gui) {
     # its parts share one vertical midpoint (each part's top margin is set from the tallest part). One left edge per card:
     # a label draws its text after a padding that grows with its font (Windows text padding: about 1/6 of the line), so a
     # 22 pt headline started about 3 px right of a 9 pt line and of the buttons. Each part moves by its own padding.
-    $ui.Pads = @{}
-    $ui.PadOf = { param($F) try { $k = [string]$F.Name + '|' + $F.SizeInPoints + '|' + $F.Style
-        if (-not $ui.Pads.ContainsKey($k)) { $big = New-Object System.Drawing.Size(9999, 999); $ui.Pads[$k] = [int][math]::Round(([System.Windows.Forms.TextRenderer]::MeasureText('x', $F, $big, [System.Windows.Forms.TextFormatFlags]'SingleLine').Width - [System.Windows.Forms.TextRenderer]::MeasureText('x', $F, $big, [System.Windows.Forms.TextFormatFlags]'SingleLine, NoPadding').Width) / 2.0) }
-        return [int]$ui.Pads[$k] } catch { return 0 } }
+    # Where a part's ink starts, measured: the part drawn into a bitmap by Windows (DrawToBitmap: the same drawing as on
+    # screen, with its own flags, padding and the first glyph's side bearing), the first column that differs from its back
+    # color. A button with an edge starts at its edge. Without a bitmap (the test stand-ins), the text padding Windows adds
+    # (1/6 em, rounded up). R24 job: a formula and a with/without-NoPadding measure both missed by 3 to 6 px.
+    $ui.Inks = @{}
+    $ui.Ink = { param($C)
+      if ($C -is [System.Windows.Forms.ButtonBase] -and [int]$C.FlatAppearance.BorderSize -gt 0) { return 0 }
+      $f = $C.Font; $k = $C.GetType().Name + '|' + $f.Name + '|' + $f.SizeInPoints + '|' + $f.Style + '|' + ([string]$C.Text).PadRight(2).Substring(0, 2) + '|' + $(if ($C -is [System.Windows.Forms.ButtonBase] -or $C -is [System.Windows.Forms.Panel]) { $C.Width } else { '' })
+      if ($ui.Inks.ContainsKey($k)) { return [int]$ui.Inks[$k] }
+      $v = [int][math]::Ceiling([double]$f.SizeInPoints * $ui.Dpi / 72.0 / 6.0); $got = $false
+      if (-not $C.Text -and -not ($C -is [System.Windows.Forms.Panel])) { return $v }   # nothing drawn: nothing to measure
+      try { if ($C.AutoSize -and $C.Text) { $pz = $C.PreferredSize; if ($C.Width -ne $pz.Width -or $C.Height -ne $pz.Height) { $C.Size = $pz } }   # a new text: the size the layout will give it
+        $w = [math]::Max(1, $C.Width); $h = [math]::Max(1, $C.Height); $bm = New-Object System.Drawing.Bitmap($w, $h)
+        try { $C.DrawToBitmap($bm, (New-Object System.Drawing.Rectangle(0, 0, $w, $h))); $bg = $C.BackColor; $hit = -1
+          for ($x = 0; $x -lt [math]::Min($w, (& $ui.Sc 40)) -and $hit -lt 0; $x++) { for ($y = 0; $y -lt $h; $y++) { $px = $bm.GetPixel($x, $y); if ([math]::Abs($px.R - $bg.R) + [math]::Abs($px.G - $bg.G) + [math]::Abs($px.B - $bg.B) -gt 90) { $hit = $x; break } } }
+          if ($hit -ge 0) { $v = $hit; $got = $true } } finally { $bm.Dispose() } } catch { $null = $_ }
+      if ($got) { $ui.Inks[$k] = $v }; return $v }   # only a measure is kept; the estimate is tried again next time
     $ui.SetLeft = { param($C, [int]$L) $L = [math]::Max(0, $L); $m = $C.Margin; if ($m.Left -ne $L) { $C.Margin = New-Object System.Windows.Forms.Padding($L, $m.Top, $m.Right, $m.Bottom) } }
+    # One edge per card at $ui.Sc 10 from the card's column: room for the largest text inset (a 22 pt headline: about 7)
+    # and for a button's 4 px margin, because a negative margin is taken as 0 in a table cell (R24 job).
     $ui.FitEdges = { try {
-        $mm = & $ui.Sc $ui.Z.M; $x = $mm; foreach ($l in @($ui.Kick, $ui.Sent, $ui.P[0], $ui.P[1], $ui.Lines, $ui.Note, $ui.Help, $ui.Foot, $ui.FieldL, $ui.TestL, $ui.StepName, $ui.LastLog)) { $x = [math]::Max($x, (& $ui.PadOf $l.Font)) }
-        $ui.EdgeX = $x
-        foreach ($l in @($ui.Kick, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.Lines, $ui.Note, $ui.Help, $ui.Foot, $ui.LastLog, $ui.FieldL, $ui.TestL)) { & $ui.SetLeft $l ($x - (& $ui.PadOf $l.Font)) }
-        $ps = & $ui.PadOf $ui.Sent.Font; & $ui.SetLeft $ui.SentRow ($x - $ps); & $ui.SetLeft $ui.TickP ($ps - [int][math]::Round(0.09 * $ui.TickP.Width))   # the tick's stroke starts 9 % into its box
-        & $ui.SetLeft $ui.StepRow ($x - (& $ui.PadOf $ui.StepName.Font)); & $ui.SetLeft $ui.ErrRow ($x - $ui.ErrBox.Margin.Left)
-        foreach ($r in @($ui.BtnRow, $ui.LinkRow)) { & $ui.SetLeft $r ($x - $mm) }   # a button's own 4 px margin (room for the ring)
+        $mm = & $ui.Sc $ui.Z.M; $x = & $ui.Sc 10; $ui.EdgeX = $x
+        foreach ($l in @($ui.Kick, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.Lines, $ui.Note, $ui.Help, $ui.Foot, $ui.LastLog, $ui.FieldL, $ui.TestL)) { & $ui.SetLeft $l ($x - (& $ui.Ink $l)) }
+        & $ui.SetLeft $ui.TickP 0; & $ui.SetLeft $ui.SentRow ($x - $(if ($ui.TickP.Visible) { & $ui.Ink $ui.TickP } else { & $ui.Ink $ui.Sent }))
+        & $ui.SetLeft $ui.StepRow ($x - (& $ui.Ink $ui.StepName)); & $ui.SetLeft $ui.ErrRow ($x - $ui.ErrBox.Margin.Left)
+        & $ui.SetLeft $ui.BtnRow ($x - $mm)   # a button's own 4 px margin (room for the ring)
+        $l1 = @($ui.LinkRow.Controls)[0]; & $ui.SetLeft $ui.LinkRow ($x - $mm - (& $ui.Ink $l1))   # a link's text is in the middle of its box
         & $ui.SetLeft $ui.Opts $x } catch { $null = $_ } }
     $ui.AlignRow = { param($Parts, [int]$Base)
       try { $hs = @($Parts | ForEach-Object { if ($_.AutoSize) { [int]$_.PreferredSize.Height } else { [int]$_.Height } }); $hh = [int]($hs | Measure-Object -Maximum).Maximum
         for ($i = 0; $i -lt $Parts.Count; $i++) { $m = $Parts[$i].Margin; $t = $Base + [int][math]::Floor(($hh - $hs[$i]) / 2); $b = $Base + $hh - $hs[$i] - ($t - $Base)
           if ($m.Top -ne $t -or $m.Bottom -ne $b) { $Parts[$i].Margin = New-Object System.Windows.Forms.Padding($m.Left, $t, $m.Right, $b) } } } catch { $null = $_ } }
     $ui.RowParts = { param([string]$Row) switch ($Row) { 'Top' { @(@($ui.Logo) + @($ui.WordL, $ui.AppL) | Where-Object { $_ }) } 'FieldRow' { @($ui.FieldL, $ui.FieldBox) + @($(if ($ui.FieldBOn) { $ui.FieldB })) } 'TestRow' { @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox) } } }
-    $ui.AlignRows = { & $ui.AlignRow (& $ui.RowParts 'Top') 0; $mm = & $ui.Sc $ui.Z.M; & $ui.AlignRow (& $ui.RowParts 'FieldRow') $mm; & $ui.AlignRow (& $ui.RowParts 'TestRow') $mm }
-    # The question headline (manifest "answers") shrinks to fit one line: from the headline size in 0.5 pt steps to 60 % of
-    # it (never under the body size); only at that size does it wrap. Other cards keep the headline size.
+    $ui.AlignRows = { try { $bh = [int]$ui.FieldB.PreferredSize.Height; if ($bh -gt 0) { foreach ($p in $ui.Boxes) { if ($p.Height -ne $bh) { $p.Height = $bh } } } } catch { $null = $_ }   # a box is as tall as the compact button, measured
+      foreach ($p in $ui.Boxes) { & $ui.BoxFit $p }   # the text box fills its frame (R24 job: a frame whose size never changed kept a 100 px text box at its top)
+      & $ui.AlignRow (& $ui.RowParts 'Top') 0; $mm = & $ui.Sc $ui.Z.M; & $ui.AlignRow (& $ui.RowParts 'FieldRow') $mm; & $ui.AlignRow (& $ui.RowParts 'TestRow') $mm }
+    # The question headline (the prompt's first sentence, manifest "answers") shrinks to fit one line: from the headline size
+    # in 0.5 pt steps to 60 % of it (never under the body size); only at that size does it wrap. Other cards keep the headline size.
     $ui.SentFonts = @{}
     $ui.FitSent = { try {
         $f = $ui.F.Sent
-        if ($ui.View -eq 'answer' -and -not $ui.NoShrink) {
+        if ($ui.View -eq 'answer') {
           $w = [int]$ui.Sent.MaximumSize.Width; $t = [string]$ui.Sent.Text; $pt = [double]$ui.F.Sent.SizeInPoints; $floor = [math]::Max($pt * 0.6, [double]$ui.F.Body.SizeInPoints)
           while ($w -gt 0 -and $pt -gt $floor -and [System.Windows.Forms.TextRenderer]::MeasureText($t, $f).Width -gt $w) {
             $pt = [math]::Max($floor, $pt - 0.5); $k = [string]$pt; if (-not $ui.SentFonts.ContainsKey($k)) { $ui.SentFonts[$k] = & $ui.Font ([string]$ui.F.Sent.Name) $pt $null }; $f = $ui.SentFonts[$k] }
@@ -1910,7 +1927,10 @@ if ($gui) {
     # RowBad: the parts of an aligned row (@{ N; Top; H; Kind }) share one midpoint within 1 px, and a box and a button in
     # it are as tall as each other. EdgeBad: the visible left edges of a card's parts (@{ N; X }) are within 1 px.
     $ui.RowBad = { param([string]$Card, [string]$Row, $Parts)
-      $out = @(); $tol = [math]::Max(1, (& $ui.Sc 1)); $ps = @($Parts | Where-Object { $_ }); if ($ps.Count -lt 2) { return $out }
+      # A row that wraps (the test extras in a small window) has a midpoint on each line: Line = the top of a part's margin box.
+      $out = @(); $byLine = [ordered]@{}; foreach ($q in @($Parts | Where-Object { $_ })) { $k = [string][int]$q.Line; if (-not $byLine.Contains($k)) { $byLine[$k] = @() }; $byLine[$k] += $q }
+      if ($byLine.Count -gt 1) { foreach ($k in @($byLine.Keys)) { $out += & $ui.RowBad $Card $Row @($byLine[$k] | ForEach-Object { $c = $_.Clone(); $c.Line = 0; $c }) }; return $out }
+      $tol = [math]::Max(1, (& $ui.Sc 1)); $ps = @($Parts | Where-Object { $_ }); if ($ps.Count -lt 2) { return $out }
       $m0 = $ps[0].Top + $ps[0].H / 2.0
       foreach ($q in $ps) { $m = $q.Top + $q.H / 2.0; if ([math]::Abs($m - $m0) -gt $tol) { $out += ('LAYOUT ' + $Card + ' ' + $Row + ' ' + $q.N + ' midpoint: ' + $m + ', the row midpoint is ' + $m0) } }
       $bx = @($ps | Where-Object { $_.Kind -eq 'box' }); $bt = @($ps | Where-Object { $_.Kind -eq 'button' })
@@ -1925,16 +1945,18 @@ if ($gui) {
       $out = @(); $sr = { param($C) $C.RectangleToScreen($C.ClientRectangle) }
       foreach ($row in 'Top', 'FieldRow', 'TestRow') {
         $ps = @(& $ui.RowParts $row | Where-Object { $_.Visible }); if ($ps.Count -lt 2) { continue }
-        $out += & $ui.RowBad $Card $row @($ps | ForEach-Object { $rr = & $sr $_; @{ N = (& $ui.NameOf $_); Top = $rr.Top; H = $rr.Height; Kind = $(if ($ui.Boxes -contains $_) { 'box' } elseif ($_ -is [System.Windows.Forms.Button] -and $_.FlatAppearance.BorderSize -gt 0) { 'button' } else { 'other' }) } })
+        $out += & $ui.RowBad $Card $row @($ps | ForEach-Object { $rr = & $sr $_; @{ N = (& $ui.NameOf $_); Top = $rr.Top; H = $rr.Height; Line = $rr.Top - $_.Margin.Top; Kind = $(if ($ui.Boxes -contains $_) { 'box' } elseif ($_ -is [System.Windows.Forms.Button] -and $_.FlatAppearance.BorderSize -gt 0) { 'button' } else { 'other' }) } })
       }
       if (-not $ui.RecOn) {
-        $tx = { param($C) (& $sr $C).Left + (& $ui.PadOf $C.Font) }   # where a label's text starts
+        $tx = { param($C) (& $sr $C).Left + (& $ui.Ink $C) }   # where its ink starts (text, edge or drawing), measured
         $es = @()
         if ($ui.Kick.Visible) { $es += @{ N = 'Kick'; X = (& $tx $ui.Kick) } }
-        if ($ui.TickP.Visible) { $es += @{ N = 'TickP'; X = (& $sr $ui.TickP).Left + [int][math]::Round(0.09 * $ui.TickP.Width) } } elseif ($ui.Sent.Visible -and $ui.Sent.Text) { $es += @{ N = 'Sent'; X = (& $tx $ui.Sent) } }
-        $p1 = @(@($ui.P) + @($ui.Lines) | Where-Object { $_.Visible -and $_.Text })[0]; if ($p1) { $es += @{ N = (& $ui.NameOf $p1); X = (& $tx $p1) } }
+        if ($ui.TickP.Visible) { $es += @{ N = 'TickP'; X = (& $tx $ui.TickP) } } elseif ($ui.Sent.Visible -and $ui.Sent.Text) { $es += @{ N = 'Sent'; X = (& $tx $ui.Sent) } }
+        foreach ($l in @(@($ui.P) + @($ui.Lines, $ui.StepName, $ui.LastLog, $ui.FieldL, $ui.Note, $ui.Help, $ui.Foot, $ui.TestL))) { if ($l.Visible -and $l.Text) { $es += @{ N = (& $ui.NameOf $l); X = (& $tx $l) } } }
+        if ($ui.ErrBox.Visible) { $es += @{ N = 'ErrBox'; X = (& $sr $ui.ErrBox).Left } }
+        $k1 = @($ui.LinkRow.Controls | Where-Object { $_.Visible })[0]; if ($k1) { $es += @{ N = (& $ui.NameOf $k1); X = (& $tx $k1) } }
         $o1 = @($ui.Opts.Controls | Where-Object { $_.Visible })[0]; if ($o1) { $es += @{ N = 'choice 1'; X = (& $sr $o1).Left } }
-        $b1 = @($ui.B | Where-Object { $_.Visible })[0]; if ($b1) { $es += @{ N = (& $ui.NameOf $b1); X = (& $sr $b1).Left } }
+        $b1 = @($ui.B | Where-Object { $_.Visible })[0]; if ($b1) { $es += @{ N = (& $ui.NameOf $b1); X = (& $tx $b1) } }
         $out += & $ui.EdgeBad $Card $es
       }
       return $out }
@@ -2320,10 +2342,9 @@ if ($gui) {
     $ui.VAnswer = { param($Q, [int]$I, [int]$N)
       $ui.Reply = $null
       $c = @{ View = 'answer'; Light = 'you'; Kicker = ($(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot } else { '' }) + 'Question ' + $I + ' of ' + $N); Sentence = [string]$Q.Prompt; Right = 'RADE waits for you' }
-      # TEST ONLY (tests/window_real_driver.ps1 sets RADE_T_SPLIT=1 for one picture, the Administrator's second rework): the first
-      # sentence at the headline size and the rest as a body line. Off by default: the shipped card shrinks the prompt to fit ($ui.FitSent).
-      $ui.QNow = @($Q, $I, $N); $ui.NoShrink = $false
-      if ($env:RADE_T_SPLIT -eq '1' -and [string]$Q.Prompt -match '^(.+?[?.:])\s+(\S.*)$') { $c.Sentence = $Matches[1]; $c.P = @($Matches[2]); $ui.NoShrink = $true }
+      # The prompt's first sentence (up to the first "?", "." or ":" followed by a space or the end) is the headline; the rest
+      # is a body line under it (the Administrator, 2026-11-15, rework B). A first sentence too long for one line shrinks ($ui.FitSent).
+      if ([string]$Q.Prompt -match '^(.+?[?.:])(?:\s+(\S.*))?$') { $c.Sentence = $Matches[1]; if ($Matches[2]) { $c.P = @($Matches[2].Trim()) } }
       if ($Q.Kind -eq 'text') { $c.Field = @{ Label = 'Your answer'; Text = ''; Name = [string]$Q.Prompt; Max = 120 }; $c.Focus = 'field'; $c.Buttons = @(@{ Text = 'Continue'; Kind = 'primary'; Act = { $ui.Reply = [string]$ui.Field.Text } }) }
       else { $ws = @($(if ($Q.Kind -eq 'yesno') { 'Yes', 'No' } else { $Q.Choices })); $c.Buttons = @(for ($k = 0; $k -lt $ws.Count; $k++) { @{ Text = [string]$ws[$k]; Act = $ui.ReplyActs[$k] } }) }
       & $ui.SetCard $c }

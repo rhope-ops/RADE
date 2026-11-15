@@ -62,6 +62,7 @@ namespace System.Windows.Forms {
     public List<Control> Items = new List<Control>(); public Control Owner;
     public void Add(Control c) { c.Parent = Owner; Items.Add(c); } public void Add(Control c, int col, int row) { Add(c); }
     public void AddRange(Control[] cs) { foreach (Control c in cs) Add(c); } public void Clear() { Items.Clear(); }
+    public Control this[int i] { get { return Items[i]; } }
     public int Count { get { return Items.Count; } } public IEnumerator GetEnumerator() { return Items.ToArray().GetEnumerator(); }
   }
   public class Control : RadeStub.Dyn {

@@ -105,7 +105,7 @@ function global:Push-RadeButton([string]$Text) {
   }
   elseif ($v -eq 'hand') {
     $m = { param($C) $(if ($C.AutoSize) { $C.Margin.Top + $C.PreferredSize.Height / 2.0 } else { $C.Margin.Top + $C.Height / 2.0 }) }
-    Write-Host ('WIN mid hand label=' + (& $m $ui.FieldL) + ' box=' + (& $m $ui.FieldBox) + ' button=' + (& $m $ui.FieldB) + ' box-h=' + $ui.FieldBox.Height + ' button-h=' + $ui.FieldB.PreferredSize.Height + ' gaps=' + ($ui.FieldL.Margin.Right + $ui.FieldBox.Margin.Left) + ',' + ($ui.FieldBox.Margin.Right + $ui.FieldB.Margin.Left))
+    Write-Host ('WIN mid hand label=' + (& $m $ui.FieldL) + ' box=' + (& $m $ui.FieldBox) + ' button=' + (& $m $ui.FieldB) + ' box-h=' + $ui.FieldBox.Height + ' button-h=' + $ui.FieldB.PreferredSize.Height + ' gaps=' + ($ui.FieldL.Margin.Right + $ui.FieldBox.Margin.Left) + ',' + ($ui.FieldBox.Margin.Right + $ui.FieldB.Margin.Left) + ' inner=' + $ui.Field.Width + '/' + $ui.FieldBox.Width + ' tick=' + $ui.TickP.Margin.Left)
     Write-Host ('WIN mid header logo=' + ($ui.Logo.Margin.Top + $ui.Logo.Height / 2.0) + ' word=' + (& $m $ui.WordL) + ' app=' + (& $m $ui.AppL))
     if (-not $ui.Field.Shown -or $ui.Form.Values['AcceptButton']) { Write-Host 'WIN BAD hand card: no address box, or Enter answers' }
     $ui.FieldB.PerformClick(); if ($ui.CopyPathB.Shown) { $ui.CopyPathB.PerformClick() }; Write-Host ('WIN hand-note=' + $ui.Note.Text + ' clip=' + [bool][RadeStub.Driver]::Clip)
@@ -127,6 +127,10 @@ function global:Push-RadeButton([string]$Text) {
     $ok = @(& $ui.RowBad 'fixture' 'FieldRow' @(@{ N = 'FieldL'; Top = 10; H = 18; Kind = 'other' }, @{ N = 'FieldBox'; Top = 4; H = 30; Kind = 'box' }, @{ N = 'FieldB'; Top = 4; H = 30; Kind = 'button' })) + @(& $ui.EdgeBad 'fixture' @(@{ N = 'Kick'; X = 125 }, @{ N = 'Sent'; X = 126 }, @{ N = 'P0'; X = 125 }, @{ N = 'B0'; X = 125 }))
     $no = @(& $ui.RowBad 'fixture' 'FieldRow' @(@{ N = 'FieldL'; Top = 13; H = 18; Kind = 'other' }, @{ N = 'FieldBox'; Top = 4; H = 23; Kind = 'box' }, @{ N = 'FieldB'; Top = 4; H = 30; Kind = 'button' })) + @(& $ui.EdgeBad 'fixture' @(@{ N = 'Kick'; X = 123 }, @{ N = 'Sent'; X = 126 }, @{ N = 'P0'; X = 123 }, @{ N = 'B0'; X = 124 }))
     Write-Host ('WIN rule aligned=' + $ok.Count + ' misaligned=' + $no.Count + ' ~ ' + ($no -join ' ~ '))
+    # A row that wraps: the check box alone on the second line is aligned on its own line; on the first line it is not.
+    $wrap = @(& $ui.RowBad 'fixture' 'TestRow' @(@{ N = 'TestL'; Top = 10; H = 18; Line = 0; Kind = 'other' }, @{ N = 'ToBoxF'; Top = 4; H = 30; Line = 0; Kind = 'box' }, @{ N = 'OkBox'; Top = 48; H = 20; Line = 38; Kind = 'other' }))
+    $wbad = @(& $ui.RowBad 'fixture' 'TestRow' @(@{ N = 'TestL'; Top = 10; H = 18; Line = 0; Kind = 'other' }, @{ N = 'ToBoxF'; Top = 4; H = 30; Line = 0; Kind = 'box' }, @{ N = 'OkBox'; Top = 48; H = 20; Line = 0; Kind = 'other' }))
+    Write-Host ('WIN rule wrapped=' + $wrap.Count + ' one-line=' + $wbad.Count + ' ~ ' + ($wbad -join ' ~ '))
     foreach ($b in $ui.B) { if ($b.Shown -and $b.Text -in 'Copy summary', 'Copy the log') { $b.PerformClick() } }
     Write-Host ('WIN copied=' + [bool]([RadeStub.Driver]::Clip -match 'Application: ') + ' note=' + $ui.Note.Text)
     if ($ui.TestRow.Shown) { $ui.DraftB.PerformClick(); Write-Host ('WIN draft-note=' + $ui.Note.Text) }
