@@ -63,6 +63,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import unicodedata
 
 ZERO = re.compile(r"^0+$")
@@ -162,7 +163,7 @@ WARN_OPTION = "denylist: warn"  # .pii-guard option line; first_use_check.py rea
 #   - the word profile, unless a character of a name follows it (profile.example.org and profile-x stay allowed values);
 #   - or one word, at most one punctuation mark, and the value dod (a misspelt key such as "profil: dod").
 # Every form other than `profile: dod` is unknown and fails the scan.
-_TIER = r"[\W_]*(?:profile(?![A-Za-z0-9._/-])|(?!skip\b|denylist\b)[A-Za-z_-]+\s*[^\w\s.]?\s*dod[\W_]*$)"
+_TIER = r"[\W_]*(?:profile(?![A-Za-z0-9._/-])|(?!skip\b|denylist\b)[A-Za-z_-]{1,40}\s*[^\w\s.]?\s*dod[\W_]*$)"
 PROFILE_LINE = re.compile(r"(?i)^" + _TIER)
 OPTION_LINE = re.compile(r"(?i)^(?:" + _TIER + r"|denylist\s*:)")  # option lines, never allowed values
 UNREADABLE = "profile: <.pii-guard is not UTF-8 text>"  # load_allow adds it; it reads as an unknown tier line
@@ -488,6 +489,11 @@ def self_test():
         and profile_of({"denylist: warn", "x", "profile.example.org", "profile-x", "profile/x", "host.dod", "a.dod",
                         "skip: a/dod", "skip: profile dod", "skip: dod", "skip:dod"}) == "minimum"
     print(("ok   " if good else "FAIL ") + "profile line: any case, spacing around the colon; any other form is unknown")
+    ok = ok and good
+    t0 = time.monotonic()  # a long line of one repeated character must not make the tier-line pattern slow
+    good = all(profile_of({c * 100_000}) == "minimum" and profile_of({c * 100_000 + " dod"}) != "dod" for c in "-_a.") \
+        and time.monotonic() - t0 < 5
+    print(("ok   " if good else "FAIL ") + f"profile line: 100,000-character lines are read in {time.monotonic() - t0:.2f} s")
     expect("dod id: a longer word that starts like the keyword is not one", "dodidentifier 12345" + "67890", [], dod=True)
     ok = ok and good
     expect("dod: 10 digits with no keyword", "ts 17312" + "34567", [], dod=True)
