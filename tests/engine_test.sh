@@ -275,6 +275,29 @@ echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows"
 mkdir -p "$t/m9/test1234/OneDrive - United States Air Force/RADE/Config/rade-installed.json"; mkround m9
 grep -q "installed-version record (RADE.Config.rade-installed.json) could not be saved" "$t/out-m9.txt" && ! grep -q "^Install record on the site" "$t/out-m9.txt" && ! grep -q "InstalledVersion" "$fake" && ok || { bad "marker: no row when the own record failed"; grep "record" "$t/out-m9.txt"; cat "$fake"; }
 
+# Moved from rhope-ops/90-161.Z tests (2026-11-15): engine behavior is tested here, an app tests its own bundle.
+# Step default: a bool, or {passed, paths}: on only when those files changed since the round that last passed them.
+sd=$(python3 - <<'P'
+import os
+ns = {'__file__': os.path.abspath('engine/rade_build.py')}; exec(open('engine/rade_build.py').read().split('\ndef here')[0], ns)
+import pathlib; ns['ROOT'] = pathlib.Path('.').resolve()
+p = ['schemas/examples/sample-manifest.json']; h = ns['files_hash'](p)
+print(ns['step_default']({'default': {'passed': h, 'paths': p}}), ns['step_default']({'default': {'passed': 'x', 'paths': p}}),
+      ns['step_default']({}), ns['step_default']({'default': False}))
+P
+)
+[ "$sd" = "False True True False" ] && ok || bad "step default by hash: $sd"
+# Two bars: progress math, the PROGRESS line rule and the check gate, from the sample bundle's own functions.
+pg=$(pwsh -NoProfile -File tests/progress_test.ps1 -Bundle "$b" 2>&1)
+[ "$(echo $pg)" = "0.10 0.28 101 | -1 0.375 0.50 | True True False gate False True True True" ] && ok || bad "progress math and gate: got '$pg'"
+# Fonts: New-Object with a string for an enum argument can match two overloads ("Multiple ambiguous overloads") and
+# drop the window to text mode. No Font() call in the engine or the sample bundle may pass a string enum.
+fa=$(grep -ohE "(New-Object System\.Drawing\.Font|\[System\.Drawing\.Font\]::new)\([^)]*,[^)]*, *[\"'][A-Za-z]+[\"'] *\)" engine/rade_build.py "$b" | wc -l)
+amb=$(pwsh -NoProfile -c 'Add-Type -AssemblyName System.Drawing.Common; try { $null = New-Object System.Drawing.Font("Segoe UI", 10, "Bold"); "bound" } catch { if ($_.Exception.Message -match "ambiguous") { "ambiguous" } else { "bound" } }' 2>&1 | tail -1)
+[ "$fa" -eq 0 ] && [ "$amb" = "ambiguous" ] && ok || bad "fonts: string enum in Font() found=$fa (pwsh: $amb)"
+# Outlook draft: made when Outlook answers, with a fallback text when it does not (the run above shows the fallback).
+grep -q '\$script:draftMade = (-not \$why)' engine/rade_build.py && grep -q "Outlook draft could not be created" engine/rade_build.py && ok || bad "Outlook draft fallback"
+
 # The tagline (the Administrator, 14 Nov 26): no "DoD".
 ! grep -q "for your DoD organization" engine/rade_build.py && grep -q "'Test and deploy apps for your organization'" engine/rade_build.py && ok || bad "tagline"
 echo "ENGINE pass=$pass fail=$fail"
