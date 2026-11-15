@@ -1,0 +1,51 @@
+name: release
+# Signed engine release (the Administrator, 2026-11-15; docs/engine.md "How an app gets the engine").
+# Manual runs only, from main. It runs the repo checks, lists every file the engine reads with its SHA-256
+# (scripts/engine_files.py), signs that list as a build attestation (keyless, no secret), and makes the tag and release.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag: engine-v and a number, for example engine-v1"
+        required: true
+permissions:
+  contents: read
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Tag is new and well formed
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$TAG" =~ ^engine-v[0-9]+$ ]] || { echo "FAIL the tag must be engine-v and a number"; exit 1; }
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then echo "FAIL the tag $TAG exists"; exit 1; fi
+      - name: Repo checks (self-tests and engine tests)
+        run: scripts/check.sh
+      - name: Engine file list
+        run: |
+          python3 scripts/engine_files.py > rade-engine.sha256
+          python3 scripts/engine_files.py --lock > rade-engine.lock.json
+          cat rade-engine.sha256
+      - name: Sign the file list (build attestation)
+        uses: actions/attest@v4
+        with:
+          subject-checksums: rade-engine.sha256
+      - name: Tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "RADE engine $TAG" \
+            --notes "Engine files at commit $GITHUB_SHA, each with its SHA-256, in rade-engine.sha256 (signed as a build attestation of this repository). rade-engine.lock.json holds the fields an app lock needs." \
+            rade-engine.sha256 rade-engine.lock.json

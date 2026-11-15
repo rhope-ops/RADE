@@ -6,6 +6,8 @@ cd "$(git rev-parse --show-toplevel)"
 python3 scripts/check_manifest.py
 # Engine (moved from rhope-ops/90-161.Z, 2026-11-14): it compiles. Each app's own tests build and check its bundles.
 python3 -m py_compile engine/rade_build.py
+# Engine file list (apps lock these files; the release workflow signs the list): the trace runs and names the engine.
+python3 scripts/engine_files.py | grep -q '  engine/rade_build.py$'
 # RADE page (index.html): its application list is valid, and each entry names a repository and a manifest path.
 python3 -c "import json,re; c=json.load(open('apps.json')); assert c['apps'] and all(re.fullmatch(r'[\w.-]+/[\w.-]+', a['repo']) and a['manifest'].endswith('.json') for a in c['apps']), 'apps.json'"
 # Engine behavior (deploy v1): build the sample bundle and run it in pwsh text mode.
