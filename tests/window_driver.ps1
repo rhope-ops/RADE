@@ -3,11 +3,11 @@
 # "WIN" line per card, runs every Paint handler, checks that each control has a name, and selects a button.
 # Set by the test: RADE_T_STUB (path of the stub), RADE_T_APP (index of the application), RADE_T_HAND (done, fail or
 # skip), RADE_T_RECORD (1 = open "Steps and files" and clear the Clean-up box before the run), RADE_T_TOUR (1 = the
-# application also gets the site, sign-in and Power Automate checks, and the other application is shown as blocked).
+# application also gets the site, sign-in and Power Automate checks, and a base check of the test application is FAILED).
 # A check that cannot pass on the test computer is set to PASSED after its card has shown (the test is of the window).
 Add-Type -TypeDefinition ([System.IO.File]::ReadAllText($env:RADE_T_STUB)) -ReferencedAssemblies @('System.Drawing.Primitives', 'System.Collections', 'System.Linq.Expressions', 'System.Management.Automation', 'System.Runtime', 'netstandard') -WarningAction SilentlyContinue
 function Start-Process { param($FilePath, $ArgumentList) Write-Host ('WIN start-process ' + $(if ($FilePath -match '^https://') { 'browser' } else { [string]$FilePath })) }
-$global:RadeT = @{ Seen = ''; App = [int]$env:RADE_T_APP; Hand = [string]$env:RADE_T_HAND; Record = ($env:RADE_T_RECORD -eq '1'); Forced = $false; Opened = $false; Tour = ($env:RADE_T_TOUR -eq '1') }
+$global:RadeT = @{ Seen = ''; App = [int]$env:RADE_T_APP; Hand = [string]$env:RADE_T_HAND; Record = ($env:RADE_T_RECORD -eq '1'); Forced = $false; Opened = $false; Tour = ($env:RADE_T_TOUR -eq '1'); Esc = $false; Again = $false; SignIn = $false }
 function global:Show-RadeCard {
   $ps = @($ui.P | Where-Object { $_.Shown } | ForEach-Object { $_.Text }) -join ' / '
   $bs = @($ui.B | Where-Object { $_.Shown } | ForEach-Object { $(if ($_.Enabled) { '[' } else { '(' }) + $_.Text + $(if ($_.Enabled) { ']' } else { ')' }) }) -join ' '
@@ -42,17 +42,27 @@ function global:Push-RadeButton([string]$Text) {
     }
     if ($global:RadeT.Tour) {
       $global:RadeT.Tour = $false; $apps[$global:RadeT.App].Checks = @($apps[$global:RadeT.App].Checks) + @('net-site', 'site-rights', 'flow-guide')
-      $ui.Blocked[(1 - $global:RadeT.App)] = 'Word is installed: Not found. Install Word, then paste the block again'; & $ui.VChoose; Show-RadeCard
+      $ui.BaseRes['outlook'] = @{ State = 'FAILED'; Detail = 'Not found'; Fix = 'Install Outlook, then paste the block again' }   # a base check only the test application has: that one is blocked
+      & $ui.VChoose; Show-RadeCard
     }
     foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Index -eq $global:RadeT.App) { $ui.Form.Key('D' + $o.Tag.Key); return } }
     throw 'the test user found no choice for the application'
   }
-  elseif ($v -eq 'maint') { $ui.B[0].PerformClick() }
+  elseif ($v -eq 'maint') {
+    if (-not $global:RadeT.Esc) { $global:RadeT.Esc = $true; Write-Host 'WIN esc'; $ui.Form.Key('Escape'); return }   # Esc = Back: Choose again; the user chooses the same application
+    $ui.B[0].PerformClick()
+  }
   elseif ($v -eq 'site') { $ui.Field.Text = 'not an address'; $ui.B[0].PerformClick(); Write-Host ('WIN site-note=' + $ui.Note.Text); $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }   # .invalid never resolves: the site check fails on every computer
   elseif ($v -in 'fail', 'need') {
     # The check on the card: the look-and-answer check is answered through its own card; any other is set to PASSED.
     $id = [string]@($script:appChecks)[([int]($ui.Kick.Text -replace '^CHECK (\d+) OF .*$', '$1')) - 1]
     if ($v -eq 'need' -and (Get-CheckDef $id).Kind -eq 'guide') { $ui.B[0].PerformClick(); return }
+    if ($v -eq 'need' -and (Get-CheckDef $id).Kind -eq 'signin' -and -not $global:RadeT.SignIn) {   # a sign-in that failed: its card must offer the sign-in again
+      $global:RadeT.SignIn = $true; $script:checkResults[$id] = @{ State = 'FAILED'; Detail = 'Sign-in was not finished'; Fix = 'Select "Sign in and check site rights"' }; & $ui.Next; return
+    }
+    if ($v -eq 'fail' -and $ui.B[0].Text -eq 'Run checks again' -and -not $global:RadeT.Again) {   # the check runs again and fails again
+      $global:RadeT.Again = $true; Write-Host 'WIN again'; $ui.B[0].PerformClick(); return   # the cards that follow are answered by the calls inside this click
+    }
     $script:checkResults[$id] = @{ State = 'PASSED'; Detail = 'Set by the test'; Fix = '' }
     & $ui.Next
   }

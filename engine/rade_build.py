@@ -1299,7 +1299,7 @@ if ($gui) {
   try {
     # The "One thing" window (the Administrator, 2026-11-14; docs/window-design.md): the window shows one statement or one
     # question at a time; everything else (all checks, the step boxes, the files, the made list, the log) is in the Record
-    # (F2). Each answer moves on: there is no Next / Back row and no Exit button (Esc goes back; the window's X exits).
+    # (F2). Each answer moves on: there is no Next / Back row and no Exit button (Esc goes back, and exits on Choose; the window's X exits).
     # Every window value lives in $ui: handlers and the engine's callbacks run inside engine functions, where a plain
     # variable name could meet a local of the same name. A block stored in $ui reads only $ui and the bundle's globals.
     [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -1323,7 +1323,7 @@ if ($gui) {
     $ui.Form.SuspendLayout()
     $ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(96, 96); $ui.Form.AutoScaleMode = 'Dpi'   # sizes below are at 100 % scaling
     $ui.Form.Font = New-Object System.Drawing.Font('Segoe UI', 10)
-    $ui.Form.ClientSize = New-Object System.Drawing.Size(1020, 760); $ui.Form.MinimumSize = New-Object System.Drawing.Size(680, 540)
+    $ui.Form.ClientSize = New-Object System.Drawing.Size(1020, 760)   # no MinimumSize: scaled to 150 % it could be taller than a 1280 x 800 screen (R09)
     $ui.Form.StartPosition = 'CenterScreen'; $ui.Form.KeyPreview = $true; $ui.Form.BackColor = $ui.C.White
     # Cosmetics never stop the window (R06: Font('Segoe UI', 10, 'Bold') failed with "Multiple ambiguous overloads"): a typed
     # style and size, and the window font when a font cannot be made.
@@ -1514,7 +1514,8 @@ if ($gui) {
         if ($o.R2) { & $ui.Word $G ([string]$o.R2) $ui.F.Small $ui.C.Gray $rx ($y + $h1) $rw $h2 'Right, Top, NoPrefix, SingleLine' }
       } catch { $null = $_ } }
     $ui.FillOpts = { param($List)
-      $old = @($ui.Opts.Controls); $ui.Opts.Controls.Clear(); foreach ($o in $old) { $o.Dispose() }
+      foreach ($o in @($ui.Trash)) { try { $o.Dispose() } catch { $null = $_ } }   # the choices of the card before last: a button is not disposed inside its own Click
+      $ui.Trash = @($ui.Opts.Controls); $ui.Opts.Controls.Clear()
       $n = 0
       foreach ($o in @($List | Where-Object { $_ })) {
         $said = (@($o.Name, $o.Ver, $o.Sub, $o.Note, $o.R1, $o.R2) | Where-Object { $_ }) -join '. '
@@ -1561,7 +1562,7 @@ if ($gui) {
       $ui.BtnRow.Visible = [bool]$bs.Count
       $ui.TestRow.Visible = [bool]$c.Test
       $ui.Form.AcceptButton = $(if ($c.NoAccept) { $null } else { $accept })   # Enter = the primary button, except on a hand step
-      $ui.Back = $c.Back; $ui.BackB.Visible = [bool]$c.Back; $ui.RightL.Text = [string]$c.Right
+      $ui.Back = $c.Back; $ui.BackB.Visible = ([bool]$c.Back -and -not $ui.RecOn); $ui.RightL.Text = [string]$c.Right
       $ui.Card.ResumeLayout(); try { $ui.Card.PerformLayout() } catch { $null = $_ }
       $f = $null
       if ($c.Focus -eq 'field') { $f = $ui.Field } elseif ($c.Focus -eq 'fieldbutton') { $f = $ui.FieldB } elseif ($c.Focus -eq 'err') { $f = $ui.ErrBox }
@@ -1576,7 +1577,7 @@ if ($gui) {
     # An application with a FAILED one cannot be chosen. For a deploy, a newer version on the app page is read here too.
     $ui.RunBase = {
       $ui.BaseIds = @(); foreach ($a in $apps) { foreach ($id in @($a.Checks)) { $d = Get-CheckDef $id; if ($d -and $d.Group -eq 'Local' -and $d.Kind -eq 'auto' -and $ui.BaseIds -notcontains $id) { $ui.BaseIds += $id } } }
-      $cache = Read-CheckCache; $bp = Get-BasePath; $site = Get-SiteUrl $bp; $i = 0; $ui.Busy = $true; $ui.BaseRes = @{}; $ui.Blocked = @{}
+      $cache = Read-CheckCache; $bp = Get-BasePath; $site = Get-SiteUrl $bp; $i = 0; $ui.Busy = $true; $ui.BaseRes = @{}
       try {
         foreach ($id in $ui.BaseIds) {
           if ($ui.Form.IsDisposed -or $script:closing) { return }
@@ -1585,7 +1586,6 @@ if ($gui) {
           if (-not $r) { $r = Invoke-Check $d $bp $site { [System.Windows.Forms.Application]::DoEvents() } }
           $ui.BaseRes[$id] = $r
         }
-        for ($j = 0; $j -lt $apps.Count; $j++) { foreach ($id in @($apps[$j].Checks)) { $r = $ui.BaseRes[$id]; if ($r -and $r.State -eq 'FAILED') { $ui.Blocked[$j] = (@(((Get-CheckDef $id).Name + ': ' + $r.Detail), $r.Fix) | Where-Object { $_ }) -join '. '; break } } }
         # One read per deploy application (4 s at most each); after one slow read the others are not tried.
         $slow = $false
         for ($j = 0; $j -lt $apps.Count; $j++) {
@@ -1595,7 +1595,8 @@ if ($gui) {
         if (-not $ui.ContainsKey('NewRound')) { $ui.NewRound = [string](Get-NewerRound) }
       } finally { $ui.Busy = $false; Select-App 0 } }
     $ui.VChoose = {
-      Select-App 0; $ui.Picked = $false; $ui.Plan = $null; $ui.AppL.Text = ''; $list = @(); $dep = $false
+      Select-App 0; $ui.Picked = $false; $ui.Plan = $null; $ui.AppL.Text = ''; $list = @(); $dep = $false; $ui.Blocked = @{}
+      for ($j = 0; $j -lt $apps.Count; $j++) { foreach ($id in @($apps[$j].Checks)) { $r = $ui.BaseRes[$id]; if ($r -and $r.State -eq 'FAILED') { $ui.Blocked[$j] = (@(((Get-CheckDef $id).Name + ': ' + $r.Detail), $r.Fix) | Where-Object { $_ }) -join '. '; break } } }
       for ($j = 0; $j -lt $apps.Count; $j++) {
         $a = $apps[$j]; if ([string]$a.Mode -eq 'deploy') { $dep = $true }
         if ($ui.Blocked.ContainsKey($j)) { $list += @{ Off = $true; Index = $j; Name = [string]$a.Name; Ver = $(if ($a.Version) { ' ' + $a.Version } else { '' }); Sub = [string]$ui.Blocked[$j]; R1 = 'FAILED' }; continue }
@@ -1614,7 +1615,8 @@ if ($gui) {
     $ui.InitSel = { $ui.Sel = @{}; foreach ($k in $script:appSteps) { $ui.Sel[[int]$k] = [bool](Get-StepDefault $k) }; $ui.Clean = $true; $ui.StepState = @{} }
     $ui.Pick = { param([int]$J)
       Select-App $J; $ui.Picked = $true
-      foreach ($id in $script:appChecks) { if ($ui.BaseRes.ContainsKey($id)) { $script:checkResults[$id] = $ui.BaseRes[$id] } }   # the base checks are not run twice
+      # The base checks are not run twice, except the ones whose answer can change at any time ($checkNoSave: Word open, disk, write).
+      foreach ($id in $script:appChecks) { if ($ui.BaseRes.ContainsKey($id) -and $checkNoSave -notcontains $id -and $ui.BaseRes[$id].State -in 'PASSED', 'WARNING') { $script:checkResults[$id] = $ui.BaseRes[$id] } }
       $ui.AppL.Text = $dot.TrimStart() + $script:app.Name + $(if ($script:app.Version) { ' ' + $script:app.Version } else { '' })
       & $ui.InitSel
       $e = $null; if (Test-Deploy) { $e = (Read-Installed)[(Get-InstalledKey $script:app)] }
@@ -1663,6 +1665,7 @@ if ($gui) {
           $ui.P[0].Text = [string]$d.Name; $ui.RightL.Text = 'Check ' + ($i + 1) + ' of ' + $ids.Count; & $ui.SetBar 'all' ($i / [math]::Max(1, $ids.Count)) $true
           [System.Windows.Forms.Application]::DoEvents()
           $script:checkResults[$id] = Invoke-Check $d $bp $site { [System.Windows.Forms.Application]::DoEvents() }
+          if ($ui.BaseRes.ContainsKey($id)) { $ui.BaseRes[$id] = $script:checkResults[$id] }   # Choose shows the newest result of a base check
         }
       } finally { $null = Save-CheckCache $script:checkResults $bp $site; $ui.Busy = $false; & $ui.SetBar 'all' 0 $false }
       & $ui.Next }
@@ -1675,11 +1678,13 @@ if ($gui) {
       if ($needs.Count) { & $ui.VNeed $needs[0]; return }
       & $ui.VReady }
     $ui.VFail = { param([int]$I, [int]$Count)
-      $ids = @($script:appChecks); $d = Get-CheckDef $ids[$I]; $r = $script:checkResults[$ids[$I]]
+      $ids = @($script:appChecks); $ui.CurId = [string]$ids[$I]; $d = Get-CheckDef $ids[$I]; $r = $script:checkResults[$ids[$I]]
+      # A check that runs on its own: "Run checks again". A sign-in or look-and-answer check: its own button, as on the card that asks for it.
+      $again = $(if ($d.Kind -eq 'signin') { @{ Text = 'Sign in and check site rights'; Kind = 'primary'; Act = { & $ui.One } } } elseif ($d.Kind -eq 'guide') { @{ Text = 'Check Power Automate'; Kind = 'primary'; Act = { & $ui.One } } } else { @{ Text = 'Run checks again'; Kind = 'primary'; Act = { & $ui.Checks $true } } })
       $ok = @($ids | Where-Object { $script:checkResults[$_] -and $script:checkResults[$_].State -in 'PASSED', 'WARNING' }).Count
       & $ui.SetCard @{ View = 'fail'; Light = 'bad'; Kicker = ('Check ' + ($I + 1) + ' of ' + $ids.Count + $dot + 'FAILED'); Sentence = $(if ($Count -eq 1) { 'One check failed.' } else { [string]$Count + ' checks failed. This is the first.' })
         P = @([string]$d.Name, [string]$r.Detail, $(if ($r.Fix) { 'What to do: ' + $r.Fix } else { '' })); Bold1 = $true
-        Buttons = @(@{ Text = 'Run checks again'; Kind = 'primary'; Act = { & $ui.Checks $true } }, $(if (& $ui.NeedSite) { @{ Text = 'Change the site address'; Act = { & $ui.VSite } } } else { $null }))
+        Buttons = @($again, $(if (& $ui.NeedSite) { @{ Text = 'Change the site address'; Act = { & $ui.VSite } } } else { $null }))
         Foot = ([string]$ok + ' of ' + $ids.Count + ' checks passed. RADE changes nothing until every check passes.'); Back = { & $ui.VChoose } }
       & $ui.ToFront }
     $ui.VNeed = { param([int]$I)
@@ -1687,7 +1692,7 @@ if ($gui) {
       $how = $(if ($d.Kind -eq 'signin') { 'CAC sign-in, read-only' } elseif ($d.Kind -eq 'guide') { 'You look and answer, read-only' } else { 'Not run yet' })
       $text = $(if ($d.Kind -eq 'signin') { 'Sign in and check site rights' } elseif ($d.Kind -eq 'guide') { 'Check Power Automate' } else { 'Run checks again' })
       & $ui.SetCard @{ View = 'need'; Light = 'you'; Kicker = ('Check ' + ($I + 1) + ' of ' + $ids.Count + $dot + 'your turn'); Sentence = 'One check needs you.'
-        P = @([string]$d.Name, $(if ($r -and $r.Detail) { [string]$r.Detail } else { $how }), $(if ($r -and $r.Fix) { 'What to do: ' + $r.Fix } else { '' })); Bold1 = $true
+        P = @([string]$d.Name, $(if ($r -and $r.Detail) { [string]$r.Detail } elseif ($script:savedWhy[$ui.CurId]) { [string]$script:savedWhy[$ui.CurId] } else { $how }), $(if ($r -and $r.Fix) { 'What to do: ' + $r.Fix } else { '' })); Bold1 = $true
         Buttons = @(@{ Text = $text; Kind = 'primary'; Act = $(if ($d.Kind -eq 'auto') { { & $ui.Checks $true } } else { { & $ui.One } }) }); Back = { & $ui.VChoose } } }
     $ui.One = {
       # A check that needs you: the CAC sign-in opens its own window; the look-and-answer check shows a hand card.
@@ -1725,7 +1730,7 @@ if ($gui) {
 
     # ---- The run. Invoke-Round calls back: a log line ($ui.Say), a tick ($ui.Tick), a step that starts ($ui.OnStatus) and
     # a step that ends ($ui.OnStep). A step you do by hand comes in through $script:guideUi.
-    $ui.Say = { param($t) Add-RunLog $t; $ui.Log.Add([string]$t); $x = ([string]$t).Trim(); if ($x -and $ui.View -eq 'run') { $ui.LastLog.Text = $x }; try { [System.Windows.Forms.Application]::DoEvents() } catch { $null = $_ } }
+    $ui.Say = { param($t) Add-RunLog $t; $ui.Log.Add([string]$t); $x = ([string]$t).Trim(); if ($x -and $ui.View -eq 'run') { $ui.LastLog.Text = $x }; if ($ui.RecOn) { try { $ui.RecText.AppendText([string]$t + "`r`n") } catch { $null = $_ } }; try { [System.Windows.Forms.Application]::DoEvents() } catch { $null = $_ } }
     $ui.Paint = {
       if (-not $script:prog -or -not $script:stepStart) { return }
       $g = Get-Progress
@@ -1775,7 +1780,7 @@ if ($gui) {
       try {
         $ui.Summary = Invoke-Round ([bool]($cleanup.Count -and $ui.Clean)) $sel $to $ui.Say $ui.Tick $ui.OnStep $ui.OnStatus $ui.WindowLine $answers $checkLines
         $script:stepStart = $null; $ui.Running = $false
-        & $ui.VDone
+        if (-not ($script:closing -or $ui.Form.IsDisposed)) { & $ui.VDone }   # closed in the last moments of the run: no clipboard, no folder
       } catch {
         $script:stepStart = $null; $ui.Running = $false
         if ($script:closing -or $ui.Form.IsDisposed) { return }   # Exit during a step: the report on disk says STOPPED
@@ -1821,11 +1826,13 @@ if ($gui) {
       if (-not $dep) { & $ui.Copy; if (-not $script:draftMade) { & $ui.Open } }   # a test round: the summary is on the clipboard, and with no draft the folder opens
       & $ui.ToFront }
     $ui.VStopped = { param([string]$Why, [string]$What)
+      if ($script:closing -or $ui.Form.IsDisposed) { return }
       $dep = Test-Deploy
       & $ui.SetCard @{ View = 'stopped'; Light = 'bad'; Kicker = 'Stopped'; Right = 'Stopped'; Sentence = $(if ($dep) { 'The install stopped.' } else { 'The round stopped.' })
         P = @(($Why.Substring(0, 1).ToUpperInvariant() + $Why.Substring(1)), $What, 'The report in the results folder says STOPPED.'); Help = $(if ($dep) { Get-HelpLine } else { '' })
         Buttons = @(@{ Text = 'Copy the log'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Try again'; Act = { & $ui.VReady } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } }); Back = { & $ui.VReady } }
       & $ui.ToFront }
+    $ui.OkBox.Add_CheckedChanged({ if (-not $ui.OkBox.Checked) { & $ui.Say1 'The draft made at the end says "Window: OK". Select "Make e-mail draft" for one that says NOT OK.' } })
     $ui.DraftB.Add_Click({
       $to = $ui.ToBox.Text.Trim()
       if ($to -and -not (Test-MailTo $to)) { & $ui.Say1 'The e-mail address does not look right.'; return }
@@ -1873,7 +1880,7 @@ if ($gui) {
         $d = Get-CheckDef $id; $r = $(if ($ui.Picked) { $script:checkResults[$id] } else { $ui.BaseRes[$id] }); if (-not $r) { $r = @{ State = 'NOT RUN'; Detail = ''; Fix = '' } }
         if ([string]$d.Group -ne $g0) { $g0 = [string]$d.Group; $rows += @{ Head = $g0.ToUpperInvariant() } }
         $nm = [string]$d.Short; if (-not $nm) { $nm = [string]$d.Name }
-        $rows += @{ Name = $nm; State = [string]$r.State; More = $(if ($r.State -ne 'PASSED' -or $r.Saved) { (@($r.Detail, $r.Fix) | Where-Object { $_ }) -join $dot } else { '' }) }
+        $rows += @{ Name = $nm; State = [string]$r.State; More = $(if ($r.State -ne 'PASSED' -or $r.Saved) { @(@($r.Detail, $r.Fix) | Where-Object { $_ }) } else { @() }) }
       }
       return $rows }
     $ui.RecChecks.Add_Paint({
@@ -1884,13 +1891,13 @@ if ($gui) {
           if ($r.Head) { $y += & $ui.Sc 8; & $ui.Word $g ([string]$r.Head) $ui.F.Cap $ui.C.Gray 0 $y $w $h 'Left, VerticalCenter, NoPrefix, SingleLine'; $y += $h; continue }
           & $ui.Word $g ([string]$r.Name) $ui.F.Small $ui.C.Ink 0 $y ($w - $sw) $h 'Left, VerticalCenter, NoPrefix, SingleLine, EndEllipsis'
           & $ui.Word $g ([string]$r.State) $ui.F.Cap (& $ui.StateInk ([string]$r.State)) ($w - $sw) $y $sw $h 'Right, VerticalCenter, NoPrefix, SingleLine'; $y += $h
-          if ($r.More) { & $ui.Word $g ([string]$r.More) $ui.F.Small $ui.C.Gray (& $ui.Sc 12) $y ($w - (& $ui.Sc 12)) $h 'Left, VerticalCenter, NoPrefix, SingleLine, EndEllipsis'; $y += $h }
+          foreach ($m in @($r.More)) { & $ui.Word $g ([string]$m) $ui.F.Small $ui.C.Gray (& $ui.Sc 12) $y ($w - (& $ui.Sc 12)) $h 'Left, VerticalCenter, NoPrefix, SingleLine, EndEllipsis'; $y += $h }   # what was found, then what to do
         }
       } catch { $null = $_ } })
     $ui.RecChecks.Add_Resize({ $this.Invalidate() })
     $ui.VRecord = {
       $ui.RecOn = $true; $ui.RecData = @(& $ui.RecRows)
-      $ui.RecChecks.AccessibleName = 'Checks. ' + ((@($ui.RecData) | ForEach-Object { if ($_.Head) { $_.Head + ':' } else { $_.Name + ' ' + $_.State + $(if ($_.More) { ', ' + $_.More } else { '' }) } }) -join '. ')
+      $ui.RecChecks.AccessibleName = 'Checks. ' + ((@($ui.RecData) | ForEach-Object { if ($_.Head) { $_.Head + ':' } else { $_.Name + ' ' + $_.State + $(if (@($_.More).Count) { ', ' + (@($_.More) -join ', ') } else { '' }) } }) -join '. ')
       $old = @($ui.RecSteps.Controls); $ui.RecSteps.Controls.Clear(); foreach ($o in $old) { $o.Dispose() }
       $mk = { param([string]$Text, $Font, $Color) $l = New-Object System.Windows.Forms.Label; $l.AutoSize = $true; $l.UseMnemonic = $false; $l.MaximumSize = New-Object System.Drawing.Size(([math]::Max(120, $ui.RecSteps.ClientSize.Width - (& $ui.Sc 24))), 0); $l.Text = $Text; $l.Font = $Font; $l.ForeColor = $Color; $l.Margin = (& $ui.Pad 5 0 0 (& $ui.Sc 6)); [void]$ui.RecSteps.Controls.Add($l) }
       & $mk 'STEPS' $ui.F.Cap $ui.C.Gray
@@ -1930,13 +1937,13 @@ if ($gui) {
       try { [void]$ui.RecB.Focus() } catch { $null = $_ } }
     $ui.RecB.Add_Click({ & $ui.VRecord })
     $ui.RecClose.Add_Click({ & $ui.CloseRecord })
-    $ui.BackB.Add_Click({ if ($ui.Back -and -not $ui.Busy -and -not $ui.Running) { & $ui.Back } })
+    $ui.BackB.Add_Click({ if ($ui.Back -and -not $ui.RecOn -and -not $ui.Busy -and -not $ui.Running) { & $ui.Back } })
 
-    # ---- Keys: F2 = the Record; Esc = close the Record, else Back; 1 to 9 = a choice. Tab reaches every control.
+    # ---- Keys: F2 = the Record; Esc = close the Record, else Back, and on Choose (no Back) it exits; 1 to 9 = a choice. Tab reaches every control.
     $ui.Form.Add_KeyDown({
       $k = [string]$_.KeyCode
       if ($k -eq 'F2') { $_.SuppressKeyPress = $true; if ($ui.RecOn) { & $ui.CloseRecord } else { & $ui.VRecord } }
-      elseif ($k -eq 'Escape') { $_.SuppressKeyPress = $true; if ($ui.RecOn) { & $ui.CloseRecord } elseif ($ui.Back -and -not $ui.Busy -and -not $ui.Running) { & $ui.Back } }
+      elseif ($k -eq 'Escape') { $_.SuppressKeyPress = $true; if ($ui.RecOn) { & $ui.CloseRecord } elseif ($ui.Back -and -not $ui.Busy -and -not $ui.Running) { & $ui.Back } elseif ($ui.View -eq 'choose' -and -not $ui.Busy) { $ui.Form.Close() } }
       elseif ($k -match '^(D|NumPad)([1-9])$' -and -not $ui.RecOn -and -not $ui.Busy -and $ui.Opts.Visible -and -not ($ui.Form.ActiveControl -is [System.Windows.Forms.TextBox])) {
         $n = [int]$Matches[2]; foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Key -eq $n) { $_.SuppressKeyPress = $true; $o.PerformClick(); break } } } })
     $ui.Form.Add_Shown({
