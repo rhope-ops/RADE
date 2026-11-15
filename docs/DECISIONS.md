@@ -4,6 +4,7 @@ Newest first. Why the kit defaults are what they are: https://github.com/rhope-o
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-15 | Personal-data guard: the tier line fails closed. A `profile:` line in `.pii-guard` with any value other than `dod` (any case or spacing of `dod` is accepted) fails the scan, so a wrong spelling cannot lower the tier in silence. Scope: the guard, every project. | the Administrator | — |
 | 2026-11-15 | RADE runs the personal-data guard in the DoD tier. Approved `.pii-guard` entries: 4 host names that the engine and its tests need (the DAF SharePoint host and the classified-network suffix samples of the NIPR guardrail) and 2 skip rules (the logo PNG files, the sample flow zip). Scope: RADE only. | the Administrator | — |
 | 2026-11-15 | Personal-data guard, two tiers in one scanner, set in `.pii-guard`: minimum (no line) and DoD (`profile: dod`: adds military and DoD cloud host names, controlled-information and classification marks, DoD ID numbers, and blocks files the guard cannot read unless a `skip:` line names them). Detail: the header of `scripts/pii_guard.py`. Scope: the guard in RADE; other repos get it by a hand port (no kit sync). | the Administrator | — |
 | 2026-11-15 | Personal-data guard, minimum tier: a push with no name denylist is blocked. The Administrator's projects do not use the line `denylist: warn`; the scanner keeps that option for the kit's starter projects, and the DoD tier ignores it. Scope: the guard, every project of the Administrator. | the Administrator | — |
