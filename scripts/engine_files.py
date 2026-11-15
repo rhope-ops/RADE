@@ -4,8 +4,8 @@
 An app's lock must name these files (docs/engine.md "How an app gets the engine"). The list comes from the engine
 itself: this script builds the sample app (schemas/examples/sample-manifest.json + tests/fixture-app, in a temporary
 copy) under a Python audit hook and records each file the build opens under the repo. A search of the source cannot
-give this list. Limit: it shows the files this sample build reads; an app with another manifest runs the same trace
-on its own build.
+give this list. Limits: it shows the files this sample build reads through open(); an app with another manifest runs the same trace
+on its own build. Hashes are of the files in this checkout: run it on a clean checkout of the commit.
 Usage: python3 scripts/engine_files.py           lines "<sha256>  <path>" (shasum format, sorted by path)
        python3 scripts/engine_files.py --lock    JSON: repo, commit, engine and files, the fields an app lock needs
 """
@@ -55,6 +55,8 @@ if __name__ == '__main__':
     files = trace()
     if '--lock' in sys.argv:
         commit = subprocess.run(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
+        if len(commit) != 40:
+            sys.exit('FAIL cannot read the commit id (git rev-parse HEAD)')
         print(json.dumps({'repo': REPO, 'commit': commit, 'engine': ENGINE, 'files': files}, indent=2))
     else:
         for p, h in files.items():

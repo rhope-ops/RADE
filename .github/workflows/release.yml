@@ -12,7 +12,6 @@ permissions:
   contents: read
 jobs:
   release:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -21,9 +20,13 @@ jobs:
       attestations: write
       artifact-metadata: write
     steps:
-      - uses: actions/checkout@v5
+      - name: Run from main only
+        run: |
+          [ "$GITHUB_REF" = "refs/heads/main" ] || { echo "FAIL run this workflow from main, not $GITHUB_REF"; exit 1; }
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Tag is new and well formed
         env:
           TAG: ${{ inputs.tag }}
@@ -38,7 +41,7 @@ jobs:
           python3 scripts/engine_files.py --lock > rade-engine.lock.json
           cat rade-engine.sha256
       - name: Sign the file list (build attestation)
-        uses: actions/attest@v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6  # v4
         with:
           subject-checksums: rade-engine.sha256
       - name: Tag and release
@@ -47,5 +50,5 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           gh release create "$TAG" --target "$GITHUB_SHA" --title "RADE engine $TAG" \
-            --notes "Engine files at commit $GITHUB_SHA, each with its SHA-256, in rade-engine.sha256 (signed as a build attestation of this repository). rade-engine.lock.json holds the fields an app lock needs." \
+            --notes "Engine files at commit $GITHUB_SHA, each with its SHA-256, in rade-engine.sha256 (signed as a build attestation of this repository). rade-engine.lock.json holds the same hashes in the form an app lock needs; the signed list is the authority." \
             rade-engine.sha256 rade-engine.lock.json
