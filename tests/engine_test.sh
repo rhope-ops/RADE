@@ -60,10 +60,11 @@ python3 - "$inst" <<'P' && ok || { bad "contract: steps and made lists in the re
 import json, sys
 s = json.load(open(sys.argv[1]))['apps']['SampleApp/Sample app (deploy)']['steps']
 a, b = s['T01 Sample check r1'], s['T02 Sample import r1']
-assert a['state'] == 'PASSED' and a['version'] == '1.0.0' and a['made'] == [{'kind': 'file', 'name': 'SAMPLE-T01-result-r1.txt'}, {'kind': 'list', 'name': 'Sample list at <SITE>'}], a
+assert a['state'] == 'PASSED' and a['version'] == '1.0.0' and a['made'] == [{'kind': 'file', 'name': 'SAMPLE-T01-result-r1.txt'}, {'kind': 'list', 'name': 'Sample FAIL list at <SITE> and <SITE> and <SITE> for <DODID>'}], a
 assert b['state'] == 'PASSED' and b['made'] == [{'kind': 'flow', 'name': 'Sample flow'}], b
 P
-! grep -rq "fake.example\|sites/fake" "$inst" "$od/RADE/SampleApp/Rounds" && ok || bad "contract: a site address reached the record or the report"
+! grep -rq "fake.example\|sites/fake\|test1234" "$inst" "$od/RADE/SampleApp/Rounds" && ! grep -v "^Working folder: " "$t/out.txt" | grep -q "fake.example\|sites/fake\|test1234" && ok || bad "contract: a site address or the ID reached the record, the report or the screen log"
+grep -q "^    MADE backup of nothing (prose, not a record)" "$t/out.txt" && grep -q "^  Result: PASSED (1 passed, 0 failed" "$t/out.txt" && ok || { bad "contract: a MADE name with FAIL changed the counts, or a prose line was taken as a record"; grep "Result:" "$t/out.txt"; }
 
 # 3. A test round: the draft path is unchanged and the record is not touched.
 cp "$inst" "$t/inst.before"; round 1

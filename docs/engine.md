@@ -39,7 +39,7 @@ What RADE and a step script give each other (the Administrator, 2026-11-14: the 
 |---|---|
 | `PASS ...`, `FAIL ...`, `SKIP ...` | One result each; the step state comes from the counts and the exit code. |
 | `PROGRESS n/m` | Moves the step bar; not logged. |
-| `MADE <kind> <name>` | Something the step created (kind: a lowercase word such as `list`, `column`, `flow`, `file`). RADE removes any address from the name and keeps it for the undo list. |
+| `MADE <kind>: <name>` | Something the step created (kind: a lowercase word such as `list`, `column`, `flow`, `file`). RADE removes any address from the name and keeps it for the undo list. The line is not a result: words in the name never count as PASS or FAIL. |
 
 A step the user does by hand (kind `guide`) lists what it creates in the manifest field `makes`.
 

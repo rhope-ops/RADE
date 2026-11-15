@@ -359,9 +359,13 @@ function Get-StepEnv([string]$Base, $Step) {
   return [ordered]@{ RADE_CONTRACT = '1'; RADE_MODE = [string]$script:app.Mode; RADE_APP = [string]$script:app.Name; RADE_APP_VERSION = [string]$script:app.Version
     RADE_INSTALLED_VERSION = $inst; RADE_STEP_LAST = $last; RADE_SITE = [string](Get-SiteUrl $Base) }
 }
-function ConvertTo-MadeName([string]$Name) {
+function ConvertTo-MadeName([string]$Name, [string]$Site) {
   # A made item's name goes into the record: no address, no ID, one line, 200 characters at most.
-  $t = (ConvertTo-Masked $Name) -replace 'https?://\S+', '<SITE>' -replace '\s+', ' '
+  # Out: any https address, the saved site address in any form (with or without https://, or only its /sites/ path),
+  # and any other host/sites/ path.
+  $t = (ConvertTo-Masked $Name) -replace 'https?://\S+', '<SITE>'
+  if ($Site -match '^https://([^/]+)(/sites/[^/]+)') { $t = $t -replace [regex]::Escape($Matches[1] + $Matches[2]), '<SITE>' -replace [regex]::Escape($Matches[2]), '<SITE>' }
+  $t = $t -replace '[A-Za-z0-9.-]+\.[A-Za-z]{2,}/sites/\S*', '<SITE>' -replace '\s+', ' '
   $t = $t.Trim(); if ($t.Length -gt 200) { $t = $t.Substring(0, 200) }
   return $t
 }
@@ -385,6 +389,7 @@ function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]
   $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
   try { $envs = Get-StepEnv $Base $Step; foreach ($k in @($envs.Keys)) { $psi.EnvironmentVariables[[string]$k] = [string]$envs[$k] } } catch { & $Say ('    NOTE: the step inputs could not be set: ' + (ConvertTo-Masked $_.Exception.Message)) }
   $r = @{ Pass = 0; Fail = 0; Skip = 0; Exit = $null; Made = @() }
+  $siteNow = [string](Get-SiteUrl $Base)
   $p = [System.Diagnostics.Process]::Start($psi)
   $script:child = $p
   $limit = $stepMinutes; if ($Step.Minutes) { $limit = [int]$Step.Minutes }   # a step that waits for a person sets its own limit
@@ -407,8 +412,12 @@ function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]
     }
     # Lines that may name a unit or a file (for example seal details) never reach the report (data boundary).
     if ($Step.ScreenOnly -and $line -match $Step.ScreenOnly) { $line = ($line -replace '^(\S+).*$', '$1') + ' (detail hidden: it may hold a name; run the step script by hand to see it)' }
-    # "MADE <kind> <name>": something the step created (a list, a flow, a file); kept for the undo list (step contract).
-    if ($line -cmatch '^\s*MADE\s+([a-z][a-z-]{0,30})\s+(\S.*)$') { $mk = $Matches[1]; $mn = ConvertTo-MadeName $Matches[2]; $r.Made += @{ kind = $mk; name = $mn }; $line = 'MADE ' + $mk + ' ' + $mn }   # the log shows the cleaned name
+    # "MADE <kind>: <name>": something the step created (a list, a flow, a file); kept for the undo list (step contract).
+    # A MADE line is never a result: it is logged with the cleaned name and not counted as PASS, FAIL or SKIP (review).
+    if ($line -cmatch '^\s*MADE\s+([a-z][a-z-]{0,30}):\s+(\S.*)$') {
+      $mk = $Matches[1]; $mn = ConvertTo-MadeName $Matches[2] $siteNow; $r.Made += @{ kind = $mk; name = $mn }
+      & $Say ('    MADE ' + $mk + ': ' + $mn); $lineTask = $p.StandardOutput.ReadLineAsync(); continue
+    }
     if ($line -match '(^|\s)PASS(\s|$)') { $r.Pass++ }
     if ($line -cmatch '(^|\s)SKIP(\s|$)') { $r.Skip++ }   # upper case only: prose such as "skip this" is not a result
     if ($line -match '(^|\s)(FAIL|FORMAT-FAIL|RENDER-ERROR|MEASURE-ERROR|STOPPED:)(\s|$)') { $r.Fail++ }
