@@ -19,9 +19,9 @@ Source: the Administrator's notes after 90-161.Z round R21 (engine pinned at eb5
 
 - **Pre-check before an app is selectable** (the Administrator's idea): decided 14 Nov 26 (docs/DECISIONS.md "base checks before Choose, app checks after"; docs/engine.md "Check stages" 1: "An app whose checks cannot pass is marked on the Choose screen"). **Not built**: docs/window-design.md says "Partly built (all checks run after Choose)". It belongs in the same pass or the one after it: run the base checks when the window opens, then mark or disable an app card whose needs cannot pass, with the reason on the card.
 
-## UI pass 3 proposals (15 Nov 26)
+## UI pass 3 proposals (14 Nov 26, evening)
 
-Mockups: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "15 Nov: UI pass 3" (15 artboards, 1020 x 760: Choose, Check, Deploy running, Deploy done, by-hand step panel and parts, for each proposal). Status: **not chosen** (the Administrator, 15 Nov 26: no preference yet; the build waits for the Administrator's prompt). Decided the same day: [DECISIONS.md](../DECISIONS.md) 2026-11-15. All three build W1-W10 and the pre-check before Choose.
+Mockups: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "UI pass 3" (15 artboards, 1020 x 760: Choose, Check, Deploy running, Deploy done, by-hand step panel and parts, for each proposal). Status: **not chosen** (the Administrator, 14 Nov 26: no preference yet; the build waits for the Administrator's prompt). Decided the same day: [DECISIONS.md](../DECISIONS.md) 2026-11-14 "UI pass 3". All three build W1-W10 and the pre-check before Choose.
 
 | | A Refine | B Quiet (agent REC) | C Command |
 |---|---|---|---|
@@ -33,4 +33,4 @@ Mockups: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "15 Nov: UI pas
 | Risk | A long finding is cut with "..." and has no tooltip | A fifth "Needs you" item scrolls the list | WinForms has no dark theme: scroll bars, system dialogs and check box glyphs stay light unless RADE draws them |
 | Engine work (agent estimate, low confidence) | Small | Medium | Large |
 
-Measured on the mockups in Chromium at 1020 x 760 (15 Nov 26; not on a device, fonts differ from Segoe UI): 0 clipped texts, 0 parts outside the window, 0 targets under 24 x 24 px, lowest text contrast 5.55:1 (A, B) and 7.58:1 (C). The heights above are arithmetic, not measured on a device.
+Measured on the mockups in Chromium at 1020 x 760 (14 Nov 26; not on a device, fonts differ from Segoe UI): 0 clipped texts, 0 parts outside the window, 0 targets under 24 x 24 px, lowest text contrast 5.55:1 (A, B) and 7.58:1 (C). The heights above are arithmetic, not measured on a device.
