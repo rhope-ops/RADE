@@ -4,6 +4,10 @@ Newest first. Why the kit defaults are what they are: https://github.com/rhope-o
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-14 | Immutable rule: nothing like network reconnaissance may occur, in RADE or in any app. Detail: docs/engine.md "RADE and the app". With the DoD365 boundary rule (row below) these are the two rules that cannot be changed. | the Administrator | Adds to "never a network scan" (drift check row, 2026-11-14) |
+| 2026-11-14 | Hard rule: users cannot write data across the DoD365 boundary through any of the Administrator's apps, RADE included. Inside DoD365 RADE may read and write app data where a run type needs it. Detail: docs/engine.md "RADE and the app". | the Administrator | The table rows "never writes to the site" and "never reads or writes app data" (agent wording, 2026-11-14) |
+| 2026-11-14 | Environment: what works on the owner's NIPR computer works on all, PnP.PowerShell included; the owner's account has no special flag. Windows PowerShell 5.1 is the least that is always available. | the Administrator | Adds to the "NIPR is standardized" row below |
+| 2026-11-14 | Tests run on Windows PowerShell 5.1 from now on. The work-computer rounds already do (ISE and child powershell.exe); the cloud tests run on PowerShell 7 (Linux) and how to move them is open. | the Administrator | — |
 | 2026-11-14 | RADE and the app: RADE owns the computer and the run; the app owns the product and the site. RADE may know a platform, never an app's objects. Table: docs/engine.md "RADE and the app". | the Administrator | — |
 | 2026-11-14 | Maintenance run types: RADE offers Install, Diagnose, Restore and Uninstall and keeps its record right for each; the app supplies the steps for each. Detail: docs/engine.md "Maintenance run types". Not built. | the Administrator | — |
 | 2026-11-14 | One preflight: RADE's checks. An app keeps a probe flow only for rights a script cannot see (connector data policy, Send As). | the Administrator | — |

@@ -12,13 +12,19 @@ Decided by the Administrator, 2026-11-14. RADE owns the computer and the run. Th
 | Checks | Runs them; owns the check library | Declares which checks each step needs (`needs`) |
 | Files on the computer | Makes folders, writes and downloads files, verifies sha256, recycles old files | Declares the files and the clean-up patterns |
 | Order and gating | Runs steps in manifest order, applies `after`, blocks on a failed check | The author sets the order and the dependencies |
-| What is created on the site or in Power Automate | Never writes there; its only contact is the read-only rights check | Every list, column, permission, flow and setting, through its step scripts |
+| What is created on the site or in Power Automate | Creates nothing of its own there | Declares or scripts every list, column, permission, flow and setting |
 | Steps done by hand | Opens the address, shows the numbered steps, waits for Done or It failed | Writes the guide text; owns what the user imports |
 | Values asked from the user | Asks what the install needs (site address), passes it once (`RADE_SITE`) | Asks its own settings in its own setup screen |
 | Record of the install | Keeps the version, each step's state and the made list | Prints `PASS`, `FAIL` and `MADE` lines; each script is safe to run again |
-| App data (rows, files, backups) | Never reads or writes it | Owns it, including backup and restore content |
+| App data (rows, files, backups) | May read and write it inside DoD365 where a run type needs it (Diagnose, Restore, backup); how is not decided | Owns it; declares what RADE may touch |
 | After the install | Not present; the app works if RADE is deleted | Flows, the Power App, health and its own alerts |
 | Help | Names the Teams channel | Says what to do when one of its steps needs review |
+
+Hard rule (the Administrator, 2026-11-14): users cannot write data across the DoD365 boundary through any of the Administrator's apps, RADE included. Inside DoD365 (the site, the user's OneDrive) RADE may read and write. The first version of the two rows above said RADE never writes to the site or touches app data; that was agent wording and is replaced.
+
+No reconnaissance (the Administrator, 2026-11-14; cannot be changed): nothing like network reconnaissance may occur, in RADE or in any app. RADE and a step contact only the fixed hosts the engine or the manifest names, the one site the user gave, and the user's own flows and app; they never search for or list hosts, ports, sites, tenants, accounts or groups beyond those.
+
+Environment (the Administrator, 2026-11-14): what works on the owner's NIPR computer works on every NIPR computer, PnP.PowerShell included; the owner's account has no special flag. Windows PowerShell 5.1 is the least that is always there: all engine and step code runs on it, and tests run on it.
 
 Preflight: RADE's checks are the one preflight; an app keeps a probe flow only for rights a script cannot see (for example the connector data policy, Send As). Updates: RADE compares the installed version with the newest one at each run; an app only shows its installed version.
 

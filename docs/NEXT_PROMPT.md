@@ -18,6 +18,8 @@ Updated: 2026-11-14 by Claude (deploy v1). Keep this file at 40 lines or fewer. 
 
 6. RADE and the app (docs/engine.md, 14 Nov 26): move the base checks from rhope-ops/90-161.Z scripts/build_paste_bundles.py (`BASE_CHECKS`) into the engine; then the maintenance run types (function list not approved yet).
 
+7. Tests on Windows PowerShell 5.1 (the Administrator, 14 Nov 26): tests/engine_test.sh runs pwsh 7 on Linux; options are with the Administrator (a Windows CI job, or device-only proof).
+
 ## Needs the Administrator
 
 - The final Teams channel name (placeholder RHOPE-OPS in the engine, DECISIONS 14 Nov).
