@@ -225,12 +225,23 @@ echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows"
 echo "https://usaf.dps.mil/sites/second" > "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
 printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234" pwsh -NoProfile -File "$t/m-m6.ps1" > "$t/out-m6b.txt" 2>&1
 grep -q "^First install from this account" "$t/out-m6b.txt" && grep -q "^Step 1 of [0-9]: T01 Sample check r1" "$t/out-m6b.txt" && grep -q "and the date (added)" "$t/out-m6b.txt" && ok || { bad "marker: records from another site do not count"; grep "^First\|^Step\|Install record" "$t/out-m6b.txt"; }
-python3 - "$t/m6/test1234/OneDrive - United States Air Force/RADE/Config/rade-installed.json" <<'P' && ok || bad "record: sites holds two hashes and no address"
+# A part install on a third site, then its second run: the step that never ran there (T03) runs; only then is the row whole.
+echo "https://usaf.dps.mil/sites/third" > "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
+printf '2\n\nS\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234" pwsh -NoProfile -File "$t/m-m6.ps1" > "$t/out-m6c.txt" 2>&1
+grep -q "marked partial" "$t/out-m6c.txt" && ! grep -q "T03 Sample verify r1: PASSED" "$t/out-m6c.txt" && ok || { bad "marker: part install on a third site"; grep "T03\|Install record" "$t/out-m6c.txt"; }
+printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234" pwsh -NoProfile -File "$t/m-m6.ps1" > "$t/out-m6d.txt" 2>&1
+grep -q "^Step [0-9] of [0-9]: T03 Sample verify r1" "$t/out-m6d.txt" && grep -q "is recorded as installed" "$t/out-m6d.txt" && ! grep -q "partial" "$fake" && ok || { bad "marker: a step that never ran on this site must run before the install is whole"; grep "^Step\|installed\|Install record" "$t/out-m6d.txt"; }
+python3 - "$t/m6/test1234/OneDrive - United States Air Force/RADE/Config/rade-installed.json" <<'P' && ok || bad "record: one entry for each site, keyed by a hash, no address"
 import json, sys, re
-raw = open(sys.argv[1], encoding='utf-8-sig').read(); a = json.loads(raw)['apps']['SampleApp/Sample app (deploy)']
-assert len(a['sites']) == 2 and all(re.fullmatch(r'[0-9a-f]{12}', h) for h in a['sites']), a['sites']
-assert 'usaf.dps.mil' not in raw and 'site' not in a['lastRun']
+raw = open(sys.argv[1], encoding='utf-8-sig').read(); a = json.loads(raw)['apps']
+keys = [k for k in a if k.startswith('SampleApp/Sample app (deploy)')]
+assert len(keys) == 3 and all(re.fullmatch(r'SampleApp/Sample app \(deploy\)@[0-9a-f]{12}', k) for k in keys), keys
+assert 'usaf.dps.mil' not in raw
 P
+# The site row is not written when the account's own record cannot be saved (it would stop that account's next run).
+echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows": {} }' > "$fake"
+mkdir -p "$t/m9/test1234/OneDrive - United States Air Force/RADE/Config/rade-installed.json"; mkround m9
+grep -q "installed-version record (RADE.Config.rade-installed.json) could not be saved" "$t/out-m9.txt" && ! grep -q "^Install record on the site" "$t/out-m9.txt" && ! grep -q "InstalledVersion" "$fake" && ok || { bad "marker: no row when the own record failed"; grep "record" "$t/out-m9.txt"; cat "$fake"; }
 
 # The tagline (the Administrator, 14 Nov 26): no "DoD".
 ! grep -q "for your DoD organization" engine/rade_build.py && grep -q "'Test and deploy apps for your organization'" engine/rade_build.py && ok || bad "tagline"

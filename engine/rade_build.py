@@ -655,7 +655,14 @@ function Test-Deploy { return ([string]$script:app.Mode -eq 'deploy') }
 # ---- Installed versions (the Administrator, 14 Nov 26, deploy v1): RADE\Config\rade-installed.json keeps, per app, the
 # version a deploy last installed and the last deploy run. It holds no user name, path, site or DODID. A deploy run sends
 # nothing: no e-mail draft, no saved address; its report stays in Rounds\<round> on this computer.
-function Get-InstalledKey($A) { return ($appFolder + '/' + [string]$A.Name) }
+function Get-InstalledKey($A) {
+  # An app that keeps an install record on the site (manifest "marker") has one record for each site: the key ends in
+  # "@" and a short hash of the site address (never the address). So versions, step states and the made list of one
+  # site never count on another (reviews, 14 Nov 26).
+  $k = $appFolder + '/' + [string]$A.Name
+  if ($A.Marker) { $h = Get-SiteMark (Get-SiteUrl (Get-BasePath)); if ($h) { $k += '@' + $h } }
+  return $k
+}
 function ConvertTo-InstalledRun($V) {
   if ($null -eq $V) { return $null }
   $at = $V.at; if ($at -is [datetime]) { $at = $at.ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }   # PowerShell 7 reads it as a date
@@ -676,8 +683,7 @@ function Read-Installed {
         $made = @(); foreach ($m in @($s.Value.made)) { if ($null -ne $m) { $made += [ordered]@{ kind = [string]$m.kind; name = [string]$m.name } } }
         $st[$s.Name] = [ordered]@{ state = [string]$s.Value.state; version = [string]$s.Value.version; at = [string]$at; made = $made }
       } }
-      $sites = @(); foreach ($h in @($c.Value.sites)) { if ($h) { $sites += [string]$h } }
-      $res[$c.Name] = [ordered]@{ installed = (ConvertTo-InstalledRun $c.Value.installed); lastRun = (ConvertTo-InstalledRun $c.Value.lastRun); steps = $st; sites = $sites }
+      $res[$c.Name] = [ordered]@{ installed = (ConvertTo-InstalledRun $c.Value.installed); lastRun = (ConvertTo-InstalledRun $c.Value.lastRun); steps = $st }
     }
   } catch { $res = @{} }   # a damaged file reads as nothing installed
   return $res
@@ -708,12 +714,6 @@ function Save-Installed([string]$State, [bool]$Whole, $StepRecs) {
     $key = Get-InstalledKey $script:app
     $run = [ordered]@{ version = [string]$script:app.Version; build = [string]$buildId; round = [string]$round; at = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }
     $inst = $null; if ($all.ContainsKey($key)) { $inst = $all[$key].installed }
-    # "sites": a short hash (never the address) of each site where a deploy of this app from this account reached a
-    # step. An install record on a site is this account's own only when that site is in the list (review, 14 Nov 26:
-    # one account on two sites; a run that reached no step does not count).
-    $sites = @(); if ($all.ContainsKey($key)) { $sites = @($all[$key].sites | Where-Object { $_ }) }
-    $sm = Get-SiteMark (Get-SiteUrl (Get-BasePath))
-    if ($sm -and $StepRecs -and $StepRecs.Count -and $sites -notcontains $sm) { $sites += $sm }
     if ($State -eq 'PASSED' -and $Whole) { $inst = [ordered]@{ version = $run.version; build = $run.build; round = $run.round; at = $run.at } }
     $run.state = $State
     $st = [ordered]@{}; if ($all.ContainsKey($key) -and $all[$key].steps) { $st = $all[$key].steps }
@@ -723,11 +723,11 @@ function Save-Installed([string]$State, [bool]$Whole, $StepRecs) {
       foreach ($m in ($old + @($StepRecs[$n].made))) { if ($null -eq $m) { continue }; $id = [string]$m.kind + '|' + [string]$m.name; if (-not $seen[$id]) { $seen[$id] = $true; $made += [ordered]@{ kind = [string]$m.kind; name = [string]$m.name } } }
       $st[$n] = [ordered]@{ state = [string]$StepRecs[$n].state; version = $run.version; at = $run.at; made = $made }
     } }
-    $all[$key] = [ordered]@{ installed = $inst; lastRun = $run; steps = $st; sites = @($sites) }
+    $all[$key] = [ordered]@{ installed = $inst; lastRun = $run; steps = $st }
     $sorted = [ordered]@{}; foreach ($k in @($all.Keys | Sort-Object)) { $sorted[$k] = $all[$k] }
     $doc = [ordered]@{
       schema = 'rade-installed/1'
-      about = 'Versions RADE installed on this computer, by app (folder/name). "installed" is the last deploy in which every step ran and PASSED; "lastRun" is the last deploy run and its state; "steps" holds each step''s last state and what it made. No user, path or site address is kept here ("sites" holds short hashes).'
+      about = 'Versions RADE installed on this computer, by app (folder/name). "installed" is the last deploy in which every step ran and PASSED; "lastRun" is the last deploy run and its state; "steps" holds each step''s last state and what it made. No user, path or site address is kept here (a key that ends in @ and letters is one site, as a short hash).'
       apps = $sorted
     }
     $dir = Split-Path -Parent $p
@@ -741,7 +741,6 @@ function Get-StepPrior {
   $res = @{}
   if (-not (Test-Deploy)) { return $res }
   $e = (Read-Installed)[(Get-InstalledKey $script:app)]
-  if ($script:app.Marker -and -not (Test-InstalledHere)) { return $res }   # step records from another site do not count on this one
   if ($e -and $e.steps) { foreach ($n in @($e.steps.Keys)) { if ([string]$e.steps[$n].version -eq [string]$script:app.Version) { $res[[string]$n] = [string]$e.steps[$n].state } } }
   return $res
 }
@@ -1134,11 +1133,11 @@ function Get-SiteMark([string]$Site) {
   return (Get-ShortHash $Site.Trim().TrimEnd('/').ToLowerInvariant())
 }
 function Test-InstalledHere {
-  # True when this account's record says a deploy of the chosen app reached a step on this site.
+  # True when this account's record for this site (Get-InstalledKey) holds a step: a deploy from this account reached
+  # a step here. A run that reached no step does not count.
+  if (-not (Get-SiteMark (Get-SiteUrl (Get-BasePath)))) { return $false }
   $e = (Read-Installed)[(Get-InstalledKey $script:app)]
-  $h = Get-SiteMark (Get-SiteUrl (Get-BasePath))
-  if (-not $e -or -not $h) { return $false }
-  return [bool](@($e.sites) -contains $h)
+  return [bool]($e -and $e.steps -and $e.steps.Count)
 }
 function Test-FirstInstall { return ((Test-Deploy) -and [bool]$script:app.Marker -and -not (Test-InstalledHere)) }
 $markerScript = @'
@@ -1494,7 +1493,7 @@ $script:secret = @(); $script:dodid = ''; $script:child = $null; $script:runLog 
 $script:statusBase = ''; $script:stepStart = $null; $script:stepEst = 0; $script:noWindowWhy = ''; $script:ranSteps = @(); $script:prog = $null; $script:roundStart = Get-Date
 $helpChannel = 'RHOPE-OPS'   # a placeholder name (the Administrator, 14 Nov 26); a name only, never a link or an address
 $script:checkResults = @{}; $script:closing = $false; $checkGate = $true   # tests turn the gate off to run steps
-$script:checkHost = $null; $script:savedWhy = @{}
+$script:checkHost = $null; $script:savedWhy = @{}; $script:checkSite = $null
 function Select-App([int]$I) {
   # The chosen application: its steps and the checks they need (the embedded catalog; PFM 14 Nov 26: no fetch, 3A).
   $script:app = $apps[$I]; $script:appSteps = @($script:app.Steps); $script:appChecks = @($script:app.Checks); $script:checkResults = @{}
@@ -2169,6 +2168,8 @@ if ($gui) {
       # Saved results (R17): a check with a good saved result is not run again unless $Force ("Run checks again" or a button).
       $site = $siteBox.Text.Trim()
       if (Test-SiteUrl $site) { try { if ($site -ne (Get-SiteUrl $basePath)) { Save-SiteUrl $basePath $site } } catch { $null = $_ } }
+      # A result for one site is never shown for another (review, 14 Nov 26): a new address drops the site results.
+      if ($script:checkSite -ne $site) { foreach ($x in 'net-site', 'site-rights') { if ($script:checkResults.ContainsKey($x)) { $script:checkResults.Remove($x) } }; $script:checkSite = $site }
       $againB.Enabled = $false; foreach ($x in $script:rowBtns) { $x.Enabled = $false }; $next.Enabled = $false; $back.Enabled = $false
       $cache = Read-CheckCache; $script:savedWhy = @{}
       try {
@@ -2391,7 +2392,7 @@ try {
   $site0 = Get-SiteUrl (Get-BasePath)
   if (-not (Test-SiteUrl $site0) -and @($script:appChecks | Where-Object { $_ -in 'net-site', 'site-rights' }).Count) {
     $v = ([string](Read-Host 'Type the site address (it starts with https://usaf.dps.mil/sites/), then press Enter')).Trim()
-    if (Test-SiteUrl $v) { $site0 = $v }
+    if (Test-SiteUrl $v) { $site0 = $v; try { Save-SiteUrl (Get-BasePath) $v } catch { $null = $_ } }   # saved as the window does: the record and the steps read it
   }
   $script:secret = Get-Secret (Get-ProfileLeaf) (Get-ProfileLeaf)
   $cache = Read-CheckCache
