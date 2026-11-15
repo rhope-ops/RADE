@@ -84,10 +84,10 @@ def main():
         for l in lines:
             if l.startswith(("WIN", "LAYOUT", "MEASURE", "No window could open")):
                 print("   " + l[:400])
-        if not closed:
-            print("   --- last lines ---")
-            for l in lines[-25:]:
-                print("   " + l[:400])
+        print("::group::%s: all output" % name)
+        for l in lines:
+            print("   " + l[:400])
+        print("::endgroup::")
         if layout or not closed:
             bad += 1
         shutil.rmtree(t, ignore_errors=True)
