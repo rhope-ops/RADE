@@ -7,7 +7,8 @@ tests/window_real_driver.ps1 in front and runs it with powershell.exe. The drive
 lines for each card and saves one PNG of each card.
 
 Usage: python tests/window_real.py OUT_DIR
-Pass = every run ends with "WIN closed=True" and prints no "LAYOUT " line (exit 0). Output: OUT_DIR/<run>/*.png, out.txt.
+Pass = every run ends with "WIN closed=True", prints no "LAYOUT " line (the engine's layout self-check) and no card
+scrolls at a size larger than the smallest (exit 0). Output: OUT_DIR/<run>/*.png, out.txt.
 """
 import os
 import pathlib
@@ -20,6 +21,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 # name, application (0 = test, 1 = deploy), hand step, tour, window size in 100 % pixels ("" = as the engine sets it;
 # 1020x616 = 1920 x 1080 at 150 % scaling; 811x469 = 95 % of the work area of 1280 x 800 at 150 % scaling)
+SMALLEST = "811x469"   # the only size at which the text of a card may scroll (the buttons stay in view)
 RUNS = [
     ("deploy-full", 1, "done", "0", ""),
     ("deploy-616", 1, "done", "1", "1020x616"),
@@ -84,14 +86,25 @@ def main():
         print("== %s: cards=%d layout-lines=%d closed=%s png=%d" % (name, cards, len(layout), closed, len(list(d.glob("*.png")))))
         first = name == RUNS[0][0]
         for l in lines:
-            if l.startswith(("WIN", "LAYOUT ", "No window could open")) or (first and l.startswith("MEASURE")):
+            if l.startswith(("WIN", "LAYOUT ", "No window could open", "Layout self-check")) or (first and l.startswith("MEASURE")):
                 print("   " + l[:300])
         if not closed:
             print("   --- last lines ---")
             for l in lines[-25:]:
                 print("   " + l[:300])
-        if layout or not closed:
+        scrolls = [l for l in lines if l.startswith("WIN scrolls ")]
+        why = []
+        if not closed:
+            why.append("the window did not reach its end")
+        if layout:
+            why.append("%d layout defects" % len(layout))
+        if scrolls and size != SMALLEST:
+            why.append("a card scrolls at a size where none may: " + scrolls[0][12:])
+        if not any(l.startswith("WIN line Layout self-check: ") for l in lines):
+            why.append("no line of the layout self-check")
+        if why:
             bad += 1
+            print("   FAIL " + name + ": " + "; ".join(why))
         shutil.rmtree(t, ignore_errors=True)
     print("WINDOW runs=%d bad=%d" % (len(RUNS), bad))
     return 1 if bad else 0

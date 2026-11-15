@@ -1,43 +1,17 @@
 # The test "user" for the REAL RADE window (tests/window_real.py; the Windows job .github/workflows/window.yml).
 # It is put in front of a test copy of a bundle and runs on Windows PowerShell 5.1 with the real Windows Forms types
 # (tests/window_driver.ps1 is the same idea for the stand-in types on Linux). A timer answers each card: it prints one
-# "WIN" line, saves one PNG of the window, prints the layout lines, then selects a button.
+# "WIN" line, saves one PNG of the window, prints the lines of the engine's layout self-check, then selects a button.
 # Set by the harness: RADE_T_OUT (folder for the PNG files), RADE_T_APP (index of the application), RADE_T_HAND (done or
 # fail), RADE_T_TOUR (1 = the application also gets the site, sign-in and Power Automate checks), RADE_T_SIZE
 # ("811x469" = the window is set to this size: 1280 x 800 at 150 % scaling, in 100 % pixels; empty = as the engine sets it).
 # A check that cannot pass on the test computer is set to PASSED after its card has shown (the test is of the window).
 Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing
+$env:RADE_LAYOUT = '1'   # the layout self-check runs for a deploy too
 function Start-Process { param($FilePath, $ArgumentList) Write-Host ('WIN start-process ' + $(if ([string]$FilePath -match '^https://') { 'browser' } else { [string]$FilePath })) }
 $global:RadeT = @{ Seen = ''; N = 0; Out = [string]$env:RADE_T_OUT; App = [int]$env:RADE_T_APP; Hand = [string]$env:RADE_T_HAND; Tour = ($env:RADE_T_TOUR -eq '1'); Size = [string]$env:RADE_T_SIZE
-  Forced = $false; Opened = $false; SignIn = $false; Sized = $false; T0 = (Get-Date); Env = $false }
+  Forced = $false; Opened = $false; Lay = 0; SignIn = $false; Sized = $false; T0 = (Get-Date); Env = $false }
 
-function global:Get-RadeName($C) {
-  foreach ($k in @($ui.Keys)) { if ([object]::ReferenceEquals($ui[$k], $C)) { return [string]$k } }
-  foreach ($k in 'B', 'P') { for ($i = 0; $i -lt @($ui[$k]).Count; $i++) { if ([object]::ReferenceEquals($ui[$k][$i], $C)) { return ($k + $i) } } }
-  $t = [string]$C.Text; if ($t.Length -gt 24) { $t = $t.Substring(0, 24) }
-  return ($C.GetType().Name + '"' + $t + '"')
-}
-function global:Test-RadeLayout([string]$Card) {
-  # One line per defect: a text that needs more room than its control has, a control cut by a parent, two siblings that overlap.
-  $bad = @(); $todo = New-Object System.Collections.Stack; $todo.Push(@($ui.Form, $ui.Form.RectangleToScreen($ui.Form.ClientRectangle), $false))
-  while ($todo.Count) {
-    $it = $todo.Pop(); $p = $it[0]; $clip = $it[1]; $scroll = $it[2]
-    $kids = @($p.Controls | Where-Object { $_.Visible })
-    for ($i = 0; $i -lt $kids.Count; $i++) {
-      $c = $kids[$i]; $r = $c.RectangleToScreen($c.ClientRectangle); $nm = Get-RadeName $c
-      if ($r.Width -le 0 -or $r.Height -le 0) { continue }
-      if (-not $scroll -and -not $clip.Contains($r)) { $bad += ('LAYOUT ' + $Card + ' ' + $nm + ' cut: needs ' + $r.Width + 'x' + $r.Height + ' at ' + ($r.Left - $clip.Left) + ',' + ($r.Top - $clip.Top) + ' in ' + $clip.Width + 'x' + $clip.Height) }
-      $isText = ($c -is [System.Windows.Forms.Label] -or $c -is [System.Windows.Forms.ButtonBase])
-      if ($isText -and $c.Text -and -not ($c -is [System.Windows.Forms.Label] -and $c.AutoEllipsis)) {
-        $want = $c.GetPreferredSize((New-Object System.Drawing.Size($c.Width, 0)))
-        if ($want.Width -gt $c.Width + 1 -or $want.Height -gt $c.Height + 1) { $bad += ('LAYOUT ' + $Card + ' ' + $nm + ' text: needs ' + $want.Width + 'x' + $want.Height + ' has ' + $c.Width + 'x' + $c.Height) }
-      }
-      for ($j = $i + 1; $j -lt $kids.Count; $j++) { if ($c.Bounds.IntersectsWith($kids[$j].Bounds)) { $bad += ('LAYOUT ' + $Card + ' ' + $nm + ' overlaps ' + (Get-RadeName $kids[$j])) } }
-      if ($c.Controls.Count) { $todo.Push(@($c, [System.Drawing.Rectangle]::Intersect($clip, $r), ($scroll -or [bool]$c.AutoScroll))) }
-    }
-  }
-  if ($bad.Count) { foreach ($b in $bad) { Write-Host $b } } else { Write-Host ('LAYOUT-OK ' + $Card) }
-}
 function global:Save-RadeCard([string]$Tag) {
   $global:RadeT.N++; $card = ('{0:00}-{1}' -f $global:RadeT.N, $Tag)
   try { $ui.Form.Refresh() } catch { $null = $_ }
@@ -52,7 +26,11 @@ function global:Save-RadeCard([string]$Tag) {
     Write-Host ('WIN png=' + $card + ' colors=' + $all.Count)
     $bmp.Dispose()
   } catch { Write-Host ('WIN PNG-FAILED ' + $card + ' ' + $_.Exception.Message) }
-  try { Test-RadeLayout $card } catch { Write-Host ('WIN LAYOUT-FAILED ' + $card + ' ' + $_.Exception.Message) }
+  # The engine's own layout self-check ($ui.Check) measures the card; this prints what it added.
+  & $ui.Check
+  for ($i = $global:RadeT.Lay; $i -lt $ui.LayBad.Count; $i++) { Write-Host $ui.LayBad[$i] }
+  $global:RadeT.Lay = $ui.LayBad.Count
+  if ($ui.Scrolls -and -not $ui.RecOn) { Write-Host ('WIN scrolls ' + $card) }
 }
 function global:Step-Rade {
   if (((Get-Date) - $global:RadeT.T0).TotalSeconds -gt 240) { Write-Host ('WIN TIMEOUT view=' + $ui.View + ' sent=' + $ui.Sent.Text); [Environment]::Exit(3) }
@@ -101,7 +79,7 @@ function global:Step-Rade {
   elseif ($v -in 'done', 'review', 'stopped') {
     foreach ($l in @($ui.Log)) { if ([string]$l -match 'failed|FAILED|STOPPED|could not') { Write-Host ('WIN log ' + ([string]$l).Trim()) } }
     & $ui.VRecord; Save-RadeCard ($v + '-record'); & $ui.CloseRecord
-    Write-Host 'WIN closed=True'; $ui.Form.Close()
+    Write-Host ('WIN line ' + ((& $ui.LayLine) -split "`r`n")[0]); Write-Host 'WIN closed=True'; $ui.Form.Close()
   }
 }
 $global:RadeTimer = New-Object System.Windows.Forms.Timer
