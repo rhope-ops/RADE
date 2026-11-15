@@ -2,6 +2,32 @@
 
 Status: decided by the Administrator, 2026-11-14 (docs/DECISIONS.md); not all built. The engine is [../engine/rade_build.py](../engine/rade_build.py) (moved from rhope-ops/90-161.Z on 2026-11-14; apps pin it by sha256). Drift check: [drift-check.md](drift-check.md). Input contract: [../schemas/rade-manifest.schema.json](../schemas/rade-manifest.schema.json).
 
+## RADE and the app
+
+Decided by the Administrator, 2026-11-14. RADE owns the computer and the run. The app owns the product and the site. RADE may know a platform (SharePoint, Power Automate, Word, Outlook), never an app's objects (a list, column, flow or setting by name). Test for any line of code or text: would it be the same for a different app? If yes, it is RADE's.
+
+| Subject | RADE | The selected app |
+|---|---|---|
+| Window, screens, bars, log, report | Owns all of it | Supplies its name, summary, step notes and help text |
+| Checks | Runs them; owns the check library | Declares which checks each step needs (`needs`) |
+| Files on the computer | Makes folders, writes and downloads files, verifies sha256, recycles old files | Declares the files and the clean-up patterns |
+| Order and gating | Runs steps in manifest order, applies `after`, blocks on a failed check | The author sets the order and the dependencies |
+| What is created on the site or in Power Automate | Creates nothing of its own there | Declares or scripts every list, column, permission, flow and setting |
+| Steps done by hand | Opens the address, shows the numbered steps, waits for Done or It failed | Writes the guide text; owns what the user imports |
+| Values asked from the user | Asks what the install needs (site address), passes it once (`RADE_SITE`) | Asks its own settings in its own setup screen |
+| Record of the install | Keeps the version, each step's state and the made list | Prints `PASS`, `FAIL` and `MADE` lines; each script is safe to run again |
+| App data (rows, files, backups) | May read and write it inside DoD365 where a run type needs it (Diagnose, Restore, backup); how is not decided | Owns it; declares what RADE may touch |
+| After the install | Not present; the app works if RADE is deleted | Flows, the Power App, health and its own alerts |
+| Help | Names the Teams channel | Says what to do when one of its steps needs review |
+
+Hard rule (the Administrator, 2026-11-14): users cannot write data across the DoD365 boundary through any of the Administrator's apps, RADE included. Inside DoD365 (the site, the user's OneDrive) RADE may read and write. The first version of the two rows above said RADE never writes to the site or touches app data; that was agent wording and is replaced.
+
+No reconnaissance (the Administrator, 2026-11-14; cannot be changed): RADE, every app, every step, flow and test, and every agent that writes them, must never do anything that is malicious in nature or that could be misconstrued as malicious. Never, with no exception: finding or pinging hosts on the network, port checks, or working out network or logical boundaries by probing. Allowed: reading SharePoint and Power Platform data with the user's own account, in the open (the script says what it reads before it runs), including to record what that account can do so an app can be deployed. If there is any doubt, stop and seek approval from the owner before the code is written or run.
+
+Environment (the Administrator, 2026-11-14): what works on the owner's NIPR computer works on every NIPR computer, PnP.PowerShell included; the owner's account has no special flag. Windows PowerShell 5.1 is the least that is always there: all engine and step code runs on it. The work-computer rounds are the 5.1 test; the cloud tests stay on PowerShell 7, and a 5.1 fault is fixed when a round finds it.
+
+Preflight: RADE's checks are the one preflight; an app keeps a probe flow only for rights a script cannot see (for example the connector data policy, Send As). Updates: RADE compares the installed version with the newest one at each run; an app only shows its installed version.
+
 ## Modes
 
 One engine, three modes per catalog app (`mode` in the manifest): **deploy** (install an app), **test** (a test round; the default) and **drift** (owner only). Test rounds are run by the owner only; other users only deploy (the Administrator, 2026-11-14).
@@ -68,3 +94,25 @@ Newer version: in a deploy RADE reads `rade-release.json` at the root of the app
 Not in v1: environment values in the manifest (the OneDrive folder name and the site prefix stay in the engine: NIPR is the same everywhere, the Administrator, 2026-11-14). Rights are not the same for every user, so each step that needs extra rights keeps a documented fallback.
 
 After the owner's test rounds end, the test branch and its results e-mail (draft, address box, "window displayed correctly" box) are removed from the engine in one change (the Administrator, 2026-11-14).
+
+## Maintenance run types
+
+Decided by the Administrator, 2026-11-14: RADE offers Install, Diagnose, Restore and Uninstall as run types and keeps the record right for each (version, step states, made list); the app supplies what each needs. Not built.
+
+Everything below is an agent recommendation (2026-11-14), not approved.
+
+Screen: title "Maintenance", shown for an app that is installed. Five action buttons:
+
+| Button | Does | Writes | Asks first |
+|---|---|---|---|
+| Install (reads "Update to <version>" or "Repair" by state) | Adds what is missing, updates flows and app, keeps data | Site, Power Automate (hand steps), the record | No |
+| Diagnose | Read-only checks; each finding names its fix | A report on the computer | No |
+| Back up | Saves every app list as JSON plus a CSV copy | The backup folder | No |
+| Restore | Puts rows back: Recycle Bin first, else a backup the user picks | Site rows | Yes, after a dry run with counts |
+| Uninstall | Backs up, then removes all that the made list names | Site, Power Automate (hand steps), the record | Yes: the user types the app name |
+
+Diagnose functions: D1 installed record against the newest version; D2 schema compare (lists, columns, types, choices, indexes, views, list settings); D3 permission compare; D4 required settings rows; D5 empty required lookups and item counts against the 5,000 view threshold; D6 flow health from rows the flows write; D7 backup age and counts; D8 hand checks (co-owner, sharing, connections).
+
+Restore functions: R1 Recycle Bin restore; R2 pause flows before, resume after; R3 fresh backup before any write; R4 dry run with counts; R5 load in dependency order and remap lookup IDs; R6 resolve Person fields, report missing accounts; R7 verify, then clear the pause. Version 1: an empty list, or missing rows only; no overwrite of rows.
+
+What an app supplies: one schema file; a settings list with standard keys (app version, schema version, flows paused, test mode); a health list and a heartbeat step in each flow; the backup folder.
