@@ -4,13 +4,16 @@
 # Set by the test: RADE_T_STUB (path of the stub), RADE_T_APP (index of the application), RADE_T_HAND (done, fail or
 # skip), RADE_T_RECORD (1 = open "Steps and files" and clear the Clean-up box before the run), RADE_T_TOUR (1 = the
 # application also gets the site, sign-in and Power Automate checks, and a base check of the test application is FAILED),
-# RADE_T_LOOP (1 = Application.Run fails as when a message loop already runs: the window must open with ShowDialog).
+# RADE_T_LOOP (1 = Application.Run fails as when a message loop already runs: the window must open with ShowDialog),
+# RADE_T_SCALE (150 = the form scales to 144 dpi while the screen dpi says 96, as on the R24 device). It prints "WIN measure"
+# lines: sizes RADE sets after the form has scaled (a choice on Choose, the Record's step boxes and labels, made then).
+# A button that showed a longer text on an earlier card must be able to shrink (AutoSize GrowAndShrink): else WIN BAD.
 # On the hand step's questions (manifest "answers") it answers No, the second choice, and a text with a fake e-mail address.
 # A check that cannot pass on the test computer is set to PASSED after its card has shown (the test is of the window).
 Add-Type -TypeDefinition ([System.IO.File]::ReadAllText($env:RADE_T_STUB)) -ReferencedAssemblies @('System.Drawing.Primitives', 'System.Collections', 'System.Linq.Expressions', 'System.Management.Automation', 'System.Runtime', 'netstandard') -WarningAction SilentlyContinue
 function Start-Process { param($FilePath, $ArgumentList) Write-Host ('WIN start-process ' + $(if ($FilePath -match '^https://') { 'browser' } else { [string]$FilePath })) }
-[RadeStub.Driver]::RunThrows = ($env:RADE_T_LOOP -eq '1')
-$global:RadeT = @{ Min = $false; Seen = ''; App = [int]$env:RADE_T_APP; Hand = [string]$env:RADE_T_HAND; Record = ($env:RADE_T_RECORD -eq '1'); Forced = $false; Opened = $false; Tour = ($env:RADE_T_TOUR -eq '1'); Esc = $false; Again = $false; SignIn = $false }
+[RadeStub.Driver]::RunThrows = ($env:RADE_T_LOOP -eq '1'); if ($env:RADE_T_SCALE -eq '150') { [RadeStub.Driver]::FormDpi = 144 }
+$global:RadeT = @{ Long = @{}; Min = $false; Seen = ''; App = [int]$env:RADE_T_APP; Hand = [string]$env:RADE_T_HAND; Record = ($env:RADE_T_RECORD -eq '1'); Forced = $false; Opened = $false; Tour = ($env:RADE_T_TOUR -eq '1'); Esc = $false; Again = $false; SignIn = $false }
 function global:Show-RadeCard {
   $ps = @($ui.P | Where-Object { $_.Shown } | ForEach-Object { $_.Text }) -join ' / '
   $bs = @($ui.B | Where-Object { $_.Shown } | ForEach-Object { $(if ($_.Enabled) { '[' } else { '(' }) + $_.Text + $(if ($_.Enabled) { ']' } else { ')' }) }) -join ' '
@@ -18,6 +21,10 @@ function global:Show-RadeCard {
   Write-Host ('WIN view=' + $ui.View + ' light=' + ([string]$ui.Light.AccessibleName).Substring(14) + ' kick=' + $(if ($ui.Kick.Shown) { $ui.Kick.Text } else { '' }) + ' sent=' + $ui.Sent.Text + ' p=' + $ps + $(if ($ui.Opts.Shown) { ' opts=' + $os } else { '' }) +
     $(if ($ui.Lines.Shown) { ' lines=' + ($ui.Lines.Text -replace '\r\n', ' ~ ') } else { '' }) + $(if ($ui.Note.Shown) { ' note=' + $ui.Note.Text } else { '' }) + $(if ($ui.Help.Shown) { ' help=' + $ui.Help.Text } else { '' }) + ' btn=' + $bs + $(if ($ui.Foot.Shown) { ' foot=' + $ui.Foot.Text } else { '' }) +
     $(if ($ui.TestRow.Shown) { ' test=shown' } else { '' }) + ' back=' + [bool]$ui.BackB.Shown + ' right=' + $ui.RightL.Text + ' app=' + $ui.AppL.Text)
+  # The stand-ins have no layout: a button keeps the width of its longest text unless it can shrink (Windows Forms GrowOnly).
+  for ($k = 0; $k -lt @($ui.B).Count; $k++) { $b = $ui.B[$k]; if (-not $b.Shown) { continue }; $was = [int]$global:RadeT.Long[$k]
+    if ($was -gt $b.Text.Length -and [string]$b.Values['AutoSizeMode'] -ne 'GrowAndShrink') { Write-Host ('WIN BAD button ' + $k + ' "' + $b.Text + '" keeps the width of a ' + $was + '-character text in view ' + $ui.View) }
+    if ($b.Text.Length -gt $was) { $global:RadeT.Long[$k] = $b.Text.Length } }
   $ui.Form.Repaint()
   $all = New-Object 'System.Collections.Generic.List[System.Windows.Forms.Control]'; $ui.Form.Walk($all)
   foreach ($c in $all) {
@@ -50,7 +57,7 @@ function global:Push-RadeButton([string]$Text) {
       $ui.BaseRes['outlook'] = @{ State = 'FAILED'; Detail = 'Not found'; Fix = 'Install Outlook, then paste the block again' }   # a base check only the test application has: that one is blocked
       & $ui.VChoose; Show-RadeCard
     }
-    foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Index -eq $global:RadeT.App) { $ui.Form.Key('D' + $o.Tag.Key); return } }
+    foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Index -eq $global:RadeT.App) { Write-Host ('WIN measure choice h=' + $o.Height + ' gap=' + $o.Margin.Bottom + ' plan-x=' + (& $ui.OptPlan $o.Tag $o.Width).X); $ui.Form.Key('D' + $o.Tag.Key); return } }
     throw 'the test user found no choice for the application'
   }
   elseif ($v -eq 'maint') {
@@ -84,6 +91,8 @@ function global:Push-RadeButton([string]$Text) {
       $all = New-Object 'System.Collections.Generic.List[System.Windows.Forms.Control]'; $ui.Rec.Walk($all)   # the Record's controls: each one that takes the focus has a ring
       foreach ($c in $all) { $t = $c.GetType().Name; if ($t -in 'Button', 'TextBox', 'CheckBox' -and -not ($c.Parent -and $c.Parent.Events.ContainsKey('Paint'))) { Write-Host ('WIN NOFOCUS ' + $t + ' "' + $c.Text + '" in the Record') } }
       $boxes = @($ui.RecSteps.Controls | Where-Object { $_ -is [System.Windows.Forms.CheckBox] })
+      $lab = @($ui.RecSteps.Controls | Where-Object { $_ -is [System.Windows.Forms.Label] })[0]
+      Write-Host ('WIN measure record box=' + $boxes[0].Margin.Left + ',' + $boxes[0].Margin.Top + ' label=' + $lab.Margin.Left + ',' + $lab.Margin.Bottom + ' rows=' + (& $ui.RecPlan 400).Tall)
       Write-Host ('WIN record on=' + $ui.RecOn + ' rows=' + @($ui.RecData).Count + ' boxes=' + $boxes.Count + ' enabled=' + $boxes[0].Enabled + ' text=' + [bool]($ui.RecText.Text -match 'Files this round saves') + ' name=' + [bool]($ui.RecChecks.Values['AccessibleName'] -match 'PASSED') + ' reused=' + (@($ui.RecData | Where-Object { $_.Name -match '^PowerShell is version' })[0].More -join ' / ') + ' tall=' + ($ui.RecChecks.Height -gt 100))
       $ui.Form.Key('Next'); Write-Host ('WIN paged=' + $ui.RecScroll.Values['AutoScrollPosition'].Y); $ui.Form.Key('Prior')   # the names Windows gives Page Down and Page Up
       foreach ($b in $boxes) { if ([int]$b.Tag -lt 0) { $b.Checked = $false } }
