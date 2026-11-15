@@ -1,11 +1,13 @@
 # Next prompt: RADE
 
-Updated: 2026-11-14 by Claude (deploy v1). Keep this file at 40 lines or fewer. The current request overrides it.
+Updated: 2026-11-14 by Claude (RADE page). Keep this file at 40 lines or fewer. The current request overrides it.
 
 ## State
 
 - main: bootstrapped from rhope-ops/archimedes_lever. Manifest contract: schemas/rade-manifest.schema.json; `python3 scripts/check_manifest.py <manifest>` checks one (the 90-161.Z manifest passes, 14 Nov 26).
 - Engine source: engine/rade_build.py here (AGENTS.md Project rules); 90-161.Z pins fe32673 (the "One thing" window, engine sha256 3036c97a...8b60; its scripts/rade.lock.json is the source; its bundle is R22 r2, 14 Nov 26). First gov-device proof: 90-161.Z R20 "Window: OK" and a PASSED repository check. Known cosmetic notes left: Run box not tinted on the current row, old result text under a reset chip, one culture-sensitive StartsWith, Choose list too tall at high DPI (fixed by P1).
+
+- RADE page (14 Nov 26, DECISIONS): index.html + apps.json on main = the work bookmark rhope-ops.github.io/RADE; it offers the last bundle of each application's manifest, so a round needs no change here. Measured in the cloud (375 and 1440 px, light and dark); NOT verified on a work computer (Copy of 275 KB, reach of github.io/RADE). Left from review (MINOR): with 2+ applications, Back and the same choice again lets the older load draw too (a flicker; use a counter per load).
 
 ## Open (in order)
 
@@ -22,7 +24,8 @@ Updated: 2026-11-14 by Claude (deploy v1). Keep this file at 40 lines or fewer. 
 
 ## Needs the Administrator
 
-- The final Teams channel name (placeholder RHOPE-OPS in the engine, DECISIONS 14 Nov).
+- The final Teams channel name (placeholder RHOPE-OPS in the engine and in apps.json `help`, DECISIONS 14 Nov).
+- Turn on GitHub Pages once (branch main, folder / (root)): https://github.com/rhope-ops/RADE/settings/pages. Until then the bookmark gives a 404.
 
 ## Do not
 
