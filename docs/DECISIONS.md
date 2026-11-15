@@ -4,6 +4,9 @@ Newest first. Why the kit defaults are what they are: https://github.com/rhope-o
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-14 | Deploy payload: the paste carries the engine and the scripts; large data files (flow zips, templates) download from a tagged release and are checked by sha256. Reason: the 90-161.Z payload files are about 628 KB (about 860 KB as text) against the 300 KB paste limit. | the Administrator | — |
+| 2026-11-14 | Order: the step contract (docs/engine.md "Step contract") comes before the safe second run and the undo list. | the Administrator | — |
+| 2026-11-14 | RADE installs apps only; it does not start them. | the Administrator | — |
 | 2026-11-14 | Help contact: the window and the app page name the Teams channel only, by its name, with no link and no address. No e-mail address goes in this repo. | the Administrator | — |
 | 2026-11-14 | ISSM texts: the general ones go (the engine header line "ISSM approved paste and run in writing" and the general approval item); the drift check keeps "the ISSM sees the report field list before the first run" (it reads security settings). | the Administrator | Open question in the "no ISSM approval" row below |
 | 2026-11-14 | Deploy v1 scope approved (docs/engine.md "Deploy v1"); items 1 (a deploy sends nothing) and 2 (installed-version record) start now. RADE is the framework: it runs the checks an app needs, then installs as much as it can before it asks the user for help. | the Administrator | — |

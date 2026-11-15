@@ -13,6 +13,7 @@ t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 od="$t/u/test1234/OneDrive - United States Air Force"; cfg="$od/RADE/Config"; inst="$cfg/rade-installed.json"
 mkdir -p "$od" "$t/app/scripts"; cp -r tests/fixture-app/. "$t/app/"; cp schemas/examples/sample-manifest.json "$t/app/scripts/paste_bundles.json"
 : > "$t/go.md"
+mkdir -p "$od/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$od/RADE/SampleApp/Config/SAMPLE-site.txt"
 build() { python3 engine/rade_build.py --app-root "$t/app" > "$t/build.txt" 2>&1 || { cat "$t/build.txt"; return 1; }
   sed -e "s#^\$usersRoot = 'C:\\\\Users'#\$usersRoot = '$t/u'#" -e "s#^\$goUrl = '.*'#\$goUrl = 'file://$t/go.md'#" -e "s#\$checkGate = \$true#\$checkGate = \$false#" \
     -e "s#https://example-org.github.io/sample-app#file://$t/go.md#g" -e "s#https://example.invalid/import#file://$t/go.md#" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" > "$t/b.ps1"; }
@@ -27,7 +28,7 @@ grep -q "Name = 'Sample app (deploy)'.*Mode = 'deploy'; Version = '1.0.0'" "$b" 
 grep "Name = 'Sample app'" "$b" | grep -q "'outlook'.*Mode = 'test'; Version = ''" && ok || bad "catalog: test app keeps the outlook check and Mode test"
 
 # 0. A skipped step: the run is PASSED but the version is not recorded as installed (review of deploy v1).
-round 2 S
+round 2 S; cp "$t/out.txt" "$t/out0.txt"
 grep -q "^Note: some steps were off or skipped, so version 1.0.0 is not recorded as installed" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 None 1.0.0 PASSED" ] && ok || { bad "deploy 0: skipped step ($(js))"; tail -8 "$t/out.txt"; }
 
 # 1. First deploy: every step on, PASSED, version recorded, nothing sent.
@@ -51,8 +52,19 @@ P
 
 # 2. Same version again: the record says it is installed.
 round 2
-round 2
 grep -q "^Mode: deploy, version 1.0.0 is installed" "$t/out.txt" && [ "$(js)" = "rade-installed/1 1 1.0.0 1.0.0 PASSED" ] && ok || bad "deploy 2: installed text ($(js))"
+
+# Step contract (docs/engine.md): inputs as environment variables, MADE lines and "makes" in the record.
+grep -q "contract=1 mode=deploy version=1.0.0 installed=1.0.0 last=PASSED site=True" "$t/out.txt" && grep -q "contract=1 mode=deploy version=1.0.0 installed= last= site=True" "$t/out0.txt" && ok || { bad "contract: step inputs"; grep "contract=" "$t/out.txt" "$t/out0.txt"; }
+python3 - "$inst" <<'P' && ok || { bad "contract: steps and made lists in the record"; cat "$inst"; }
+import json, sys
+s = json.load(open(sys.argv[1]))['apps']['SampleApp/Sample app (deploy)']['steps']
+a, b = s['T01 Sample check r1'], s['T02 Sample import r1']
+assert a['state'] == 'PASSED' and a['version'] == '1.0.0' and a['made'] == [{'kind': 'file', 'name': 'SAMPLE-T01-result-r1.txt'}, {'kind': 'list', 'name': 'Sample FAIL list at <SITE> and <SITE> and <SITE> for <DODID>'}], a
+assert b['state'] == 'PASSED' and b['made'] == [{'kind': 'flow', 'name': 'Sample flow'}], b
+P
+! grep -rq "fake.example\|sites/fake\|test1234" "$inst" "$od/RADE/SampleApp/Rounds" && ! grep -v "^Working folder: " "$t/out.txt" | grep -q "fake.example\|sites/fake\|test1234" && ok || bad "contract: a site address or the ID reached the record, the report or the screen log"
+grep -q "^    MADE backup of nothing (prose, not a record)" "$t/out.txt" && grep -q "^  Result: PASSED (1 passed, 0 failed" "$t/out.txt" && ok || { bad "contract: a MADE name with FAIL changed the counts, or a prose line was taken as a record"; grep "Result:" "$t/out.txt"; }
 
 # 3. A test round: the draft path is unchanged and the record is not touched.
 cp "$inst" "$t/inst.before"; round 1
