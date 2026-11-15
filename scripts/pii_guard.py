@@ -48,7 +48,9 @@ DoD checks (only with `profile: dod`):
 Known limits of the DoD checks: the scanner reads one line at a time, so a keyword on one line and its number on
 the next pass; a binary file that enters only through a merge resolution is found by --all, not by the commit scan;
 a one-word classification alone on a line is a mark in upper case only (in title case it is an ordinary heading).
-A profile line with any other value than `dod` fails the scan: a wrong spelling cannot lower the tier in silence.
+A tier line in any form other than `profile: dod`, and a `.pii-guard` that is not UTF-8 text, fail the scan: a wrong
+spelling or a wrong file encoding cannot lower the tier in silence. Limit: a line with both the key and the value
+misspelt is not seen as a tier line; `--status` and the result line always print the tier in use.
 Matches are printed masked (names and secrets as a length only), so CI logs do not repeat them. Exit 1 when anything is found.
 Standard library only. Needs git (except for FILE mode).
 """
@@ -61,6 +63,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import unicodedata
 
 ZERO = re.compile(r"^0+$")
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
@@ -155,10 +158,14 @@ MISSING_HELP = ("no denylist found. Add your names (comma or newline separated),
 WARN_OPTION = "denylist: warn"  # .pii-guard option line; first_use_check.py reads it too
 
 
-PROFILE_LINE = re.compile(r"(?i)^profile\s*(?:[:=]|\s+dod\b)")  # a tier line, also when written with = or no colon
-OPTION_LINE = re.compile(r"(?i)^(?:profile\s*(?:[:=]|\s+dod\b)|denylist\s*:)")  # option lines, never allowed values
-UNKNOWN_PROFILE = ("unknown profile line in .pii-guard: the only tier line is `profile: dod`. "
-                   "Correct or remove the line; the guard does not guess a tier.")
+# A tier line, also in a wrong form: `profile` with : or =, the bare word, or any one-word key with the value dod
+# (a misspelt key such as "profil: dod"). Every form other than `profile: dod` is unknown and fails the scan.
+_TIER = r"profile\s*[:=]|profile$|[A-Za-z_-]+\s*[:=]?\s*dod$"
+PROFILE_LINE = re.compile(r"(?i)^(?:" + _TIER + r")")
+OPTION_LINE = re.compile(r"(?i)^(?:" + _TIER + r"|denylist\s*:)")  # option lines, never allowed values
+UNREADABLE = "profile: <.pii-guard is not UTF-8 text>"  # load_allow adds it; it reads as an unknown tier line
+UNKNOWN_PROFILE = ("unknown profile line in .pii-guard, or the file is not UTF-8 text: the only tier line is "
+                   "`profile: dod`. Correct or remove the line, or save the file as UTF-8; the guard does not guess a tier.")
 
 
 def profile_of(allow):
@@ -194,15 +201,23 @@ def load_denylist():
 def load_allow(root, ref=None):
     """Allowed exact strings from .pii-guard (working tree, or the file at a git ref such as the PR base)."""
     if ref:
-        r = subprocess.run(["git", "show", f"{ref}:.pii-guard"], cwd=root, capture_output=True, text=True)
-        text = r.stdout if r.returncode == 0 else ""
+        r = subprocess.run(["git", "show", f"{ref}:.pii-guard"], cwd=root, capture_output=True)
+        data = r.stdout if r.returncode == 0 else b""
     else:
         f = pathlib.Path(root) / ".pii-guard"
-        text = f.read_text(encoding="utf-8", errors="replace") if f.is_file() else ""
-    text = text.replace("\ufeff", "")  # a byte-order mark (Windows editors add one) must not hide the first line
+        data = f.read_bytes() if f.is_file() else b""
+    # The file must be clean UTF-8 text. Anything else (UTF-16 from a Windows shell, a NUL, bytes that do not decode)
+    # could hide the tier line, so it adds UNREADABLE: profile_of then says "unknown" and the scan fails.
+    bad = data.startswith((b"\xff\xfe", b"\xfe\xff")) or b"\0" in data
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text, bad = data.decode("utf-8", "replace"), True
+    # Invisible format characters (zero-width space, a second byte-order mark) are dropped: they must not hide a line.
+    text = "".join(c for c in text if unicodedata.category(c) != "Cf")
     # A comment starts at the line start or after whitespace, so "skip: docs/#1.txt" keeps its "#".
     vals = (re.split(r"(?:^|\s)#", l, maxsplit=1)[0].strip() for l in text.splitlines())
-    return {v for v in vals if v}
+    return {v for v in vals if v} | ({UNREADABLE} if bad else set())
 
 
 def skipped(path, allow):
@@ -464,7 +479,8 @@ def self_test():
     good = profile_of({"Profile: DoD"}) == profile_of({"profile:dod"}) == profile_of({"profile :  dod"}) == "dod" \
         and profile_of({"profile: dodd"}) == profile_of({"profile: dod", "profile: min"}) == profile_of({"profile:"}) == "unknown" \
         and profile_of({"profile: d o d"}) == profile_of({"profile = dod"}) == profile_of({"profile dod"}) == "unknown" \
-        and profile_of({"denylist: warn", "x", "profile.example.org"}) == "minimum"
+        and profile_of({"profil: dod"}) == profile_of({"tier=dod"}) == profile_of({"profile"}) == "unknown" \
+        and profile_of({"denylist: warn", "x", "profile.example.org", "profile-x", "host.dod", "skip: a/dod"}) == "minimum"
     print(("ok   " if good else "FAIL ") + "profile line: any case, spacing around the colon; any other form is unknown")
     expect("dod id: a longer word that starts like the keyword is not one", "dodidentifier 12345" + "67890", [], dod=True)
     ok = ok and good
@@ -545,6 +561,21 @@ def self_test():
         good = r.returncode == 0 and "profile: dod" in r.stdout and dod_mode(d) and profile_of(staged) == "dod"
         subprocess.run(["git", "rm", "-q", "--cached", ".pii-guard"], cwd=d, check=True, capture_output=True)
         print(("ok   " if good else "FAIL ") + "tier line after a byte-order mark, with CRLF: DoD tier (file and git read)")
+        ok = ok and good
+        cases = {"UTF-16 with a byte-order mark": "profile: dod\n".encode("utf-16"), "UTF-16, no mark": "profile: dod\n".encode("utf-16-le"),
+                 "bytes that are not UTF-8": b"# note \xc3(\n", "a NUL byte": b"x\0y\n"}
+        for label, raw in cases.items():
+            pathlib.Path(d, ".pii-guard").write_bytes(raw)
+            r = subprocess.run(me + ["--all"], cwd=d, env=env, capture_output=True, text=True)
+            subprocess.run(["git", "add", ".pii-guard"], cwd=d, check=True, capture_output=True)
+            good = r.returncode == 1 and "PII GUARD FAIL: unknown profile" in r.stdout and "Traceback" not in r.stderr \
+                and profile_of(load_allow(d, ":0")) == "unknown"
+            subprocess.run(["git", "rm", "-q", "--cached", ".pii-guard"], cwd=d, check=True, capture_output=True)
+            print(("ok   " if good else "FAIL ") + f".pii-guard with {label}: the scan fails (file and git read)")
+            ok = ok and good
+        pathlib.Path(d, ".pii-guard").write_text("\u200bprofile: dod\n", encoding="utf-8")
+        good = profile_of(load_allow(d)) == "dod"
+        print(("ok   " if good else "FAIL ") + "tier line after a zero-width space: DoD tier")
         ok = ok and good
         pathlib.Path(d, ".pii-guard").write_text("denylist: warn\nProfile:DoD\n")
         r = subprocess.run(me + ["--status"], cwd=d, env=env, capture_output=True, text=True)
