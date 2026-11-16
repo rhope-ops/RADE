@@ -21,7 +21,7 @@ Updated: 2026-11-16 by Claude (kit port). Keep this file at 40 lines or fewer, o
 9. Shared files: built; a 90-161.Z round must show 4 `PASS shared files` lines (the 5.1 proof).
 10. After R24: questions, taskbar restore, bottom line, SCALE line built, release pending; the question-card PNGs need the Administrator's approval.
 11. MINOR review leftovers (PR 33, 44, 54 and others): the list in the detail file, for the next engine change.
-12. After this PR merges: record the full-lane median as the check baseline in `.bloat-audit.json` (`python3 scripts/bloat_check.py --time --record`; the Administrator, 2026-11-16).
+12. After this PR merges: set `timings.check.seconds` in `.bloat-audit.json` to the median of 3 full-lane runs on main (`--time --record` stores one run only; DECISIONS 2026-11-16).
 
 ## Needs the Administrator
 
