@@ -18,6 +18,6 @@ Brief: the kit's text in `.claude/skills/rule-change/SKILL.md` "Conflict check",
 5. Overlap: "Read docs/NEXT_PROMPT.md" in "Start of session" and the `handoff` skill. Fix: the skill points to "Start of session".
 6. Overlap: AGENTS.md "one line per rule" against `audit` item 12 "Prefer one line per rule". Fix: item 12 points to the AGENTS.md line.
 
-Status: findings 1, 3 to 6 go to the Administrator before the merge.
+Status (the Administrator, 2026-11-16): finding 1 fixed in RADE's `efficiency` skill (check lanes: median of 3); findings 3 to 6 fixed in RADE's `handoff` and `audit` skills ("one line each", pointers to AGENTS.md "Start of session", "Order of authority" and "Bloat, drift and assumptions"). The kit can take the same fixes.
 
 rule-conflict-check: 5a5b94a0763f

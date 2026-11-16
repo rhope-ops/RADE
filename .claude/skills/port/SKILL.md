@@ -1,6 +1,6 @@
 ---
 name: port
-description: Use when the Administrator asks to bring a change of the archimedes_lever kit (a pull request, a decision, a script or a skill) into a project by hand, when a sync with scripts/sync_baseline.py would overwrite the project's own text, and when scripts/drift.py shows that a project's kit sections differ. Gives how to choose between a sync and a port, the port steps, the approval of rule lines, and the before and after proof.
+description: Use when the Administrator asks to bring a change of the archimedes_lever kit (a pull request, a decision, a script or a skill) into a project by hand, when a sync with scripts/sync_baseline.py would overwrite the project's own text, and when scripts/drift.py shows that a project's kit sections differ. Gives why RADE always ports (never syncs), the port steps, the approval of rule lines, and the before and after proof.
 ---
 
 # Port a kit change to a project
