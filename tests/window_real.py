@@ -39,7 +39,7 @@ RUNS = [
     # the same bundle in the real Windows PowerShell ISE host, as on a work computer (run_ise)
     ("ise-host", 1, "done", "0", "", False),
     # the scaling of the R24 and R25 work computer, in the ISE host: the form scales its controls 1.5 x while the screen dpi
-    # says 96 and the fonts stay at 96 dpi (SCALE: autoScale=144, font=18), on a 1920 x 1200 screen (device_screen)
+    # says 96 and the fonts stay at 96 dpi (SCALE: autoScale=144, font=18), on a screen 1920 wide (device_screen)
     ("device-150", 1, "done", "0", "", False),
 ]
 ISE = "ise-host"
@@ -92,12 +92,15 @@ def file_url(p):
 
 
 def device_screen():
-    """Set the screen to 1920 x 1200 (the R25 work computer). True when Windows did it."""
-    r = subprocess.run(["powershell.exe", "-NoProfile", "-Command",
-                        "try { Set-DisplayResolution -Width 1920 -Height 1200 -Force -ErrorAction Stop | Out-Null } catch { $_.Exception.Message }; Add-Type -AssemblyName System.Windows.Forms; "
-                        "$b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds; 'SCREEN ' + $b.Width + 'x' + $b.Height"], capture_output=True, text=True)
-    print("   " + " | ".join(l.strip()[:160] for l in (r.stdout + r.stderr).splitlines() if l.strip()))
-    return "SCREEN 1920x1200" in r.stdout
+    """Set the screen to 1920 x 1200 (the R25 work computer), else to 1920 x 1080 (room for the 1.5 x window too).
+    True when Windows did it."""
+    ps = ("Add-Type -AssemblyName System.Windows.Forms; foreach ($h in 1200, 1080) { "
+          "try { $o = Set-DisplayResolution -Width 1920 -Height $h -Force -ErrorAction Stop 2>&1 | Out-String; if ($o.Trim()) { 'SET ' + $h + ': ' + $o.Trim() } } catch { 'SET ' + $h + ': ' + $_.Exception.Message }; "
+          "Start-Sleep -Milliseconds 800; $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds; if ($b.Width -eq 1920) { break } }; "
+          "$b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds; 'SCREEN ' + $b.Width + 'x' + $b.Height")
+    r = subprocess.run(["powershell.exe", "-NoProfile", "-Command", ps], capture_output=True, text=True)
+    print("   " + " | ".join(l.strip()[:200] for l in (r.stdout + r.stderr).splitlines() if l.strip()))
+    return "SCREEN 1920x" in r.stdout
 
 
 def bundle(t, long, keep=None, device=False):
@@ -184,7 +187,7 @@ def main():
         env = dict(os.environ, RADE_T_OUT=str(d), RADE_T_APP=str(app), RADE_T_HAND=hand, RADE_T_TOUR=tour, RADE_T_SIZE=size, USERPROFILE=str(users / "test1234"),
                    RADE_T_PROBE="1" if first or name in IN_ISE else "")
         if name == DEVICE and not device_screen():
-            print("== %s: NOT RUN, this computer could not set a 1920 x 1200 screen" % name)
+            print("== %s: NOT RUN, this computer could not set a screen 1920 wide" % name)
             skipped.append(name)
             shutil.rmtree(t, ignore_errors=True)
             continue
