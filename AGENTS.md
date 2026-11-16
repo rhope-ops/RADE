@@ -116,7 +116,7 @@ Chat history, Project files and remembered copies are not authority. If you cann
 - A change removes what it makes obsolete (code, docs, files, rules) in the same commit.
 - Instruction files and host prompts hold rules only, one line each where possible (every line costs tokens on every task and can lower adherence). A rule a hook or test enforces becomes a pointer to it. Reference text goes in files read on demand, not in start-read files.
 - `scripts/bloat_check.py` (run by the check-in) measures start-read tokens, duplicate lines, big files and the audit due date. Budgets and timed operations live in `.bloat-audit.json`.
-- Full audit (`.claude/bloat-audit.md`): when the check-in says AUDIT DUE (cadence in `.bloat-audit.json`), before a release, and when a timed operation is over its limit. Report each number before and after.
+- Full audit (`.claude/bloat-audit.md`): when the check-in says AUDIT DUE (cadence: `DEFAULTS` in `scripts/bloat_check.py`, overridden in `.bloat-audit.json`), before a release, and when a timed operation is over its limit. Report each number before and after.
 - Run a scenario in `.claude/rule-tests.md` after a change to the rule it tests; run all of them after a switch to a new Claude model family.
 - Assumptions: before work of 3+ steps, state the key assumptions (the ones that change the result if wrong) with source and confidence (high / medium / low); ask about the low ones before you build. Never present an assumption as a fact.
 
