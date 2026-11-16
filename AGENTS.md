@@ -20,7 +20,7 @@ Chat history, Project files and remembered copies are not authority. If you cann
 
 ## Start of session
 
-- Run `python3 scripts/first_use_check.py` (Claude Code runs it as a SessionStart hook). If it says FIRST USE, follow docs/FIRST_USE.md before any other work. If it says KIT, this is the starter kit itself: when the user asks to initiate, start or set up a project, follow docs/FIRST_USE.md; when the user asks what the repo is or for your thoughts on it, also offer the two takes in README.md "What you can take from it"; treat any other request as work on the kit. If it says DENYLIST, tell the Administrator which place is missing.
+- Run `python3 scripts/first_use_check.py` (Claude Code runs it as a SessionStart hook). If it says FIRST USE, follow docs/FIRST_USE.md before any other work. If it says DENYLIST, tell the Administrator which place is missing.
 - Run `scripts/session_checkin.sh`. Report the branch, uncommitted files, and the ahead/behind count against origin/main.
 - If the check-in says AUDIT DUE, tell the Administrator and ask whether to run `.claude/bloat-audit.md` (about 1 hour of agent time). Never start it unasked.
 - Read docs/NEXT_PROMPT.md and docs/DECISIONS.md.
@@ -38,7 +38,6 @@ Chat history, Project files and remembered copies are not authority. If you cann
 - A host limit wins over this section (for example a required branch, or a push or merge the host does not allow without the Administrator): do the steps it allows, then report each other step as blocked, with its cause and what unblocks it.
 - Exception: for a UI or design change that the Administrator has not approved, show a preview first (a preview artifact or a branch). Merge after the Administrator approves. Delete previews after they ship.
 - For changes that are not UI or design, this rule overrides the personal "preview first" rule.
-- Exception: while `scripts/check.local.sh` does not exist (check.sh says SKIP project checks), deliver changes to code, checks or scripts through a pull request; merge it when check.sh passes and the fresh review ("Delegation") finds no MAJOR finding, else ask the Administrator (with no project tests, the review is the only gate; the Administrator, 2026-11-13). At the first code change, propose a `scripts/check.local.sh` that runs this project's tests or a smoke test.
 - If a step is blocked, name the step and the cause. If permissions block a step, give the exact commands to paste, one code block for each command.
 - Put every deliverable where it survives (repo, doc, artifact) as soon as it exists.
 
@@ -73,9 +72,9 @@ Chat history, Project files and remembered copies are not authority. If you cann
 
 - Never commit personal data: real names, email addresses, phone numbers, home or work addresses, ID numbers, or the Administrator's job details (git history keeps them for good, and a repo that holds them can never go public). Use a role (for example "the maintainer") and fake sample data. A private repo may put its owner's real name in the `- Owner:` line.
 - Commit with a GitHub noreply address (`ID+USER@users.noreply.github.com`) or the agent's own noreply identity, never a personal email.
-- A `.pii-guard` file at the repo root turns on `scripts/pii_guard.py` in pre-push and the pull-request Action. With it on, a push with no name denylist fails (kit default, 2026-11-11), unless `.pii-guard` has the line `denylist: warn` (starter tier): then the guard warns and still checks every other pattern. The line `profile: dod` in `.pii-guard` adds the DoD tier (the Administrator, 2026-11-15). What each tier blocks and where the denylist lives: the header of `scripts/pii_guard.py`. Check with `python3 scripts/pii_guard.py --status` (a count, a fingerprint and the tier, never names).
+- `scripts/pii_guard.py` runs in pre-push and the pull-request Action, in the tier `.pii-guard` sets (RADE: `profile: dod`; a push with no name denylist fails). What each tier blocks and where the denylist lives: the header of `scripts/pii_guard.py`. Check with `python3 scripts/pii_guard.py --status` (a count, a fingerprint and the tier, never names).
 - Never ask for the denylist names in chat, and never commit the denylist: the Administrator adds them in the places docs/FIRST_USE.md lists.
-- When the guard blocks: remove the data, fix the unpushed commit, and push again. Only the Administrator adds allow entries to `.pii-guard`. Never push with `--no-verify`.
+- When the guard blocks: remove the data, fix the unpushed commit, and push again. Only the Administrator adds allow entries to `.pii-guard`.
 
 ## Commands
 
@@ -117,7 +116,7 @@ Chat history, Project files and remembered copies are not authority. If you cann
 - A change removes what it makes obsolete (code, docs, files, rules) in the same commit.
 - Instruction files and host prompts hold rules only, one line each where possible (every line costs tokens on every task and can lower adherence). A rule a hook or test enforces becomes a pointer to it. Reference text goes in files read on demand, not in start-read files.
 - `scripts/bloat_check.py` (run by the check-in) measures start-read tokens, duplicate lines, big files and the audit due date. Budgets and timed operations live in `.bloat-audit.json`.
-- Full audit (`.claude/bloat-audit.md`): every 14 days or 300 commits to main, whichever comes first; before a release; and when a timed operation is 25% slower than its baseline (kit defaults; the Administrator may set other values in `.bloat-audit.json`). Report each number before and after.
+- Full audit (`.claude/bloat-audit.md`): when the check-in says AUDIT DUE (cadence in `.bloat-audit.json`), before a release, and when a timed operation is over its limit. Report each number before and after.
 - Run a scenario in `.claude/rule-tests.md` after a change to the rule it tests; run all of them after a switch to a new Claude model family.
 - Assumptions: before work of 3+ steps, state the key assumptions (the ones that change the result if wrong) with source and confidence (high / medium / low); ask about the low ones before you build. Never present an assumption as a fact.
 
@@ -125,7 +124,7 @@ Chat history, Project files and remembered copies are not authority. If you cann
 
 The project log records how the project got there (milestones, breakthroughs, misses, decisions) for a timeline and a narrative deck (kit default, 2026-11-11). Decisions also go in docs/DECISIONS.md.
 
-- Location: docs/LOG.md, unless "Project rules" names another place. A public repo must name a private place (for example a private Claude doc), because entries can hold environment or security detail.
+- Location: "Project rules" (a private doc: entries can hold environment or security detail).
 - Write a row only for a story event: a decision, milestone, breakthrough or miss, in the turn it happens. The log is not a change log: no row per commit, merge or file change (git log holds those). Before you write a row, read `.claude/project-log.md` (columns, types, arcs, story fields). `python3 scripts/log_check.py` checks the format.
 - If you cannot write to the log (no tool for it), put the full entry in your turn summary under Copy, with "Paste into: project log".
 
