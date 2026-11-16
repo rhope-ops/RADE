@@ -83,7 +83,7 @@ Assumptions that nobody checked are drift that has not happened yet.
 ## Step 5: record
 
 1. Write `docs/reviews/YYYY-MM-DD-bloat-audit.md` (or the place AGENTS.md "Project rules" names): the before/after table, findings by category with evidence, fixes made, proposals for the Administrator, the assumption table, the tech-debt register.
-2. Update `.bloat-audit.json`: `last_audit` (date, commit on main after the fixes, report path), new `timings` baselines (`--time --record`, and `scripts/check.sh --record` for the lanes), and `ignore` globs for generated or reference files that the duplicate scan should skip (each new glob is a proposal: it hides files from the scan).
+2. Update `.bloat-audit.json`: `last_audit` (date, commit on main after the fixes, report path), new `timings` baselines (`--time --record`; the lanes as `.claude/skills/efficiency/SKILL.md` "Record a baseline" says), and `ignore` globs for generated or reference files that the duplicate scan should skip (each new glob is a proposal: it hides files from the scan).
 3. Log the audit in the project log (milestone; a breakthrough when a fix removes a blocker or saves 25%+ time).
 4. Ask the Administrator the open questions together, each with options and a recommendation. Removal proposals: make the 5 with the largest saving on a second branch and open one pull request for them, one commit for each item, with a table in its text: what, where, why it exists (or "not found"), evidence it is unused, saving, risk. An agent never merges this pull request: the Administrator's merge is the approval, and the Administrator can drop a commit. List the other proposals in the report for the next audit; a long list is not approved, so it removes nothing.
 
