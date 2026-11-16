@@ -32,6 +32,11 @@ def refs(m):
                 out.append('%s: step %r: %s/%s is not in files' % (r, s['name'], s['dir'], s['file']))
             if 'answers' in s and s.get('kind') != 'guide':
                 out.append('%s: step %r: answers: only a guide step (kind "guide") can ask questions' % (r, s['name']))
+            if s.get('late') is True and s.get('kind') != 'guide':
+                out.append('%s: step %r: late: only a guide step (kind "guide") can answer "Not yet"' % (r, s['name']))
+            for o in b.get('steps', []):
+                if s.get('late') is True and s['name'] in (o.get('after') or []):
+                    out.append('%s: step %r: late: step %r needs it (after), so it cannot wait' % (r, s['name'], o['name']))
             qs = s.get('answers') if isinstance(s.get('answers'), list) else []
             keys = [a['key'] for a in qs if isinstance(a, dict) and isinstance(a.get('key'), str)]
             for k in sorted({k for k in keys if keys.count(k) > 1}):

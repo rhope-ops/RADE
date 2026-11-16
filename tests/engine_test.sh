@@ -72,6 +72,10 @@ def blank_p(st): st[2]['answers'] = [dict(qs[0], prompt='   ')]
 def blank_c(st): st[2]['answers'] = [dict(qs[1], choices=['One', '  '])]
 case('blank prompt', blank_p, "answers: the prompt of 'run-started' is empty (only spaces)", "question 'run-started': the prompt must have 1 to")
 case('blank choice', blank_c, "answers: a choice of 'flow-count' is empty (only spaces)", "question 'flow-count': a pick needs 2 to 4 choices")
+def late_script(st): st[0]['late'] = True
+def late_after(st): st[2]['late'] = True
+case('late script', late_script, "late: only a guide step (kind \"guide\") can answer \"Not yet\"", "late: only a guide step (kind \"guide\") can answer \"Not yet\"")
+case('late after', late_after, "step 'T02 Sample import r1': late: step ", "step 'T02 Sample import r1': late: step ")
 case('case', case_sp, "answers: the choices of 'flow-count' must differ (case and spaces ignored)", "question 'flow-count': the choices of a pick must differ (case and spaces ignored)")
 P
 
@@ -188,7 +192,7 @@ round 2 S; cp "$t/out.txt" "$t/out0.txt"
 grep -q "^Note: some steps were off or skipped, so version 1.0.0 is not recorded as installed" "$t/out.txt" && [ "$(js)" = "rade-installed/2 1 None 1.0.0 PASSED" ] && ok || { bad "deploy 0: skipped step ($(js))"; tail -8 "$t/out.txt"; }
 
 # Optional = "default": false only (review): T04 is optional, the other steps are needed.
-[ "$(grep -c '^\$steps += .*Optional = \$false; Help = ' "$b")" = 3 ] && grep -q "^\$steps += @{ Name = 'T04 Sample optional r1'.*Default = \$false.*Optional = \$true; Help = '' }$" "$b" && ok || bad "catalog: Optional flags"
+[ "$(grep -c '^\$steps += .*Optional = \$false; Help = ' "$b")" = 3 ] && grep -q "^\$steps += @{ Name = 'T04 Sample optional r1'.*Default = \$false.*Optional = \$true; Help = ''; Late = \$false }$" "$b" && ok || bad "catalog: Optional flags"
 # A files-changed default that the build turns off is still a needed step: in a deploy it runs (review).
 python3 - "$t" <<'P' && ok || bad "item 3: a step with a files-changed default must stay needed in a deploy"
 import json, subprocess, sys, pathlib, shutil, os, re
@@ -490,5 +494,21 @@ grep -q '\$script:draftMade = (-not \$why)' engine/rade_build.py && grep -q "Out
 
 # The tagline (the Administrator, 14 Nov 26): no "DoD".
 ! grep -q "for your DoD organization" engine/rade_build.py && grep -q "'Test and deploy apps for your organization'" engine/rade_build.py && ok || bad "tagline"
+# ---- "Not yet" on a hand step (manifest "late"; the Administrator, 2026-11-15, after R25: an e-mail that came after the step
+# was reported as failed). The test copy turns it on for T02 (the sample manifest cannot: T03 needs T02). The card has a
+# fourth answer; the step is WAITING and the round goes on; after the last step RADE asks again (no Skip, "Still not").
+# Then Done gives PASSED with the questions; "Still not" gives FAILED and NEEDS REVIEW. Text mode: L.
+sed "/Name = 'T02 Sample import r1'/s/Late = \$false/Late = \$true/" "$t/wb.ps1" > "$t/wl.ps1"; grep -q "Late = \$true" "$t/wl.ps1" && [ "$(grep -c "Late = \$false" "$t/wb.ps1")" = "$(grep -c "^\$steps += " "$t/wb.ps1")" ] && ok || bad "late: every step has Late, off by default"
+rm -rf "$t/wu/test1234/OneDrive - United States Air Force/RADE"; win 1 later 0 0 "$t/wl.ps1"
+has "btn=[Imported] [It failed] [Skip] [Not yet]" "view=hand light=RADE waits for you kick=ASKED AGAIN · YOUR TURN sent=T02 Sample import r1 p=Your answer was \"Not yet\". Is the result there now?" "btn=[Imported] [It failed] [Still not]" "QUESTION 1 OF 3" &&
+  grep -q "^T02 Sample import r1: WAITING (your answer was \"Not yet\"; asked again before the summary)" "$wr" && grep -q "^T02 Sample import r1: PASSED (confirmed by you) in " "$wr" && grep -q "^  Answer run-started: No" "$wr" && ok || { bad "window 1i: Not yet, then Done"; grep "view=hand\|view=answer" "$t/win.txt" | cut -c1-260; grep "^T02" "$wr"; }
+rm -rf "$t/wu/test1234/OneDrive - United States Air Force/RADE"; win 1 never 0 0 "$t/wl.ps1"
+has "btn=[Imported] [It failed] [Still not]" "view=review light=failed kick=NEEDS REVIEW" && grep -q "^T02 Sample import r1: FAILED (not there by the end of the round, 1 min after the step started; your answer was \"Not yet\" 2 times) in " "$wr" && ! grep -q "QUESTION 1 OF 3" "$t/win.txt" && ok || { bad "window 1i: Not yet, then Still not"; grep "view=hand\|view=review" "$t/win.txt" | cut -c1-260; grep "^T02" "$wr"; }
+rm -rf "$t/wu/test1234/OneDrive - United States Air Force/RADE"
+swap "$b" "$t/bl0.ps1" "$t/lu"; sed "/Name = 'T02 Sample import r1'/s/Late = \$false/Late = \$true/" "$t/bl0.ps1" > "$t/bl.ps1"; mkdir -p "$t/lu/test1234/OneDrive - United States Air Force"
+printf '2\n\nL\nL\nL\nL\n' | USERPROFILE="$t/lu/test1234" pwsh -NoProfile -File "$t/bl.ps1" > "$t/late.txt" 2>&1
+grep -q "Not yet (your answer). RADE asks again before the summary." "$t/late.txt" && grep -q "^Asked again: T02 Sample import r1" "$t/late.txt" && grep -q "Still not there (your answer)." "$t/late.txt" && grep -q "Result: FAILED (not there by the end of the round" "$t/late.txt" && ok || { bad "late: text mode, L and L"; grep -n "T02\|Not yet\|Asked\|Still" "$t/late.txt" | cut -c1-200; }
+rm -rf "$t/lu/test1234/OneDrive - United States Air Force/RADE"; printf '2\n\nL\n\n\n\n' | USERPROFILE="$t/lu/test1234" pwsh -NoProfile -File "$t/bl.ps1" > "$t/late.txt" 2>&1
+grep -q "^Asked again: T02 Sample import r1" "$t/late.txt" && grep -q "Result: PASSED (confirmed by you)" "$t/late.txt" && ! grep -q "or L and Enter" "$t/out0.txt" && ok || { bad "late: text mode, L and Done; no L without late"; grep -n "T02\|Asked\|Result" "$t/late.txt" | cut -c1-200; }
 echo "ENGINE pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

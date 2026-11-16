@@ -4,6 +4,8 @@ Newest first. Why the kit defaults are what they are: https://github.com/rhope-o
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-15 | A hand step can offer a fourth answer, "Not yet" (manifest `late`, opt-in per step, never a step that another step needs with `after`): the step is WAITING, the round goes on, and RADE asks once more before the summary; "Still not" then gives FAILED. Rule: docs/engine.md "Step contract". | the Administrator | Agent REC after 90-161.Z R25 (an e-mail came after its step was reported as failed); built in pull request 55 |
+| 2026-11-15 | The "Back" link stays on the cards that have it (R25 note). Changes to it come from the session that owns the window mockup, not from pull request 55. | the Administrator | Agent REC |
 | 2026-11-15 | Window polish after R24 pictures: header parts and label-box-button rows share one midpoint, one left edge per card, question prompt: first sentence is the headline, the rest a body line; a long first sentence shrinks to fit, buttons draw only the engine's own border. | the Administrator | — |
 | 2026-11-15 | Guide steps can ask up to 4 questions (yes/no, pick one, short text) after Done; answers go to the report and summary, text masked. Asked for after 90-161.Z R24. | the Administrator | — |
 | 2026-11-15 | Ready card: when an application needs a site, the card before Install or Run shows the saved site by name (last part of the address; on the card only, never in the log or the report) and offers "Change the site address". Reason: app steps now use the saved site with no question (90-161.Z). Detail: docs/window-design.md "Ready". | the Administrator | — |

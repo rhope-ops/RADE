@@ -446,6 +446,7 @@ function Get-StepLine($Step, $R, [double]$Seconds) {
   # One line per step in the summary and the e-mail: name, result, check counts, time.
   $state = Get-StepState $R
   if ($R.Skipped) { return ($Step.Name + ': SKIPPED' + $(if ($R.Why) { ' (' + $R.Why + ')' } else { ' by you' })) }
+  if ($Step.Kind -eq 'guide' -and $R.Late) { return ($Step.Name + ': FAILED (not there by the end of the round, ' + $R.Late + ' min after the step started; your answer was "Not yet" 2 times) in ' + (Format-Duration $Seconds)) }
   if ($Step.Kind -eq 'guide' -and $R.FailText) { return ($Step.Name + ': FAILED (reported by you) in ' + (Format-Duration $Seconds) + ': ' + $R.FailText) }
   if ($Step.Kind -eq 'guide') { return ($Step.Name + ': ' + $state + ' (confirmed by you) in ' + (Format-Duration $Seconds)) }
   if ($state -eq 'PASSED' -and $R.Fallback) { $state = 'PASSED (fallback: ' + $R.Fallback + ')' }
@@ -481,8 +482,9 @@ function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
     & $Say ('    Address: ' + $url)
     if ($file -and (Copy-TextToClipboard $file)) { & $Say '    The full file path is on the clipboard.' }
     if ($env:OS -eq 'Windows_NT') { try { Start-Process -FilePath $url } catch { $null = $_ } }
-    $a = [string](Read-Host 'Press Enter when the flow run has started, type F and Enter if it failed, or S and Enter to skip this step'); $a = $(if ($a) { $a.Trim() } else { '' })   # no input (closed stdin) gives no value, not ''
-    $res = $(if ($a -match '^[Ss]') { 'Cancel' } elseif ($a -match '^[Ff]') { 'Abort' } else { 'OK' })
+    $ask = 'Press Enter when the step is done, type F and Enter if it failed' + $(if ($script:guideAgain) { '' } else { ', or S and Enter to skip this step' }) + $(if ($Step.Late) { ', or L and Enter if the result is not there yet' + $(if ($script:guideAgain) { '' } else { ' (RADE asks again before the summary)' }) } else { '' })
+    $a = [string](Read-Host $ask); $a = $(if ($a) { $a.Trim() } else { '' })   # no input (closed stdin) gives no value, not ''
+    $res = $(if ($a -match '^[Ss]' -and -not $script:guideAgain) { 'Cancel' } elseif ($a -match '^[Ff]') { 'Abort' } elseif ($a -match '^[Ll]' -and $Step.Late) { 'Later' } else { 'OK' })
     if ($res -eq 'Abort') { $script:guideError = [string](Read-Host 'Paste the error message (no names or site address), then press Enter') }
   } elseif ($script:guideUi) { $res = [string](@(& $script:guideUi $Step $file $url $urlFile))[-1] }   # the window shows the step as a card and waits for the answer
   else { $res = 'Cancel' }
@@ -506,7 +508,8 @@ function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
       else { $v = [string]$script:guideAnswers[$k] }   # yes/no and pick: the fixed words of the buttons
       $r.Answers += ('  Answer ' + $k + ': ' + $v)
     }
-  } else { $r.Skipped = $true; & $Say '    Skipped by you.' }
+  } elseif ($res -eq 'Later' -and $Step.Late) { $r.Waiting = $true; & $Say $(if ($script:guideAgain) { '    Still not there (your answer).' } else { '    Not yet (your answer). RADE asks again before the summary.' }) }   # manifest "late": Invoke-Round asks once more
+  else { $r.Skipped = $true; & $Say '    Skipped by you.' }
   return $r
 }
 function Add-RunLog([string]$T) { if ($null -ne $script:runLog) { $script:runLog.Add($T) } }
@@ -858,6 +861,26 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     }
     else { $summary += 'Clean-up: SKIPPED by you' }
   }
+  # What follows a step's result (state, record, summary line, history). Run in this scope (". $finish") after a step
+  # in the loop and after a hand step that was asked again ("late"); it reads $k, $r, $secs and $need.
+  $waiting = @()
+  $finish = {
+    if ((Get-StepState $r) -ne 'SKIPPED') { $script:ranSteps += $steps[$k].Name }   # a step you skip, or one that only printed SKIP, expects no result files
+    $state = Get-StepState $r
+    if ($state -eq 'NEEDS REVIEW') { $script:roundBad = $true }
+    if ($state -ne 'PASSED' -and -not [bool]$steps[$k].Optional) { $whole = $false }   # a skipped step is not installed (review, deploy v1); an optional step that fails makes the run NEEDS REVIEW
+    $made = @($r.Made | Where-Object { $_ }); if ($state -eq 'PASSED') { foreach ($m in @($steps[$k].Makes)) { $made += @{ kind = [string]$m.kind; name = [string]$m.name } } }
+    $runState[[string]$steps[$k].Name] = $state
+    if (-not $need) { $stepRecs[[string]$steps[$k].Name] = @{ state = $state; made = $made } }   # a step skipped for a missing dependency keeps its older record
+    $line = Get-StepLine $steps[$k] $r $secs
+    $summary += $line
+    foreach ($al in @($r.Answers | Where-Object { $_ })) { $summary += [string]$al }   # a hand step's answers, under its line
+    & $speak ('  Result: ' + ($line.Substring($steps[$k].Name.Length + 2)))
+    if ($state -eq 'NEEDS REVIEW' -and $steps[$k].Help) { $hl = '  What to do: ' + $steps[$k].Help; & $speak $hl; $summary += $hl }   # the step's own help text (manifest "help")
+    $script:prog.Done += $script:prog.Cur; $script:prog.Cur = 0; $script:prog.Frac = -1
+    & $OnStep $k $line
+    Add-RoundHistory $base $steps[$k].Name $(if ($state -eq 'PASSED') { 'OK' } else { 'CHECK' }) ([int]$secs)
+  }
   for ($k = 0; $k -lt $steps.Count; $k++) {
     if ($script:closing) { throw 'the window was closed (Exit) while the round ran; the steps after it did not run' }
     if (-not $Selected[$k]) { if ($script:appSteps -contains $k) { $summary += ($steps[$k].Name + $(if ($prior[[string]$steps[$k].Name] -eq 'PASSED') { ': already done for version ' + $script:app.Version + ', not run again' } else { ': not selected' })) }; continue }
@@ -882,22 +905,23 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     if ($need) { $r = @{ Pass = 0; Fail = 0; Exit = 0; Skipped = $true; Why = 'it needs "' + $need + '" to pass first' }; & $speak ('    Skipped: ' + $r.Why + '.') }
     elseif ($steps[$k].Kind -eq 'guide') { $r = Invoke-GuideStep $base $steps[$k] $speak }
     else { $r = Invoke-RoundStep $base $steps[$k] $speak $Tick $ans }
-    if ((Get-StepState $r) -ne 'SKIPPED') { $script:ranSteps += $steps[$k].Name }   # a step you skip, or one that only printed SKIP, expects no result files
     $secs = ((Get-Date) - $t0).TotalSeconds
-    $state = Get-StepState $r
-    if ($state -eq 'NEEDS REVIEW') { $script:roundBad = $true }
-    if ($state -ne 'PASSED' -and -not [bool]$steps[$k].Optional) { $whole = $false }   # a skipped step is not installed (review, deploy v1); an optional step that fails makes the run NEEDS REVIEW
-    $made = @($r.Made | Where-Object { $_ }); if ($state -eq 'PASSED') { foreach ($m in @($steps[$k].Makes)) { $made += @{ kind = [string]$m.kind; name = [string]$m.name } } }
-    $runState[[string]$steps[$k].Name] = $state
-    if (-not $need) { $stepRecs[[string]$steps[$k].Name] = @{ state = $state; made = $made } }   # a step skipped for a missing dependency keeps its older record
-    $line = Get-StepLine $steps[$k] $r $secs
-    $summary += $line
-    foreach ($al in @($r.Answers | Where-Object { $_ })) { $summary += [string]$al }   # a hand step's answers, under its line
-    & $speak ('  Result: ' + ($line.Substring($steps[$k].Name.Length + 2)))
-    if ($state -eq 'NEEDS REVIEW' -and $steps[$k].Help) { $hl = '  What to do: ' + $steps[$k].Help; & $speak $hl; $summary += $hl }   # the step's own help text (manifest "help")
-    $script:prog.Done += $script:prog.Cur; $script:prog.Cur = 0; $script:prog.Frac = -1
-    & $OnStep $k $line
-    Add-RoundHistory $base $steps[$k].Name $(if ($state -eq 'PASSED') { 'OK' } else { 'CHECK' }) ([int]$secs)
+    if ($r.Waiting) {   # "Not yet" on a hand step (manifest "late"): no result now; asked again after the last step
+      $waiting += @{ K = $k; Secs = $secs; T0 = $t0 }; $runState[[string]$steps[$k].Name] = 'WAITING'
+      $wl = $steps[$k].Name + ': WAITING (your answer was "Not yet"; asked again before the summary)'; $summary += $wl; & $speak ('  Result: ' + ($wl.Substring($steps[$k].Name.Length + 2)))
+      $script:prog.Done += $script:prog.Cur; $script:prog.Cur = 0; $script:prog.Frac = -1; & $OnStep $k $wl; continue
+    }
+    . $finish
+  }
+  foreach ($wq in $waiting) {
+    if ($script:closing) { throw 'the window was closed (Exit) while the round ran; a step that waited was not asked again' }
+    $k = $wq.K; $need = ''; $t0 = Get-Date
+    & $OnStatus $n $units $steps[$k].Name 0
+    & $speak ''; & $speak ('Asked again: ' + $steps[$k].Name)
+    $script:guideAgain = $true; try { $r = Invoke-GuideStep $base $steps[$k] $speak } finally { $script:guideAgain = $false }
+    $secs = $wq.Secs + ((Get-Date) - $t0).TotalSeconds   # the time you worked on it, not the wait between the two
+    if ($r.Waiting) { $r.Fail = 1; $r.Late = [int][math]::Max(1, [math]::Round(((Get-Date) - $wq.T0).TotalMinutes)) }
+    . $finish
   }
   & $speak ''
   if (-not $deploy) {
@@ -2345,7 +2369,7 @@ if ($gui) {
       $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }
     $ui.OnStep = { param($k, $line)
       $nm = [string]$steps[$k].Name + ': '; $rest = [string]$line; if ($rest.StartsWith($nm, [System.StringComparison]::Ordinal)) { $rest = $rest.Substring($nm.Length) }
-      $st = 'DONE'; foreach ($w in 'NEEDS REVIEW', 'FAILED', 'SKIPPED', 'PASSED') { if ($rest.StartsWith($w, [System.StringComparison]::Ordinal)) { $st = $w; break } }
+      $st = 'DONE'; foreach ($w in 'NEEDS REVIEW', 'FAILED', 'SKIPPED', 'PASSED', 'WAITING') { if ($rest.StartsWith($w, [System.StringComparison]::Ordinal)) { $st = $w; break } }
       $ui.StepState[[int]$k] = $st; $null = & $ui.Paint }
     $ui.WindowLine = { $w = $(if ($ui.OkBox.Checked) { 'Window: OK' } else { 'Window: NOT OK - write here what overlapped or was cut off' }); if ($ui.LayOn -and ($env:RADE_LAYOUT -eq '1' -or -not (Test-Deploy))) { $w + "`r`n" + (& $ui.LayLine) } else { $w } }
     $ui.Run = {
@@ -2440,9 +2464,13 @@ if ($gui) {
       $st = $ui.G.Step; $file = [string]$ui.G.File
       $note = $(if (-not $file) { '' } elseif (Copy-TextToClipboard $file) { 'The path of ' + $st.File + ' is on the clipboard.' } else { 'Select "Copy file path" to put the path of ' + $st.File + ' on the clipboard.' })
       $two = $(if ($st.NoText) { @{ Text = [string]$st.NoText; Act = { $ui.Answer = 'No' } } } else { @{ Text = 'It failed'; Act = { & $ui.VHandFail } } })
-      & $ui.SetCard @{ View = 'hand'; Light = 'you'; Kicker = $(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot + 'your turn' } else { 'Your turn' }); Sentence = [string]$st.Name
+      # "Not yet" (manifest "late"): a fourth answer for a step whose result comes from outside (an e-mail). RADE asks once
+      # more after the last step: then the card says so, and the answers are Done, It failed and "Still not" (no Skip).
+      $again = [bool]$ui.G.Again; $late = $(if ($st.Late) { @{ Text = $(if ($again) { 'Still not' } else { 'Not yet' }); Act = { $ui.Answer = 'Later' } } } else { $null })
+      & $ui.SetCard @{ View = 'hand'; Light = 'you'; Kicker = $(if ($again) { 'Asked again' + $dot + 'your turn' } elseif ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot + 'your turn' } else { 'Your turn' }); Sentence = [string]$st.Name
+        P = @($(if ($again) { 'Your answer was "Not yet". Is the result there now?' } else { '' }))
         Lines = (@($st.Guide) -join "`r`n"); Field = @{ Label = 'Address'; Text = $ui.GUrl; Name = 'Address to open'; Button = 'Open in browser'; Act = { & $ui.OpenUrl } }; Links = [bool]$file; Note = $note
-        Buttons = @(@{ Text = $(if ($st.DoneText) { [string]$st.DoneText } else { 'Done' }); Kind = 'primary'; Act = { $ui.Answer = 'OK' } }, $two, @{ Text = $(if ($st.SkipText) { [string]$st.SkipText } else { 'Skip' }); Act = { $ui.Answer = 'Cancel' } })
+        Buttons = @(@{ Text = $(if ($st.DoneText) { [string]$st.DoneText } else { 'Done' }); Kind = 'primary'; Act = { $ui.Answer = 'OK' } }, $two, $(if ($again) { $null } else { @{ Text = $(if ($st.SkipText) { [string]$st.SkipText } else { 'Skip' }); Act = { $ui.Answer = 'Cancel' } } }), $late)
         Right = 'RADE waits for you'; NoAccept = $true; Focus = 'fieldbutton' } }
     $ui.VHandFail = {
       & $ui.SetCard @{ View = 'handfail'; Light = 'you'; Kicker = 'It failed'; Sentence = 'What did the error say?'; P = @('Paste the error message here. Do not include names or a site address.'); Err = $true
@@ -2467,7 +2495,7 @@ if ($gui) {
     $ui.CopyPathB.Add_Click({ & $ui.Say1 $(if (Copy-TextToClipboard ([string]$ui.G.File)) { 'File path copied. Press Ctrl+V in the "File name" box' } else { 'The clipboard is busy. Select "Copy file path" again.' }) })
     $ui.ShowFileB.Add_Click({ if ($ui.G.File) { Start-Process -FilePath 'explorer.exe' -ArgumentList ('/select,"' + $ui.G.File + '"') } })
     $script:guideUi = { param($Step, [string]$File, [string]$Url, [string]$UrlFile)
-      $ui.G = @{ Step = $Step; File = $File; UrlFile = $UrlFile }; $ui.GUrl = $Url; $script:guideError = ''; $ui.Answer = ''; $was = $ui.Busy; $ui.Busy = $false
+      $ui.G = @{ Step = $Step; File = $File; UrlFile = $UrlFile; Again = [bool]$script:guideAgain }; $ui.GUrl = $Url; $script:guideError = ''; $ui.Answer = ''; $was = $ui.Busy; $ui.Busy = $false
       $null = & $ui.VHand; $null = & $ui.ToFront
       while (-not $ui.Answer -and -not $script:closing -and -not $ui.Form.IsDisposed) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 25 }
       # After Done (not after "It failed" or Skip): the step's questions, one card each, in order. Their time is the step's time.
@@ -2739,6 +2767,20 @@ def app_lines(b):
 ANSWER_KINDS = ('yesno', 'pick', 'text')
 
 
+def late_step(b, s):
+    """True when a hand step may be answered "Not yet" (manifest "late": true; the Administrator, 2026-11-15, after R25:
+    an e-mail that came after the step was reported as failed). RADE asks again before the summary. Only a guide step,
+    and no step may need it ("after"): that step would have to run before the answer is known."""
+    if not s.get('late'):
+        return False
+    if s.get('kind', 'script') != 'guide':
+        raise SystemExit('step %r: late: only a guide step (kind "guide") can answer "Not yet"' % s['name'])
+    for o in b['steps']:
+        if s['name'] in o.get('after', []):
+            raise SystemExit('step %r: late: step %r needs it (after), so it cannot wait' % (s['name'], o['name']))
+    return True
+
+
 def answers_part(s):
     """The "answers" of a guide step (questions asked after Done; docs/engine.md "Step contract") as the end of its
     $steps line, or '' when it has none. A bad list stops the build (the schema says the same: scripts/check_manifest.py)."""
@@ -2790,14 +2832,14 @@ def build(b):
         parts.append("$files += @{ Dir = %s; Name = %s; Kind = '%s'; Sha = '%s'; Data = %s }"
                      % (q(f['dir']), q(src.name), kind, sha, body))
     # kind "guide": a step the PFM does in another program (guide lines, an address to open, a marker file on Done).
-    steps = ['$steps += @{ Name = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s; Makes = @(%s); After = @(%s); Optional = $%s; Help = %s }'
+    steps = ['$steps += @{ Name = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s; Makes = @(%s); After = @(%s); Optional = $%s; Help = %s; Late = $%s }'
              % (q(s['name']), q(s['dir']), q(s['file']), 'true' if step_default(s) else 'false',
                 q(s.get('ask', {}).get('param', '')), q(s.get('ask', {}).get('prompt', '')), q(s.get('screenOnly', '')),
                 int(s.get('minutes', 30)), q(s.get('args', '')), q(s.get('note', '')), q(s.get('kind', 'script')),
                 ', '.join(q(g) for g in s.get('guide', [])), q(s.get('url', '')), q(s.get('urlConfig', '')), q(s.get('marker', '')),
                 int(s.get('estimate', 0)) * 60, q(s.get('doneText', '')), q(s.get('doneLog', '')),
                 ', '.join('@{ kind = %s; name = %s }' % (q(m['kind']), q(m['name'])) for m in s.get('makes', [])), ', '.join(q(a) for a in s.get('after', [])),
-                'true' if s.get('default', True) is False else 'false', q(s.get('help', '')))   # optional = "default": false only; a files-changed default is still a needed step
+                'true' if s.get('default', True) is False else 'false', q(s.get('help', '')), 'true' if late_step(b, s) else 'false')   # optional = "default": false only; a files-changed default is still a needed step
              for s in b['steps']]
     steps = [line[:-2] + answers_part(s) + ' }' for line, s in zip(steps, b['steps'])]   # a step without "answers": the line as before
     apps = app_lines(b)

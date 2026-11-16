@@ -1,8 +1,8 @@
 # The test "user" for the RADE window (tests/engine_test.sh, section "window"). It is put in front of a test copy of a
 # bundle. It loads the stand-in types (tests/window_stub.cs), then answers each card the window shows: it prints one
 # "WIN" line per card, runs every Paint handler, checks that each control has a name and a focus ring, and selects a button.
-# Set by the test: RADE_T_STUB (path of the stub), RADE_T_APP (index of the application), RADE_T_HAND (done, fail or
-# skip), RADE_T_RECORD (1 = open "Steps and files" and clear the Clean-up box before the run), RADE_T_TOUR (1 = the
+# Set by the test: RADE_T_STUB (path of the stub), RADE_T_APP (index of the application), RADE_T_HAND (done, fail,
+# skip, or for a step with "late": later = Not yet and then Done, never = Not yet and then Still not), RADE_T_RECORD (1 = open "Steps and files" and clear the Clean-up box before the run), RADE_T_TOUR (1 = the
 # application also gets the site, sign-in and Power Automate checks, and a base check of the test application is FAILED),
 # RADE_T_LOOP (1 = Application.Run fails as when a message loop already runs: the window must open with ShowDialog),
 # RADE_T_SCALE (150 = the form scales to 144 dpi while the screen dpi says 96, as on the R24 device). It prints "WIN measure"
@@ -121,6 +121,8 @@ function global:Push-RadeButton([string]$Text) {
     if (-not $ui.Field.Shown -or $ui.Form.Values['AcceptButton']) { Write-Host 'WIN BAD hand card: no address box, or Enter answers' }
     $ui.FieldB.PerformClick(); if ($ui.CopyPathB.Shown) { $ui.CopyPathB.PerformClick() }; Write-Host ('WIN hand-note=' + $ui.Note.Text + ' clip=' + [bool][RadeStub.Driver]::Clip)
     if ($ui.B[1].Text -ne 'It failed') { $ui.B[0].PerformClick() }   # a look-and-answer check: Yes
+    elseif ($global:RadeT.Hand -in 'later', 'never') {   # "late": Not yet; when asked again: Done (later) or Still not (never)
+      if (@($ui.B | Where-Object { $_.Shown -and $_.Text -eq 'Not yet' }).Count) { Push-RadeButton 'Not yet' } elseif ($global:RadeT.Hand -eq 'later') { $ui.B[0].PerformClick() } else { Push-RadeButton 'Still not' } }
     elseif ($global:RadeT.Hand -eq 'fail') { Push-RadeButton 'It failed' } elseif ($global:RadeT.Hand -eq 'skip') { $ui.B[2].PerformClick() } else { $ui.B[0].PerformClick() }
   }
   elseif ($v -eq 'answer') {

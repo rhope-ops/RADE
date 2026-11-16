@@ -331,6 +331,10 @@
           },
           "description": "Names of earlier steps of the same app that must PASS before this step runs; else RADE skips it. In a deploy, an automatic step may come after a hand (guide) step only when it needs it (docs/engine.md \"Deploy v1\" item 3)."
         },
+        "late": {
+          "type": "boolean",
+          "description": "Guide steps only: the person may answer \"Not yet\" (the result comes from outside, for example an e-mail). RADE asks once more after the last step; \"Still not\" then gives FAILED. No step may name this step in \"after\"."
+        },
         "help": {
           "type": "string",
           "minLength": 1,
