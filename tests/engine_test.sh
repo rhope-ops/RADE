@@ -68,6 +68,10 @@ def same(st): st[2]['answers'] = [dict(qs[1], choices=['One', 'One'])]
 case('newline', newline, "should not be valid under {'pattern': '\\n'}", 'question 1: the key must be 1 to 24 lowercase')
 case('same', same, 'has non-unique elements', "question 'flow-count': the choices of a pick must differ")
 def case_sp(st): st[2]['answers'] = [dict(qs[1], choices=['One', 'one ', 'Two'])]
+def blank_p(st): st[2]['answers'] = [dict(qs[0], prompt='   ')]
+def blank_c(st): st[2]['answers'] = [dict(qs[1], choices=['One', '  '])]
+case('blank prompt', blank_p, "answers: the prompt of 'run-started' is empty (only spaces)", "question 'run-started': the prompt must have 1 to")
+case('blank choice', blank_c, "answers: a choice of 'flow-count' is empty (only spaces)", "question 'flow-count': a pick needs 2 to 4 choices")
 case('case', case_sp, "answers: the choices of 'flow-count' must differ (case and spaces ignored)", "question 'flow-count': the choices of a pick must differ (case and spaces ignored)")
 P
 
@@ -129,6 +133,17 @@ has "WIN restored=Normal taskbar=True minbox=True shown-by=Run" "WIN layline=Lay
 has "WIN mid hand label=18.5 box=19 button=19 box-h=30 button-h=30 gaps=8,8 inner=148/160 tick=0" "WIN mid header logo=20 word=20 app=19.5" "WIN mid answer label=18.5 box=19 h=30" \
   'WIN sent-pt=22 for "Did the flow run start?"' 'WIN sent-pt=22 for "Anything else to report?"' 'WIN sent-pt=13.2 for "How many flows does the import page show?"' \
   "WIN rule aligned=0 misaligned=4 ~ LAYOUT fixture FieldRow FieldBox midpoint: 15.5, the row midpoint is 22 ~ LAYOUT fixture FieldRow FieldB midpoint: 19, the row midpoint is 22 ~ LAYOUT fixture FieldRow heights: box FieldBox 23, button FieldB 30 ~ LAYOUT fixture Sent edge: starts at 126, the card edge is 123 (Kick)" && ok || { bad "window 1d: alignment, question headline, alignment rules"; grep "WIN mid\|sent-pt\|WIN rule" "$t/win.txt" | cut -c1-300; }
+# 1h. R25 r1, the window's state (tests/window_driver.ps1): a minimized window that the person selected and that stays
+# minimized is shown by RADE after 400 ms, not before (as it was; a second time maximized); one that stays the foreground
+# window after it was minimized is left alone; one that is not on a screen after a restore goes back; the WINSTATE line
+# (numbers only) is under the SCALE line.
+has "WIN winstate early=Minimized shown=Normal second-try=Maximized foreground-stays=Minimized/-501 moved-back=True ~ WINSTATE shown-by=Run host=console now=Normal changes=13: Ns Normal>Minimized b=" "Ns selected while minimized; Ns RADE shows it: Normal; Ns Minimized>Normal b=1020x684@130,18" \
+  "Ns RADE shows it: Maximized" "Ns not on a screen b=1020x684@-32000,-32000: RADE moves it" " state=Normal logo=40x40 btn=400x40 ~ WINSTATE shown-by=Run host=console now=Normal changes=" && ok || { bad "window 1h: the window's state"; grep "WIN winstate\|layline=" "$t/win.txt" | cut -c1-900; }
+# 1g. R25 r1: no Back link on the first two cards (boot, Choose); every link fits its text; the rule for a button wider than
+# its text; the narrowest button seen is kept for the SCALE line (the run card has none); text set after a card was drawn
+# has its long word broken; the application line and the last log line are cut by RADE (no AutoEllipsis: no tooltip).
+has "WIN links shrink=True wide-bad=LAYOUT fixture RecB too wide: has 165, its text needs 110 wide-ok=True btn-seen=400x40" "WIN late note-break=True app-cut=True log-cut=True app-back=True no-ellipsis=True" &&
+  [ "$(grep -c "^WIN view=\(boot\|choose\) .* back=False " "$t/win.txt")" = "$(grep -c "^WIN view=\(boot\|choose\) " "$t/win.txt")" ] && grep -q "^WIN view=ready .* back=True " "$t/win.txt" && ok || { bad "window 1g: links, Back, late text, cut labels"; grep "WIN links\|WIN late\|view=boot\|view=choose" "$t/win.txt" | cut -c1-300; }
 # 1f. Review of b093036: a click within 400 ms of a new card does nothing (a double-click on Done answers no question
 # unseen; Enter clicks the same buttons); a word wider than the line is cut into pieces that fit, and the self-check
 # reports a word of a wrapping label that is wider than the label; the Record's step boxes are one line that ends with

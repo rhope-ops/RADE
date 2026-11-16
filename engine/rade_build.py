@@ -1608,7 +1608,9 @@ if ($gui) {
     $ui.Btn = { param([string]$Kind) $b = New-Object System.Windows.Forms.Button; $b.AutoSize = $true; $b.AutoSizeMode = 'GrowAndShrink'   # a button that showed a long text shrinks back for the next card
       $b.MinimumSize = $(if ($Kind -eq 'compact') { New-Object System.Drawing.Size($ui.Z.CompactW, $ui.Z.CompactH) } else { New-Object System.Drawing.Size($ui.Z.ActionW, $ui.Z.ActionH) })
       $b.Padding = (& $ui.Pad 12 0 12 0); $b.Margin = (& $ui.Pad $ui.Z.M $ui.Z.M $ui.Z.M $ui.Z.M); $b.UseMnemonic = $false; & $ui.Style $b ''; & $ui.Cue $b; & $ui.Own $b; $b }
-    $ui.LinkBtn = { param([string]$Text) $b = New-Object System.Windows.Forms.Button; $b.Text = $Text; $b.AutoSize = $true; $b.MinimumSize = New-Object System.Drawing.Size(0, $ui.Z.LinkH); $b.Margin = (& $ui.Pad $ui.Z.M $ui.Z.M $ui.Z.M $ui.Z.M); $b.UseMnemonic = $false
+    # GrowAndShrink (R25): a link made at 100 % was scaled 1.5 x wide with the form and kept that width (GrowOnly), while its
+    # text did not grow: the text sat in the middle of a box that was too wide ("Record (F2)" and "Back" apart, "Copy file path" 38 px right of the card's edge).
+    $ui.LinkBtn = { param([string]$Text) $b = New-Object System.Windows.Forms.Button; $b.Text = $Text; $b.AutoSize = $true; $b.AutoSizeMode = 'GrowAndShrink'; $b.MinimumSize = New-Object System.Drawing.Size(0, $ui.Z.LinkH); $b.Margin = (& $ui.Pad $ui.Z.M $ui.Z.M $ui.Z.M $ui.Z.M); $b.UseMnemonic = $false
       $b.FlatStyle = 'Flat'; $b.FlatAppearance.BorderSize = 0; $b.BackColor = $ui.C.White; $b.ForeColor = $ui.C.Blue; $b.Font = $ui.F.Link; try { $b.FlatAppearance.MouseOverBackColor = $ui.C.White; $b.FlatAppearance.MouseDownBackColor = $ui.C.Hair } catch { $null = $_ }; & $ui.Cue $b; & $ui.Own $b; $b }   # a link: Air Force blue, bold and underlined (not color alone), 28 high
 
     # ---- The fixed parts: the light (6 px), the logo line, the card, the bottom line and the bar on the bottom edge.
@@ -1623,8 +1625,8 @@ if ($gui) {
       [void]$ui.Top.Controls.Add($ui.Logo)
     } catch { $null = $_ }   # the window runs without the logo
     $ui.WordL = & $ui.Label $ui.F.Word $ui.C.Navy 5; $ui.WordL.Text = 'RADE'; $ui.WordL.Visible = $true
-    $ui.AppL = & $ui.Label $ui.F.Small $ui.C.Gray 14; $ui.AppL.Margin = (& $ui.Pad 10 14 0 0); $ui.AppL.Visible = $true
-    $ui.AppL.AutoSize = $false; $ui.AppL.AutoEllipsis = $true; $ui.AppL.Size = New-Object System.Drawing.Size(600, 22)   # a long name and version: cut with "..."; its width follows the window ($ui.Fit)
+    $ui.AppL = & $ui.Label $ui.F.Small $ui.C.Gray 14; $ui.AppL.AccessibleName = 'Application'; $ui.AppL.Margin = (& $ui.Pad 10 14 0 0); $ui.AppL.Visible = $true
+    $ui.AppL.AutoSize = $false; $ui.AppL.Size = New-Object System.Drawing.Size(600, 22)   # a long name and version: cut with "..." by RADE ($ui.Cut; no AutoEllipsis: that shows a tooltip); its width follows the window ($ui.Fit)
     [void]$ui.Top.Controls.Add($ui.WordL); [void]$ui.Top.Controls.Add($ui.AppL)
     $ui.Bottom = New-Object System.Windows.Forms.TableLayoutPanel
     $ui.Bottom.Dock = 'Bottom'; $ui.Bottom.Height = 46; $ui.Bottom.AutoSize = $true; $ui.Bottom.AutoSizeMode = 'GrowAndShrink'; $ui.Bottom.MinimumSize = New-Object System.Drawing.Size(0, 46); $ui.Bottom.ColumnCount = 4; $ui.Bottom.RowCount = 1; $ui.Bottom.Padding = (& $ui.Pad 28 3 32 3); $ui.Bottom.BackColor = $ui.C.White
@@ -1649,7 +1651,8 @@ if ($gui) {
     $ui.Edge = & $ui.MkBar 'all' 'Progress of all steps'; $ui.Edge.Dock = 'Bottom'
     $ui.Anim = New-Object System.Windows.Forms.Timer
     $ui.Anim.Interval = 30
-    $ui.Anim.Add_Tick({ foreach ($b in @($ui.Bars.Values)) { $d = $b.Target - $b.Shown; if ([math]::Abs($d) -gt 0.0005) { $b.Shown = $(if ($ui.Calm) { $b.Target } else { $b.Shown + $d * 0.18 }); $b.Panel.Invalidate() } } })
+    $ui.Anim.Add_Tick({ $ui.WN++; if ($ui.WN % 10 -eq 0) { & $ui.WWatch }   # the window's state, about 3 times a second
+      foreach ($b in @($ui.Bars.Values)) { $d = $b.Target - $b.Shown; if ([math]::Abs($d) -gt 0.0005) { $b.Shown = $(if ($ui.Calm) { $b.Target } else { $b.Shown + $d * 0.18 }); $b.Panel.Invalidate() } } })
 
     # ---- The card: one block, left edge at 12 % of the width, 40 % of the spare height above it. Top to bottom: a small
     # line in capitals, the sentence, up to four paragraphs, the choices, the numbered lines of a hand step, the step line,
@@ -1685,7 +1688,7 @@ if ($gui) {
     $ui.StepFrac = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepFrac.Visible = $true
     foreach ($c in @($ui.StepName, $ui.StepBar, $ui.StepFrac)) { [void]$ui.StepRow.Controls.Add($c) }
     $ui.LastLog = New-Object System.Windows.Forms.Label
-    $ui.LastLog.AutoSize = $false; $ui.LastLog.AutoEllipsis = $true; $ui.LastLog.UseMnemonic = $false; $ui.LastLog.Height = 20; $ui.LastLog.Width = 780; $ui.LastLog.Font = $ui.F.Mono; $ui.LastLog.ForeColor = $ui.C.Gray; $ui.LastLog.Margin = (& $ui.Pad 0 $ui.Z.G2 0 0); $ui.LastLog.Visible = $false; $ui.LastLog.AccessibleName = 'Last log line'
+    $ui.LastLog.AutoSize = $false; $ui.LastLog.UseMnemonic = $false; $ui.LastLog.Height = 20; $ui.LastLog.Width = 780; $ui.LastLog.Font = $ui.F.Mono; $ui.LastLog.ForeColor = $ui.C.Gray; $ui.LastLog.Margin = (& $ui.Pad 0 $ui.Z.G2 0 0); $ui.LastLog.Visible = $false; $ui.LastLog.AccessibleName = 'Last log line'
     $ui.FieldRow = & $ui.Flow $ui.Z.G2; $ui.FieldRow.WrapContents = $true; & $ui.Ring $ui.FieldRow
     $ui.FieldL = & $ui.Label $ui.F.SmallB $ui.C.Gray 9; $ui.FieldL.Visible = $true
     # A one-line box: a frame as tall as a compact button with RADE's own 1 px edge, the text box inside it with no border,
@@ -1771,6 +1774,7 @@ if ($gui) {
       $ui.StepName.MaximumSize = $mx; $ui.ErrBox.Width = [math]::Min((& $ui.Sc 600), ($cw - 2 * $mm))
       try { $ui.AppL.Width = [math]::Max((& $ui.Sc 60), ($ui.Top.ClientSize.Width - $ui.AppL.Left - (& $ui.Sc 32))) } catch { $null = $_ }
       try { $ui.AppL.Height = $ui.AppL.PreferredSize.Height } catch { $null = $_ }
+      & $ui.Cut $ui.AppL $null; & $ui.Cut $ui.LastLog $null
       & $ui.FitRow; & $ui.Apart; & $ui.FitSent; & $ui.FitEdges; & $ui.AlignRows
       foreach ($o in @($ui.Opts.Controls)) { $o.Width = $cw; try { $o.Height = (& $ui.OptPlan $o.Tag $cw).H } catch { $null = $_ } }
       & $ui.Squeeze }
@@ -1810,7 +1814,8 @@ if ($gui) {
       try { $hs = @($Parts | ForEach-Object { if ($_.AutoSize) { [int]$_.PreferredSize.Height } else { [int]$_.Height } }); $hh = [int]($hs | Measure-Object -Maximum).Maximum
         for ($i = 0; $i -lt $Parts.Count; $i++) { $m = $Parts[$i].Margin; $t = $Base + [int][math]::Floor(($hh - $hs[$i]) / 2); $b = $Base + $hh - $hs[$i] - ($t - $Base)
           if ($m.Top -ne $t -or $m.Bottom -ne $b) { $Parts[$i].Margin = New-Object System.Windows.Forms.Padding($m.Left, $t, $m.Right, $b) } } } catch { $null = $_ } }
-    $ui.RowParts = { param([string]$Row) switch ($Row) { 'Top' { @(@($ui.Logo) + @($ui.WordL, $ui.AppL) | Where-Object { $_ }) } 'FieldRow' { @($ui.FieldL, $ui.FieldBox) + @($(if ($ui.FieldBOn) { $ui.FieldB })) } 'TestRow' { @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox) } } }
+    $ui.RowParts = { param([string]$Row) switch ($Row) { 'Top' { @(@($ui.Logo) + @($ui.WordL, $ui.AppL) | Where-Object { $_ }) } 'FieldRow' { @($ui.FieldL, $ui.FieldBox) + @($(if ($ui.FieldBOn) { $ui.FieldB })) } 'TestRow' { @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox) }
+        'Bottom' { @(@($ui.RecB, $ui.BackB, $ui.RightL) | Where-Object { $_.Visible -and $_.Text }) } } }   # the bottom line: one row of a table, measured only (the links are as tall as each other; the gray text is in the middle of the row)
     $ui.AlignRows = { try { $bh = [int]$ui.FieldB.PreferredSize.Height; if ($bh -gt 0) { foreach ($p in $ui.Boxes) { if ($p.Height -ne $bh) { $p.Height = $bh } } } } catch { $null = $_ }   # a box is as tall as the compact button, measured
       foreach ($p in $ui.Boxes) { & $ui.BoxFit $p }   # the text box fills its frame (R24 job: a frame whose size never changed kept a 100 px text box at its top)
       & $ui.AlignRow (& $ui.RowParts 'Top') 0; $mm = & $ui.Sc $ui.Z.M; & $ui.AlignRow (& $ui.RowParts 'FieldRow') $mm; & $ui.AlignRow (& $ui.RowParts 'TestRow') $mm }
@@ -1849,6 +1854,11 @@ if ($gui) {
       $si = New-Object System.Globalization.StringInfo($Full); $lo = 0; $hi = $si.LengthInTextElements
       while ($lo -lt $hi) { $mid = [int][math]::Ceiling(($lo + $hi) / 2.0); $C.Text = $si.SubstringByTextElements(0, $mid).TrimEnd() + '...'; if ($C.PreferredSize.Width -le $W) { $lo = $mid } else { $hi = $mid - 1 } }
       $C.Text = $(if ($lo -gt 0) { $si.SubstringByTextElements(0, $lo).TrimEnd() } else { '' }) + '...' }
+    # The two one-line labels of fixed width (the application beside the logo, the last log line): the full text is kept and
+    # shown cut to the label's width, again when the window changes its size ($ui.Fit).
+    $ui.CutText = @{}
+    $ui.Cut = { param($C, $Text) $k = [string]$C.AccessibleName; if ($null -ne $Text) { $ui.CutText[$k] = [string]$Text }; $t = [string]$ui.CutText[$k]
+      try { if ($t -and $ui.Scaled) { & $ui.Shorten $C $t ([int]$C.Width) } else { $C.Text = $t } } catch { $C.Text = $t } }
     # The self-check's rule for it: a word of a label that wraps is never wider than the label (else the word is cut).
     $ui.WordBad = { param([string]$Card, [string]$Name, [string]$Text, $F, [int]$W)
       foreach ($wd in ($Text -split '\s+')) { if ($wd) { $ww = & $ui.WordW $wd $F; if ($ww -gt $W + 1) { return ('LAYOUT ' + $Card + ' ' + $Name + ' text: the word "' + $(if ($wd.Length -gt 20) { $wd.Substring(0, 20) + '...' } else { $wd }) + '" needs ' + $ww + ', the line is ' + $W) } } }
@@ -1984,12 +1994,13 @@ if ($gui) {
       $out = @(); $tol = [math]::Max(1, (& $ui.Sc 1)); $es = @($Edges | Where-Object { $_ }); if ($es.Count -lt 2) { return $out }
       foreach ($e in $es) { if ([math]::Abs($e.X - $es[0].X) -gt $tol) { $out += ('LAYOUT ' + $Card + ' ' + $e.N + ' edge: starts at ' + $e.X + ', the card edge is ' + $es[0].X + ' (' + $es[0].N + ')') } }
       return $out }
+    $ui.WideBad = { param([string]$Card, [string]$Name, [int]$Has, [int]$Needs) if ($Has -gt $Needs + [math]::Max(1, (& $ui.Sc 1))) { return ('LAYOUT ' + $Card + ' ' + $Name + ' too wide: has ' + $Has + ', its text needs ' + $Needs) }; return $null }
     $ui.Measure = { param([string]$Card)
       # The numbers for RowBad and EdgeBad, from the real layout (screen pixels).
       $out = @(); $sr = { param($C) $C.RectangleToScreen($C.ClientRectangle) }
-      foreach ($row in 'Top', 'FieldRow', 'TestRow') {
+      foreach ($row in 'Top', 'FieldRow', 'TestRow', 'Bottom') {
         $ps = @(& $ui.RowParts $row); if ($ps.Count -lt 2 -or -not $ps[0].Parent.Visible) { continue }   # the parts AlignRow aligns (R5 review: one rule for both)
-        $out += & $ui.RowBad $Card $row @($ps | ForEach-Object { $rr = & $sr $_; @{ N = (& $ui.NameOf $_); Top = $rr.Top; H = $rr.Height; Line = $rr.Top - $_.Margin.Top; Kind = $(if ($ui.Boxes -contains $_) { 'box' } elseif ($_ -is [System.Windows.Forms.Button] -and $_.FlatAppearance.BorderSize -gt 0) { 'button' } else { 'other' }) } })
+        $out += & $ui.RowBad $Card $row @($ps | ForEach-Object { $rr = & $sr $_; @{ N = (& $ui.NameOf $_); Top = $rr.Top; H = $rr.Height; Line = $(if ($row -eq 'Bottom') { 0 } else { $rr.Top - $_.Margin.Top }); Kind = $(if ($ui.Boxes -contains $_) { 'box' } elseif ($_ -is [System.Windows.Forms.Button] -and $_.FlatAppearance.BorderSize -gt 0) { 'button' } else { 'other' }) } })
       }
       if (-not $ui.RecOn) {
         $tx = { param($C) (& $sr $C).Left + (& $ui.Ink $C) }   # where its ink starts (text, edge or drawing), measured
@@ -2020,12 +2031,14 @@ if ($gui) {
             $c = $kids[$i]; $r = $c.RectangleToScreen($c.ClientRectangle); if ($r.Width -le 0 -or $r.Height -le 0) { continue }
             if (-not $scroll -and -not $clip.Contains($r)) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' cut: needs ' + $r.Width + 'x' + $r.Height + ' at ' + ($r.Left - $clip.Left) + ',' + ($r.Top - $clip.Top) + ' in ' + $clip.Width + 'x' + $clip.Height) }
             if ($c -is [System.Windows.Forms.Label] -and $c.AutoSize -and $c.MaximumSize.Width -gt 0 -and $c.Text) { $wb = & $ui.WordBad $card (& $ui.NameOf $c) ([string]$c.Text) $c.Font $c.Width; if ($wb) { $ui.LayBad.Add($wb) } }
-            if ($c -is [System.Windows.Forms.CheckBox] -and $c.Text -and -not $c.AutoEllipsis) {   # a one-line check box whose text alone is wider than it is cut (the Record's step boxes before R24 fix round 3)
+            if ($c -is [System.Windows.Forms.CheckBox] -and $c.Text) {   # a one-line check box whose text alone is wider than it is cut (the Record's step boxes before R24 fix round 3)
               $tw = [System.Windows.Forms.TextRenderer]::MeasureText([string]$c.Text, $c.Font).Width; if ($tw -gt $c.ClientSize.Width + 1) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' text cut: needs ' + $tw + ' has ' + $c.ClientSize.Width) } }
             $isText = ($c -is [System.Windows.Forms.Label] -or $c -is [System.Windows.Forms.ButtonBase])
-            if ($isText -and $c.Text -and -not $c.AutoEllipsis) {   # a label or box that ends with "..." by rule is not a defect
+            if ($isText -and $c.Text) {
               $want = $c.GetPreferredSize((New-Object System.Drawing.Size($c.Width, 0)))
               if ($want.Width -gt $c.Width + 1 -or $want.Height -gt $c.Height + 1) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' text: needs ' + $want.Width + 'x' + $want.Height + ' has ' + $c.Width + 'x' + $c.Height) }
+              # a button or link that sizes itself is as wide as its text needs, not wider (R25: links kept a 1.5 x width, the text in the middle)
+              if ($c -is [System.Windows.Forms.Button] -and $c.AutoSize) { $lb = & $ui.WideBad $card (& $ui.NameOf $c) ([int]$c.Width) ([int]$c.PreferredSize.Width); if ($lb) { $ui.LayBad.Add($lb) } }
             }
             for ($j = $i + 1; $j -lt $kids.Count; $j++) { if ($c.Bounds.IntersectsWith($kids[$j].Bounds)) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' overlaps ' + (& $ui.NameOf $kids[$j])) } }
             $sc2 = [bool]$c.AutoScroll; if ([object]::ReferenceEquals($c, $ui.Scroll)) { $sc2 = [bool]$ui.Scrolls }   # the card's text scrolls only when $ui.Squeeze says so
@@ -2043,7 +2056,7 @@ if ($gui) {
         $aw = 'n/a'; try { $dh = $f.GetType().Assembly.GetType('System.Windows.Forms.DpiHelper'); if ($dh) { $bf = [System.Reflection.BindingFlags]'NonPublic, Public, Static'; $pm = $dh.GetProperty('IsPerMonitorV2Awareness', $bf)
             if ($pm) { $aw = $(if ([bool]$pm.GetValue($null, $null)) { 'PerMonitorV2' } else { 'not-PerMonitorV2' }) } } } catch { $null = $_ }
         $sd = $f.AutoScaleDimensions
-        $lg = $(if ($ui.Logo) { [string]$ui.Logo.Width + 'x' + $ui.Logo.Height } else { 'n/a' }); $b1 = @($ui.B | Where-Object { $_.Visible })[0]; $bt = $(if ($b1) { [string]$b1.Width + 'x' + $b1.Height } else { 'n/a' })
+        $lg = $(if ($ui.Logo) { [string]$ui.Logo.Width + 'x' + $ui.Logo.Height } else { 'n/a' }); $b1 = @($ui.B | Where-Object { $_.Visible })[0]; $bt = $(if ($b1) { [string]$b1.Width + 'x' + $b1.Height } elseif ($ui.BtnSeen) { [string]$ui.BtnSeen } else { 'n/a' })   # the run card has no button (R25: btn=n/a): then the narrowest button an earlier card showed
         return ('SCALE dpiX=' + [int]$ui.ScreenDpi + ' deviceDpi=' + $dd + ' mode=' + [string]$f.AutoScaleMode + ' asd=' + [int]$sd.Width + 'x' + [int]$sd.Height + ' autoScale=' + [int]$as.Width + 'x' + [int]$as.Height + ' font=' + [int]$f.Font.Height + ' fontPt=' + $f.Font.SizeInPoints + ' aware=' + $aw + ' screen=' + $sn.Bounds.Width + 'x' + $sn.Bounds.Height +
           ' work=' + $sn.WorkingArea.Width + 'x' + $sn.WorkingArea.Height + ' client=' + $f.ClientSize.Width + 'x' + $f.ClientSize.Height + ' state=' + [string]$f.WindowState + ' logo=' + $lg + ' btn=' + $bt)
       } catch { return ('SCALE could not be read: ' + (ConvertTo-Masked ([string]$_.Exception.Message))) } }
@@ -2052,14 +2065,15 @@ if ($gui) {
       $pct = [int][math]::Round($ui.Dpi / 96.0 * 100); $sp = [int][math]::Round($ui.ScreenDpi / 96.0 * 100)   # the form's scale (the one source); the screen dpi beside it when it differs
       $size = [string]$ui.Form.ClientSize.Width + ' x ' + $ui.Form.ClientSize.Height + ' at ' + [string]$pct + ' %' + $(if ($sp -ne $pct) { ' (the form auto-scale; the screen dpi says ' + $sp + ' %)' } else { '' })
       $sc = $(if ($ui.LayScroll.Count) { '; the text scrolls on: ' + ((@($ui.LayScroll.Keys) | Sort-Object) -join ', ') } else { '' })
-      if ($ui.LayBad.Count) { return ('Layout self-check: ' + $ui.LayBad.Count + ' defects in ' + $ui.LaySeen.Count + ' cards (' + $size + ')' + $sc + "`r`n" + (& $ui.Scale) + "`r`n" + (@($ui.LayBad) -join "`r`n")) }
-      return ('Layout self-check: PASS layout, ' + $ui.LaySeen.Count + ' cards (' + $size + ')' + $sc + "`r`n" + (& $ui.Scale)) }
+      if ($ui.LayBad.Count) { return ('Layout self-check: ' + $ui.LayBad.Count + ' defects in ' + $ui.LaySeen.Count + ' cards (' + $size + ')' + $sc + "`r`n" + (& $ui.Scale) + "`r`n" + (& $ui.WLine) + "`r`n" + (@($ui.LayBad) -join "`r`n")) }
+      return ('Layout self-check: PASS layout, ' + $ui.LaySeen.Count + ' cards (' + $size + ')' + $sc + "`r`n" + (& $ui.Scale) + "`r`n" + (& $ui.WLine)) }
     $ui.Show = { param($C, [string]$Text) $C.Text = $Text; $C.Visible = [bool]$Text }
     $ui.SetCard = { param($c)
       # Shows one card. $c names the parts: View, Light ('you' = yellow, 'bad' = dark red), Kicker, Sentence, Tick, P (up to 4
       # paragraphs), Bold1, Options + OnOption, Lines, StepRow, Field (Label, Text, Name, Button, Do, Max), Err, Links, Note, Help,
       # Buttons (Text, Kind, Do, Apart), Foot, Test, Right, Back, NoAccept, Focus.
       & $ui.Check   # the card that goes away (test rounds only)
+      try { foreach ($b in $ui.B) { if ($b.Visible -and (-not $ui.BtnSeen -or [int]$b.Width -lt [int]$ui.BtnSeenW)) { $ui.BtnSeenW = [int]$b.Width; $ui.BtnSeen = [string]$b.Width + 'x' + $b.Height } } } catch { $null = $_ }   # for the SCALE line
       $ui.Hot = $null; $ui.Down = $null   # no hover or pressed state is carried over (R4 review)
       if ($ui.RecOn -and ($c.Light -or $c.View -eq 'done')) { $ui.RecOn = $false; $ui.Rec.Visible = $false; $ui.Card.Visible = $true; $ui.RecB.Visible = $true }   # a card that needs you closes the Record
       $ui.View = [string]$c.View; $ui.Card.SuspendLayout()
@@ -2071,7 +2085,7 @@ if ($gui) {
       $ui.P[0].Font = $(if ($c.Bold1) { $ui.F.BodyB } else { $ui.F.Body })
       $ui.OnOpt = $c.OnOption; & $ui.FillOpts $c.Options; $ui.Opts.Visible = [bool]$ui.Opts.Controls.Count
       & $ui.Show $ui.Lines ([string]$c.Lines)
-      $ui.StepRow.Visible = [bool]$c.StepRow; $ui.LastLog.Visible = [bool]$c.StepRow; if ($c.StepRow) { $ui.LastLog.Text = '' }
+      $ui.StepRow.Visible = [bool]$c.StepRow; $ui.LastLog.Visible = [bool]$c.StepRow; if ($c.StepRow) { & $ui.Cut $ui.LastLog '' }
       $ui.FieldRow.Visible = [bool]$c.Field; $ui.FieldDo = $null
       if ($c.Field) { $ui.FieldL.Text = [string]$c.Field.Label; $ui.Field.Text = [string]$c.Field.Text; $ui.Field.AccessibleName = [string]$c.Field.Name; $ui.FieldB.Visible = [bool]$c.Field.Button; $ui.FieldBOn = [bool]$c.Field.Button; $ui.FieldB.Text = [string]$c.Field.Button; $ui.FieldDo = $c.Field.Act; $ui.Field.MaxLength = $(if ($c.Field.Max) { [int]$c.Field.Max } else { 32767 }); & $ui.FitRow }
       $ui.ErrRow.Visible = [bool]$c.Err; if ($c.Err) { $ui.ErrBox.Text = '' }
@@ -2102,8 +2116,48 @@ if ($gui) {
       # queue while the card was built comes in during this DoEvents, inside the guard, and is dropped.
       $ui.CardAt = $ui.Clock.Elapsed.TotalMilliseconds
       [System.Windows.Forms.Application]::DoEvents() }
+    # ---- The window's state (R25: on a work computer a minimized window did not come back with its taskbar button or with
+    # Restore; Maximize brought it back. The Windows job restores it with the same messages, also in the ISE host, so the
+    # cause is on the device). Two parts. (1) A trace for the report, numbers only (the WINSTATE line under SCALE): each
+    # change of state with the window's bounds and restore bounds. (2) A repair, checked about 3 times a second:
+    # a. the person selected the minimized window (it is the foreground window again, after another window was) and 400 ms
+    #    later it is still minimized: RADE shows it in the state it had; if that does not work, maximized;
+    # b. in the second after a restore the window is not on a screen, or is too small to use: RADE puts it where it was
+    #    (else maximized), and in front of the other windows.
+    # A window that stays the foreground window after it was minimized (no other window took its place) is left alone.
+    $ui.WinLog = New-Object System.Collections.Generic.List[string]; $ui.WState = 'Normal'; $ui.WBack = 'Normal'; $ui.WGood = $null; $ui.WAway = $false; $ui.WActAt = -1.0; $ui.WTry = 0; $ui.WCheck = 0; $ui.WN = 0
+    $ui.Rect = { param($b) try { [string][int]$b.Width + 'x' + [int]$b.Height + '@' + [int]$b.X + ',' + [int]$b.Y } catch { 'n/a' } }
+    $ui.WNote = { param([string]$T) if ($ui.WinLog.Count -lt 24) { $ui.WinLog.Add(([string][math]::Round($ui.Clock.Elapsed.TotalSeconds, 1)) + 's ' + $T) } }
+    $ui.OnScreen = { param($b) try { if ($b.Width -lt (& $ui.Sc 200) -or $b.Height -lt (& $ui.Sc 100)) { return $false }
+        foreach ($sn in [System.Windows.Forms.Screen]::AllScreens) { $i = [System.Drawing.Rectangle]::Intersect($sn.WorkingArea, $b); if ($i.Width -ge 64 -and $i.Height -ge 32) { return $true } }; return $false } catch { return $true } }
+    $ui.WSee = { try { $f = $ui.Form; $st = [string]$f.WindowState; $b = $f.Bounds
+        if ($st -ne 'Minimized' -and (& $ui.OnScreen $b)) { $ui.WBack = $st; if ($st -eq 'Normal') { $ui.WGood = $b } }
+        if ($st -eq $ui.WState) { return }
+        & $ui.WNote ($ui.WState + '>' + $st + ' b=' + (& $ui.Rect $b) + ' r=' + (& $ui.Rect $f.RestoreBounds))
+        if ($ui.WState -eq 'Minimized') { $ui.WCheck = 3; $ui.WTry = 0 }
+        $ui.WState = $st; $ui.WAway = $false; $ui.WActAt = -1.0 } catch { $null = $_ } }
+    $ui.WWatch = { try { $f = $ui.Form; if (-not $ui.Opened -or $f.IsDisposed -or $script:closing) { return }
+        $st = [string]$f.WindowState; $now = $ui.Clock.Elapsed.TotalMilliseconds
+        if ($st -ne $ui.WState) { & $ui.WSee }
+        if ($st -eq 'Minimized') {
+          if (-not [object]::ReferenceEquals([System.Windows.Forms.Form]::ActiveForm, $f)) { $ui.WAway = $true; $ui.WActAt = -1.0; return }
+          if (-not $ui.WAway) { return }
+          if ($ui.WActAt -lt 0) { $ui.WActAt = $now; & $ui.WNote 'selected while minimized'; return }
+          if ($now - $ui.WActAt -lt 400) { return }
+          $to = $(if ($ui.WTry -ge 1) { 'Maximized' } else { [string]$ui.WBack }); $ui.WTry++; $ui.WActAt = -1.0
+          if ($ui.WTry -le 3) { & $ui.WNote ('RADE shows it: ' + $to); $f.WindowState = $to }
+          return }
+        if ($ui.WCheck -gt 0) { $ui.WCheck--
+          if (-not (& $ui.OnScreen $f.Bounds)) {
+            & $ui.WNote ('not on a screen b=' + (& $ui.Rect $f.Bounds) + ': RADE moves it'); $g = $ui.WGood
+            if ($st -eq 'Normal' -and $g) { $f.Left = $g.X; $f.Top = $g.Y; $f.Width = $g.Width; $f.Height = $g.Height }
+            if (-not (& $ui.OnScreen $f.Bounds)) { $f.WindowState = 'Maximized' } }
+          if ($ui.WCheck -eq 2) { $f.TopMost = $true; $f.TopMost = $false } }   # in front of the other windows, once
+      } catch { $null = $_ } }
+    $ui.WLine = { $h = [string]$Host.Name; $h = $(if ($h -match 'ISE') { 'ise' } elseif ($h -eq 'ConsoleHost') { 'console' } else { 'other' })
+      'WINSTATE shown-by=' + [string]$ui.ShownBy + ' host=' + $h + ' now=' + [string]$ui.Form.WindowState + ' changes=' + $ui.WinLog.Count + $(if ($ui.WinLog.Count) { ': ' + (@($ui.WinLog) -join '; ') } else { '' }) }
     $ui.ToFront = { try { if ([string]$ui.Form.WindowState -eq 'Minimized') { $ui.Form.WindowState = 'Normal' }; $ui.Form.TopMost = $true; $ui.Form.Activate(); $ui.Form.TopMost = $false } catch { $null = $_ } }
-    $ui.Say1 = { param([string]$Text) $ui.Note.Text = $Text; $ui.Note.Visible = [bool]$Text }   # one gray line under the card's box or buttons
+    $ui.Say1 = { param([string]$Text) $ui.Note.Text = $Text; $ui.Note.Visible = [bool]$Text; & $ui.BreakAll }   # one gray line under the card's box or buttons
 
     # ---- When the window opens: the Local checks of every application in the paste run once (base checks before Choose).
     # An application with a FAILED one cannot be chosen. For a deploy, a newer version on the app page is read here too.
@@ -2127,7 +2181,7 @@ if ($gui) {
         if (-not $ui.ContainsKey('NewRound')) { $ui.NewRound = [string](Get-NewerRound) }
       } finally { $ui.Busy = $false; Select-App 0 } }
     $ui.VChoose = {
-      Select-App 0; $ui.Picked = $false; $ui.Plan = $null; $ui.AppL.Text = ''; $list = @(); $dep = $false; $ui.Blocked = @{}; $ui.BlockedFix = @{}
+      Select-App 0; $ui.Picked = $false; $ui.Plan = $null; & $ui.Cut $ui.AppL ''; $list = @(); $dep = $false; $ui.Blocked = @{}; $ui.BlockedFix = @{}
       for ($j = 0; $j -lt $apps.Count; $j++) { foreach ($id in @($apps[$j].Checks)) { $r = $ui.BaseRes[$id]; if ($r -and $r.State -eq 'FAILED') { $ui.Blocked[$j] = ((Get-CheckDef $id).Name + ': ' + $r.Detail); $ui.BlockedFix[$j] = $(if ($r.Fix) { 'What to do: ' + $r.Fix } else { '' }); break } } }
       for ($j = 0; $j -lt $apps.Count; $j++) {
         $a = $apps[$j]; if ([string]$a.Mode -eq 'deploy') { $dep = $true }
@@ -2149,7 +2203,7 @@ if ($gui) {
       Select-App $J; $ui.Picked = $true
       # The base checks are not run twice, except the ones whose answer can change at any time ($checkNoSave: Word open, disk, write).
       foreach ($id in $script:appChecks) { if ($ui.BaseRes.ContainsKey($id) -and $checkNoSave -notcontains $id -and $ui.BaseRes[$id].State -in 'PASSED', 'WARNING') { $script:checkResults[$id] = $ui.BaseRes[$id] } }
-      $ui.AppL.Text = $dot.TrimStart() + $script:app.Name + $(if ($script:app.Version) { ' ' + $script:app.Version } else { '' })
+      & $ui.Cut $ui.AppL ($dot.TrimStart() + $script:app.Name + $(if ($script:app.Version) { ' ' + $script:app.Version } else { '' }))
       & $ui.InitSel
       $e = $null; if (Test-Deploy) { $e = (Read-Installed (Get-InstalledKey $script:app)) }
       if ($e -and $e.installed) { & $ui.VMaint $e.installed } else { & $ui.Checks $false } }
@@ -2267,7 +2321,7 @@ if ($gui) {
 
     # ---- The run. Invoke-Round calls back: a log line ($ui.Say), a tick ($ui.Tick), a step that starts ($ui.OnStatus) and
     # a step that ends ($ui.OnStep). A step you do by hand comes in through $script:guideUi.
-    $ui.Say = { param($t) Add-RunLog $t; $ui.Log.Add([string]$t); $x = ([string]$t).Trim(); if ($x -and $ui.View -eq 'run') { $ui.LastLog.Text = $x }; if ($ui.RecOn) { try { $ui.RecText.AppendText([string]$t + "`r`n") } catch { $null = $_ } }; try { [System.Windows.Forms.Application]::DoEvents() } catch { $null = $_ } }
+    $ui.Say = { param($t) Add-RunLog $t; $ui.Log.Add([string]$t); $x = ([string]$t).Trim(); if ($x -and $ui.View -eq 'run') { & $ui.Cut $ui.LastLog $x }; if ($ui.RecOn) { try { $ui.RecText.AppendText([string]$t + "`r`n") } catch { $null = $_ } }; try { [System.Windows.Forms.Application]::DoEvents() } catch { $null = $_ } }
     $ui.Paint = {
       if (-not $script:prog -or -not $script:stepStart) { return }
       $g = Get-Progress
@@ -2280,12 +2334,12 @@ if ($gui) {
     $ui.ShowRun = {
       & $ui.SetCard @{ View = 'run'; Kicker = $(if ($ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN } else { 'Starting' }); Sentence = $(if (Test-Deploy) { 'Installing ' + $script:app.Name + '.' } else { 'Running round ' + $round + '.' })
         StepRow = $true; Foot = $(if (@($ui.Guides).Count) { 'RADE asks for you at "' + $ui.Guides[0] + '". Until then nothing is needed from you. Keep this window open.' } else { 'Nothing is needed from you. Keep this window open.' }) }
-      $ui.StepName.Text = [string]$ui.StepNow }
+      $ui.StepName.Text = [string]$ui.StepNow; & $ui.BreakAll }
     $ui.OnStatus = { param($i, $count, $name, $estimate)
       $script:statusBase = $name; $script:stepStart = Get-Date; $script:stepEst = $estimate
       if ($i -le 1) { $null = & $ui.SetBar 'all' 0 $true }
       $ui.StepI = [int]$i; $ui.StepN = [int]$count; $ui.StepNow = [string]$name
-      if ($ui.View -ne 'run') { $null = & $ui.ShowRun } else { $ui.Kick.Text = ('Step ' + $i + ' of ' + $count).ToUpperInvariant(); $ui.StepName.Text = [string]$name }
+      if ($ui.View -ne 'run') { $null = & $ui.ShowRun } else { $ui.Kick.Text = ('Step ' + $i + ' of ' + $count).ToUpperInvariant(); $ui.StepName.Text = [string]$name; & $ui.BreakAll }
       $null = & $ui.SetBar 'step' 0 $true; $ui.StepFrac.Text = ''
       $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }
     $ui.OnStep = { param($k, $line)
@@ -2541,6 +2595,7 @@ if ($gui) {
         $ui.Form.Left = $wa.Left + [int](($wa.Width - $ui.Form.Width) / 2); $ui.Form.Top = $wa.Top + [int](($wa.Height - $ui.Form.Height) / 2) } catch { $null = $_ }
       & $ui.Fit; $ui.Anim.Start()
       & $ui.Boot })
+    $ui.Form.Add_Resize({ & $ui.WSee })
     $ui.Form.Add_FormClosing({
       # The window's X (there is no Exit button): ask first only while a step runs, because closing stops it (R17).
       if ($ui.Running -and -not $script:closing) {
@@ -2705,12 +2760,12 @@ def answers_part(s):
         if key in keys:
             no('question %d: the key %r is used twice' % (i, key))
         keys.add(key)
-        if not isinstance(prompt, str) or not 1 <= len(prompt) <= TEXT_LIMITS['answer prompt']:
+        if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= TEXT_LIMITS['answer prompt']:   # after the trim: a prompt of only spaces is empty
             no('question %r: the prompt must have 1 to %d characters' % (key, TEXT_LIMITS['answer prompt']))
         if kind not in ANSWER_KINDS:
             no('question %r: the kind must be yesno, pick or text' % key)
         if kind == 'pick':
-            if not isinstance(choices, list) or not 2 <= len(choices) <= 4 or not all(isinstance(c, str) and 1 <= len(c) <= TEXT_LIMITS['answer choice'] for c in choices):
+            if not isinstance(choices, list) or not 2 <= len(choices) <= 4 or not all(isinstance(c, str) and 1 <= len(c.strip()) <= TEXT_LIMITS['answer choice'] for c in choices):
                 no('question %r: a pick needs 2 to 4 choices of 1 to %d characters' % (key, TEXT_LIMITS['answer choice']))
             if len({c.strip().lower() for c in choices}) != len(choices):
                 no('question %r: the choices of a pick must differ (case and spaces ignored)' % key)

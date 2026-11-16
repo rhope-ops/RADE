@@ -27,20 +27,29 @@ Add-Type -Namespace RadeT -Name Win -MemberDefinition @'
 [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr h);
 [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr h, uint c);
 [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr h, int i);
+[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
 '@
 function global:Test-RadeRestore([string]$Where) {
   $f = $ui.Form; $h = $f.Handle; $b0 = $f.Bounds
   $r = { param($b) [string]$b.Width + 'x' + $b.Height + '@' + $b.X + ',' + $b.Y }
   $pump = { param([int]$Ms) $sw = [System.Diagnostics.Stopwatch]::StartNew(); while ($sw.ElapsedMilliseconds -lt $Ms) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 15 } }
-  $say = { param([string]$T) Write-Host ('WIN probe ' + $Where + ' ' + $T + ' state=' + $f.WindowState + ' iconic=' + [RadeT.Win]::IsIconic($h) + ' bounds=' + (& $r $f.Bounds) + ' restore=' + (& $r $f.RestoreBounds) + ' owned=' + ([RadeT.Win]::GetWindow($h, 4) -ne [IntPtr]::Zero) + ' enabled=' + [RadeT.Win]::IsWindowEnabled($h) + ' exstyle=0x' + ([RadeT.Win]::GetWindowLong($h, -20)).ToString('X') + ' topmost=' + $f.TopMost + ' card=' + $ui.Card.Width + 'x' + $ui.Card.Height) }
+  $say = { param([string]$T) Write-Host ('WIN probe ' + $Where + ' ' + $T + ' state=' + $f.WindowState + ' iconic=' + [RadeT.Win]::IsIconic($h) + ' bounds=' + (& $r $f.Bounds) + ' restore=' + (& $r $f.RestoreBounds) + ' owned=' + ([RadeT.Win]::GetWindow($h, 4) -ne [IntPtr]::Zero) + ' enabled=' + [RadeT.Win]::IsWindowEnabled($h) + ' exstyle=0x' + ([RadeT.Win]::GetWindowLong($h, -20)).ToString('X') + ' topmost=' + $f.TopMost + ' foreground=' + [object]::ReferenceEquals([System.Windows.Forms.Form]::ActiveForm, $f) + ' card=' + $ui.Card.Width + 'x' + $ui.Card.Height) }
   $cmd = { param([int]$C, [int]$Ms) [void][RadeT.Win]::PostMessage($h, 0x112, [IntPtr]$C, [IntPtr]::Zero); & $pump $Ms }
   & $say 'start'
-  & $cmd 0xF020 400; & $say 'minimized'; $min = [RadeT.Win]::IsIconic($h)
+  & $cmd 0xF020 1500; & $say 'minimized'; $min = [RadeT.Win]::IsIconic($h)   # 1.5 s: the engine's repair leaves a window alone that the person minimized
   & $cmd 0xF120 600; & $say 'restored'; $ok1 = ($min -and [string]$f.WindowState -eq 'Normal' -and -not [RadeT.Win]::IsIconic($h) -and $f.Bounds -eq $b0)
   & $cmd 0xF030 400; & $cmd 0xF020 400; & $say 'max-minimized'
   & $cmd 0xF120 600; & $say 'max-restored'; $ok2 = ([string]$f.WindowState -eq 'Maximized' -and -not [RadeT.Win]::IsIconic($h))
   & $cmd 0xF120 600; & $say 'normal-again'; $ok3 = ([string]$f.WindowState -eq 'Normal' -and $f.Bounds -eq $b0)
-  Write-Host ('WIN restore ' + $Where + ' ok=' + ($ok1 -and $ok2 -and $ok3) + ' normal=' + $ok1 + ' maximized=' + $ok2 + ' back=' + $ok3 + ' host=' + $Host.Name + ' shown-by=' + $ui.ShownBy)
+  # The engine's repair (a): the minimized window is made the foreground window, as a click on its taskbar button does, but
+  # with no restore (SetForegroundWindow leaves a window minimized). The engine must show it within about a second. Where
+  # Windows does not give the foreground to it (no other window had it, or the session forbids it), the case cannot be made: "n/a".
+  & $cmd 0xF020 700; $away = -not [object]::ReferenceEquals([System.Windows.Forms.Form]::ActiveForm, $f); [void][RadeT.Win]::SetForegroundWindow($h); & $pump 300
+  $fg = ([RadeT.Win]::IsIconic($h) -and [object]::ReferenceEquals([System.Windows.Forms.Form]::ActiveForm, $f)); & $say 'selected'; & $pump 1500; & $say 'repaired'
+  $rep = $(if (-not ($away -and $fg)) { 'n/a' } else { [string]([string]$f.WindowState -eq 'Normal' -and -not [RadeT.Win]::IsIconic($h) -and $f.Bounds -eq $b0) })
+  if ([RadeT.Win]::IsIconic($h)) { & $cmd 0xF120 600 }
+  Write-Host ('WIN ' + (& $ui.WLine))
+  Write-Host ('WIN restore ' + $Where + ' ok=' + ($ok1 -and $ok2 -and $ok3 -and $rep -ne 'False') + ' normal=' + $ok1 + ' maximized=' + $ok2 + ' back=' + $ok3 + ' repair=' + $rep + ' host=' + $Host.Name + ' shown-by=' + $ui.ShownBy)
 }
 function global:Save-RadeCard([string]$Tag) {
   $global:RadeT.N++; $card = ('{0:00}-{1}' -f $global:RadeT.N, $Tag)

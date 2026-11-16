@@ -84,7 +84,17 @@ function global:Push-RadeButton([string]$Text) {
   }
   elseif ($v -eq 'ready') {
     if (-not $global:RadeT.Min) {   # a minimized window: RADE brings it back when it needs the person; it has its own taskbar button
-      $global:RadeT.Min = $true; $ui.Form.WindowState = 'Minimized'; & $ui.ToFront
+      $global:RadeT.Min = $true
+      # R25 (the window's state): 1. the person selects the minimized window and it stays minimized: RADE shows it after 400 ms
+      # (first as it was; when that does not work, maximized). 2. A window that stays the foreground window after it was
+      # minimized is left alone. 3. A window that is not on a screen after a restore goes back to where it was.
+      $f = $ui.Form; $AF = [System.Windows.Forms.Form]; $ui.Opened = $true; $g0 = $f.Bounds; & $ui.WSee
+      $f.WindowState = 'Minimized'; $AF::ActiveForm = $null; & $ui.WWatch; $AF::ActiveForm = $f; & $ui.WWatch; & $ui.WWatch; $early = [string]$f.WindowState; $ui.WActAt -= 500; & $ui.WWatch; $h1 = [string]$f.WindowState; & $ui.WWatch
+      $f.WindowState = 'Minimized'; $AF::ActiveForm = $null; & $ui.WWatch; $AF::ActiveForm = $f; & $ui.WWatch; $ui.WActAt -= 500; & $ui.WWatch; $f.WindowState = 'Minimized'; & $ui.WWatch; $ui.WActAt -= 500; & $ui.WWatch; $h2 = [string]$f.WindowState
+      $f.WindowState = 'Normal'; & $ui.WWatch; $f.WindowState = 'Minimized'; & $ui.WWatch; & $ui.WWatch; $ui.WActAt -= 500; & $ui.WWatch; $stay = [string]$f.WindowState + '/' + $ui.WActAt
+      $f.Left = -32000; $f.Top = -32000; $f.WindowState = 'Normal'; & $ui.WWatch; $moved = ($f.Bounds -eq $g0); $AF::ActiveForm = $null
+      Write-Host ('WIN winstate early=' + $early + ' shown=' + $h1 + ' second-try=' + $h2 + ' foreground-stays=' + $stay + ' moved-back=' + $moved + ' ~ ' + ((& $ui.WLine) -replace '\d+(\.\d+)?s ', 'Ns '))
+      $f.WindowState = 'Minimized'; & $ui.ToFront
       Write-Host ('WIN restored=' + $ui.Form.WindowState + ' taskbar=' + $ui.Form.Values['ShowInTaskbar'] + ' minbox=' + $ui.Form.Values['MinimizeBox'] + ' shown-by=' + [RadeStub.Driver]::ShownBy)
     }
     if ($global:RadeT.Record -and -not $global:RadeT.Opened) {
@@ -125,6 +135,14 @@ function global:Push-RadeButton([string]$Text) {
       $pl = New-Object System.Windows.Forms.Label; & $ui.Shorten $pl 'abcdefghij' 50
       $ui.P[1].MaximumSize = New-Object System.Drawing.Size(50, 0); $ui.P[1].Text = 'see abcdefghijkl'; & $ui.BreakAll; $bb = ($ui.P[1].Text -eq "see abcdefg`nhijkl"); $ui.P[1].Text = ''
       Write-Host ('WIN shorten=' + $pl.Text + ' body-break=' + $bb)
+      # R25: every link fits its text (GrowAndShrink), and the self-check's rule for a button that is wider than its text needs;
+      # a note or a step name set after the card was drawn gets its long word broken; the two fixed one-line labels are cut by RADE.
+      $lk = @($ui.RecB, $ui.BackB, $ui.CopyPathB, $ui.ShowFileB, $ui.DraftB)
+      Write-Host ('WIN links shrink=' + (@($lk | Where-Object { [string]$_.Values['AutoSizeMode'] -eq 'GrowAndShrink' }).Count -eq 5) + ' wide-bad=' + (& $ui.WideBad 'fixture' 'RecB' 165 110) + ' wide-ok=' + ($null -eq (& $ui.WideBad 'fixture' 'RecB' 111 110)) + ' btn-seen=' + $ui.BtnSeen)
+      $nt = [string]$ui.Note.Text; $nv = $ui.Note.Visible; $ui.Note.MaximumSize = New-Object System.Drawing.Size(50, 0); & $ui.Say1 'see abcdefghijkl'; $nb = ($ui.Note.Text -eq "see abcdefg`nhijkl"); & $ui.Say1 $nt; $ui.Note.Visible = $nv
+      $af = [string]$ui.CutText['Application']; & $ui.Cut $ui.AppL ('Sample ' * 20); $ac = [string]$ui.AppL.Text; & $ui.Cut $ui.AppL $af
+      $ui.View = 'run'; & $ui.Cut $ui.LastLog ('log ' * 80); $lc = [string]$ui.LastLog.Text; & $ui.Cut $ui.LastLog ''; $ui.View = 'answer'
+      Write-Host ('WIN late note-break=' + $nb + ' app-cut=' + ($ac.EndsWith('...') -and $ac.Length * 7 -le $ui.AppL.Width) + ' log-cut=' + ($lc.EndsWith('...') -and $lc.Length * 7 -le $ui.LastLog.Width) + ' app-back=' + ($ui.AppL.Text -eq $af) + ' no-ellipsis=' + (-not $ui.AppL.Values.ContainsKey('AutoEllipsis') -and -not $ui.LastLog.Values.ContainsKey('AutoEllipsis')))
       Write-Host ('WIN break=' + ((& $ui.BreakLong 'abcdefghij' $ui.F.Body 21) -replace "`n", '|') + ' word-bad=' + (& $ui.WordBad 'fixture' 'P0' 'abcdefghij' $ui.F.Body 50) + ' word-ok=' + ($null -eq (& $ui.WordBad 'fixture' 'P0' 'abc def ghi' $ui.F.Body 50)))
     }
     if ($ui.FieldRow.Shown) { $m = { param($C) $(if ($C.AutoSize) { $C.Margin.Top + $C.PreferredSize.Height / 2.0 } else { $C.Margin.Top + $C.Height / 2.0 }) }; Write-Host ('WIN mid answer label=' + (& $m $ui.FieldL) + ' box=' + (& $m $ui.FieldBox) + ' h=' + $ui.FieldBox.Height) }

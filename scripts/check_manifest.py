@@ -37,6 +37,11 @@ def refs(m):
             for k in sorted({k for k in keys if keys.count(k) > 1}):
                 out.append('%s: step %r: answers: the key %r is used twice' % (r, s['name'], k))
             for a in qs:
+                # the schema counts spaces; the window shows the text trimmed, so a text of only spaces is empty
+                if isinstance(a, dict) and isinstance(a.get('prompt'), str) and not a['prompt'].strip():
+                    out.append('%s: step %r: answers: the prompt of %r is empty (only spaces)' % (r, s['name'], a.get('key')))
+                if isinstance(a, dict) and any(isinstance(c, str) and not c.strip() for c in (a.get('choices') if isinstance(a.get('choices'), list) else [])):
+                    out.append('%s: step %r: answers: a choice of %r is empty (only spaces)' % (r, s['name'], a.get('key')))
                 cs = a.get('choices') if isinstance(a, dict) and isinstance(a.get('choices'), list) else []
                 low = [c.strip().lower() for c in cs if isinstance(c, str)]
                 if len(set(low)) != len(low):

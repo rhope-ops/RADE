@@ -98,6 +98,7 @@ namespace System.Windows.Forms {
     public bool Closed; public Form() { Width = 1020; Height = 760; }
     public string WindowState = "Normal";
     public System.Drawing.SizeF CurrentAutoScaleDimensions { get { return new System.Drawing.SizeF(RadeStub.Driver.FormDpi, RadeStub.Driver.FormDpi); } }   // 144 = the R24 device: the form scales 1.5 x while the screen dpi says 96
+    public static Form ActiveForm;   // the foreground window, when it is a form of this program (set by the test user)
     public Control ActiveControl { get { return RadeStub.Driver.Focus; } }
     public void Activate() { }
     public void Close() { if (Closed) return; RadeStub.Dyn e = new RadeStub.Dyn(); e.Values["Cancel"] = false; Fire("FormClosing", e); if (!(e.Values["Cancel"] is bool && (bool)e.Values["Cancel"])) { Closed = true; IsDisposed = true; } }
@@ -130,6 +131,6 @@ namespace System.Windows.Forms {
     public static void DrawText(object g, string t, object f, Rectangle r, Color c, TextFormatFlags fl) { if (t == null) throw new ArgumentNullException("text"); }
   }
   public static class Clipboard { public static void SetText(string t) { if (string.IsNullOrEmpty(t)) throw new ArgumentNullException("text"); RadeStub.Driver.Clip = t; } }
-  public class Screen { public Rectangle Bounds = new Rectangle(0, 0, 1280, 800); public Rectangle WorkingArea = new Rectangle(0, 0, 1280, 720); public static Screen FromControl(Control c) { return new Screen(); } }
+  public class Screen { public Rectangle Bounds = new Rectangle(0, 0, 1280, 800); public Rectangle WorkingArea = new Rectangle(0, 0, 1280, 720); public static Screen FromControl(Control c) { return new Screen(); } public static Screen[] AllScreens { get { return new Screen[] { new Screen() }; } } }
   public static class MessageBox { public static string Show(object owner, string text, string caption, MessageBoxButtons b, MessageBoxIcon i, MessageBoxDefaultButton d) { return "Yes"; } }
 }

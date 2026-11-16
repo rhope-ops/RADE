@@ -38,8 +38,13 @@ RUNS = [
     ("long-small", 0, "done", "0", "811x469", True),
     # the same bundle in the real Windows PowerShell ISE host, as on a work computer (run_ise)
     ("ise-host", 1, "done", "0", "", False),
+    # the scaling of the R24 and R25 work computer, in the ISE host: the form scales its controls 1.5 x while the screen dpi
+    # says 96 and the fonts stay at 96 dpi (SCALE: autoScale=144, font=18), on a 1920 x 1200 screen (device_screen)
+    ("device-150", 1, "done", "0", "", False),
 ]
 ISE = "ise-host"
+DEVICE = "device-150"
+IN_ISE = (ISE, DEVICE)
 
 WORDS = "readiness tracker for each unit member with a reminder before an item is due and one page for the commander "
 
@@ -86,7 +91,16 @@ def file_url(p):
     return pathlib.Path(p).resolve().as_uri()
 
 
-def bundle(t, long, keep=None):
+def device_screen():
+    """Set the screen to 1920 x 1200 (the R25 work computer). True when Windows did it."""
+    r = subprocess.run(["powershell.exe", "-NoProfile", "-Command",
+                        "try { Set-DisplayResolution -Width 1920 -Height 1200 -Force -ErrorAction Stop | Out-Null } catch { $_.Exception.Message }; Add-Type -AssemblyName System.Windows.Forms; "
+                        "$b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds; 'SCREEN ' + $b.Width + 'x' + $b.Height"], capture_output=True, text=True)
+    print("   " + " | ".join(l.strip()[:160] for l in (r.stdout + r.stderr).splitlines() if l.strip()))
+    return "SCREEN 1920x1200" in r.stdout
+
+
+def bundle(t, long, keep=None, device=False):
     app = t / "app"
     shutil.copytree(ROOT / "tests" / "fixture-app", app)
     m = json.loads((ROOT / "schemas" / "examples" / "sample-manifest.json").read_text(encoding="utf-8"))
@@ -117,7 +131,12 @@ def bundle(t, long, keep=None):
         (r"(?m)^\$releaseUrl = '.*'", "$releaseUrl = '%s'" % file_url(t / "rel.json")),
         (r"\$checkGate = \$true", "$checkGate = $false"),
         (r"(?m)^\$sitePrefix = 'https://usaf\.dps\.mil/sites/'", "$sitePrefix = 'https://rade-test.invalid/sites/'"),
-    ]:
+    ] + ([
+        # the work computer's scaling: the form is designed at 64 dpi, so Windows Forms scales its controls 96 / 64 = 1.5 x
+        # and no font; the engine's one scale source is then 144, as CurrentAutoScaleDimensions gives it there
+        (r"\$ui\.Form\.AutoScaleDimensions = New-Object System\.Drawing\.SizeF\(96, 96\)", "$ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(64, 64)"),
+        (r"if \(\$d -gt 0\) \{ \$ui\.Dpi = \$d \}", "if ($d -gt 0) { $ui.Dpi = $d * 1.5 }"),
+    ] if device else []):
         s, n = re.subn(pat, lambda m, new=new: new, s)
         if not n:
             sys.exit("FAIL the bundle has no line for " + pat)
@@ -155,18 +174,25 @@ def main():
     bad = 0
     home = pathlib.Path(tempfile.mkdtemp())   # the user folder the three "deploy" runs share
     maint = 0
+    skipped = []
     for name, app, hand, tour, size, long in RUNS:
         t = pathlib.Path(tempfile.mkdtemp())
-        users = bundle(t, long, home if name.startswith("deploy-") else None)
+        users = bundle(t, long, home if name.startswith("deploy-") else None, name == DEVICE)
         d = out / name
         d.mkdir(parents=True, exist_ok=True)
         first = name == RUNS[0][0]
         env = dict(os.environ, RADE_T_OUT=str(d), RADE_T_APP=str(app), RADE_T_HAND=hand, RADE_T_TOUR=tour, RADE_T_SIZE=size, USERPROFILE=str(users / "test1234"),
-                   RADE_T_PROBE="1" if first or name == ISE else "")
-        if name == ISE:
+                   RADE_T_PROBE="1" if first or name in IN_ISE else "")
+        if name == DEVICE and not device_screen():
+            print("== %s: NOT RUN, this computer could not set a 1920 x 1200 screen" % name)
+            skipped.append(name)
+            shutil.rmtree(t, ignore_errors=True)
+            continue
+        if name in IN_ISE:
             text = run_ise(t, env)
             if text is None:
                 print("== %s: NOT RUN, powershell_ise.exe is not on this computer" % name)
+                skipped.append(name)
                 shutil.rmtree(t, ignore_errors=True)
                 continue
         else:
@@ -183,7 +209,7 @@ def main():
         print("== %s: cards=%d layout-lines=%d closed=%s png=%d" % (name, cards, len(layout), closed, len(list(d.glob("*.png")))))
         for l in lines:
             if l.startswith(("WIN", "LAYOUT ", "No window could open", "Layout self-check")) or (first and l.startswith("MEASURE")):
-                print("   " + l[:170])
+                print("   " + l[:(600 if l.startswith(("WIN probe", "WIN restore", "WIN WINSTATE", "WIN SCALE")) else 170)])
         if not closed:
             print("   --- last lines ---")
             for l in lines[-25:]:
@@ -205,11 +231,13 @@ def main():
             why.append("the question cards (answer-yesno, answer-pick, answer-text) were not all drawn: %s" % sorted(got))
         if size == SMALLEST and hand == "done" and "answer-text" not in got:
             why.append("the text question (answer-text) was not drawn in the smallest window")
-        if first or name == ISE:   # minimize and restore with the window messages of the taskbar button (R25)
+        if name == DEVICE and not any(l.startswith("WIN SCALE ") and " logo=60x60 " in l for l in lines):
+            why.append("the 1.5 x scale did not reach the window (SCALE must say logo=60x60)")
+        if first or name in IN_ISE:   # minimize and restore with the window messages of the taskbar button (R25)
             rs = [l for l in lines if l.startswith("WIN restore ")]
             if len(rs) != 2 or any(" ok=True " not in l for l in rs):
                 why.append("minimize and restore (2 WIN restore lines with ok=True are needed): %s" % [l[:60] for l in rs])
-            if name == ISE and not any("host=Windows PowerShell ISE Host" in l for l in rs):
+            if name in IN_ISE and not any("host=Windows PowerShell ISE Host" in l for l in rs):
                 why.append("the run was not in the ISE host")
         broken = [l for l in lines if l.startswith(("WIN PNG-FAILED", "WIN DRIVER-ERROR", "WIN TIMEOUT", "WIN BAD"))]
         if broken:
@@ -225,7 +253,7 @@ def main():
     if maint < 2:
         bad += 1
         print("   FAIL the Maintenance card showed %d times, 2 at least are needed (1020 and 811 wide)" % maint)
-    print("WINDOW runs=%d bad=%d maintenance-cards=%d" % (len(RUNS), bad, maint))
+    print("WINDOW runs=%d bad=%d maintenance-cards=%d not-run=%s" % (len(RUNS), bad, maint, ",".join(skipped) or "none"))
     return 1 if bad else 0
 
 
