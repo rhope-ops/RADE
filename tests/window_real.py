@@ -32,7 +32,8 @@ RUNS = [
     # Maintenance card shows, with "Uninstall" at the right end (1020 wide) and on its own row (811 wide)
     ("deploy-616", 1, "done", "1", "1020x616", False),
     ("deploy-tour-small", 1, "fail", "1", "811x469", False),
-    ("test-small", 0, "done", "0", "811x469", False),
+    # hand "later": the hand step has "late" in the test copy; the user answers "Not yet" and, asked again, Done
+    ("test-small", 0, "later", "0", "811x469", False),
     # the same bundle with every text at its limit (docs/window-design.md "Text lengths")
     ("long-616", 1, "fail", "1", "1020x616", True),
     ("long-small", 0, "done", "0", "811x469", True),
@@ -40,7 +41,7 @@ RUNS = [
     ("ise-host", 1, "done", "0", "", False),
     # the scaling of the R24 and R25 work computer, in the ISE host: the form scales its controls 1.5 x while the screen dpi
     # says 96 and the fonts stay at 96 dpi (SCALE: autoScale=144, font=18), on a screen 1920 wide (device_screen)
-    ("device-150", 1, "done", "0", "", False),
+    ("device-150", 1, "later", "0", "", False),
 ]
 ISE = "ise-host"
 DEVICE = "device-150"
@@ -105,7 +106,7 @@ def device_screen():
     return now().startswith("1920x")
 
 
-def bundle(t, long, keep=None, device=False):
+def bundle(t, long, keep=None, device=False, late=False):
     app = t / "app"
     shutil.copytree(ROOT / "tests" / "fixture-app", app)
     m = json.loads((ROOT / "schemas" / "examples" / "sample-manifest.json").read_text(encoding="utf-8"))
@@ -141,8 +142,11 @@ def bundle(t, long, keep=None, device=False):
         # and no font; the engine's one scale source is then 144, as CurrentAutoScaleDimensions gives it there
         (r"\$ui\.Form\.AutoScaleDimensions = New-Object System\.Drawing\.SizeF\(96, 96\)", "$ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(64, 64)"),
         (r"if \(\$d -gt 0\) \{ \$ui\.Dpi = \$d \}", "if ($d -gt 0) { $ui.Dpi = $d * 1.5 }"),
-    ] if device else []):
-        s, n = re.subn(pat, lambda m, new=new: new, s)
+    ] if device else []) + ([
+        # "Not yet" on the hand step (manifest "late"); the sample manifest cannot have it: its last step needs the hand step
+        (r"(?m)^(\$steps \+= @\{ Name = 'T02 Sample import r1.*)Late = \$false", lambda m: m.group(1) + "Late = $true"),
+    ] if late else []):
+        s, n = re.subn(pat, new if callable(new) else (lambda m, new=new: new), s)
         if not n:
             sys.exit("FAIL the bundle has no line for " + pat)
     s = s.replace("https://raw.githubusercontent.com/example-org/sample-app/v1.0.0/", file_url(app) + "/")
@@ -182,7 +186,7 @@ def main():
     skipped = []
     for name, app, hand, tour, size, long in RUNS:
         t = pathlib.Path(tempfile.mkdtemp())
-        users = bundle(t, long, home if name.startswith("deploy-") else None, name == DEVICE)
+        users = bundle(t, long, home if name.startswith("deploy-") else None, name == DEVICE, hand == "later")
         d = out / name
         d.mkdir(parents=True, exist_ok=True)
         first = name == RUNS[0][0]
@@ -234,7 +238,9 @@ def main():
         got = {re.sub(r"^\d+-", "", p.stem) for p in d.glob("*-answer-*.png")}
         if first and got != {"answer-yesno", "answer-pick", "answer-text"}:
             why.append("the question cards (answer-yesno, answer-pick, answer-text) were not all drawn: %s" % sorted(got))
-        if size == SMALLEST and hand == "done" and "answer-text" not in got:
+        if hand == "later" and not (any(l.startswith("WIN not-yet") for l in lines) and any(l.startswith("WIN asked-again still-not=True") for l in lines)):
+            why.append("the \"Not yet\" card and the card that asks again were not both shown")
+        if size == SMALLEST and hand in ("done", "later") and "answer-text" not in got:
             why.append("the text question (answer-text) was not drawn in the smallest window")
         if name == DEVICE and not any(l.startswith("WIN SCALE ") and " logo=60x60 " in l for l in lines):
             why.append("the 1.5 x scale did not reach the window (SCALE must say logo=60x60)")

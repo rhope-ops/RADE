@@ -2,8 +2,8 @@
 # It is put in front of a test copy of a bundle and runs on Windows PowerShell 5.1 with the real Windows Forms types
 # (tests/window_driver.ps1 is the same idea for the stand-in types on Linux). A timer answers each card: it prints one
 # "WIN" line, saves one PNG of the window, prints the lines of the engine's layout self-check, then selects a button.
-# Set by the harness: RADE_T_OUT (folder for the PNG files), RADE_T_APP (index of the application), RADE_T_HAND (done or
-# fail), RADE_T_TOUR (1 = the application also gets the site, sign-in and Power Automate checks), RADE_T_SIZE
+# Set by the harness: RADE_T_OUT (folder for the PNG files), RADE_T_APP (index of the application), RADE_T_HAND (done,
+# fail, or later = the hand step has "late": Not yet, and Done when RADE asks again), RADE_T_TOUR (1 = the application also gets the site, sign-in and Power Automate checks), RADE_T_SIZE
 # ("811x469" = the window is set to this size: 1280 x 800 at 150 % scaling, in 100 % pixels; empty = as the engine sets it).
 # A check that cannot pass on the test computer is set to PASSED after its card has shown (the test is of the window).
 # The hand step's questions (manifest "answers"): one picture per kind (NN-answer-yesno, NN-answer-pick, NN-answer-text),
@@ -116,6 +116,8 @@ function global:Step-Rade {
   elseif ($v -eq 'hand') {
     if ($global:RadeT.Probe -and -not $global:RadeT.Probed2 -and $ui.Running) { $global:RadeT.Probed2 = $true; Test-RadeRestore 'hand' }   # the window waits for an answer inside a run (the R25 case)
     if ($ui.B[1].Text -ne 'It failed') { $ui.B[0].PerformClick() }
+    elseif ($global:RadeT.Hand -eq 'later') {   # a step with "late": Not yet; when RADE asks again: Done (one picture of each card)
+      $ny = @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Not yet' })[0]; if ($ny) { Write-Host 'WIN not-yet'; $ny.PerformClick() } else { Write-Host ('WIN asked-again still-not=' + [bool]@($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Still not' }).Count); $ui.B[0].PerformClick() } }
     elseif ($global:RadeT.Hand -eq 'fail') { $ui.B[1].PerformClick() } else { $ui.B[0].PerformClick() }
   }
   elseif ($v -eq 'answer') {
