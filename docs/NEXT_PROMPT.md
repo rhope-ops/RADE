@@ -1,6 +1,6 @@
 # Next prompt: RADE
 
-Updated: 2026-11-16 by Claude (kit port). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
+Updated: 2026-11-16 by Claude (kit port; check baseline and progress-test clock done). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
 
 ## State
 
@@ -21,8 +21,6 @@ Updated: 2026-11-16 by Claude (kit port). Keep this file at 40 lines or fewer, o
 9. Shared files: built; a 90-161.Z round must show 4 `PASS shared files` lines (the 5.1 proof).
 10. After R24: questions, taskbar restore, bottom line, SCALE line built, release pending; the question-card PNGs need the Administrator's approval.
 11. MINOR review leftovers (PR 33, 44, 54 and others): the list in the detail file, for the next engine change.
-12. After this PR merges: set `timings.check.seconds` in `.bloat-audit.json` to the median of 3 full-lane runs on main (`--time --record` stores one run only; DECISIONS 2026-11-16).
-13. Next PR: one fixed clock time in tests/progress_test.ps1 (it can fail under CPU load; DECISIONS 2026-11-16).
 
 ## Needs the Administrator
 

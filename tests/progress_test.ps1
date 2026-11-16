@@ -5,6 +5,9 @@ $src = Get-Content -LiteralPath $Bundle -Raw
 foreach ($n in 'Format-Duration', 'Get-Progress', 'Get-CheckBlock') { Invoke-Expression ([regex]::Match($src, "(?s)function $n\b.*?\n}\n").Value) }
 $re = [regex]::Match($src, "if \(\`$line -match '([^']+)'\) \{\s+if \(\`$script:prog").Groups[1].Value
 $now = Get-Date
+# One clock for the whole test: the bundle's Get-Progress reads Get-Date, and a function wins over the cmdlet in this
+# scope. Without it a busy CPU moved "now" between the set-up and the read (0.376 for 0.375; DECISIONS 2026-11-16).
+function Get-Date { $now }
 # Done 100 of 400 s; this step weighs 100 s, ran 90 s and reports 1 of 10: 10 %, about 810 s left in it, 200 s after it.
 $script:prog = @{ Total = 400.0; Done = 100.0; Cur = 100.0; CurKnown = $true; Known = $true; Start = $now.AddSeconds(-90); Frac = 0.1; FracText = '1 of 10' }
 $g = Get-Progress
