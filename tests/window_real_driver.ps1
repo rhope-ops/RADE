@@ -7,14 +7,41 @@
 # ("811x469" = the window is set to this size: 1280 x 800 at 150 % scaling, in 100 % pixels; empty = as the engine sets it).
 # A check that cannot pass on the test computer is set to PASSED after its card has shown (the test is of the window).
 # The hand step's questions (manifest "answers"): one picture per kind (NN-answer-yesno, NN-answer-pick, NN-answer-text),
+# RADE_T_PROBE (1 = on the Ready card and on the first hand step of a run, minimize and restore the window: Test-RadeRestore).
 # for the owner's approval of the look (the long-text run draws a first sentence that shrinks in the smallest window);
 # the driver selects the first button (a text gets a short fake note).
 Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing
 $env:RADE_LAYOUT = '1'   # the layout self-check runs for a deploy too
 function Start-Process { param($FilePath, $ArgumentList) Write-Host ('WIN start-process ' + $(if ([string]$FilePath -match '^https://') { 'browser' } else { [string]$FilePath })) }
 $global:RadeT = @{ Seen = ''; N = 0; Out = [string]$env:RADE_T_OUT; App = [int]$env:RADE_T_APP; Hand = [string]$env:RADE_T_HAND; Tour = ($env:RADE_T_TOUR -eq '1'); Size = [string]$env:RADE_T_SIZE
-  Forced = $false; Opened = $false; Lay = 0; SignIn = $false; Sized = $false; T0 = (Get-Date); Env = $false }
+  Forced = $false; Opened = $false; Probe = ($env:RADE_T_PROBE -eq '1'); Lay = 0; SignIn = $false; Sized = $false; T0 = (Get-Date); Env = $false }
 
+# RADE_T_LOG (the ISE run: the ISE host has no standard output): every Write-Host line also goes to this file.
+if ($env:RADE_T_LOG) { function global:Write-Host { param([Parameter(Position = 0)]$Object, $ForegroundColor, $BackgroundColor, [switch]$NoNewline) [System.IO.File]::AppendAllText([string]$env:RADE_T_LOG, ([string]$Object) + "`r`n") } }
+# Minimize and restore with the messages Windows sends for the title bar and the taskbar button (WM_SYSCOMMAND with
+# SC_MINIMIZE, SC_RESTORE, SC_MAXIMIZE), not with the WindowState property (R25: a click on the taskbar button did not
+# bring the window back). "WIN probe" lines give the facts (numbers only); "WIN restore ... ok=" the verdict.
+Add-Type -Namespace RadeT -Name Win -MemberDefinition @'
+[DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+[DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+[DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr h);
+[DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr h, uint c);
+[DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr h, int i);
+'@
+function global:Test-RadeRestore([string]$Where) {
+  $f = $ui.Form; $h = $f.Handle; $b0 = $f.Bounds
+  $r = { param($b) [string]$b.Width + 'x' + $b.Height + '@' + $b.X + ',' + $b.Y }
+  $pump = { param([int]$Ms) $sw = [System.Diagnostics.Stopwatch]::StartNew(); while ($sw.ElapsedMilliseconds -lt $Ms) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 15 } }
+  $say = { param([string]$T) Write-Host ('WIN probe ' + $Where + ' ' + $T + ' state=' + $f.WindowState + ' iconic=' + [RadeT.Win]::IsIconic($h) + ' bounds=' + (& $r $f.Bounds) + ' restore=' + (& $r $f.RestoreBounds) + ' owned=' + ([RadeT.Win]::GetWindow($h, 4) -ne [IntPtr]::Zero) + ' enabled=' + [RadeT.Win]::IsWindowEnabled($h) + ' exstyle=0x' + ([RadeT.Win]::GetWindowLong($h, -20)).ToString('X') + ' topmost=' + $f.TopMost + ' card=' + $ui.Card.Width + 'x' + $ui.Card.Height) }
+  $cmd = { param([int]$C, [int]$Ms) [void][RadeT.Win]::PostMessage($h, 0x112, [IntPtr]$C, [IntPtr]::Zero); & $pump $Ms }
+  & $say 'start'
+  & $cmd 0xF020 400; & $say 'minimized'; $min = [RadeT.Win]::IsIconic($h)
+  & $cmd 0xF120 600; & $say 'restored'; $ok1 = ($min -and [string]$f.WindowState -eq 'Normal' -and -not [RadeT.Win]::IsIconic($h) -and $f.Bounds -eq $b0)
+  & $cmd 0xF030 400; & $cmd 0xF020 400; & $say 'max-minimized'
+  & $cmd 0xF120 600; & $say 'max-restored'; $ok2 = ([string]$f.WindowState -eq 'Maximized' -and -not [RadeT.Win]::IsIconic($h))
+  & $cmd 0xF120 600; & $say 'normal-again'; $ok3 = ([string]$f.WindowState -eq 'Normal' -and $f.Bounds -eq $b0)
+  Write-Host ('WIN restore ' + $Where + ' ok=' + ($ok1 -and $ok2 -and $ok3) + ' normal=' + $ok1 + ' maximized=' + $ok2 + ' back=' + $ok3 + ' host=' + $Host.Name + ' shown-by=' + $ui.ShownBy)
+}
 function global:Save-RadeCard([string]$Tag) {
   $global:RadeT.N++; $card = ('{0:00}-{1}' -f $global:RadeT.N, $Tag)
   try { $ui.Form.Refresh() } catch { $null = $_ }
@@ -74,9 +101,11 @@ function global:Step-Rade {
   }
   elseif ($v -eq 'ready') {
     if (-not $global:RadeT.Opened) { $global:RadeT.Opened = $true; & $ui.VRecord; Save-RadeCard 'record'; & $ui.CloseRecord }
+    if ($global:RadeT.Probe -and -not $global:RadeT.Probed1) { $global:RadeT.Probed1 = $true; Test-RadeRestore 'ready' }   # the window waits in its own message loop
     $ui.B[0].PerformClick()
   }
   elseif ($v -eq 'hand') {
+    if ($global:RadeT.Probe -and -not $global:RadeT.Probed2 -and $ui.Running) { $global:RadeT.Probed2 = $true; Test-RadeRestore 'hand' }   # the window waits for an answer inside a run (the R25 case)
     if ($ui.B[1].Text -ne 'It failed') { $ui.B[0].PerformClick() }
     elseif ($global:RadeT.Hand -eq 'fail') { $ui.B[1].PerformClick() } else { $ui.B[0].PerformClick() }
   }

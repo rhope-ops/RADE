@@ -298,7 +298,7 @@
         },
         "doneLog": {
           "type": "string",
-          "description": "Log line on Done."
+          "description": "Log line on Done. Without it: \"Confirmed by you.\""
         },
         "makes": {
           "type": "array",

@@ -496,7 +496,7 @@ function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
   } elseif ($ok) {
     if ($Step.Marker) { try { Set-Content -LiteralPath (Join-Path $dir $Step.Marker) -Value (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') -Encoding UTF8 } catch { $null = $_ } }
     $r.Pass = 1
-    & $Say ('    ' + $(if ($Step.DoneLog) { $Step.DoneLog } else { 'Confirmed by you: the flow is imported and its run has started.' }))
+    & $Say ('    ' + $(if ($Step.DoneLog) { $Step.DoneLog } else { 'Confirmed by you.' }))
     # The step's questions (manifest "answers"), asked after Done: one line each for the summary, under the step's line.
     foreach ($q in @($Step.Answers | Where-Object { $_ })) {
       $k = [string]$q.Key
@@ -2552,12 +2552,12 @@ if ($gui) {
     # The window is the main form of this thread, with no owner (R24: shown with ShowDialog from PowerShell ISE, ISE owned
     # it, so it had no taskbar button and could not be restored after it was minimized). When a message loop already runs
     # on this thread, Application.Run cannot start one: then ShowDialog, as before. Run disposes the form when it closes.
-    $ui.Opened = $false
+    $ui.Opened = $false; $ui.ShownBy = 'Run'
     try { [System.Windows.Forms.Application]::Run($ui.Form) }
     catch {
       $ex = $_.Exception; while ($ex -and -not ($ex -is [System.InvalidOperationException])) { $ex = $ex.InnerException }
       if (-not $ex -or $ui.Opened -or $ui.Form.IsDisposed) { throw }   # only a loop that could not start: the window never showed
-      [void]$ui.Form.ShowDialog()
+      $ui.ShownBy = 'ShowDialog'; [void]$ui.Form.ShowDialog()
     }
     foreach ($o in @($ui.Trash)) { try { $o.Dispose() } catch { $null = $_ } }   # after the window has closed: no handler is running
     return

@@ -36,7 +36,11 @@ RUNS = [
     # the same bundle with every text at its limit (docs/window-design.md "Text lengths")
     ("long-616", 1, "fail", "1", "1020x616", True),
     ("long-small", 0, "done", "0", "811x469", True),
+    # the same bundle in the real Windows PowerShell ISE host, as on a work computer (run_ise)
+    ("ise-host", 1, "done", "0", "", False),
 ]
+ISE = "ise-host"
+
 WORDS = "readiness tracker for each unit member with a reminder before an item is due and one page for the commander "
 
 
@@ -124,6 +128,28 @@ def bundle(t, long, keep=None):
     return users
 
 
+def run_ise(t, env):
+    """The bundle in the Windows PowerShell ISE host: ISE runs its profile on the thread that runs a pasted script, so the
+    profile runs the test copy of the bundle and then ends ISE. ISE has no standard output: the driver writes its lines to a
+    file (RADE_T_LOG). Returns the text, or None when this computer has no ISE."""
+    exe = pathlib.Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell_ise.exe"
+    if not exe.exists():
+        return None
+    log = t / "ise.txt"
+    q = subprocess.run(["powershell.exe", "-NoProfile", "-Command", "[Environment]::GetFolderPath('MyDocuments')"], capture_output=True, text=True)
+    prof = pathlib.Path(q.stdout.strip()) / "WindowsPowerShell" / "Microsoft.PowerShellISE_profile.ps1"
+    prof.parent.mkdir(parents=True, exist_ok=True)
+    prof.write_text("$env:USERPROFILE = '%s'; try { . '%s' } catch { [System.IO.File]::AppendAllText('%s', 'WIN DRIVER-ERROR ' + $_.Exception.Message + \"`r`n\") } finally { [Environment]::Exit(0) }\n" % (env["USERPROFILE"], t / "w.ps1", log), encoding="utf-8-sig")
+    try:
+        subprocess.run([str(exe)], env=dict(env, RADE_T_LOG=str(log), PSExecutionPolicyPreference="Bypass", USERPROFILE=os.environ.get("USERPROFILE", "")), timeout=420, stdin=subprocess.DEVNULL)
+        text = ""
+    except subprocess.TimeoutExpired:
+        text = "WIN HARNESS-TIMEOUT\n"
+    finally:
+        prof.unlink()
+    return (log.read_text(encoding="utf-8", errors="replace") if log.exists() else "WIN BAD the ISE run wrote no line\n") + text
+
+
 def main():
     out = pathlib.Path(sys.argv[1]).resolve()
     bad = 0
@@ -134,19 +160,27 @@ def main():
         users = bundle(t, long, home if name.startswith("deploy-") else None)
         d = out / name
         d.mkdir(parents=True, exist_ok=True)
-        env = dict(os.environ, RADE_T_OUT=str(d), RADE_T_APP=str(app), RADE_T_HAND=hand, RADE_T_TOUR=tour, RADE_T_SIZE=size, USERPROFILE=str(users / "test1234"))
-        try:
-            r = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(t / "w.ps1")], env=env, capture_output=True, text=True, timeout=420, stdin=subprocess.DEVNULL, errors="replace")
-            text = r.stdout + r.stderr
-        except subprocess.TimeoutExpired as e:
-            text = (e.stdout or b"").decode("utf-8", "replace") + "\nWIN HARNESS-TIMEOUT"
+        first = name == RUNS[0][0]
+        env = dict(os.environ, RADE_T_OUT=str(d), RADE_T_APP=str(app), RADE_T_HAND=hand, RADE_T_TOUR=tour, RADE_T_SIZE=size, USERPROFILE=str(users / "test1234"),
+                   RADE_T_PROBE="1" if first or name == ISE else "")
+        if name == ISE:
+            text = run_ise(t, env)
+            if text is None:
+                print("== %s: NOT RUN, powershell_ise.exe is not on this computer" % name)
+                shutil.rmtree(t, ignore_errors=True)
+                continue
+        else:
+            try:
+                r = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(t / "w.ps1")], env=env, capture_output=True, text=True, timeout=420, stdin=subprocess.DEVNULL, errors="replace")
+                text = r.stdout + r.stderr
+            except subprocess.TimeoutExpired as e:
+                text = (e.stdout or b"").decode("utf-8", "replace") + "\nWIN HARNESS-TIMEOUT"
         (d / "out.txt").write_text(text, encoding="utf-8")
         lines = text.splitlines()
         layout = [l for l in lines if l.startswith("LAYOUT ")]
         closed = any(l.startswith("WIN closed=True") for l in lines)
         cards = sum(1 for l in lines if l.startswith("WIN card="))
         print("== %s: cards=%d layout-lines=%d closed=%s png=%d" % (name, cards, len(layout), closed, len(list(d.glob("*.png")))))
-        first = name == RUNS[0][0]
         for l in lines:
             if l.startswith(("WIN", "LAYOUT ", "No window could open", "Layout self-check")) or (first and l.startswith("MEASURE")):
                 print("   " + l[:170])
@@ -171,6 +205,12 @@ def main():
             why.append("the question cards (answer-yesno, answer-pick, answer-text) were not all drawn: %s" % sorted(got))
         if size == SMALLEST and hand == "done" and "answer-text" not in got:
             why.append("the text question (answer-text) was not drawn in the smallest window")
+        if first or name == ISE:   # minimize and restore with the window messages of the taskbar button (R25)
+            rs = [l for l in lines if l.startswith("WIN restore ")]
+            if len(rs) != 2 or any(" ok=True " not in l for l in rs):
+                why.append("minimize and restore (2 WIN restore lines with ok=True are needed): %s" % [l[:60] for l in rs])
+            if name == ISE and not any("host=Windows PowerShell ISE Host" in l for l in rs):
+                why.append("the run was not in the ISE host")
         broken = [l for l in lines if l.startswith(("WIN PNG-FAILED", "WIN DRIVER-ERROR", "WIN TIMEOUT", "WIN BAD"))]
         if broken:
             why.append(broken[0][:120])
