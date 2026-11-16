@@ -1,5 +1,5 @@
 {
-  "last_audit": {"date": "2026-11-16", "commit": "67f7681", "report": "docs/reviews/2026-11-16-bloat-audit.md"},
+  "last_audit": {"date": "2026-11-15", "commit": "67f7681", "report": "docs/reviews/2026-11-15-bloat-audit.md"},
   "timings": {
     "check": {"cmd": "scripts/check.sh", "max_slowdown": 0.25, "seconds": 158.0},
     "checkin": {"cmd": "scripts/session_checkin.sh", "max_slowdown": 0.25, "seconds": 1.0}
