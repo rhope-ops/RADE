@@ -115,7 +115,7 @@ SECRET = [re.compile(r) for r in (
 # quadratic ("a." * 10,000 took 0.8 s). The marks are split in the source so this file does not flag itself.
 MILHOST = re.compile(
     r"(?i)(?<![A-Za-z0-9])(?<![A-Za-z0-9]-)(?<!--)(?<![A-Za-z0-9]\.)(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+mil(?![A-Za-z0-9-]|\.[A-Za-z0-9])"   # any host under the military domain
-    r"|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*sharepoint-mil\.us\b|dod\.teams\.microsoft\.us\b)")    # DoD cloud tenant hosts
+    r"|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*sharepoint-mil\.us\b|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*dod\.teams\.microsoft\.us\b)")    # DoD cloud tenant hosts
 # A DNS label is 1-63 letters, digits or inside hyphens, so "word-" + ".mil" is not a host (the length cap stops runaway backtracking on long "a-a-a-" runs).
 MARKING = [re.compile(r) for r in (
     r"\bCUI/" r"/", r"^[^A-Za-z0-9]*CU" r"I[^A-Za-z0-9]*$", r"(?i)\bcontrolled\s+unclassified\s+" r"information\b",
@@ -505,8 +505,8 @@ def _hook(stdin_text):
     for where, n, kind, val in found:
         print(f"pii-guard hook: {where}:{n}: {kind}: {val}", file=sys.stderr)
     print(f"pii-guard hook: blocked the {tool} call: {len(found)} finding(s) of personal data or secrets. Remove or "
-          "mask them (never copy them elsewhere), then call again. A finding that is not personal data: tell the owner; "
-          "only the owner adds an allow line to .pii-guard (.claude/skills/personal-data/SKILL.md).", file=sys.stderr)
+          "mask them (never copy them elsewhere), then call again. A finding that is not personal data: tell the Administrator; "
+          "only the Administrator adds an allow line to .pii-guard (.claude/skills/personal-data/SKILL.md).", file=sys.stderr)
     return 2
 
 
@@ -541,12 +541,14 @@ def self_test():
     good = 1 <= chain <= 2 and time.time() - t0 < 2  # the first address and the "+" joined one; scan_text drops repeats
     print(("ok   " if good else "FAIL ") + f"200 KB chain of joined addresses: linear ({time.time() - t0:.2f} s)")
     ok = ok and good
-    for label, run in (("a.", "a." * 100_000), ("a1-a.", "a1-a." * 40_000), ("-a.", "-a." * 66_000)):
+    for label, run in (("a.", "a." * 100_000), ("a1-a.", "a1-a." * 40_000), ("-a.", "-a." * 66_000), ("a-a.", "a-a." * 50_000)):
         t0 = time.time()
         scan_text(run, "t", [], set(), True)  # DoD tier: MILHOST must not start inside a host name
         good = time.time() - t0 < 2
         print(("ok   " if good else "FAIL ") + f"200 KB of {label!r}: MILHOST linear ({time.time() - t0:.2f} s)")
         ok = ok and good
+    teams = "api" + dot + "dod" + dot + "teams" + dot + "microsoft" + dot + "us"
+    expect("a DoD Teams host with a subdomain", "see https://" + teams + "/x", ["milhost"], dod=True)
     expect("address joined to the end of an allowed one", "x" + at + "example" + dot + "com+bob" + at + "corp" + dot + "org", ["email"])
     expect("github noreply allowed", "123+x" + at + "users.noreply.github" + dot + "com", [])
     expect("noreply allowed", "noreply" + at + "anthropic" + dot + "com", [])
