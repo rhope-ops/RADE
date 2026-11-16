@@ -1,10 +1,11 @@
 # Next prompt: RADE
 
-Updated: 2026-11-16 by Claude (kit port; check baseline and progress-test clock done). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
+Updated: 2026-11-16 by Claude (delta kit port to archimedes_lever c523a21, pull request 61). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
 
 ## State
 
 - Engine: engine/rade_build.py; apps fetch it by commit and own their lock (docs/engine.md). Last release engine-v4 (4a0fbad). Tests: `ENGINE pass=93 fail=0` (tests/engine_test.sh). Nothing after R20 is verified on a device.
+- Kit: ported to archimedes_lever c523a21 (kit pull requests 19-25); next port starts there (`port` skill).
 - RADE page: https://rhope-ops.github.io/RADE/ (index.html + apps.json on main); NOT verified on a work computer.
 
 ## Open (in order)
