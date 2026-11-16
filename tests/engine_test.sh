@@ -9,6 +9,13 @@ cd "$(git rev-parse --show-toplevel)"
 pass=0; fail=0
 ok() { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL $1"; }
+# Groups (bloat audit P8, 2026-11-16): a section whose runs use only their own folders runs in the background, between
+# "go NAME; {" and "} > ... &". The subshell starts from the counts at that point; "GROUP" in its log is its own part.
+# gather waits for all groups, prints each log in file order and adds the counts (a group with no GROUP line failed).
+groups=(); base=()
+go() { groups+=("$1"); base+=("$pass $fail"); }
+gather() { wait; local i g c b; for i in "${!groups[@]}"; do g=${groups[$i]}; c=$(grep '^GROUP ' "$t/grp-$g.log" | tail -1); grep -v '^GROUP ' "$t/grp-$g.log"
+  if [ -z "$c" ]; then bad "group $g ended before its last line"; else set -- $c ${base[$i]}; pass=$((pass + $2 - $4)); fail=$((fail + $3 - $5)); fi; done; }
 command -v pwsh >/dev/null || { echo "FAIL pwsh is missing (PowerShell 7: see https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-linux)"; echo "ENGINE pass=0 fail=1"; exit 1; }
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 od="$t/u/test1234/OneDrive - United States Air Force"; cfg="$od/RADE/Config"
@@ -100,6 +107,7 @@ P
 # win APP HAND RECORD TOUR [BUNDLE]: runs the window for application APP (0 = test, 1 = deploy); output in $t/win.txt.
 mkdir -p "$t/wu/test1234/OneDrive - United States Air Force"
 swap "$b" "$t/wb.ps1" "$t/wu"
+go W; {   # group W: runs in the background (see "go" above)
 win() { sed -E -e 's#Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing#$null = 0#' -e "s#^\\\$sitePrefix = 'https://usaf.dps.mil/sites/'#\$sitePrefix = 'https://rade-test.invalid/sites/'#" -e 's#System\.Drawing\.(FontStyle|Font|Pen|SolidBrush|Image|Graphics)\b#RadeDraw.\1#g' "${5:-$t/wb.ps1}" > "$t/wb2.ps1"
   cat tests/window_driver.ps1 "$t/wb2.ps1" > "$t/w.ps1"
   RADE_T_SCALE="${scale:-}" RADE_T_LOOP="${loop:-}" RADE_T_STUB="$PWD/tests/window_stub.cs" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$t/wu/test1234" timeout 180 pwsh -NoProfile -File "$t/w.ps1" < /dev/null > "$t/win.txt" 2>&1; }
@@ -168,6 +176,7 @@ has "view=stopped light=failed kick=STOPPED sent=The install stopped. p=A file t
 scale=150 win 1 done 1 0
 has "WIN measure choice h=120 gap=12 plan-x=81" "WIN measure record box=8,6 label=8,9 " "(1020 x 684 at 150 % (the form auto-scale; the screen dpi says 100 %)) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=144x144 " && ok || { bad "window 5: scale 150 % with a 96 dpi screen"; grep "measure\|layline" "$t/win.txt" | cut -c1-300; }
 
+echo "GROUP $pass $fail"; } > "$t/grp-W.log" 2>&1 &
 # 0. A skipped step: the run is PASSED but the version is not recorded as installed (review of deploy v1).
 round 2 S; cp "$t/out.txt" "$t/out0.txt"
 grep -q "^Note: some steps were off or skipped, so version 1.0.0 is not recorded as installed" "$t/out.txt" && [ "$(js)" = "rade-installed/2 1 None 1.0.0 PASSED" ] && ok || { bad "deploy 0: skipped step ($(js))"; tail -8 "$t/out.txt"; }
@@ -186,16 +195,20 @@ r = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t 
 line = [l for l in (t / 'cond/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1').read_text().split('\n') if l.startswith("$steps += @{ Name = 'T01 Sample check r1'")][0]
 assert r.returncode == 0 and 'Default = $false' in line and 'Optional = $false; Help = ' in line, line
 P
+go C; {   # group C: runs in the background (see "go" above)
 swap "$t/cond/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/c.ps1" "$t/cu"
 mkdir -p "$t/cu/test1234/OneDrive - United States Air Force"
 printf '2\n\n\n\n' | USERPROFILE="$t/cu/test1234" pwsh -NoProfile -File "$t/c.ps1" > "$t/outc.txt" 2>&1
 grep -q "^Step 1 of 3: T01 Sample check r1" "$t/outc.txt" && grep -q "is recorded as installed" "$t/outc.txt" && ok || { bad "item 3: files-changed default step did not run in a deploy"; grep "^Step \|installed" "$t/outc.txt"; }
+echo "GROUP $pass $fail"; } > "$t/grp-C.log" 2>&1 &
 
 # Item 5: a fetch file comes from the bundle's release tag; with a failed download a deploy runs no step.
 grep -q "Url = 'https://raw.githubusercontent.com/example-org/sample-app/v1.0.0/flow/SAMPLE-data-r1.txt'; Sha = '[0-9a-f]\{64\}'" "$b" && grep -q "^  Downloaded   T02.SAMPLE-data-r1.txt" "$t/out0.txt" && ok || bad "item 5: fetch from the release tag"
 sed "s#file://$t/app/flow/SAMPLE-data#file://$t/app/flow/NOPE#" "$t/b.ps1" | sed "s#usersRoot = '$t/u'#usersRoot = '$t/fu'#" > "$t/f.ps1"; mkdir -p "$t/fu/test1234/OneDrive - United States Air Force"
+go F; {   # group F: runs in the background (see "go" above)
 printf '2\n\n\n\n' | USERPROFILE="$t/fu/test1234" pwsh -NoProfile -File "$t/f.ps1" > "$t/outf.txt" 2>&1
 grep -q "could not be downloaded, so no step ran" "$t/outf.txt" && ! grep -q "^Step 1 of" "$t/outf.txt" && grep -q "^For help, ask in the Teams channel" "$t/outf.txt" && grep -q '"state":  *"STOPPED"' "$t/fu/test1234/OneDrive - United States Air Force/RADE/Config/installed/$(rec 'SampleApp/Sample app (deploy)')" && ok || { bad "item 5: a failed download must stop a deploy before its steps"; tail -8 "$t/outf.txt"; }
+echo "GROUP $pass $fail"; } > "$t/grp-F.log" 2>&1 &
 # A newer version in rade-release.json is named in a deploy only.
 grep -q "^A newer version, 9.0.0, of Sample app (deploy) is on the app page" "$t/out0.txt" && ok || bad "newer-version notice in a deploy"
 
@@ -282,6 +295,7 @@ P
 
 # ---- Guardrails (the Administrator, 14 Nov 26; docs/engine.md "Guardrails").
 # 1. A computer whose full name lacks the NIPR label '.area52.' stops RADE before it writes anything (the Administrator, 15 Nov 26).
+go G; {   # group G: runs in the background (see "go" above)
 mkdir -p "$t/gu/test1234/OneDrive - United States Air Force"; sed "s#usersRoot = '$t/u'#usersRoot = '$t/gu'#" "$t/b.ps1" > "$t/g.ps1"
 for n in 'pc01.example.invalid' 'pc01.notarea52.example.invalid' 'pc01.area52x.example.invalid' 'pc01.example.area52' 'pc01.' ''; do
   printf '2\n\n\n\n' | RADE_TEST_FQDN="$n" USERPROFILE="$t/gu/test1234" pwsh -NoProfile -File "$t/g.ps1" > "$t/outg.txt" 2>&1
@@ -290,6 +304,7 @@ done
 printf '2\n\n\n\n' | RADE_TEST_FQDN="PC01.AREA52.EXAMPLE.INVALID" USERPROFILE="$t/gu/test1234" pwsh -NoProfile -File "$t/g.ps1" > "$t/outg2.txt" 2>&1
 grep -q "PASSED: This computer is on NIPR (area52 domain)" "$t/outg2.txt" && ! grep -qi "example" "$t/outg2.txt" && ! grep -q "cannot be installed" "$t/outg2.txt" && ok || { bad "guard: an area52 name in capitals must pass and never be shown"; head -5 "$t/outg2.txt"; }
 grep -q "PASSED: This computer is on NIPR (area52 domain)" "$t/out0.txt" && ok || bad "guard: the check line is in a normal run"
+echo "GROUP $pass $fail"; } > "$t/grp-G.log" 2>&1 &
 # 2. Only a site on the DAF SharePoint host is accepted.
 grep "^\$sitePrefix = \|^function Test-SiteUrl" "$t/b.ps1" > "$t/site.ps1"
 cat >> "$t/site.ps1" <<'P'
@@ -319,6 +334,8 @@ mkround() { # $1 = users root name; runs the marker bundle as the deploy app wit
   mkdir -p "$t/$1/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/$1/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
   swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-$1.ps1" "$t/$1"
   printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/$1/test1234" pwsh -NoProfile -File "$t/m-$1.ps1" > "$t/out-$1.txt" 2>&1; }
+go MA; {   # group MA: runs in the background (see "go" above)
+fake="$t/fake-ma.json"
 echo '{ "admin": false, "rights": true, "list": true, "rows": {} }' > "$fake"; mkround m1
 grep -q "PASSED: You can change the site.*Site collection administrator: no (shown only, not required)" "$t/out-m1.txt" && ok || { bad "rights: admin flag shown, not required"; grep "change the site" "$t/out-m1.txt"; }
 grep -q '^On the site   after the steps, one row in the list "Sample Settings"' "$t/out-m1.txt" && grep -q "^First install from this account. Install Sample app (deploy) once for each wing" "$t/out-m1.txt" && ok || bad "marker: the plan names the row and gives the one-install notice"
@@ -340,11 +357,17 @@ echo '{ "admin": false, "rights": true, "list": true, "rows": { "InstalledVersio
 echo "https://usaf.dps.mil/sites/other" > "$t/m1/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
 printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m1/test1234" pwsh -NoProfile -File "$t/m-m1.ps1" > "$t/out-m1b.txt" 2>&1
 grep -q "FAILED: You can change the site.*\[version 9.9\], made from another account or for another site" "$t/out-m1b.txt" && ok || { bad "marker: the installer is stopped on another site"; grep "change the site" "$t/out-m1b.txt"; }
+echo "GROUP $pass $fail"; } > "$t/grp-MA.log" 2>&1 &
+go MC; {   # group MC: runs in the background (see "go" above)
+fake="$t/fake-mc.json"
 # A row value that is not a version still counts as an install; a list that cannot be read is FAILED.
 echo '{ "admin": false, "rights": true, "list": true, "rows": { "InstalledVersion": "v9.9 someday" } }' > "$fake"; mkround m5
 grep -q "FAILED: You can change the site.*\[version not readable\]" "$t/out-m5.txt" && ok || { bad "marker: any row value is an install"; grep "change the site" "$t/out-m5.txt"; }
 echo '{ "admin": false, "rights": true, "list": true, "listError": true, "rows": {} }' > "$fake"; mkround m7
 grep -q "FAILED: You can change the site.*The install record on the site could not be read" "$t/out-m7.txt" && ok || { bad "marker: an unreadable record fails closed"; grep "change the site" "$t/out-m7.txt"; }
+echo "GROUP $pass $fail"; } > "$t/grp-MC.log" 2>&1 &
+go MD; {   # group MD: runs in the background (see "go" above)
+fake="$t/fake-md.json"
 # A part install (one step skipped) writes the row marked partial; that account's next run is not stopped; the row is then updated.
 echo '{ "admin": false, "rights": true, "list": true, "rows": {} }' > "$fake"
 mkdir -p "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
@@ -384,10 +407,14 @@ assert len(keys) == 3 and all(re.fullmatch(r'SampleApp/Sample app \(deploy\)@[0-
 assert all(f.name == hashlib.sha256(k.lower().encode()).hexdigest()[:12] + '.json' for f, k in zip(fs, keys)), fs
 assert not any('usaf.dps.mil' in r for r in raw)
 P
+echo "GROUP $pass $fail"; } > "$t/grp-MD.log" 2>&1 &
+go MG; {   # group MG: runs in the background (see "go" above)
+fake="$t/fake-mg.json"
 # The site row is not written when the account's own record cannot be saved (it would stop that account's next run).
 echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows": {} }' > "$fake"
 mkdir -p "$t/m9/test1234/OneDrive - United States Air Force/RADE/Config"; : > "$t/m9/test1234/OneDrive - United States Air Force/RADE/Config/installed"; mkround m9
 grep -q "installed-version record (RADE.Config.installed) could not be saved" "$t/out-m9.txt" && ! grep -q "^Install record on the site" "$t/out-m9.txt" && ! grep -q "InstalledVersion" "$fake" && ok || { bad "marker: no row when the own record failed"; grep "record" "$t/out-m9.txt"; cat "$fake"; }
+echo "GROUP $pass $fail"; } > "$t/grp-MG.log" 2>&1 &
 
 # ---- Shared files (docs/engine.md "Shared files"; the Administrator, 2026-11-15): many apps, each with its own engine
 # version, use RADE\Config. Fixtures are files the engines wrote; the hand-made ones only stand for another app's file.
@@ -401,6 +428,7 @@ for x in e: print('  schema:', '/'.join(str(p) for p in x.path), x.message[:160]
 sys.exit(1 if e else 0)
 P
 }
+go S; {   # group S: runs in the background (see "go" above)
 # The files the engine wrote in the runs above follow the two schemas.
 valid schemas/rade-installed.schema.json "$inst" && valid schemas/rade-checks.schema.json "$cfg/rade-checks.json" && ok || bad "shared files: the engine's files do not follow schemas/rade-installed.schema.json and rade-checks.schema.json"
 # S1 and S5. A deploy of one app changes no other file in RADE\Config\installed: another app's record (with fields this
@@ -427,6 +455,8 @@ grep -q '"key": "SampleApp/Another app"' "$inst" && [ "$(sha "$inst")" = "$h0" ]
 echo '{ cut' > "$inst"; round 2
 cmp -s "$inst.damaged" "$t/cut.json" && [ "$(ls "$cfg/installed" | grep -c '\.damaged-[0-9]\{8\}-[0-9]\{6\}$')" = 1 ] && ok || { bad "shared files: a second damaged record must keep the first copy"; ls "$cfg/installed"; }
 cp "$t/inst.good" "$inst"
+echo "GROUP $pass $fail"; } > "$t/grp-S.log" 2>&1 &
+go X; {   # group X: runs in the background (see "go" above)
 # Cross-version: the engine in the field (engine-v1) and this engine on one computer. Run this engine, then v1, then this
 # engine. The two keep their records in different files, so the first check shows that v1 really ran a deploy on the same
 # folder and left this engine's file alone; the second can fail: this engine reads the saved checks that v1 wrote.
@@ -447,6 +477,7 @@ if git show "$v1:engine/rade_build.py" > "$t/v1/engine/rade_build.py" 2>/dev/nul
   ! cmp -s "$t/x-new.ps1" "$t/x-v1.ps1" && grep -q "is recorded as installed" "$t/x1.txt" && grep -q "is recorded as installed" "$t/x2.txt" && [ -f "$xo/RADE/Config/rade-installed.json" ] && [ "$h0" = "$h1" ] && [ "$n0$n1" = 11 ] && ok || { bad "cross-version: engine-v1 changed this engine's record ($n0 $n1)"; tail -3 "$t/x2.txt"; }
   grep -q "^Mode: deploy, version 1.0.0 is installed" "$t/x3.txt" && grep -q "PASSED: PowerShell is version 5.1 or newer. Last check: " "$t/x3.txt" && valid schemas/rade-installed.schema.json "$xi" && valid schemas/rade-checks.schema.json "$xo/RADE/Config/rade-checks.json" && ok || { bad "cross-version: this engine after engine-v1 (its record, the saved checks)"; grep "^Mode\|PowerShell is version" "$t/x3.txt"; }
 else bad "cross-version: the engine-v1 commit $v1 is not in this clone and could not be fetched (git fetch origin $v1)"; fi
+echo "GROUP $pass $fail"; } > "$t/grp-X.log" 2>&1 &
 
 # Moved from rhope-ops/90-161.Z tests (2026-11-15): engine behavior is tested here, an app tests its own bundle.
 # Step default: a bool, or {passed, paths}: on only when those files changed since the round that last passed them.
@@ -473,5 +504,6 @@ grep -q '\$script:draftMade = (-not \$why)' engine/rade_build.py && grep -q "Out
 
 # The tagline (the Administrator, 14 Nov 26): no "DoD".
 ! grep -q "for your DoD organization" engine/rade_build.py && grep -q "'Test and deploy apps for your organization'" engine/rade_build.py && ok || bad "tagline"
+gather   # wait for the groups and add their results
 echo "ENGINE pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]
