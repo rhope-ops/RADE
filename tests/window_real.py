@@ -93,14 +93,16 @@ def file_url(p):
 
 def device_screen():
     """Set the screen to 1920 x 1200 (the R25 work computer), else to 1920 x 1080 (room for the 1.5 x window too).
-    True when Windows did it."""
-    ps = ("Add-Type -AssemblyName System.Windows.Forms; foreach ($h in 1200, 1080) { "
-          "try { $o = Set-DisplayResolution -Width 1920 -Height $h -Force -ErrorAction Stop 2>&1 | Out-String; if ($o.Trim()) { 'SET ' + $h + ': ' + $o.Trim() } } catch { 'SET ' + $h + ': ' + $_.Exception.Message }; "
-          "Start-Sleep -Milliseconds 800; $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds; if ($b.Width -eq 1920) { break } }; "
-          "$b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds; 'SCREEN ' + $b.Width + 'x' + $b.Height")
-    r = subprocess.run(["powershell.exe", "-NoProfile", "-Command", ps], capture_output=True, text=True)
-    print("   " + " | ".join(l.strip()[:200] for l in (r.stdout + r.stderr).splitlines() if l.strip()))
-    return "SCREEN 1920x" in r.stdout
+    True when Windows did it. The size is read by a new process each time: a process keeps the first size it read."""
+    def now():
+        r = subprocess.run(["powershell.exe", "-NoProfile", "-Command", "Add-Type -AssemblyName System.Windows.Forms; $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds; [string]$b.Width + 'x' + $b.Height"], capture_output=True, text=True)
+        return r.stdout.strip()
+    for h in (1200, 1080):
+        subprocess.run(["powershell.exe", "-NoProfile", "-Command", "Set-DisplayResolution -Width 1920 -Height %d -Force" % h], capture_output=True, text=True)
+        if now().startswith("1920x"):
+            break
+    print("   SCREEN " + now())
+    return now().startswith("1920x")
 
 
 def bundle(t, long, keep=None, device=False):
