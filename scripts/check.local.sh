@@ -13,8 +13,8 @@ changed() {
   [ "$lane" = full ] && return 0
   local base files
   base="$(git merge-base HEAD origin/main 2>/dev/null)" || return 0
-  files="$(git diff --name-only "$base"; git ls-files -o --exclude-standard)"   # a list first: "| grep -q" can break the pipe
-  printf '%s\n' "$files" | grep -qE "$1"
+  files="$(git diff --name-only "$base"; git ls-files -o --exclude-standard)"
+  grep -qE "$1" <<<"$files"   # no pipe: with pipefail, "| grep -q" on a long list can end in SIGPIPE and read as "not changed"
 }
 # Manifest contract: schemas/rade-manifest.schema.json plus cross-references (scripts/check_manifest.py).
 python3 scripts/check_manifest.py
@@ -34,7 +34,7 @@ cmp -s "$lt/assets/logo/logo-K.svg" assets/logo/logo-K.svg || { echo "FAIL asset
 python3 tests/check_apps_test.py
 if [ "$lane" = full ]; then python3 scripts/check_apps.py; else echo "SKIP app canary (fast lane: the full lane runs it)"; fi
 # Engine behavior (deploy v1): build the sample bundle and run it in pwsh text mode.
-if changed '^(engine/|tests/|schemas/|assets/|scripts/check_manifest\.py$|scripts/check\.local\.sh$)'; then
+if changed '^(engine/|tests/|schemas/|assets/|docs/window-design\.md$|scripts/check_manifest\.py$|scripts/check\.local\.sh$)'; then
   bash tests/engine_test.sh
 else
   echo "SKIP engine tests (fast lane: no file they read changed; the full lane runs them)"

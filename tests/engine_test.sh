@@ -52,7 +52,7 @@ psrun() { local f=$1 o=$2 in=$3 rc kv own=0; shift 3
     pwsh -NoProfile -File tests/pwsh_batch.ps1 "$t/rq-$ps_owner" "$t/rs-$ps_owner" > "$t/batch-$ps_owner.log" 2>&1 &
     ps_pid=$!; exec {ps_rq}<>"$t/rq-$ps_owner" {ps_rs}<>"$t/rs-$ps_owner"   # read-write: an open never waits
   fi
-  printf '%s' "$in" > "$t/in-$ps_owner"
+  printf '%s' "$in" > "$t/in-$ps_owner"; : > "$o"   # a stopped runner must not leave the last round's output
   { printf '%s\t%s\t%s' "$f" "$t/in-$ps_owner" "$o"; for kv in "$@"; do printf '\t%s' "$kv"; done; printf '\n'; } >&"$ps_rq"
   until read -r -t 5 rc <&"$ps_rs"; do   # a runner that stopped never answers
     kill -0 "$ps_pid" 2>/dev/null || { echo "psrun: the runner stopped (log: $t/batch-$ps_owner.log)" >> "$o"; cat "$t/batch-$ps_owner.log" >> "$o"; return 1; }
