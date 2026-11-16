@@ -14,7 +14,7 @@ AGENTS.md "Handoff" points here. The next session cannot see this chat: it reads
    - `Updated:` date and time (the time zone in the AGENTS.md header) and who.
    - State: what is on main (commit), open branches and pull requests (full links), what runs now and who owns it.
    - Open (in order): the next steps, one line each, with what "done" is.
-   - Needs the Administrator: each open decision, one line each, with its options and the recommendation.
+   - Needs the Administrator: each open decision in one line, with its options and the recommendation.
    - Do not: approaches that failed, with one line of why.
 3. Put detailed evidence (logs, tables, review findings) in its own file in the place AGENTS.md "Handoff" names (`YYYY-MM-DD-<topic>.md`), and link it.
 4. A decision by the Administrator: a row in docs/DECISIONS.md (date, scope, what it replaces). Full tier: a story event also gets a project log row (the `project-log` skill).
