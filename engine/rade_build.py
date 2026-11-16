@@ -1635,6 +1635,7 @@ if ($gui) {
     $ui.RecB = & $ui.LinkBtn 'Record (F2)'; $ui.RecB.AccessibleName = 'Record: all checks, steps, files and the log (F2)'
     $ui.BackB = & $ui.LinkBtn 'Back'; $ui.BackB.AccessibleName = 'Back (Esc)'; $ui.BackB.Visible = $false
     $ui.RightL = & $ui.Label $ui.F.Small $ui.C.Gray 0; $ui.RightL.Anchor = 'Right'; $ui.RightL.Visible = $true
+    $ui.RecB.Anchor = 'Left'; $ui.BackB.Anchor = 'Left'   # in the middle of the row's height, as the gray text is (device-like job run: the text was 3.5 px lower than the links at 150 %)
     $ui.Bottom.Controls.Add($ui.RecB, 0, 0); $ui.Bottom.Controls.Add($ui.BackB, 1, 0); $ui.Bottom.Controls.Add($ui.RightL, 3, 0); & $ui.Ring $ui.Bottom
     # Bars: RADE draws them (R17). A 30 ms timer eases the fill to its value; with Windows animations off it jumps. No bar
     # moves back inside a run (all) or a step (step). The bar on the bottom edge is all steps; the short one is this step.
