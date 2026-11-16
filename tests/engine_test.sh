@@ -40,7 +40,26 @@ build() { python3 engine/rade_build.py --app-root "$t/app" > "$t/build.txt" 2>&1
   swap "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/b.ps1" "$t/u"; }
 # $1 = the number typed on the Choose question (1 = test app, 2 = deploy app); $2 = the answer in the guide step
 # (empty = done, S = skip); the other questions get Enter. Not tested here: Windows PowerShell 5.1.
-round() { printf '%s\n\n%s\n\n' "$1" "${2:-}" | USERPROFILE="$t/u/test1234" pwsh -NoProfile -File "$t/b.ps1" > "$t/out.txt" 2>&1; }
+round() { local in; printf -v in '%s\n\n%s\n\n' "$1" "${2:-}"; psrun "$t/b.ps1" "$t/out.txt" "$in" USERPROFILE="$t/u/test1234"; }
+# psrun FILE OUT INPUT [NAME=VALUE...]: what "printf %s INPUT | NAME=VALUE pwsh -NoProfile -File FILE > OUT 2>&1" gives,
+# with every such run of one group (or of the main part) in one pwsh process: tests/pwsh_batch.ps1. A new pwsh costs about
+# 2 s of CPU (profile, 2026-11-16). A run that sets an empty value, and every run with RADE_T_BATCH=0, gets its own process.
+psrun() { local f=$1 o=$2 in=$3 rc kv own=0; shift 3
+  for kv in "$@"; do [ -z "${kv#*=}" ] && own=1; done
+  if [ "$own" = 1 ] || [ "${RADE_T_BATCH:-1}" = 0 ]; then printf '%s' "$in" | env "$@" pwsh -NoProfile -File "$f" > "$o" 2>&1; return; fi
+  if [ "${ps_owner:-}" != "$BASHPID" ]; then   # the first run of this group: start its runner
+    ps_owner=$BASHPID; mkfifo "$t/rq-$ps_owner" "$t/rs-$ps_owner"   # (in "cmd &" $BASHPID is the new process's)
+    pwsh -NoProfile -File tests/pwsh_batch.ps1 "$t/rq-$ps_owner" "$t/rs-$ps_owner" > "$t/batch-$ps_owner.log" 2>&1 &
+    ps_pid=$!; exec {ps_rq}<>"$t/rq-$ps_owner" {ps_rs}<>"$t/rs-$ps_owner"   # read-write: an open never waits
+  fi
+  printf '%s' "$in" > "$t/in-$ps_owner"; : > "$o"   # a stopped runner must not leave the last round's output
+  { printf '%s\t%s\t%s' "$f" "$t/in-$ps_owner" "$o"; for kv in "$@"; do printf '\t%s' "$kv"; done; printf '\n'; } >&"$ps_rq"
+  until read -r -t 5 rc <&"$ps_rs"; do   # a runner that stopped never answers
+    kill -0 "$ps_pid" 2>/dev/null || { echo "psrun: the runner stopped (log: $t/batch-$ps_owner.log)" >> "$o"; cat "$t/batch-$ps_owner.log" >> "$o"; return 1; }
+  done
+  return "$rc"; }
+# psclose: the main part's runner ends (before gather, which waits for every background process).
+psclose() { if [ "${ps_owner:-}" = "$BASHPID" ]; then exec {ps_rq}>&- {ps_rs}<&-; kill "$ps_pid" 2>/dev/null; wait "$ps_pid" 2>/dev/null; ps_owner=; fi; }
 js() { python3 -c "import json,sys; import glob,os; a=json.load(open(sys.argv[1])); assert a['key']=='SampleApp/Sample app (deploy)'; print(a['schema'], len(glob.glob(os.path.dirname(sys.argv[1])+'/*')), (a['installed'] or {}).get('version'), a['lastRun']['version'], a['lastRun']['state'])" "$inst" 2>&1; }
 
 build && ok || bad "build of the sample bundle"
@@ -198,7 +217,7 @@ P
 go C; {   # group C: runs in the background (see "go" above)
 swap "$t/cond/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/c.ps1" "$t/cu"
 mkdir -p "$t/cu/test1234/OneDrive - United States Air Force"
-printf '2\n\n\n\n' | USERPROFILE="$t/cu/test1234" pwsh -NoProfile -File "$t/c.ps1" > "$t/outc.txt" 2>&1
+psrun "$t/c.ps1" "$t/outc.txt" $'2\n\n\n\n' USERPROFILE="$t/cu/test1234"
 grep -q "^Step 1 of 3: T01 Sample check r1" "$t/outc.txt" && grep -q "is recorded as installed" "$t/outc.txt" && ok || { bad "item 3: files-changed default step did not run in a deploy"; grep "^Step \|installed" "$t/outc.txt"; }
 echo "GROUP $pass $fail"; } > "$t/grp-C.log" 2>&1 &
 
@@ -206,7 +225,7 @@ echo "GROUP $pass $fail"; } > "$t/grp-C.log" 2>&1 &
 grep -q "Url = 'https://raw.githubusercontent.com/example-org/sample-app/v1.0.0/flow/SAMPLE-data-r1.txt'; Sha = '[0-9a-f]\{64\}'" "$b" && grep -q "^  Downloaded   T02.SAMPLE-data-r1.txt" "$t/out0.txt" && ok || bad "item 5: fetch from the release tag"
 sed "s#file://$t/app/flow/SAMPLE-data#file://$t/app/flow/NOPE#" "$t/b.ps1" | sed "s#usersRoot = '$t/u'#usersRoot = '$t/fu'#" > "$t/f.ps1"; mkdir -p "$t/fu/test1234/OneDrive - United States Air Force"
 go F; {   # group F: runs in the background (see "go" above)
-printf '2\n\n\n\n' | USERPROFILE="$t/fu/test1234" pwsh -NoProfile -File "$t/f.ps1" > "$t/outf.txt" 2>&1
+psrun "$t/f.ps1" "$t/outf.txt" $'2\n\n\n\n' USERPROFILE="$t/fu/test1234"
 grep -q "could not be downloaded, so no step ran" "$t/outf.txt" && ! grep -q "^Step 1 of" "$t/outf.txt" && grep -q "^For help, ask in the Teams channel" "$t/outf.txt" && grep -q '"state":  *"STOPPED"' "$t/fu/test1234/OneDrive - United States Air Force/RADE/Config/installed/$(rec 'SampleApp/Sample app (deploy)')" && ok || { bad "item 5: a failed download must stop a deploy before its steps"; tail -8 "$t/outf.txt"; }
 echo "GROUP $pass $fail"; } > "$t/grp-F.log" 2>&1 &
 # A newer version in rade-release.json is named in a deploy only.
@@ -298,10 +317,10 @@ P
 go G; {   # group G: runs in the background (see "go" above)
 mkdir -p "$t/gu/test1234/OneDrive - United States Air Force"; sed "s#usersRoot = '$t/u'#usersRoot = '$t/gu'#" "$t/b.ps1" > "$t/g.ps1"
 for n in 'pc01.example.invalid' 'pc01.notarea52.example.invalid' 'pc01.area52x.example.invalid' 'pc01.example.area52' 'pc01.' ''; do
-  printf '2\n\n\n\n' | RADE_TEST_FQDN="$n" USERPROFILE="$t/gu/test1234" pwsh -NoProfile -File "$t/g.ps1" > "$t/outg.txt" 2>&1
+  psrun "$t/g.ps1" "$t/outg.txt" $'2\n\n\n\n' RADE_TEST_FQDN="$n" USERPROFILE="$t/gu/test1234"
   [ "$(cat "$t/outg.txt")" = "This application cannot be installed in your environment." ] && [ -z "$(find "$t/gu" -type f)" ] && [ ! -d "$t/gu/test1234/OneDrive - United States Air Force/RADE" ] && ok || { bad "guard: '$n' must stop with only the message and nothing written"; head -5 "$t/outg.txt"; }
 done
-printf '2\n\n\n\n' | RADE_TEST_FQDN="PC01.AREA52.EXAMPLE.INVALID" USERPROFILE="$t/gu/test1234" pwsh -NoProfile -File "$t/g.ps1" > "$t/outg2.txt" 2>&1
+psrun "$t/g.ps1" "$t/outg2.txt" $'2\n\n\n\n' RADE_TEST_FQDN="PC01.AREA52.EXAMPLE.INVALID" USERPROFILE="$t/gu/test1234"
 grep -q "PASSED: This computer is on NIPR (area52 domain)" "$t/outg2.txt" && ! grep -qi "example" "$t/outg2.txt" && ! grep -q "cannot be installed" "$t/outg2.txt" && ok || { bad "guard: an area52 name in capitals must pass and never be shown"; head -5 "$t/outg2.txt"; }
 grep -q "PASSED: This computer is on NIPR (area52 domain)" "$t/out0.txt" && ok || bad "guard: the check line is in a normal run"
 echo "GROUP $pass $fail"; } > "$t/grp-G.log" 2>&1 &
@@ -333,7 +352,7 @@ fake="$t/fake.json"; mods="$PWD/tests/fake-pnp"
 mkround() { # $1 = users root name; runs the marker bundle as the deploy app with the fake PnP
   mkdir -p "$t/$1/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/$1/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
   swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-$1.ps1" "$t/$1"
-  printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/$1/test1234" pwsh -NoProfile -File "$t/m-$1.ps1" > "$t/out-$1.txt" 2>&1; }
+  psrun "$t/m-$1.ps1" "$t/out-$1.txt" $'2\n\n\n\n' RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/$1/test1234"; }
 go MA; {   # group MA: runs in the background (see "go" above)
 fake="$t/fake-ma.json"
 echo '{ "admin": false, "rights": true, "list": true, "rows": {} }' > "$fake"; mkround m1
@@ -345,7 +364,7 @@ mkround m2
 grep -q "FAILED: You can change the site.*This site already has an install of this application \[version [0-9.]*\], made from another account" "$t/out-m2.txt" && ok || { bad "marker: a second account is stopped"; grep "change the site" "$t/out-m2.txt"; }
 mkdir -p "$t/m4/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/m4/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
 swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-m4.ps1" "$t/m4"; sed -i 's#\$checkGate = \$false#$checkGate = $true#' "$t/m-m4.ps1"   # a third account, with the gate on
-printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m4/test1234" pwsh -NoProfile -File "$t/m-m4.ps1" > "$t/out-m4.txt" 2>&1
+psrun "$t/m-m4.ps1" "$t/out-m4.txt" $'2\n\n\n\n' RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m4/test1234"
 grep -q "^You cannot deploy yet" "$t/out-m4.txt" && ! grep -q "^Step 1 of" "$t/out-m4.txt" && [ ! -e "$t/m4/test1234/OneDrive - United States Air Force/RADE/Config/installed" ] && ok || { bad "marker: with the gate on, another account runs no step"; tail -12 "$t/out-m4.txt"; }
 mkround m1
 grep -q "PASSED: You can change the site" "$t/out-m1.txt" && ! grep -q "^First install from this account" "$t/out-m1.txt" && ok || { bad "marker: the installer's own second run passes"; grep "change the site" "$t/out-m1.txt"; }
@@ -355,7 +374,7 @@ grep -q "Site collection administrator: yes" "$t/out-m3.txt" && grep -q '^NOTE: 
 # Review, 14 Nov 26. The installer on another site that has a row is stopped too (the record is per site).
 echo '{ "admin": false, "rights": true, "list": true, "rows": { "InstalledVersion": "9.9 2026-01-01" } }' > "$fake"
 echo "https://usaf.dps.mil/sites/other" > "$t/m1/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
-printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m1/test1234" pwsh -NoProfile -File "$t/m-m1.ps1" > "$t/out-m1b.txt" 2>&1
+psrun "$t/m-m1.ps1" "$t/out-m1b.txt" $'2\n\n\n\n' RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m1/test1234"
 grep -q "FAILED: You can change the site.*\[version 9.9\], made from another account or for another site" "$t/out-m1b.txt" && ok || { bad "marker: the installer is stopped on another site"; grep "change the site" "$t/out-m1b.txt"; }
 echo "GROUP $pass $fail"; } > "$t/grp-MA.log" 2>&1 &
 go MC; {   # group MC: runs in the background (see "go" above)
@@ -372,7 +391,7 @@ fake="$t/fake-md.json"
 echo '{ "admin": false, "rights": true, "list": true, "rows": {} }' > "$fake"
 mkdir -p "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
 swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-m6.ps1" "$t/m6"
-printf '2\n\nS\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234" pwsh -NoProfile -File "$t/m-m6.ps1" > "$t/out-m6.txt" 2>&1
+psrun "$t/m-m6.ps1" "$t/out-m6.txt" $'2\n\nS\n\n' RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234"
 grep -q "marked partial (added)" "$t/out-m6.txt" && grep -q '"InstalledVersion": *"[0-9.]* 20[0-9-]* partial"' "$fake" && ok || { bad "marker: a part install is recorded as partial"; tail -4 "$t/out-m6.txt"; cat "$fake"; }
 mkround m6
 grep -q "PASSED: You can change the site" "$t/out-m6.txt" && grep -q "now holds version [0-9.]* and the date (updated)" "$t/out-m6.txt" && ! grep -q "partial" "$fake" && ok || { bad "marker: the same account finishes its part install"; grep "change the site\|Install record" "$t/out-m6.txt"; cat "$fake"; }
@@ -382,23 +401,23 @@ grep -q "PASSED: You can change the site" "$t/out-m6.txt" && grep -q "now holds 
 echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows": {} }' > "$fake"
 mkdir -p "$t/m8/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$t/m8/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
 swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-m8.ps1" "$t/m8"; sed "s#file://$t/app/flow/SAMPLE-data#file://$t/app/flow/NOPE#" "$t/m-m8.ps1" > "$t/m-m8f.ps1"
-printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m8/test1234" pwsh -NoProfile -File "$t/m-m8f.ps1" > "$t/out-m8f.txt" 2>&1
+psrun "$t/m-m8f.ps1" "$t/out-m8f.txt" $'2\n\n\n\n' RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m8/test1234"
 grep -q "so no step ran" "$t/out-m8f.txt" && ! grep -q "InstalledVersion" "$fake" && ok || { bad "marker: a run with no step writes no row"; tail -4 "$t/out-m8f.txt"; }
 echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows": { "InstalledVersion": "7.7 2026-01-01" } }' > "$fake"
 sed -i 's#\$checkGate = \$false#$checkGate = $true#' "$t/m-m8.ps1"
-printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m8/test1234" pwsh -NoProfile -File "$t/m-m8.ps1" > "$t/out-m8.txt" 2>&1
+psrun "$t/m-m8.ps1" "$t/out-m8.txt" $'2\n\n\n\n' RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m8/test1234"
 grep -q "FAILED: You can change the site.*\[version 7.7\]" "$t/out-m8.txt" && ! grep -q "^Step 1 of" "$t/out-m8.txt" && grep -q '"7.7 2026-01-01"' "$fake" && ok || { bad "marker: a no-step run does not make the account the installer"; grep "change the site\|^Step" "$t/out-m8.txt"; cat "$fake"; }
 # Step records from one site do not count on another: account m6 (whole install on site "fake") on a new, empty site
 # is a first install again and runs every needed step.
 echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows": {} }' > "$fake"
 echo "https://usaf.dps.mil/sites/second" > "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
-printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234" pwsh -NoProfile -File "$t/m-m6.ps1" > "$t/out-m6b.txt" 2>&1
+psrun "$t/m-m6.ps1" "$t/out-m6b.txt" $'2\n\n\n\n' RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234"
 grep -q "^First install from this account" "$t/out-m6b.txt" && grep -q "^Step 1 of [0-9]: T01 Sample check r1" "$t/out-m6b.txt" && grep -q "and the date (added)" "$t/out-m6b.txt" && ok || { bad "marker: records from another site do not count"; grep "^First\|^Step\|Install record" "$t/out-m6b.txt"; }
 # A part install on a third site, then its second run: the step that never ran there (T03) runs; only then is the row whole.
 echo "https://usaf.dps.mil/sites/third" > "$t/m6/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
-printf '2\n\nS\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234" pwsh -NoProfile -File "$t/m-m6.ps1" > "$t/out-m6c.txt" 2>&1
+psrun "$t/m-m6.ps1" "$t/out-m6c.txt" $'2\n\nS\n\n' RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234"
 grep -q "marked partial" "$t/out-m6c.txt" && ! grep -q "T03 Sample verify r1: PASSED" "$t/out-m6c.txt" && ok || { bad "marker: part install on a third site"; grep "T03\|Install record" "$t/out-m6c.txt"; }
-printf '2\n\n\n\n' | RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234" pwsh -NoProfile -File "$t/m-m6.ps1" > "$t/out-m6d.txt" 2>&1
+psrun "$t/m-m6.ps1" "$t/out-m6d.txt" $'2\n\n\n\n' RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/m6/test1234"
 grep -q "^Step [0-9] of [0-9]: T03 Sample verify r1" "$t/out-m6d.txt" && grep -q "is recorded as installed" "$t/out-m6d.txt" && ! grep -q "partial" "$fake" && ok || { bad "marker: a step that never ran on this site must run before the install is whole"; grep "^Step\|installed\|Install record" "$t/out-m6d.txt"; }
 python3 - "$t/m6/test1234/OneDrive - United States Air Force/RADE/Config/installed" <<'P' && ok || bad "record: one file for each site, keyed by a hash, no address"
 import json, sys, re, pathlib, hashlib
@@ -468,7 +487,7 @@ if git show "$v1:engine/rade_build.py" > "$t/v1/engine/rade_build.py" 2>/dev/nul
   cp -r tests/fixture-app/. "$t/xv/app/"; cp schemas/examples/sample-manifest.json "$t/xv/app/scripts/paste_bundles.json"
   xo="$t/xu/test1234/OneDrive - United States Air Force"; mkdir -p "$xo/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$xo/RADE/SampleApp/Config/SAMPLE-site.txt"
   xb="$t/xv/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1"; xi="$xo/RADE/Config/installed/$(rec 'SampleApp/Sample app (deploy)')"
-  xrun() { printf '2\n\n\n\n' | USERPROFILE="$t/xu/test1234" pwsh -NoProfile -File "$1" > "$2" 2>&1; }
+  xrun() { psrun "$1" "$2" $'2\n\n\n\n' USERPROFILE="$t/xu/test1234"; }
   python3 engine/rade_build.py --app-root "$t/xv/app" > /dev/null 2>&1 && swap "$xb" "$t/x-new.ps1" "$t/xu"
   python3 "$t/v1/engine/rade_build.py" --app-root "$t/xv/app" > /dev/null 2>&1 && swap "$xb" "$t/x-v1.ps1" "$t/xu"
   xrun "$t/x-new.ps1" "$t/x1.txt"; h0=$(sha "$xi"); n0=$(ls "$xo/RADE/Config/installed" | wc -l)
@@ -504,6 +523,6 @@ grep -q '\$script:draftMade = (-not \$why)' engine/rade_build.py && grep -q "Out
 
 # The tagline (the Administrator, 14 Nov 26): no "DoD".
 ! grep -q "for your DoD organization" engine/rade_build.py && grep -q "'Test and deploy apps for your organization'" engine/rade_build.py && ok || bad "tagline"
-gather   # wait for the groups and add their results
+psclose; gather   # wait for the groups and add their results
 echo "ENGINE pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]
