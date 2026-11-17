@@ -5,7 +5,7 @@
 # Builds the start information of a step's child powershell.exe (pwsh when there is none): the step file with -Id and
 # -NoPause, the round's fixed arguments, the person's answer as -<AskParam>, and the step's input variables.
 # Takes the RADE app folder, the step and the answer; returns the ProcessStartInfo (nothing is started here).
-function New-StepStartInfo([string]$Base, $Step, [string]$Answer, [scriptblock]$Say) {
+function Get-StepStartInfo([string]$Base, $Step, [string]$Answer, [scriptblock]$Say) {
   $exe = 'powershell.exe'
   if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) { $exe = 'pwsh' }
   $dir = Join-Path $Base $Step.Dir
@@ -62,7 +62,7 @@ function Add-StepLine([string]$Line, $Step, $R, [string]$Site, [scriptblock]$Say
 # limit ($stepMinutes, or the step's own Minutes); the window's bars move every 30 ms ($Tick). Takes the RADE app folder,
 # the step, the log and tick callbacks and the person's answer; returns @{ Pass; Fail; Skip; Exit; Made; Fallback }.
 function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]$Tick, [string]$Answer) {
-  $psi = New-StepStartInfo $Base $Step $Answer $Say
+  $psi = Get-StepStartInfo $Base $Step $Answer $Say
   $r = @{ Pass = 0; Fail = 0; Skip = 0; Exit = $null; Made = @(); Fallback = '' }
   $siteNow = [string](Get-SiteUrl $Base)
   $p = [System.Diagnostics.Process]::Start($psi)
