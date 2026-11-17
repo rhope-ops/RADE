@@ -813,6 +813,49 @@ function Get-NewerVersionText {
   if ($v) { return ('A newer version, ' + $v + ', of ' + $script:app.Name + ' is on the RADE page (' + $radeUrl + '). Use that one instead.') }
   return ''
 }
+function Get-StartPath {
+  # R28: the app's start script (manifest app.start), inside its local install folder; '' when the app has none, the path is
+  # not inside the folder, or the file is not there. Nothing is downloaded.
+  $st = [string]$script:app.Start
+  if (-not $st) { return '' }
+  try { $base = [System.IO.Path]::GetFullPath((Get-BasePath)).TrimEnd('\', '/')
+    $full = [System.IO.Path]::GetFullPath((Join-Path $base ($st -replace '/', [string][System.IO.Path]::DirectorySeparatorChar)))
+    if (-not $full.StartsWith($base + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) { return '' }
+    if (Test-Path -LiteralPath $full -PathType Leaf) { return $full }
+  } catch { $null = $_ }
+  return ''
+}
+function Get-PowerShellExe {
+  if ($env:SystemRoot) { $x = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'; if (Test-Path -LiteralPath $x -PathType Leaf) { return $x } }
+  return 'powershell.exe'
+}
+# The installed runner (R28, the Administrator, 2026-11-17): RADE had none, so the desktop shortcut had nothing to open. The smallest
+# one: after a deploy has passed, a copy of the pasted text is saved as OneDrive\RADE\rade-runner.ps1 (the newest deploy's paste
+# replaces it; the file is a whole bundle, so it carries its own engine and its own applications). The shortcut runs it.
+$script:selfText = ''
+try { if ($PSCommandPath -and (Test-Path -LiteralPath $PSCommandPath -PathType Leaf)) { $script:selfText = [System.IO.File]::ReadAllText($PSCommandPath) } } catch { $null = $_ }
+if (-not $script:selfText) { try { if ($psISE -and $psISE.CurrentFile) { $script:selfText = [string]$psISE.CurrentFile.Editor.Text } } catch { $null = $_ } }
+if (-not $script:selfText) { try { $script:selfText = [string]$MyInvocation.MyCommand.ScriptBlock } catch { $null = $_ } }
+function Save-RunnerCopy {
+  # Returns $true when the runner is saved. Only the text of this bundle is saved (its build id must be in it). Never an error.
+  try { if (-not $script:selfText -or -not $script:selfText.Contains("`$buildId = '" + $buildId + "'")) { return $false }
+    Write-FileWhole (Join-Path (Get-RadePath) 'rade-runner.ps1') $script:selfText; return $true } catch { return $false }
+}
+function Set-DesktopIcon {
+  # One shortcut named RADE in the user's own Desktop folder (it follows OneDrive), made once, only when missing, with no
+  # administrator rights (WScript.Shell). Returns the plain line the Done card shows, or '' when there is nothing to say.
+  try { $runner = Join-Path (Get-RadePath) 'rade-runner.ps1'
+    if (-not (Test-Path -LiteralPath $runner -PathType Leaf)) { return '' }
+    $desk = [Environment]::GetFolderPath('Desktop')
+    if (-not $desk -or -not (Test-Path -LiteralPath $desk -PathType Container)) { return 'RADE could not find your Desktop folder, so it made no desktop shortcut. Open RADE from the RADE page instead.' }
+    $lnk = Join-Path $desk 'RADE.lnk'
+    if (Test-Path -LiteralPath $lnk) { return '' }
+    $sh = New-Object -ComObject WScript.Shell; $sc = $sh.CreateShortcut($lnk)
+    $sc.TargetPath = (Get-PowerShellExe); $sc.Arguments = '-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Minimized -File "' + $runner + '"'
+    $sc.WorkingDirectory = (Get-RadePath); $sc.Description = 'Open RADE'; $sc.WindowStyle = 7; $sc.Save()
+    return 'A shortcut named RADE is now on your desktop. It opens RADE.'
+  } catch { return 'RADE could not make a desktop shortcut. Open RADE from the RADE page instead.' }
+}
 function Get-MadeLine {
   # Deploy: what the installs of the chosen app made, from the record (deploy v1 item 4: the list a user needs to remove it by hand).
   $out = @()
@@ -855,7 +898,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   $script:prog.Count = $units
   $n = 0; $k1 = 0
   try {
-  & $speak ('RADE (Redacted Application Deployment Engine), round ' + $round + ' (build ' + $buildId + '), started ' + (Get-Date -Format 'yyyy-MM-dd HH:mm'))
+  & $speak ('RADE, round ' + $round + ' (build ' + $buildId + '), started ' + (Get-Date -Format 'yyyy-MM-dd HH:mm'))
   $base = Move-ToRade $speak
   & $speak ('Working folder: ' + (ConvertTo-Masked $base))
   if ($modeLine) { & $speak $modeLine; $nv = Get-NewerVersionText; if ($nv) { & $speak $nv; $summary += $nv } }
@@ -1449,10 +1492,10 @@ function Get-SavedCheck($Cache, [string]$Id, [string]$Scope) {
   $age = Get-CheckAge $c.At
   if ($age -lt -0.01) { $script:savedWhy[$Id] = 'Last check date is in the future (clock changed)'; return $null }
   if ($age -gt $checkMaxDays) { $script:savedWhy[$Id] = ('Last check ' + [int][math]::Floor([math]::Max(0, $age)) + ' days ago, older than ' + $checkMaxDays + ' days'); return $null }
-  # Two lines (the Administrator, 2026-11-14): "Last check: DD-MM-YY", then what that check found; no full stops.
+  # Two lines (the Administrator, 2026-11-14): "Last check: 17 Nov 26", then what that check found; no full stops.
   $d0 = [datetime]::ParseExact($c.At, 'yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
   $found = ([string]$c.Detail) -replace '\.$', ''; if ($found) { $found = $found.Substring(0, 1).ToUpperInvariant() + $found.Substring(1) }
-  return @{ State = 'PASSED'; Detail = ('Last check: ' + $d0.ToString('dd-MM-yy', [System.Globalization.CultureInfo]::InvariantCulture)); Fix = $found; Saved = $true; Found = $found }
+  return @{ State = 'PASSED'; Detail = ('Last check: ' + $d0.ToString('d MMM yy', [System.Globalization.CultureInfo]::InvariantCulture)); Fix = $found; Saved = $true; Found = $found }
 }
 function Save-CheckCache($Results, [string]$Base, [string]$Site) {
   # Keeps the old file's other entries (other apps' checks), replaces this run's: PASSED is saved, anything else removed.
@@ -1927,7 +1970,7 @@ if ($gui) {
       if ($ui.RecOn -and ($c.Light -or $c.View -eq 'done')) { $ui.RecOn = $false; $ui.Rec.Visible = $false; $ui.Card.Visible = $true; $ui.RecB.Visible = $true }   # a card that needs you closes the Record
       $ui.View = [string]$c.View; $ui.Card.SuspendLayout()
       $ui.Light.BackColor = $(if ($c.Light -eq 'you') { $ui.C.Yellow } elseif ($c.Light -eq 'bad') { $ui.C.Red } else { $ui.C.White })
-      $ui.Light.AccessibleName = 'Status light: ' + $(if ($c.Light -eq 'you') { 'RADE waits for you' } elseif ($c.Light -eq 'bad') { 'failed' } else { 'off' })
+      $ui.Light.AccessibleName = 'Status light: ' + $(if ($c.Light -eq 'you') { 'RADE is waiting for you' } elseif ($c.Light -eq 'bad') { 'failed' } else { 'off' })
       & $ui.Show $ui.Kick ([string]$c.Kicker).ToUpperInvariant()
       $ui.SentRaw = [string]$c.Sentence; $ui.Sent.Text = $ui.SentRaw; $ui.TickP.Visible = [bool]$c.Tick
       $ps = @($c.P | Where-Object { $_ }); for ($k = 0; $k -lt 4; $k++) { & $ui.Show $ui.P[$k] $(if ($k -lt $ps.Count) { [string]$ps[$k] } else { '' }) }
@@ -2021,7 +2064,7 @@ if ($gui) {
       # Maintenance (the Administrator, 2026-11-14; docs/engine.md "Maintenance run types"): shown for an application that is
       # installed. Install works ("Update to <version>" or "Repair"). Diagnose, Back up, Restore and Uninstall have no engine
       # function yet: they are shown off, Uninstall set apart.
-      $on = ''; try { $on = $dot + 'installed ' + ([datetime][string]$Inst.at).ToString('dd-MM-yy', [System.Globalization.CultureInfo]::InvariantCulture) } catch { $null = $_ }
+      $on = ''; try { $on = $dot + 'installed ' + ([datetime][string]$Inst.at).ToString('d MMM yy', [System.Globalization.CultureInfo]::InvariantCulture) } catch { $null = $_ }
       $verb = 'Install ' + $script:app.Version
       try { $c = ([version][string]$script:app.Version).CompareTo([version][string]$Inst.version); if ($c -gt 0) { $verb = 'Update to ' + $script:app.Version } elseif ($c -eq 0) { $verb = 'Repair' } } catch { $null = $_ }
       & $ui.SetCard @{ View = 'maint'; Kicker = ($script:app.Name + ' ' + $Inst.version + $on); Sentence = 'Maintenance'
@@ -2099,7 +2142,7 @@ if ($gui) {
       finally { $null = Save-CheckCache $script:checkResults $bp $site; $ui.Busy = $false }
       & $ui.ToFront; & $ui.Next }
     $ui.VReady = {
-      # The plan in three lines; the detail (each file, each step's box) is in the Record ("Steps and files").
+      # The plan in three lines; the detail (each file, each step's box) is in the Record.
       if ($ui.Form.IsDisposed -or $script:closing) { return }
       $plan = Get-RoundPlan; $ui.Plan = $plan; $dep = Test-Deploy
       if (-not $plan.Found) {
@@ -2118,13 +2161,21 @@ if ($gui) {
       # The saved site, by name, before anything is written (the Administrator, 2026-11-15): the steps use it with no
       # question, so a wrong site must show here. On the card only: a card's text never enters the log or the report.
       $siteName = ''; if ((& $ui.NeedSite) -and (Test-SiteUrl (Get-SiteUrl (Get-BasePath)))) { $siteName = ([string](Get-SiteUrl (Get-BasePath))).TrimEnd('/') -replace '^.*/', '' }
+      # Start (R28, the Administrator, 2026-11-17): for an application that is installed and has a start script in its local folder, after the
+      # checks pass. It is the main button when the installed version is this paste's version; when this paste is newer, Install stays
+      # the main button.
+      $startB = $null; $startPrimary = $false
+      if ($dep -and [string]$script:app.Start) {
+        $inst = Read-Installed (Get-InstalledKey $script:app)
+        if ($inst -and $inst.installed -and (Get-StartPath)) { $startPrimary = ([string]$inst.installed.version -eq [string]$script:app.Version); $startB = @{ Text = 'Start ' + $script:app.Name; Kind = $(if ($startPrimary) { 'primary' } else { '' }); Act = { & $ui.StartApp } } }
+      }
       & $ui.SetCard @{ View = 'ready'
         Kicker = $(if ($warn.Count) { [string]($ids.Count - $warn.Count) + ' checks passed' + $dot + $warn.Count + $(if ($warn.Count -eq 1) { ' warning' } else { ' warnings' }) } else { 'All ' + $ids.Count + ' checks passed' })
         Sentence = $(if ($dep) { 'Ready to install ' + $script:app.Name + ' ' + $script:app.Version + '.' } else { 'Ready to run round ' + $round + '.' })
         P = @(('Writes to ' + $plan.Shown + ': ' + $new + ' new files, ' + $rep + ' replaced, ' + $rec + ' moved to the Recycle Bin.'),
           ([string]$n + $(if ($n -eq 1) { ' step' } else { ' steps' }) + ', about ' + [math]::Max(1, [int][math]::Round($est / 60)) + ' min. ' + $you + $(if ($done) { ' ' + $done + ' already done for this version and off.' } else { '' })),
           $(if (Test-WordOpen) { 'Word is open. Save your documents and close Word before you start.' } else { '' }), $w1)
-        Buttons = @(@{ Text = $(if ($dep) { 'Install' } else { 'Run' }); Kind = $(if ($n -or ($cleanup.Count -and $ui.Clean)) { 'primary' } else { 'off' }); Act = { & $ui.Run } }, @{ Text = 'Steps and files'; Act = { $ui.Edit = $true; & $ui.VRecord } },
+        Buttons = @($startB, @{ Text = $(if ($dep) { 'Install' } else { 'Run' }); Kind = $(if (($n -or ($cleanup.Count -and $ui.Clean)) -and -not $startPrimary) { 'primary' } elseif ($n -or ($cleanup.Count -and $ui.Clean)) { '' } else { 'off' }); Act = { & $ui.Run } }, @{ Text = 'Record'; Act = { $ui.Edit = $true; & $ui.VRecord } },
           $(if ($siteName) { @{ Text = 'Change the site address'; Act = { & $ui.VSite } } } else { $null }))
         Foot = $(if ($siteName) { 'Site: ' + $siteName } else { '' })
         Back = { & $ui.VChoose } } }
@@ -2157,6 +2208,11 @@ if ($gui) {
       $st = 'DONE'; foreach ($w in 'NEEDS REVIEW', 'FAILED', 'SKIPPED', 'PASSED') { if ($rest.StartsWith($w, [System.StringComparison]::Ordinal)) { $st = $w; break } }
       $ui.StepState[[int]$k] = $st; $null = & $ui.Paint }
     $ui.WindowLine = { $w = $(if ($ui.OkBox.Checked) { 'Window: OK' } else { 'Window: NOT OK - write here what overlapped or was cut off' }); if ($ui.LayOn -and ($env:RADE_LAYOUT -eq '1' -or -not (Test-Deploy))) { $w + "`r`n" + (& $ui.LayLine) } else { $w } }
+    $ui.StartApp = {
+      # The installed app opens from its local copy in its own powershell.exe process; then RADE closes.
+      $p = Get-StartPath; if (-not $p) { & $ui.Say1 'The start file of this application was not found. Select "Install" to put it back.'; return }
+      try { Start-Process -FilePath (Get-PowerShellExe) -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -STA -File "' + $p + '"') -WorkingDirectory (Split-Path -Parent $p)
+        $ui.Started = $true; $ui.Form.Close() } catch { & $ui.Say1 'The application could not be started. Select "Start" again, or ask in the Teams channel.' } }
     $ui.Run = {
       $dep = Test-Deploy; $ui.Running = $true; $ui.Summary = @(); $ui.Log.Clear(); $ui.StepState = @{}; $ui.StepI = 0; $ui.StepNow = ''; $ui.Edit = $false
       $to = ''; if (-not $dep) { $to = [string](Get-MailTo (Get-BasePath)); $ui.ToBox.Text = $to }
@@ -2205,12 +2261,13 @@ if ($gui) {
       $took = Format-Duration ((Get-Date) - $script:roundStart).TotalSeconds
       $ui.Bars['all'].Fill = $(if ($bad) { $ui.C.Blue } else { $ui.C.Green }); & $ui.SetBar 'all' $(if ($bad) { $ui.Bars['all'].Target } else { 1 }) $true
       $mail = $(if ($script:draftMade) { 'An Outlook draft is open with the summary and all result files. Review it, then select Send.' } else { 'The results folder is open and the summary is on the clipboard. Paste it into an e-mail and attach the files.' })
-      $bMade = $(if ($made) { @{ Text = 'What it made'; Act = { & $ui.VRecord } } } else { $null })
+      $bMade = $(if ($made) { @{ Text = 'Record'; Act = { & $ui.VRecord } } } else { $null })
+      $iconNote = ''; if ($dep -and -not $bad) { $null = Save-RunnerCopy; $iconNote = [string](Set-DesktopIcon) }   # R28: the runner copy and the desktop shortcut (a deploy that passed)
       if (-not $bad) {
         $inst = ($dep -and (Get-InstalledText $script:app) -match 'is installed$')
         & $ui.SetCard @{ View = 'done'; Tick = $true; Kicker = $(if ($dep -and -not $inst) { 'Passed' } else { 'All steps passed' }); Right = $took
           Sentence = $(if (-not $dep) { 'Round ' + $round + ' is done.' } elseif ($inst) { $script:app.Name + ' ' + $script:app.Version + ' is installed.' } else { 'The run passed, but version ' + $script:app.Version + ' is not recorded as installed.' })
-          P = @($(if ($dep -and -not $inst) { 'Some steps were off or skipped. Run again with every step on.' } else { '' }), $(if ($dep) { 'Nothing was sent. The report stays on this computer.' } else { $mail }), $made)
+          P = @($(if ($dep -and -not $inst) { 'Some steps were off or skipped. Run again with every step on.' } else { '' }), $(if ($dep) { 'Nothing was sent. The report stays on this computer.' } else { $mail }), $made, $iconNote)
           Buttons = @(@{ Text = 'Close'; Kind = 'primary'; Act = { $ui.Form.Close() } }, $bMade, @{ Text = 'Open results folder'; Act = { & $ui.Open } }, @{ Text = 'Copy summary'; Act = { & $ui.Copy } })
           Test = (-not $dep); Back = { & $ui.VReady } }
       } else {
@@ -2252,16 +2309,16 @@ if ($gui) {
       & $ui.SetCard @{ View = 'hand'; Light = 'you'; Kicker = $(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot + 'your turn' } else { 'Your turn' }); Sentence = [string]$st.Name
         Lines = (@($st.Guide) -join "`r`n"); Field = @{ Label = 'Address'; Text = $ui.GUrl; Name = 'Address to open'; Button = 'Open in browser'; Act = { & $ui.OpenUrl } }; Links = [bool]$file; Note = $note
         Buttons = @(@{ Text = $(if ($st.DoneText) { [string]$st.DoneText } else { 'Done' }); Kind = 'primary'; Act = { $ui.Answer = 'OK' } }, $two, @{ Text = $(if ($st.SkipText) { [string]$st.SkipText } else { 'Skip' }); Act = { $ui.Answer = 'Cancel' } })
-        Right = 'RADE waits for you'; NoAccept = $true; Focus = 'fieldbutton' } }
+        Right = 'RADE is waiting for you'; NoAccept = $true; Focus = 'fieldbutton' } }
     $ui.VHandFail = {
       & $ui.SetCard @{ View = 'handfail'; Light = 'you'; Kicker = 'It failed'; Sentence = 'What did the error say?'; P = @('Paste the error message here. Do not include names or a site address.'); Err = $true
-        Buttons = @(@{ Text = 'Report the failure'; Kind = 'primary'; Act = { $script:guideError = [string]$ui.ErrBox.Text; $ui.Answer = 'Abort' } }, @{ Text = 'Back'; Act = { & $ui.VHand } }); Right = 'RADE waits for you'; NoAccept = $true; Focus = 'err' } }
+        Buttons = @(@{ Text = 'Report the failure'; Kind = 'primary'; Act = { $script:guideError = [string]$ui.ErrBox.Text; $ui.Answer = 'Abort' } }, @{ Text = 'Back'; Act = { & $ui.VHand } }); Right = 'RADE is waiting for you'; NoAccept = $true; Focus = 'err' } }
     # A question of a hand step (manifest "answers"), after Done: the prompt is the sentence; yes/no and pick answer with
     # one button per word, a text with one line (120 characters at most; empty is allowed) and "Continue". No Back.
     $ui.ReplyActs = @({ $ui.Reply = [string]$ui.B[0].Text }, { $ui.Reply = [string]$ui.B[1].Text }, { $ui.Reply = [string]$ui.B[2].Text }, { $ui.Reply = [string]$ui.B[3].Text })
     $ui.VAnswer = { param($Q, [int]$I, [int]$N)
       $ui.Reply = $null
-      $c = @{ View = 'answer'; Light = 'you'; Kicker = ($(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot } else { '' }) + 'Question ' + $I + ' of ' + $N); Sentence = [string]$Q.Prompt; Right = 'RADE waits for you' }
+      $c = @{ View = 'answer'; Light = 'you'; Kicker = ($(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot } else { '' }) + 'Question ' + $I + ' of ' + $N); Sentence = [string]$Q.Prompt; Right = 'RADE is waiting for you' }
       # The prompt's first sentence (up to the first "?", "." or ":" followed by a space or the end) is the headline; the rest
       # is a body line under it (the Administrator, 2026-11-15, rework B). A first sentence too long for one line shrinks ($ui.FitSent).
       if ([string]$Q.Prompt -match '^(.+?[?.:])(?:\s+(\S.*))?$') { $c.Sentence = $Matches[1]; if ($Matches[2]) { $c.P = @($Matches[2].Trim()) } }
@@ -2301,7 +2358,7 @@ if ($gui) {
         $d = Get-CheckDef $id; $r = $(if ($ui.Picked) { $script:checkResults[$id] } else { $ui.BaseRes[$id] }); if (-not $r) { $r = @{ State = 'NOT RUN'; Detail = ''; Fix = '' } }
         if ([string]$d.Group -ne $g0) { $g0 = [string]$d.Group; $rows += @{ Head = $g0.ToUpperInvariant() } }
         $nm = [string]$d.Short; if (-not $nm) { $nm = [string]$d.Name }
-        $rows += @{ Name = $nm; State = [string]$r.State; More = $(if ($r.State -ne 'PASSED' -or $r.Saved) { @(@($r.Detail, $r.Fix) | Where-Object { $_ }) } else { @() }) }   # not passed: what was found, then what to do; reused (Get-SavedCheck): "Last check: DD-MM-YY", then what it found
+        $rows += @{ Name = $nm; State = [string]$r.State; More = $(if ($r.State -ne 'PASSED' -or $r.Saved) { @(@($r.Detail, $r.Fix) | Where-Object { $_ }) } else { @() }) }   # not passed: what was found, then what to do; reused (Get-SavedCheck): "Last check: 17 Nov 26", then what it found
       }
       return $rows }
     $ui.RecPlan = { param([int]$w)
@@ -2349,7 +2406,7 @@ if ($gui) {
       & $mk 'STEPS' $ui.F.Cap $ui.C.Gray
       if (-not $ui.Picked) { & $mk 'Choose an application first.' $ui.F.Small $ui.C.Gray }
       else {
-        if (-not $ui.Edit) { & $mk $(if ($ui.Running) { 'The run has started: the boxes are locked.' } else { 'To change the boxes, go to "Ready" and select "Steps and files".' }) $ui.F.Small $ui.C.Gray }
+        if (-not $ui.Edit) { & $mk $(if ($ui.Running) { 'The run has started: the boxes are locked.' } else { 'To change the boxes, go to "Ready" and select "Record".' }) $ui.F.Small $ui.C.Gray }
         $list = @(); if ($cleanup.Count) { $list += -1 }; $list += @($script:appSteps); $n = 0
         foreach ($k in $list) {
           $cb = New-Object System.Windows.Forms.CheckBox
@@ -2466,7 +2523,7 @@ if ($gui) {
 try {
   $script:textMode = $true
   $say = { param($t) Add-RunLog $t; Write-Host $t }
-  Write-Host ('RADE (Redacted Application Deployment Engine) - ' + $round + ' - build ' + $buildId)
+  Write-Host ('RADE - ' + $round + ' - build ' + $buildId)
   Write-Host (Get-LastRoundText (Read-RoundHistory (Get-BasePath)))
   $newer = Get-NewerRound
   if ($newer) { Write-Host ('A newer round, ' + $newer + ', is in the repository. Type N and press Enter to stop, then run ' + $newer + '.') }
@@ -2525,6 +2582,9 @@ BASE_CHECKS = ['nipr', 'ps', 'lang', 'onedrive', 'disk', 'write', 'child', 'outl
 CHECK_IDS = re.findall(r"@\{ Id = '([a-z-]+)'", ENGINE)
 
 
+START_RE = re.compile(r'[A-Za-z0-9][A-Za-z0-9 ._-]*(/[A-Za-z0-9][A-Za-z0-9 ._-]*)*\.ps1')   # schemas/rade-manifest.schema.json app.start says the same
+
+
 def app_lines(b):
     """The embedded catalog (PFM 14 Nov 26: the chooser lists only applications inside the paste; no fetch, PFM 3A).
     "apps" in the JSON: [{name, summary, steps: [step names]}]; without it, one application with every step."""
@@ -2569,8 +2629,12 @@ def app_lines(b):
             assert re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ]*', mk['list']) and re.fullmatch(r'[A-Za-z0-9]+', mk['key']) and re.fullmatch(r'[A-Za-z0-9_]+', mk['field']), 'app %r: marker list, key and field hold letters and digits only' % a['name']
             assert mode == 'deploy' and 'site-rights' in need, 'app %r: a marker needs mode deploy and a step that needs site-rights' % a['name']
             marker = '@{ List = %s; Key = %s; Field = %s }' % (q(mk['list']), q(mk['key']), q(mk['field']))
-        out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s; Marker = %s }'
-                   % (q(a['name']), q(a['summary']), ', '.join(str(i) for i in idx), ', '.join(q(c) for c in checks), q(mode), q(version), marker))
+        # "start" (R28): the app's start script, a path inside its local install folder (OneDrive\\RADE\\<folder>). RADE's Start button runs
+        # it in its own powershell.exe process after the checks pass; nothing is downloaded. Plain relative .ps1 paths only.
+        start = a.get('start', '')
+        assert not start or START_RE.fullmatch(start), 'app %r: start must be a relative .ps1 path of plain names (letters, digits, space, ".", "_", "-"), for example App/Start-App.ps1' % a['name']
+        out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s; Marker = %s; Start = %s }'
+                   % (q(a['name']), q(a['summary']), ', '.join(str(i) for i in idx), ', '.join(q(c) for c in checks), q(mode), q(version), marker, q(start)))
     return out
 
 
@@ -2669,7 +2733,7 @@ def build(b):
     build_id = hashlib.sha256(body.encode('ascii')).hexdigest()[:8]
     modes = {a.get('mode', 'test') for a in b.get('apps', [])} or {'test'}
     sends = ' on this computer. It sends nothing.' if modes == {'deploy'} else ', then opens an Outlook draft with them (never sent; a deploy makes no draft).' if 'deploy' in modes else ', then opens an Outlook draft with them (never sent).'
-    head = ('<#\n  RADE (Redacted Application Deployment Engine), round bundle: %s.\n'
+    head = ('<#\n  RADE, round bundle: %s.\n'
             '  GENERATED by the RADE engine (rhope-ops/RADE engine/rade_build.py, sha256 %s; engine/rade_ui.ps1, sha256 %s) from %s; do not edit.\n'
             '  How to run: open Windows PowerShell ISE, File > New, paste all of this text into the script pane, press F5.\n'
             '  The RADE window opens: press Enter (or Run); it uses your Windows profile folder. It writes the files below into the task folders under\n'

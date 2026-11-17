@@ -11,7 +11,7 @@
 # the driver selects the first button (a text gets a short fake note).
 Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing
 $env:RADE_LAYOUT = '1'   # the layout self-check runs for a deploy too
-function Start-Process { param($FilePath, $ArgumentList) Write-Host ('WIN start-process ' + $(if ([string]$FilePath -match '^https://') { 'browser' } else { [string]$FilePath })) }
+function Start-Process { param($FilePath, $ArgumentList, $WorkingDirectory) Write-Host ('WIN start-process ' + $(if ([string]$FilePath -match '^https://') { 'browser' } else { [string]$FilePath })) }
 $global:RadeT = @{ Seen = ''; N = 0; Out = [string]$env:RADE_T_OUT; App = [int]$env:RADE_T_APP; Hand = [string]$env:RADE_T_HAND; Tour = ($env:RADE_T_TOUR -eq '1'); Size = [string]$env:RADE_T_SIZE
   Forced = $false; Opened = $false; Lay = 0; SignIn = $false; Sized = $false; T0 = (Get-Date); Env = $false }
 
@@ -74,7 +74,7 @@ function global:Step-Rade {
   }
   elseif ($v -eq 'ready') {
     if (-not $global:RadeT.Opened) { $global:RadeT.Opened = $true; & $ui.VRecord; Save-RadeCard 'record'; & $ui.CloseRecord }
-    $ui.B[0].PerformClick()
+    $ib = @($ui.B | Where-Object { $_.Visible -and $_.Text -in 'Install', 'Run' })[0]; $ib.PerformClick()
   }
   elseif ($v -eq 'hand') {
     if ($ui.B[1].Text -ne 'It failed') { $ui.B[0].PerformClick() }
