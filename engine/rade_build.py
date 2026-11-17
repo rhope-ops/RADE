@@ -2099,6 +2099,7 @@ if ($gui) {
       $ui.Back = $c.Back; $ui.BackB.Visible = ([bool]$c.Back -and -not $ui.RecOn); $ui.RightL.Text = [string]$c.Right
       & $ui.FitSent; & $ui.FitEdges; & $ui.AlignRows
       $ui.Card.ResumeLayout(); try { $ui.Card.PerformLayout() } catch { $null = $_ }
+      if ($ui.Guide.Visible) { & $ui.GuideFit; & $ui.FitEdges }   # the rich text box lays out its text only once it has a handle and its size: measure its edge again (R28 job: 4 to 13 px off on the first hand card)
       try { $ui.Scroll.AutoScrollPosition = New-Object System.Drawing.Point(0, 0) } catch { $null = $_ }; & $ui.Squeeze   # a new card starts at its top
       $f = $null
       if ($c.Focus -eq 'field') { $f = $ui.Field } elseif ($c.Focus -eq 'fieldbutton') { $f = $ui.FieldB } elseif ($c.Focus -eq 'err') { $f = $ui.ErrBox } elseif ($c.Focus -eq 'text') { $f = $(if ($ui.Guide.Visible) { $ui.Guide } else { $ui.Sent }) }   # a card with no box: the focus on its text, so Enter answers nothing
