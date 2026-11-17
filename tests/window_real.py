@@ -189,5 +189,22 @@ def main():
     return 1 if bad else 0
 
 
+def spike():
+    """Throwaway spike (never merged): draw two design boards and print SPIKE and PNGB64 lines; never changes the result."""
+    script = ROOT / "tests" / "spike_pfm_window.ps1"
+    if not script.exists():
+        return
+    try:
+        r = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script), "-OutDir", str(pathlib.Path(sys.argv[1]) / "spike")],
+                           capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL, errors="replace")
+        print(r.stdout)
+        if r.returncode or r.stderr.strip():
+            print("SPIKE FAILED exit=%s %s" % (r.returncode, r.stderr.strip()[:1500]))
+    except Exception as e:
+        print("SPIKE FAILED %s" % e)
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    code = main()
+    spike()
+    sys.exit(code)
