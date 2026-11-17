@@ -100,7 +100,7 @@ P
 # ---- sizes and text lengths (docs/window-design.md "Sizes", "Text lengths"; the Administrator, 2026-11-15)
 # Every button is made with a named kind (its size is in $ui.Z), and no other place sets a button's size.
 # (The bottom line's own minimum height, 46, is not a button size: R24. Only that one expression is left out of the count.)
-[ "$(grep -o '& \$ui\.Btn [^;)]*' engine/rade_build.py | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_ui.ps1 | wc -l)" = 2 ] && ok || bad "sizes: a button is made without a kind, or sets its own size"
+[ "$(cat engine/rade_build.py engine/rade_ui.ps1 | grep -o '& \$ui\.Btn [^;)]*' | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_ui.ps1 | wc -l)" = 2 ] && [ "$(grep -c 'MinimumSize = ' engine/rade_build.py)" = 2 ] && ok || bad "sizes: a button is made without a kind, or sets its own size"
 # The limits in the document are the limits of the build.
 python3 - <<'P' && ok || bad "text lengths: docs/window-design.md and TEXT_LIMITS (engine/rade_build.py) differ"
 import importlib.util, re, pathlib
@@ -251,7 +251,7 @@ go F; {   # group F: runs in the background (see "go" above)
 psrun "$t/f.ps1" "$t/outf.txt" $'2\n\n\n\n' USERPROFILE="$t/fu/test1234"
 grep -q "could not be downloaded, so no step ran" "$t/outf.txt" && ! grep -q "^Step 1 of" "$t/outf.txt" && grep -q "^For help, ask in the Teams channel" "$t/outf.txt" && grep -q '"state":  *"STOPPED"' "$t/fu/test1234/OneDrive - United States Air Force/RADE/Config/installed/$(rec 'SampleApp/Sample app (deploy)')" && ok || { bad "item 5: a failed download must stop a deploy before its steps"; tail -8 "$t/outf.txt"; }
 echo "GROUP $pass $fail"; } > "$t/grp-F.log" 2>&1 &
-# A newer version in rade-release.json is named in a deploy only.
+# A newer version in rade-release.json: in text mode it is named in a deploy only (the window shows it in a test round too).
 grep -q "^A newer version, 9.0.0, of Sample app (deploy) is on the RADE page" "$t/out0.txt" && ok || bad "newer-version notice in a deploy"
 
 # 1. First deploy: every step on, PASSED, version recorded, nothing sent.
