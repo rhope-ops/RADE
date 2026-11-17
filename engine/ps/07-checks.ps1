@@ -1,10 +1,17 @@
 # RADE engine part 07, the checks: the NIPR guard, the site address, the web and sign-in checks, the install
 # record on the site, and Invoke-Check, which runs one check. Its results are saved by 08-saved-checks.ps1.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+# Network: the app's go file (GitHub), the site on the DAF SharePoint host, the app's fixed Power Automate host, and
+#   SharePoint sign-in through PnP; only these fixed addresses (AGENTS.md "No reconnaissance").
+# Writes: one OneDrive test file and one temporary script (each deleted at once), the site address in Config, and the
+#   install record (one row of one list on the site, after a deploy step).
+# Credentials: the interactive CAC sign-in of PnP (-UseWebLogin); the proxy gets the Windows sign-in; the reach test
+#   sends no Windows sign-in to the addresses it tests (the Administrator, 2026-11-17).
 
 # ---- Checks (PFM 14 Nov 26: RADE checks, from its window, that this computer can install the chosen app and
 # that the PFM has the rights to see it done end to end). Read-only except: one test file in the OneDrive folder and one
-# temporary script in the Windows temp folder, each deleted at once, and the site address in Config when the PFM enters it.
+# temporary script in the Windows temp folder, each deleted at once, the site address in Config when the PFM enters it,
+# and the install record row on the site (the marker script below, after a deploy step).
 # Kind: auto = runs on its own when the Check screen opens; signin = needs a CAC sign-in (button); guide = the PFM looks
 # in another program and answers (button). Advisory: a problem is a WARNING, never a FAILED.
 $checkDefs = @(
@@ -57,19 +64,28 @@ function Save-SiteUrl([string]$Base, [string]$Url) {
 }
 function Get-FlowPortal([string]$Base) {
   # The address the guide steps open (editable there, remembered in Config); the first app step that names one wins.
+  # A Config address is used only when its host is the host of the app's own fixed address (the Administrator,
+  # 2026-11-17: no address from a file a user can change reaches another host).
   foreach ($k in $script:appSteps) {
     $s = $steps[$k]
     if ($s.Url) {
-      if ($s.UrlConfig) { $p = Get-ConfigFile $Base $s.UrlConfig; if (Test-Path -LiteralPath $p -PathType Leaf) { try { $v = ([string](Get-Content -LiteralPath $p -TotalCount 1)).Trim(); if ($v -match '^https://') { return @{ Url = $v; Config = $p } } } catch { $null = $_ } } }
+      if ($s.UrlConfig) { $p = Get-ConfigFile $Base $s.UrlConfig; if (Test-Path -LiteralPath $p -PathType Leaf) { try { $v = ([string](Get-Content -LiteralPath $p -TotalCount 1)).Trim(); if ((Test-SameHost $v $s.Url)) { return @{ Url = $v; Config = $p } } } catch { $null = $_ } } }
       return @{ Url = $s.Url; Config = $(if ($s.UrlConfig) { Get-ConfigFile $Base $s.UrlConfig } else { '' }) }
     }
   }
   return @{ Url = ''; Config = '' }
 }
+# True when both addresses are https and name the same host (any letter case). Takes the address to check and the
+# fixed address it must match; gives back $true or $false.
+function Test-SameHost([string]$Url, [string]$Fixed) {
+  try { $a = [uri]$Url; $b = [uri]$Fixed } catch { return $false }
+  return ($a.IsAbsoluteUri -and $b.IsAbsoluteUri -and $a.Scheme -eq 'https' -and $b.Scheme -eq 'https' -and $a.Host -ieq $b.Host)
+}
 function Test-WebReach([string]$Url) {
   # TLS 1.2 first (found in R19, fixed for R20: Windows PowerShell 5.1 starts with TLS 1.0, which GitHub closes: [ReceiveFailure]; Edge uses 1.2).
   try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { $null = $_ }
-  # Does the host answer? Any HTTP answer counts (401 or 403 = it answers but wants a sign-in). Windows sign-in for the proxy.
+  # Does the host answer? Any HTTP answer counts (401 or 403 = it answers but wants a sign-in), so the address itself
+  # never gets the Windows sign-in (the Administrator, 2026-11-17); only the proxy does.
   # Returns no address and no message text (they can hold the site or tenant name): only the code or the error kind.
   try {
     $rq = [System.Net.WebRequest]::Create($Url)
@@ -77,7 +93,7 @@ function Test-WebReach([string]$Url) {
     # R20: [ReceiveFailure] stayed with TLS 1.2 set. A request with no User-Agent can be closed by a filtering proxy (agent
     # finding, Confidence low); send the one Edge's family sends.
     try { $rq.UserAgent = $webAgent } catch { $null = $_ }
-    try { $rq.UseDefaultCredentials = $true } catch { $null = $_ }
+    try { $rq.UseDefaultCredentials = $false } catch { $null = $_ }
     try { $rq.AllowAutoRedirect = $false } catch { $null = $_ }
     try { if ($rq.Proxy) { $rq.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials } } catch { $null = $_ }
     $rs = $rq.GetResponse()
