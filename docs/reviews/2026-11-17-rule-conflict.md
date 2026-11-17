@@ -34,3 +34,22 @@ Findings (no MAJOR):
 Minor: C10 named "the lint", which RADE does not have. Fixed: removed.
 
 rule-conflict-check: 156ac6e2880a
+
+---
+
+## Rule conflict check: "Engine source" line, 2026-11-17
+
+Changed line (`python3 scripts/bloat_check.py --rules`), text approved by the Administrator (17 Nov 26):
+
+- Engine source (the Administrator, 2026-11-14): engine/rade_build.py here. Apps fetch it by commit and check each file's SHA-256 (docs/engine.md "How an app gets the engine").
++ Engine source (the Administrator, 2026-11-14; 2026-11-17): the engine/ folder here (entry engine/rade_build.py; file list: docs/engine.md "How an app gets the engine"). Apps fetch it by commit and check each file's SHA-256.
+
+Reviewer: fresh `reviewer` subagent, Opus tier, given only the changed lines, AGENTS.md, docs/DECISIONS.md and the brief of `.claude/skills/rule-change/SKILL.md`. No MAJOR finding.
+
+1. "the engine/ folder" vs the file list, which also holds assets/logo/logo-rho-128.png. Open: a wording change goes to the Administrator (rule text).
+2. "Apps fetch it" vs "No code fetch at run time": different moments (the app's build vs the runner). Open: same.
+3. Overlap with "App repos" (both point to docs/engine.md). No change.
+4. docs/engine.md and docs/window-design.md named only engine/rade_build.py. Fixed: both point to engine/ps.
+5. DECISIONS row of 2026-11-14 placed `$helpChannel` in engine/rade_build.py. Fixed: a dated note names engine/ps/09-start.ps1.
+
+rule-conflict-check: e1ad6b78cbec
