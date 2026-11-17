@@ -25,6 +25,7 @@ Updated: 2026-11-17 by Claude (runner polish, pull request 71; release engine-v9
 12. R28 leftovers (reviews of PR 72): no test for the kept runner copy; release.yml does not check ENGINE_RELEASE against the tag (guard file: the Administrator decides); Start waits 2.5 s; the shortcut's minimized console hides text-mode fallback; the no-app card cannot be reached in a real build. Device proof pending: 125/150 % text, .lnk, runner copy, ISE text capture (round R28 of 90-161.Z).
 
 13. Runner polish leftovers (reviews of pull request 71): `$ui.Say` sets the last log line without a new edge fit (stale edge possible, not seen in the job); `$ui.Fit` breaks long words before `FitSteps` sets the numbered widths (the 400 ms refit corrects it); no stand-in test covers `OnStatus`/`ShowRun`; option: only the numbered lines scroll on a hand card (today the whole text above the buttons scrolls).
+14. Logo (the Administrator, 17 Nov; DECISIONS): Rho Bold (USAF-B) replaces logo K; source RhoBold.dc.html on the Rho canvas https://claude.ai/artifact/Qw7iSQaz1FMzZQtycjrZxq. Change scripts/build_logo.py, scripts/render_logo.js, the LOGO path in engine/rade_build.py, the logo check in scripts/check.local.sh and docs/window-design.md "Logo line"; release engine-v10 before the 90-161.Z R29 build. Size: same 128 px PNG as logo K (10.7 KB), so the app bundle should change little.
 
 ## Needs the Administrator
 
