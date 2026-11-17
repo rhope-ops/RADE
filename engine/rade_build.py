@@ -156,6 +156,24 @@ function Test-MailTo([string]$To) {
 }
 function Get-ConfigFile([string]$Base, [string]$Name) { return (Join-Path (Join-Path $Base 'Config') $Name) }
 function Get-RadeConfigFile([string]$Name) { if ($script:configOver) { return (Join-Path $script:configOver $Name) }; return (Join-Path (Join-Path (Get-RadePath) 'Config') $Name) }   # the engine's own settings (R17)
+function Read-WindowState {
+  # R28 (the Administrator, 2026-11-17): where the user last closed the window. RADE\Config\rade-window.json (a cache: when it
+  # is lost or does not read, the window opens maximized on the screen with the mouse). { x, y, w, h, state, dpi, closed: { w, h, state } }
+  try { $p = Get-RadeConfigFile 'rade-window.json'
+    if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { return $null }
+    $j = Get-Content -LiteralPath $p -Raw | ConvertFrom-Json
+    foreach ($k in 'x', 'y', 'w', 'h') { if ($null -eq $j.$k -or -not ([string]$j.$k -match '^-?\d{1,5}$')) { return $null } }
+    if ([int]$j.w -lt 100 -or [int]$j.h -lt 100) { return $null }
+    $st = $(if ([string]$j.state -eq 'Maximized') { 'Maximized' } else { 'Normal' })
+    $cl = ''; if ($j.closed -and [string]$j.closed.w -match '^\d{1,5}$' -and [string]$j.closed.h -match '^\d{1,5}$') { $cl = [string]$j.closed.w + 'x' + [string]$j.closed.h + '/' + [string]$j.closed.state -replace '[^A-Za-z0-9/x]', '' }
+    return @{ X = [int]$j.x; Y = [int]$j.y; W = [int]$j.w; H = [int]$j.h; State = $st; Dpi = $(if ([string]$j.dpi -match '^\d{2,3}$') { [int]$j.dpi } else { 0 }); Closed = $cl }
+  } catch { return $null }
+}
+function Save-WindowState([int]$X, [int]$Y, [int]$W, [int]$H, [string]$State, [int]$Dpi, [int]$ClientW, [int]$ClientH, [string]$CloseState) {
+  # Numbers and two words only: no name, path or text. A write that fails is ignored (the window is closing).
+  try { $o = [ordered]@{ about = 'RADE window place (a cache; delete it to open maximized again)'; x = $X; y = $Y; w = $W; h = $H; state = $State; dpi = $Dpi; closed = [ordered]@{ w = $ClientW; h = $ClientH; state = $CloseState } }
+    Write-FileWhole (Get-RadeConfigFile 'rade-window.json') (($o | ConvertTo-Json -Depth 4) + "`r`n") } catch { $null = $_ }
+}
 function Get-MailTo([string]$Base) {
   # RADE\Config\rade-mail-to.txt: the address the results e-mail goes to (PFM 13 Nov; RADE R17). The window box saves it.
   # Until it exists, the app's old Config\@@PREFIX@@-mail-to.txt is read.
@@ -1890,15 +1908,15 @@ if ($gui) {
         $sd = $f.AutoScaleDimensions; $rd = 'n/a'; try { if ($script:native -and $f.IsHandleCreated) { $rd = [string][Rade.Native]::GetDpiForWindow($f.Handle) } } catch { $null = $_ }
         $lg = $(if ($ui.Logo) { [string]$ui.Logo.Width + 'x' + $ui.Logo.Height } else { 'n/a' }); $b1 = @($ui.B | Where-Object { $_.Visible })[0]; $bt = $(if ($b1) { [string]$b1.Width + 'x' + $b1.Height } else { 'n/a' })
         return ('SCALE dpiX=' + [int]$ui.ScreenDpi + ' deviceDpi=' + $dd + ' mode=' + [string]$f.AutoScaleMode + ' asd=' + [int]$sd.Width + 'x' + [int]$sd.Height + ' autoScale=' + [int]$as.Width + 'x' + [int]$as.Height + ' font=' + [int]$f.Font.Height + ' fontPt=' + $f.Font.SizeInPoints + ' fontScale=' + $ui.FontK + ' ctlScale=' + [math]::Round($ui.Dpi / 96.0, 2) + ' realDpi=' + $rd + ' aware=' + $aw + ' screen=' + $sn.Bounds.Width + 'x' + $sn.Bounds.Height +
-          ' work=' + $sn.WorkingArea.Width + 'x' + $sn.WorkingArea.Height + ' client=' + $f.ClientSize.Width + 'x' + $f.ClientSize.Height + ' state=' + [string]$f.WindowState + ' logo=' + $lg + ' btn=' + $bt)
+          ' work=' + $sn.WorkingArea.Width + 'x' + $sn.WorkingArea.Height + ' client=' + $f.ClientSize.Width + 'x' + $f.ClientSize.Height + ' state=' + [string]$f.WindowState + ' logo=' + $lg + ' btn=' + $bt + ' shown=' + $(if ($ui.ShownAt) { $ui.ShownAt } else { 'n/a' }) + ' placed=' + $ui.Placed + ' lastClose=' + $(if ($ui.LastClose) { $ui.LastClose } else { 'n/a' }))
       } catch { return ('SCALE could not be read: ' + (ConvertTo-Masked ([string]$_.Exception.Message))) } }
     $ui.LayLine = {
       & $ui.Check
       $pct = [int][math]::Round($ui.Dpi / 96.0 * 100); $sp = [int][math]::Round($ui.ScreenDpi / 96.0 * 100)   # the form's scale (the one source); the screen dpi beside it when it differs
       $size = [string]$ui.Form.ClientSize.Width + ' x ' + $ui.Form.ClientSize.Height + ' at ' + [string]$pct + ' %' + $(if ($sp -ne $pct) { ' (the form auto-scale; the screen dpi says ' + $sp + ' %)' } else { '' })
       $sc = $(if ($ui.LayScroll.Count) { '; the text scrolls on: ' + ((@($ui.LayScroll.Keys) | Sort-Object) -join ', ') } else { '' })
-      if ($ui.LayBad.Count) { return ('Layout self-check: ' + $ui.LayBad.Count + ' defects in ' + $ui.LaySeen.Count + ' cards (' + $size + ')' + $sc + "`r`n" + (& $ui.Scale) + "`r`n" + (@($ui.LayBad) -join "`r`n")) }
-      return ('Layout self-check: PASS layout, ' + $ui.LaySeen.Count + ' cards (' + $size + ')' + $sc + "`r`n" + (& $ui.Scale)) }
+      if ($ui.LayBad.Count) { return ('Layout self-check: ' + $ui.LayBad.Count + ' defects in ' + $ui.LayCards.Count + ' cards (' + $size + ')' + $sc + "`r`n" + (& $ui.Scale) + "`r`n" + (@($ui.LayBad) -join "`r`n")) }
+      return ('Layout self-check: PASS layout, ' + $ui.LayCards.Count + ' cards (' + $size + ')' + $sc + "`r`n" + (& $ui.Scale)) }
     $ui.Show = { param($C, [string]$Text) $C.Text = $Text; $C.Visible = [bool]$Text }
     $ui.SetCard = { param($c)
       # Shows one card. $c names the parts: View, Light ('you' = yellow, 'bad' = dark red), Kicker, Sentence, Tick, P (up to 4
@@ -2380,13 +2398,38 @@ if ($gui) {
       elseif ($k -eq 'Escape') { $_.SuppressKeyPress = $true; if ($ui.RecOn) { & $ui.CloseRecord } elseif ($ui.Back -and -not $ui.Busy -and -not $ui.Running) { & $ui.Back } elseif ($ui.View -eq 'choose' -and -not $ui.Busy) { $ui.Form.Close() } }
       elseif ($k -match '^(D|NumPad)([1-9])$' -and -not $ui.RecOn -and -not $ui.Busy -and $ui.Opts.Visible -and -not ($ui.Form.ActiveControl -is [System.Windows.Forms.TextBox])) {
         $n = [int]$Matches[2]; foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Key -eq $n) { $_.SuppressKeyPress = $true; $o.PerformClick(); break } } } })
+    # Window size and place (R28, the Administrator, 2026-11-17): the window opens where the user last closed it (RADE\Config\rade-window.json;
+    # bounds that are off every current screen are ignored); the first time it is maximized on the screen that shows the mouse. The
+    # minimum size is 1280 x 720 at 100 % (cut to the work area of a small screen). The size and the state at Shown and at close are
+    # recorded, and the layout self-check runs again after each resize (debounced: 400 ms after the last size change).
+    $ui.Place = {
+      $f = $ui.Form; $saved = Read-WindowState; $ui.Placed = 'first run'; $ui.LastClose = $(if ($saved) { [string]$saved.Closed } else { '' })
+      try {
+        $use = $null; $wa = $null
+        if ($saved) { $r = New-Object System.Drawing.Rectangle($saved.X, $saved.Y, $saved.W, $saved.H)
+          foreach ($sc in @([System.Windows.Forms.Screen]::AllScreens)) { $i = [System.Drawing.Rectangle]::Intersect($sc.WorkingArea, $r); if ($i.Width -ge (& $ui.Sc 120) -and $i.Height -ge (& $ui.Sc 60)) { $use = $r; $wa = $sc.WorkingArea; break } } }
+        if ($use) {
+          $w = $use.Width; $h = $use.Height
+          if ($saved.Dpi -gt 0 -and [int]$ui.Dpi -ne $saved.Dpi) { $w = [int]($w * $ui.Dpi / $saved.Dpi); $h = [int]($h * $ui.Dpi / $saved.Dpi) }   # the screen scale changed since: the size follows
+          $w = [math]::Min($w, $wa.Width); $h = [math]::Min($h, $wa.Height)
+          $x = [math]::Max($wa.Left, [math]::Min($use.X, $wa.Right - $w)); $y = [math]::Max($wa.Top, [math]::Min($use.Y, $wa.Bottom - $h))
+          $f.Bounds = New-Object System.Drawing.Rectangle($x, $y, $w, $h); $ui.Placed = 'saved'
+          if ($saved.State -eq 'Maximized') { $f.WindowState = 'Maximized' }
+        } else {
+          $sc = [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position); $wa = $sc.WorkingArea
+          $f.Width = [int]($wa.Width * 0.95); $f.Height = [int]($wa.Height * 0.95); $f.Left = $wa.Left + [int](($wa.Width - $f.Width) / 2); $f.Top = $wa.Top + [int](($wa.Height - $f.Height) / 2)   # where Restore goes
+          $f.WindowState = 'Maximized'
+        }
+        $f.MinimumSize = New-Object System.Drawing.Size([math]::Min((& $ui.Sc 1280), $wa.Width), [math]::Min((& $ui.Sc 720), $wa.Height))
+      } catch { $null = $_ } }
+    $ui.WinNow = { $f = $ui.Form; $s = [string]$f.WindowState; if ($s -notin 'Normal', 'Maximized', 'Minimized') { $s = 'Normal' }; return ([string]$f.ClientSize.Width + 'x' + $f.ClientSize.Height + '/' + $s) }
+    $ui.ResizeT = New-Object System.Windows.Forms.Timer; $ui.ResizeT.Interval = 400
+    $ui.ResizeT.Add_Tick({ $ui.ResizeT.Stop(); try { if ($ui.Scaled -and [string]$ui.Form.WindowState -ne 'Minimized') { & $ui.Fit; & $ui.Check } } catch { $null = $_ } })
+    $ui.Form.Add_Resize({ try { if ($ui.Scaled) { $ui.ResizeT.Stop(); $ui.ResizeT.Start() } } catch { $null = $_ } })
     $ui.Form.Add_Shown({
       $ui.Opened = $true; & $ui.FormDpi; $ui.Scaled = $true   # the form has its scale now: from here the size handlers work (each runs once below or on the first card)
-      # Fit the screen (R09: 1280 x 800 at 150 % scaling is smaller than the window).
-      try { $wa = [System.Windows.Forms.Screen]::FromControl($ui.Form).WorkingArea
-        $ui.Form.Width = [Math]::Min($ui.Form.Width, [int]($wa.Width * 0.95)); $ui.Form.Height = [Math]::Min($ui.Form.Height, [int]($wa.Height * 0.95))
-        $ui.Form.Left = $wa.Left + [int](($wa.Width - $ui.Form.Width) / 2); $ui.Form.Top = $wa.Top + [int](($wa.Height - $ui.Form.Height) / 2) } catch { $null = $_ }
-      & $ui.Fit; $ui.Anim.Start()
+      & $ui.Place
+      & $ui.Fit; $ui.ShownAt = & $ui.WinNow; $ui.Anim.Start()
       & $ui.Boot })
     $ui.Form.Add_FormClosing({
       # The window's X (there is no Exit button): ask first only while a step runs, because closing stops it (R17).
@@ -2394,7 +2437,11 @@ if ($gui) {
         $a = [System.Windows.Forms.MessageBox]::Show($ui.Form, 'A step is running. If you exit now, RADE stops it and the round ends as STOPPED (the report in the results folder says so). Exit now?', 'RADE - Exit', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning, [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
         if ([string]$a -ne 'Yes') { $_.Cancel = $true; return }
       }
-      $script:closing = $true; try { $ui.Anim.Stop() } catch { $null = $_ }
+      $script:closing = $true; try { $ui.Anim.Stop(); $ui.ResizeT.Stop() } catch { $null = $_ }
+      try { $f = $ui.Form; $ui.CloseAt = & $ui.WinNow; $st = [string]$f.WindowState; if ($st -eq 'Minimized') { $st = 'Normal' }
+        $b = $(if ([string]$f.WindowState -eq 'Normal') { $f.Bounds } else { $f.RestoreBounds }); $cs = ($ui.CloseAt -split '[x/]')
+        Save-WindowState $b.X $b.Y $b.Width $b.Height $st ([int]$ui.Dpi) ([int]$cs[0]) ([int]$cs[1]) ([string]$cs[2])
+        Write-Host ('RADE window at close: client ' + ($ui.CloseAt -replace '/', ', ') + '.') } catch { $null = $_ }
       if ($script:child -and -not $script:child.HasExited) { try { $script:child.Kill() } catch { $null = $_ } } })
     # The window is the main form of this thread, with no owner (R24: shown with ShowDialog from PowerShell ISE, ISE owned
     # it, so it had no taskbar button and could not be restored after it was minimized). When a message loop already runs

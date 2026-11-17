@@ -34,6 +34,7 @@ namespace RadeStub {
     public static ScriptBlock Pump; public static System.Windows.Forms.Control Focus; public static string Clip = "";
     public static List<System.Windows.Forms.Timer> Timers = new List<System.Windows.Forms.Timer>();
     public static int Pumps = 0;
+    public static System.Windows.Forms.Screen[] Screens() { return new System.Windows.Forms.Screen[] { new System.Windows.Forms.Screen() }; }
     public static float FormDpi = 96f;   // the dpi the form scales to (RADE_T_SCALE=150: 144); the screen dpi (Graphics.DpiX) stays 96
     public static bool RunThrows = false; public static string ShownBy = "";   // RunThrows: Application.Run fails as when a message loop already runs
   }
@@ -72,7 +73,7 @@ namespace System.Windows.Forms {
     protected bool DoubleBuffered { get; set; }
     public Size ClientSize { get { return new Size(Width, Height); } set { Width = value.Width; Height = value.Height; } }
     public Size Size { get { return new Size(Width, Height); } set { Width = value.Width; Height = value.Height; } }
-    public Rectangle Bounds { get { return new Rectangle(Left, Top, Width, Height); } }
+    public Rectangle Bounds { get { return new Rectangle(Left, Top, Width, Height); } set { Left = value.Left; Top = value.Top; Width = value.Width; Height = value.Height; } }
     public bool Focused { get { return RadeStub.Driver.Focus == this; } }
     public bool ContainsFocus { get { for (Control c = RadeStub.Driver.Focus; c != null; c = c.Parent) { if (c == this) return true; } return false; } }
     // The size the control asks for (no layout here): its own size; a label: its text in one line at its font; a button: its
@@ -97,6 +98,7 @@ namespace System.Windows.Forms {
   public class Form : Control {
     public bool Closed; public Form() { Width = 1020; Height = 760; }
     public string WindowState = "Normal";
+    public Rectangle RestoreBounds { get { return new Rectangle(Left, Top, Width, Height); } }
     public System.Drawing.SizeF CurrentAutoScaleDimensions { get { return new System.Drawing.SizeF(RadeStub.Driver.FormDpi, RadeStub.Driver.FormDpi); } }   // 144 = the R24 device: the form scales 1.5 x while the screen dpi says 96
     public Control ActiveControl { get { return RadeStub.Driver.Focus; } }
     public void Activate() { }
@@ -130,6 +132,9 @@ namespace System.Windows.Forms {
     public static void DrawText(object g, string t, object f, Rectangle r, Color c, TextFormatFlags fl) { if (t == null) throw new ArgumentNullException("text"); }
   }
   public static class Clipboard { public static void SetText(string t) { if (string.IsNullOrEmpty(t)) throw new ArgumentNullException("text"); RadeStub.Driver.Clip = t; } }
-  public class Screen { public Rectangle Bounds = new Rectangle(0, 0, 1280, 800); public Rectangle WorkingArea = new Rectangle(0, 0, 1280, 720); public static Screen FromControl(Control c) { return new Screen(); } }
+  public class Screen { public Rectangle Bounds = new Rectangle(0, 0, 1280, 800); public Rectangle WorkingArea = new Rectangle(0, 0, 1280, 720); public static Screen FromControl(Control c) { return new Screen(); }
+    public static Screen FromPoint(Point p) { return new Screen(); }
+    public static Screen[] AllScreens { get { return RadeStub.Driver.Screens(); } } }
+  public static class Cursor { public static Point Position { get { return new Point(100, 100); } } }
   public static class MessageBox { public static string Show(object owner, string text, string caption, MessageBoxButtons b, MessageBoxIcon i, MessageBoxDefaultButton d) { return "Yes"; } }
 }

@@ -142,7 +142,7 @@ $ui.Meas = { param([string]$Text, $Font, [int]$W) [System.Windows.Forms.TextRend
 # card it showed: a text that needs more room than its control has, a control that a parent cuts, two parts that
 # overlap. The result is one line under "Window: OK" in the results e-mail draft ("PASS layout" or the defects), so a
 # cut text is found by a measure, not by a person's eye. A deploy does not run it. It reads sizes only.
-$ui.LayOn = $false; $ui.LayBad = New-Object System.Collections.Generic.List[string]; $ui.LaySeen = @{}; $ui.LayScroll = @{}
+$ui.LayOn = $false; $ui.LayBad = New-Object System.Collections.Generic.List[string]; $ui.LaySeen = @{}; $ui.LayCards = @{}; $ui.LayScroll = @{}
 try { $ui.LayOn = [bool]([System.Windows.Forms.Application].GetMethod('SetCompatibleTextRenderingDefault') -and ($env:RADE_LAYOUT -eq '1' -or @($apps | Where-Object { [string]$_.Mode -ne 'deploy' }).Count)) } catch { $null = $_ }   # the real Windows Forms only: the test stand-ins have no layout
 $ui.NameOf = { param($C)
   foreach ($k in @($ui.Keys)) { if ([object]::ReferenceEquals($ui[$k], $C)) { return [string]$k } }
@@ -172,8 +172,10 @@ $ui.Check = {
   if ($ui.Picked -and (Test-Deploy) -and $env:RADE_LAYOUT -ne '1') { return }   # a deploy does not run it, also when the paste has a test application
   $card = $(if ($ui.RecOn) { 'record' } else { [string]$ui.View })
   try {
-    if (-not $ui.Form.Visible) { return }
-    $key = $card + '|' + $ui.View + '|' + $ui.Sent.Text + '|' + $ui.Kick.Text; if ($ui.LaySeen.ContainsKey($key)) { return }; $ui.LaySeen[$key] = 1
+    if (-not $ui.Form.Visible -or [string]$ui.Form.WindowState -eq 'Minimized') { return }
+    # One check for each card at each window size (R28: the check runs again after a resize).
+    $key = $card + '|' + $ui.View + '|' + $ui.Sent.Text + '|' + $ui.Kick.Text; $ui.LayCards[$key] = 1
+    $key += '|' + $ui.Form.ClientSize.Width + 'x' + $ui.Form.ClientSize.Height; if ($ui.LaySeen.ContainsKey($key)) { return }; $ui.LaySeen[$key] = 1
     if ($ui.Scrolls -and -not $ui.RecOn) { $ui.LayScroll[$card] = 1 }
     $todo = New-Object System.Collections.Stack; $todo.Push(@($ui.Form, $ui.Form.RectangleToScreen($ui.Form.ClientRectangle), $false))
     while ($todo.Count) {

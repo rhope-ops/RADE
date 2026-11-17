@@ -146,7 +146,7 @@ has "view=answer light=RADE waits for you kick=STEP 2 OF 3 · QUESTION 1 OF 3 se
 # 1c. A minimized window comes back when RADE needs the person; it has its own taskbar button (Application.Run: no owner).
 # The layout line and the SCALE line at 100 %; the sizes RADE sets after the form has scaled, at 100 % (the same numbers as
 # before the one scale source: tests/window_driver.ps1 "WIN measure").
-has "WIN restored=Normal taskbar=True minbox=True shown-by=Run" "WIN layline=Layout self-check: PASS layout, 0 cards (1020 x 684 at 100 %) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=96x96 font=17 fontPt=10 fontScale=1 ctlScale=1 realDpi=n/a aware=n/a screen=1280x800 work=1280x720 client=1020x684 state=Normal logo=40x40 btn=400x40" \
+has "WIN restored=Normal taskbar=True minbox=True shown-by=Run" "WIN layline=Layout self-check: PASS layout, 0 cards (1216 x 684 at 100 %) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=96x96 font=17 fontPt=10 fontScale=1 ctlScale=1 realDpi=n/a aware=n/a screen=1280x800 work=1280x720 client=1216x684 state=Normal logo=40x40 btn=400x40" \
   "WIN measure choice h=110 gap=8 plan-x=54" "WIN measure record box=5,4 label=5,6 rows=268" && ok || { bad "window 1c: restore, taskbar, the scale line"; grep "restored=\|layline=" "$t/win.txt" | cut -c1-300; }
 # 1d. Polish after the R24 pictures (docs/window-design.md "Sizes"): the header and the label-box-button rows share one
 # midpoint within 1 px (from margins and sizes; an odd height gives a half pixel; the stand-ins have no layout), a box is as tall as a compact button, gaps of 8; the
@@ -193,7 +193,15 @@ has "view=stopped light=failed kick=STOPPED sent=The install stopped. p=A file t
 # no fonts: text heights, the logo and the buttons made before the form scaled stay at their coded sizes here, and the
 # layout self-check does not run (the Windows job and a round on a work computer measure those).
 scale=150 win 1 done 1 0
-has "WIN measure choice h=120 gap=12 plan-x=81" "WIN measure record box=8,6 label=8,9 " "(1020 x 684 at 150 % (the form auto-scale; the screen dpi says 100 %)) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=144x144 " "fontPt=15 fontScale=1.5 ctlScale=1.5 " && ok || { bad "window 5: scale 150 % with a 96 dpi screen"; grep "measure\|layline" "$t/win.txt" | cut -c1-300; }
+has "WIN measure choice h=120 gap=12 plan-x=81" "WIN measure record box=8,6 label=8,9 " "(1280 x 720 at 150 % (the form auto-scale; the screen dpi says 100 %)) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=144x144 " "fontPt=15 fontScale=1.5 ctlScale=1.5 " && ok || { bad "window 5: scale 150 % with a 96 dpi screen"; grep "measure\|layline" "$t/win.txt" | cut -c1-300; }
+# 6. Window size and place (R28): the place is saved at close; bounds off every screen are ignored (first run: maximized, the screen with the
+# mouse); saved bounds are used and keep their size and state. The file holds numbers and two words only.
+wp="$t/wu/test1234/OneDrive - United States Air Force/RADE/Config/rade-window.json"
+[ -f "$wp" ] && grep -q '"closed"' "$wp" && ! grep -qi 'test1234\|http' "$wp" && ok || bad "window place: the file is written at close, numbers only"
+printf '{"x":9000,"y":9000,"w":800,"h":600,"state":"Normal","dpi":96}' > "$wp"; win 1 done 1 0
+has "placed=first run" "lastClose=" && ok || bad "window place: bounds off every screen are ignored"
+printf '{"x":50,"y":40,"w":1100,"h":650,"state":"Normal","dpi":96}' > "$wp"; win 1 done 1 0
+has "placed=saved" "shown=1100x650/Normal" && grep -q '"w": 1100' "$wp" && ok || bad "window place: saved bounds are used and saved again"
 
 echo "GROUP $pass $fail"; } > "$t/grp-W.log" 2>&1 &
 # 0. A skipped step: the run is PASSED but the version is not recorded as installed (review of deploy v1).
