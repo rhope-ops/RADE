@@ -55,6 +55,7 @@ def run(cs):
         new, _ = cs.compare(cs.measure(config)['violations'], {}, config['caps'])
         assert any('C1' in x and 'c.sh' in x for x in new), 'a file without a header fails: %s' % new
         self_test_kinds(cs, ROOT, g, config)
+        self_test_forms(cs, ROOT, g, config)
         self_test_main(cs, ROOT, g)
     print('code standard self-test: pass')
     return 0
@@ -110,3 +111,32 @@ def self_test_main(cs, root, g):
     assert 'config' in ' '.join(cs.against_main(raised)[0]), 'a raised cap fails'
     (root / 'docs' / 'DECISIONS.md').write_text('# Decisions\n| cap 9 | tests/code-standard-baseline.json |\n')
     assert cs.against_main(raised)[0] == [], 'a cap change with a DECISIONS row passes'
+
+
+def self_test_forms(cs, root, g, config):
+    """Self-test of function forms and comment places: shell `function name {` and a brace on the next line are found;
+    a comment after a one-line function, or a file help header, is not that function's comment; a Python `#` line
+    before the first statement counts; an arrow with no braces is not a function; bodies that differ only in their
+    docstrings are duplicates; a Python parse error fails."""
+    (root / 'h.sh').write_text('#!/bin/sh\n# Sample shell file: two function forms, for the check self-test only.\n'
+                               'function longfn {\n  a=1\n}\nnext()\n{\n  b=2\n}\n')
+    (root / 'i.ps1').write_text('<#\n.SYNOPSIS\n  Sample PowerShell file: a help header, for the check self-test only.\n#>\n'
+                                'function Get-A { 1 }\n# Returns two.\nfunction Get-B { 2 }\n')
+    (root / 'j.py').write_text('"""Sample module: comment places and duplicates, for the check self-test only."""\n\n\n'
+                               'def lead(x):\n    # Returns x.\n    return x\n\n\n' + ''.join(
+                                   'def %s(x):\n    """%s"""\n    y = x + 1\n    y = y * 2\n    y = y - 3\n    return y\n\n\n'
+                                   % (n, doc) for n, doc in (('p', 'One.'), ('q', 'Two.'))))
+    (root / 'k.js').write_text('// Sample JavaScript file: an arrow with no braces, for the check self-test only.\n'
+                               '// Adds one.\nconst inc = x => x + 1;\n// Doubles.\nfunction dbl(x) {\n  return 2 * x;\n}\n')
+    (root / 'l.py').write_text('"""Sample module that does not parse, for the check self-test only (rule C10)."""\ndef (:\n')
+    g('add', '.')
+    v = cs.measure(config)['violations']
+    assert {'h.sh::longfn', 'h.sh::next'} <= set(v['comment']), 'shell function forms are found: %s' % v['comment']
+    assert 'i.ps1::Get-A' in v['comment'] and 'i.ps1::Get-B' not in v['comment'], 'comment places: %s' % v['comment']
+    assert 'j.py::lead' not in v['comment'], 'a Python lead comment counts: %s' % v['comment']
+    assert {'j.py::p', 'j.py::q'} <= set(v['duplicate']), 'docstring-only difference is a duplicate: %s' % v['duplicate']
+    assert not any(k.startswith('k.js::') for k in v['comment'].keys() | v['length'].keys()), 'arrow: %s' % v['length']
+    assert v['parse'].get('l.py'), 'a Python parse error fails: %s' % v['parse']
+    for f in ('h.sh', 'i.ps1', 'j.py', 'k.js', 'l.py'):
+        (root / f).unlink()
+    g('add', '-A')

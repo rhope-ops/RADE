@@ -97,17 +97,6 @@ def matches(rel, patterns):
 
 # ---------------------------------------------------------------- headers (C1) and generated files (C6) ---------------
 
-def header_text(lines, lang):
-    """Return the text of the comment block at the top of a file (after a shebang, blank and `#Requires` lines), or
-    '' when the file does not start with a comment. header_end() gives the line where that block ends."""
-    return header_block(lines, lang)[0]
-
-
-def header_end(lines, lang):
-    """Return the 1-based number of the last line of the file's header comment (0 when there is none)."""
-    return header_block(lines, lang)[1]
-
-
 def header_block(lines, lang):
     """Return (text, last line number) of the comment block at the top of a file; ('', 0) when there is none."""
     i = 0
@@ -125,7 +114,8 @@ def header_block(lines, lang):
     mark = '//' if lang == 'js' else '#'
     text = []
     while i < len(lines) and lines[i].strip().startswith(mark):
-        text.append(lines[i].strip().lstrip(mark + '/').strip())
+        if not DIVIDER.match(lines[i]):   # a divider line says nothing about the file
+            text.append(lines[i].strip().lstrip(mark + '/').strip())
         i += 1
     return ' '.join(text), i
 
@@ -180,10 +170,12 @@ def python_functions(text):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 name = prefix + child.name
                 top = min([child.lineno] + [d.lineno for d in child.decorator_list])
-                first_body = lines[child.body[0].lineno - 1].strip() if child.body else ''
-                inner = bool(ast.get_docstring(child)) or first_body.startswith('#') \
+                first = child.body[0].lineno if child.body else child.lineno + 1
+                lead = [x.strip() for x in lines[child.lineno:first - 1]]   # lines before the first statement
+                inner = bool(ast.get_docstring(child)) or any(x.startswith('#') for x in lead) \
                     or lines[child.lineno - 1].split(':', 1)[-1].strip().startswith('#')
-                body = '\n'.join(lines[child.lineno:child.end_lineno])
+                skip = 1 if ast.get_docstring(child) and len(child.body) > 1 else 0   # C5 compares code, not the docstring
+                body = '\n'.join(lines[child.body[0].end_lineno if skip else child.lineno:child.end_lineno])
                 found.append((name, top, child.lineno, child.end_lineno, inner, body))
                 visit(child, name + '.')
             elif isinstance(child, ast.ClassDef):
@@ -204,7 +196,7 @@ foreach ($path in [Console]::In.ReadToEnd().Split("`n")) {
   $list = @(); $blocks = @()
   foreach ($f in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) {
     $s = $f.Extent.StartLineNumber; $e = $f.Extent.EndLineNumber
-    $list += @{ name = $f.Name; start = $s; end = $e; inner = ($null -ne $f.GetHelpContent()) -or [bool]$comments[$s + 1] }
+    $list += @{ name = $f.Name; start = $s; end = $e; inner = ($e -gt $s + 1) -and [bool]$comments[$s + 1] }
   }
   # A script block kept in a variable or a hashtable key ($ui.Say = { ... }) is a function too: the window code uses
   # them. Any other script block (an argument, such as $b.Add_Click({ ... })) is measured for its length only.
@@ -213,7 +205,7 @@ foreach ($path in [Console]::In.ReadToEnd().Split("`n")) {
     if ($p -is [System.Management.Automation.Language.PipelineAst]) { $p = $p.Parent }
     $s = $b.Extent.StartLineNumber; $e = $b.Extent.EndLineNumber
     if ($p -is [System.Management.Automation.Language.AssignmentStatementAst]) {
-      $list += @{ name = $p.Left.Extent.Text; start = $s; end = $e; inner = [bool]$comments[$s + 1] }
+      $list += @{ name = $p.Left.Extent.Text; start = $s; end = $e; inner = ($e -gt $s + 1) -and [bool]$comments[$s + 1] }
     } elseif ($e - $s -ge 2) {
       $call = ($b.Parent.Extent.Text -split "`n")[0]; $call = $call.Substring(0, [math]::Min(40, $call.Length)).Trim()
       $blocks += @{ name = '{block in ' + $call + '}'; start = $s; end = $e }
@@ -253,7 +245,7 @@ def powershell_functions(paths):
 JS_FUNC = re.compile(r'^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)\s*\(|'
                      r'^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)|'
                      r'^\s+(?:static\s+)?(?:async\s+)?(?!(?:if|for|while|switch|catch|function|return)\b)([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{')
-SH_FUNC = re.compile(r'^\s*(?:function\s+)?([A-Za-z_][\w-]*)\s*\(\)\s*\{')
+SH_FUNC = re.compile(r'^\s*(?:function\s+([A-Za-z_][\w-]*)\s*(?:\(\))?|([A-Za-z_][\w-]*)\s*\(\))\s*(?:\{|$)')
 
 
 def brace_functions(text, pattern, comment_mark):
@@ -268,13 +260,15 @@ def brace_functions(text, pattern, comment_mark):
         name = next(g for g in m.groups() if g)
         depth, end, opened = 0, i, False
         for j in range(i, len(lines)):
+            if j > i + 1 and not opened:
+                break   # no body opens on this line or the next: not a function (for example `const f = x => x + 1;`)
             depth, opened = count_braces(lines[j], depth, opened, comment_mark)
             if opened and depth <= 0:
                 end = j
                 break
         if not opened:
             continue
-        first = lines[i + 1].strip() if i + 1 < len(lines) else ''
+        first = lines[i + 1].strip() if end > i + 1 else ''   # a one-line function has no inner first line
         found.append((name, i + 1, i + 1, end + 1, first.startswith(comment_mark), '\n'.join(lines[i + 1:end + 1])))
     return found
 
