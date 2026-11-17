@@ -61,7 +61,7 @@ function global:Step-Rade {
     foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Index -eq $global:RadeT.App) { $o.PerformClick(); return } }
     Write-Host 'WIN BAD no choice for the application'; [Environment]::Exit(4)
   }
-  elseif ($v -eq 'maint') { $ui.B[0].PerformClick() }
+  elseif ($v -eq 'maint') { @($ui.B | Where-Object { $_.Visible -and $_.Enabled -and $_.Text -notlike 'Start *' })[0].PerformClick() }   # Repair or Update (Start would start the application)
   elseif ($v -eq 'site') { $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }
   elseif ($v -in 'fail', 'need') {
     $id = [string]@($script:appChecks)[([int]($ui.Kick.Text -replace '^CHECK (\d+) OF .*$', '$1')) - 1]
@@ -77,6 +77,10 @@ function global:Step-Rade {
     $ib = @($ui.B | Where-Object { $_.Visible -and $_.Text -in 'Install', 'Run' })[0]; $ib.PerformClick()
   }
   elseif ($v -eq 'hand') {
+    if (-not $global:RadeT.NoAddr -and $ui.FieldRow.Visible) {   # R28 N1: the same step with no address: no address row (its own picture and self-check)
+      $global:RadeT.NoAddr = $true; $g0 = $ui.GUrl; $s0 = $ui.G.Step; $ui.GUrl = ''; $ui.G.Step = $s0.Clone(); $ui.G.Step.UrlConfig = ''
+      & $ui.VHand; Save-RadeCard 'noaddress-hand'; Write-Host ('WIN no-address field=' + $ui.FieldRow.Visible + ' guide=' + $ui.Guide.Visible + ' path=' + $ui.PathT.Visible)
+      $ui.GUrl = $g0; $ui.G.Step = $s0; & $ui.VHand }
     if ($ui.B[1].Text -ne 'It failed') { $ui.B[0].PerformClick() }
     elseif ($global:RadeT.Hand -eq 'fail') { $ui.B[1].PerformClick() } else { $ui.B[0].PerformClick() }
   }

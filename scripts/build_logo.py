@@ -1,53 +1,27 @@
 #!/usr/bin/env python3
-"""Build the official logo for every app in this project (the Administrator, 2026-11-14: variant K).
+"""Build RADE's logo: Rho Bold (USAF-B) (the Administrator, 2026-11-17; docs/DECISIONS.md "Logo"; it replaces logo K from engine-v10).
 
-Logo K: a square frame and a square turned 45 degrees, woven over and under at the 8 crossings, with a serif
-Greek rho in the center; all lines Air Force Blue on a white disc, inside an Air Force Blue ring, with a yellow
-stripe inside the ring (blue on both sides of it). It reads on blue and on white headers.
+Rho Bold: a white Greek rho at the center of an Air Force Blue disc, inside a thin white ring; a yellow beam tipped 9 degrees past
+a dotted white level line, with a heavy yellow weight that drops on the right, a small yellow end dot on the left, and a yellow
+fulcrum below the rho. Everything inside the ring is at 90 %. The rho is the regular serif rho made thicker by a stroke (a bold
+font would turn it into a Latin "p"), with a blue halo that clears the beam around it. Colors: blue, yellow and white only
+(on the blue disc: white 11.5:1, yellow 7.7:1).
+Source: RhoBold.dc.html on the Rho canvas (https://claude.ai/artifact/Qw7iSQaz1FMzZQtycjrZxq); this script makes the same SVG.
 Master copy: this repo (assets/logo). Other repos copy a PNG only where a build needs the file and say so.
 
 Run: python3 scripts/build_logo.py, then node scripts/render_logo.js for the PNGs. Never hand-edit the outputs.
 """
-import math
 import pathlib
 
 BLUE, YELLOW, WHITE = "#00308F", "#FFCD00", "#FFFFFF"   # AF Blue PMS 287; yellow PMS 116 (confirm against the brand guide)
-R = 64                     # viewBox half-size
-S, D = 29.0, 39.0          # frame half-side; diamond half-diagonal
-SW, GAP = 8.0, 1.6         # stroke width; clear space each side of the over-stroke at a crossing
-H = SW / 2 * math.sqrt(2) + SW / 2 + GAP + 0.5   # half-length of each cut: clears the whole under-stroke
-DISC_R = 58                # white disc
-RING_R, RING_W = 58.5, 8   # blue ring (54.5 to 62.5)
-EDGE_R, EDGE_W = 58.5, 3   # yellow stripe centered in the blue ring (57.0 to 60.0; the Administrator 2026-11-14, version 2: the line outside
-                           # the ring ran to 63.8 of 64 and was cut off at 4 points, and yellow beside white is 1.5:1; now yellow touches only blue)
-
-
-def rot(p, k):             # rotate (x, y) by k * 90 degrees
-    x, y = p
-    for _ in range(k):
-        x, y = -y, x
-    return x, y
-
-
-c = D - S                  # crossing offset from an edge midpoint
-diamond_over, frame_over = [], []
-for k in range(4):         # pinwheel: alternate over/under along both paths
-    diamond_over.append((rot((-c, -S), k), rot((-1, 1), k)))   # cut runs along the diamond side
-    frame_over.append((rot((c, -S), k), rot((1, 0), k)))       # cut runs along the frame edge
-
-
-def cuts(items):
-    out = []
-    for (x, y), (dx, dy) in items:
-        n = math.hypot(dx, dy)
-        dx, dy = dx / n * H, dy / n * H
-        out.append(f'<line x1="{x-dx:.2f}" y1="{y-dy:.2f}" x2="{x+dx:.2f}" y2="{y+dy:.2f}"/>')
-    return "".join(out)
-
-
-frame = f"M{-S} {-S}H{S}V{S}H{-S}Z"
-diamond = f"M0 {-D}L{D} 0L0 {D}L{-D} 0Z"
-gap_w = SW + 2 * GAP
+C = 256                    # viewBox center (0 0 512 512)
+DISC_R = 248               # blue disc
+RING_R, RING_W = 230, 8    # white ring
+INNER = 0.9                # everything inside the ring is at 90 %
+LEVEL = (60, 452, 6, "3 14")                    # dotted level line: x from, x to, stroke, dash
+BEAM = ((62.4, 225.3), (449.6, 286.7), 14)      # the beam, tipped 9 degrees (right end down)
+WEIGHT_R, DOT_R = 22, 13                        # heavy weight (right end), light end dot (left end)
+FULCRUM = "M256 384 l-28 42 h56 z"              # the fulcrum under the rho
 
 # Greek rho, outline copied once from FreeSerif (GNU FreeFont, GPL with font exception) so the logo needs no
 # installed font. Font units: 1000/em, ink box x 50..487, y -221..461.
@@ -57,32 +31,34 @@ RHO = ("M272 461Q371 461 429.0 397.0Q487 333 487 233Q487 129 427.5 59.5Q368 -10 
        "Q130 414 173.0 437.5Q216 461 272 461ZM262 432Q138 432 138 239Q138 205 146.0 168.5Q154 132 170.0 97.5"
        "Q186 63 215.0 41.0Q244 19 281 19Q314 19 337.5 35.5Q361 52 373.0 80.0Q385 108 390.0 136.5"
        "Q395 165 395 196Q395 232 389.0 268.5Q383 305 369.5 344.0Q356 383 328.0 407.5Q300 432 262 432Z")
-RHO_K = 0.04               # scale: ink height 27.3 units
-RHO_CY = 1.5               # ink-box center below the mark center; the thin tail sits low, so the bowl reads centered
-rho_tx = -(50 + 487) / 2 * RHO_K
-rho_ty = RHO_CY + (461 + -221) / 2 * RHO_K
+RHO_K = 0.3255             # scale of the outline
+RHO_AT = (262.0, 256.0)    # where the center of the outline's box goes (the bowl reads centered)
+RHO_CENTER = (268.5, 120.0)
+HALO_W, BOLD_W = 132, 28   # blue halo stroke (clears the beam), white thickening stroke
 
 
 def svg():
-    m = f'maskUnits="userSpaceOnUse" x="{-R}" y="{-R}" width="{2*R}" height="{2*R}"'
-    full = f'<rect x="{-R}" y="{-R}" width="{2*R}" height="{2*R}" fill="#fff"/>'
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="{-R} {-R} {2*R} {2*R}" width="512" height="512" role="img" aria-label="Logo: Greek letter rho inside a square frame and a square turned 45 degrees, woven, in a blue ring with a yellow stripe inside the ring">
-  <!-- Generated by scripts/build_logo.py (logo K). Do not hand-edit. -->
-  <defs>
-    <mask id="cut-diamond" {m}>{full}<g stroke="#000" stroke-width="{gap_w}">{cuts(frame_over)}</g></mask>
-    <mask id="cut-frame" {m}>{full}<g stroke="#000" stroke-width="{gap_w}">{cuts(diamond_over)}</g></mask>
-  </defs>
-  <circle r="{DISC_R}" fill="{WHITE}"/>
-  <circle r="{RING_R}" fill="none" stroke="{BLUE}" stroke-width="{RING_W}"/>
-  <circle r="{EDGE_R}" fill="none" stroke="{YELLOW}" stroke-width="{EDGE_W}"/>
-  <path d="{diamond}" fill="none" stroke="{BLUE}" stroke-width="{SW}" mask="url(#cut-diamond)"/>
-  <path d="{frame}" fill="none" stroke="{BLUE}" stroke-width="{SW}" mask="url(#cut-frame)"/>
-  <path d="{RHO}" fill="{BLUE}" transform="translate({rho_tx:.2f} {rho_ty:.2f}) scale({RHO_K} {-RHO_K})"/>
+    (x1, y1), (x2, y2), bw = BEAM
+    lx1, lx2, lw, dash = LEVEL
+    rho_t = f"translate({RHO_AT[0]:.1f} {RHO_AT[1]:.1f}) skewX(0) scale({RHO_K} {-RHO_K}) translate({-RHO_CENTER[0]} {-RHO_CENTER[1]})"
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Logo: white Greek letter rho on an Air Force Blue disc, with a yellow beam tipped past a dotted level line over a yellow fulcrum, inside a white ring">
+  <!-- Generated by scripts/build_logo.py (Rho Bold, USAF-B). Do not hand-edit. -->
+  <circle cx="{C}" cy="{C}" r="{DISC_R}" fill="{BLUE}"/>
+  <circle cx="{C}" cy="{C}" r="{RING_R}" fill="none" stroke="{WHITE}" stroke-width="{RING_W}"/>
+  <g transform="translate({C} {C}) scale({INNER}) translate({-C} {-C})">
+    <line x1="{lx1}" y1="{C}" x2="{lx2}" y2="{C}" stroke="{WHITE}" stroke-width="{lw}" stroke-dasharray="{dash}" stroke-linecap="round"/>
+    <line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{YELLOW}" stroke-width="{bw}" stroke-linecap="round"/>
+    <circle cx="{x2}" cy="{y2}" r="{WEIGHT_R}" fill="{YELLOW}"/>
+    <circle cx="{x1}" cy="{y1}" r="{DOT_R}" fill="{YELLOW}"/>
+    <path d="{FULCRUM}" fill="{YELLOW}"/>
+    <path transform="{rho_t}" d="{RHO}" fill="{BLUE}" stroke="{BLUE}" stroke-width="{HALO_W}" stroke-linejoin="round"/>
+    <path transform="{rho_t}" d="{RHO}" fill="{WHITE}" stroke="{WHITE}" stroke-width="{BOLD_W}" stroke-linejoin="round"/>
+  </g>
 </svg>
 '''
 
 
 d = pathlib.Path(__file__).resolve().parent.parent / "assets" / "logo"
 d.mkdir(parents=True, exist_ok=True)
-(d / "logo-K.svg").write_text(svg())
-print("wrote", d / "logo-K.svg")
+(d / "logo-rho.svg").write_text(svg())
+print("wrote", d / "logo-rho.svg")

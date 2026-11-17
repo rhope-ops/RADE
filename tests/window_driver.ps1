@@ -5,7 +5,7 @@
 # skip), RADE_T_RECORD (1 = open "Record" and clear the Clean-up box before the run), RADE_T_TOUR (1 = the
 # application also gets the site, sign-in and Power Automate checks, and a base check of the test application is FAILED),
 # RADE_T_LOOP (1 = Application.Run fails as when a message loop already runs: the window must open with ShowDialog),
-# RADE_T_FAULT (boot = the boot checks throw; noapps = the paste lists no application), RADE_T_CANCEL (1 = select Cancel on the first checking card), RADE_T_START (1 = select the Start button when the Ready card has it), RADE_T_SCALE (150 = the form scales to 144 dpi while the screen dpi says 96, as on the R24 device). It prints "WIN measure"
+# RADE_T_FAULT (boot = the boot checks throw; noapps = the paste lists no application), RADE_T_CANCEL (1 = select Cancel on the first checking card), RADE_T_START (1 = select the Start button when the Ready card has it; maint = select Start on the Maintenance card), RADE_T_LINK (a folder: the Ready card's shortcut box first gets a folder that does not exist, then this one), RADE_T_SCALE (150 = the form scales to 144 dpi while the screen dpi says 96, as on the R24 device). It prints "WIN measure"
 # lines: sizes RADE sets after the form has scaled (a choice on Choose, the Record's step boxes and labels, made then).
 # A button that showed a longer text on an earlier card must be able to shrink (AutoSize GrowAndShrink): else WIN BAD.
 # Alignment (no layout here): "WIN mid" lines give the vertical midpoints of an aligned row from its margins and sizes
@@ -22,8 +22,9 @@ function global:Show-RadeCard {
   $bs = @($ui.B | Where-Object { $_.Shown } | ForEach-Object { $(if ($_.Enabled) { '[' } else { '(' }) + $_.Text + $(if ($_.Enabled) { ']' } else { ')' }) }) -join ' '
   $os = @($ui.Opts.Controls | ForEach-Object { $(if ($_.Tag.Off) { 'OFF ' } else { [string]$_.Tag.Key + ' ' }) + $_.Tag.Name + $_.Tag.Ver + $(if ($_.Tag.Note) { ' NOTE ' + $_.Tag.Note } else { '' }) }) -join '; '
   Write-Host ('WIN view=' + $ui.View + ' light=' + ([string]$ui.Light.AccessibleName).Substring(14) + ' kick=' + $(if ($ui.Kick.Shown) { $ui.Kick.Text } else { '' }) + ' sent=' + $ui.Sent.Text + ' p=' + $ps + $(if ($ui.Opts.Shown) { ' opts=' + $os } else { '' }) +
-    $(if ($ui.Steps.Shown) { ' steps=' + ((0..($ui.NumLabels.Count - 1) | ForEach-Object { $ui.NumLabels[$_].Text + ' ' + $ui.NumTexts[$_].Text }) -join ' ~ ') } else { '' }) + $(if ($ui.Rest.Shown) { ' rest=' + ($ui.Rest.Text -replace '\r\n', ' ~ ') } else { '' }) + $(if ($ui.Close.Shown) { ' close=' + $ui.Close.Text } else { '' }) + $(if ($ui.Note.Shown) { ' note=' + $ui.Note.Text } else { '' }) + $(if ($ui.Help.Shown) { ' help=' + $ui.Help.Text } else { '' }) + ' btn=' + $bs + $(if ($ui.Foot.Shown) { ' foot=' + $ui.Foot.Text } else { '' }) + $(if ($ui.StepRow.Shown) { ' step=' + $ui.StepName.Text + ' lastlog-font=' + $ui.LastLog.Font.Name + $ui.LastLog.Font.SizeInPoints } else { '' }) +
-    $(if ($ui.TestRow.Shown) { ' test=shown' } else { '' }) + ' back=' + [bool]$ui.BackB.Shown + ' right=' + $ui.RightL.Text + ' app=' + $ui.AppL.Text)
+    $(if ($ui.Guide.Shown -and @($ui.GuideNums).Count) { ' steps=' + ((@(for ($i = 0; $i -lt @($ui.GuideNums).Count; $i++) { $ui.GuideNums[$i] + ' ' + $ui.GuideTexts[$i] })) -join ' ~ ') } else { '' }) + $(if ($ui.Guide.Shown -and @($ui.GuideRest).Count) { ' rest=' + (@($ui.GuideRest) -join ' ~ ') } else { '' }) + $(if ($ui.Close.Shown) { ' close=' + $ui.Close.Text } else { '' }) + $(if ($ui.Note.Shown) { ' note=' + $ui.Note.Text } else { '' }) + $(if ($ui.Help.Shown) { ' help=' + $ui.Help.Text } else { '' }) + ' btn=' + $bs + $(if ($ui.Foot.Shown) { ' foot=' + $ui.Foot.Text } else { '' }) + $(if ($ui.StepRow.Shown) { ' step=' + $ui.StepName.Text + ' lastlog-font=' + $ui.LastLog.Font.Name + $ui.LastLog.Font.SizeInPoints } else { '' }) +
+    $(if ($ui.TestRow.Shown) { ' test=shown' } else { '' }) + ' back=' + [bool]$ui.BackB.Shown + ' right=' + $ui.RightL.Text + ' app=' + $ui.AppL.Text +
+    $(if ($ui.FieldRow.Shown) { ' field=' + $ui.FieldL.Text + ':' + $ui.Field.Text } else { '' }) + $(if ($ui.PathT.Shown) { ' path=' + ($ui.PathT.Text -replace "`n", '') } else { '' }) + $(if ($ui.StepRow.Shown) { ' time=' + $ui.StepTime.Text } else { '' }))
   # The stand-ins have no layout: a button keeps the width of its longest text unless it can shrink (Windows Forms GrowOnly).
   for ($k = 0; $k -lt @($ui.B).Count; $k++) { $b = $ui.B[$k]; if (-not $b.Shown) { continue }; $was = [int]$global:RadeT.Long[$k]
     if ($was -gt $b.Text.Length -and [string]$b.Values['AutoSizeMode'] -ne 'GrowAndShrink') { Write-Host ('WIN BAD button ' + $k + ' "' + $b.Text + '" keeps the width of a ' + $was + '-character text in view ' + $ui.View) }
@@ -74,7 +75,8 @@ function global:Push-RadeButton([string]$Text) {
   elseif ($v -eq 'checking' -and $env:RADE_T_CANCEL -eq '1' -and -not $global:RadeT.Cancelled) { $global:RadeT.Cancelled = $true; Write-Host ('WIN cancel busy=' + $ui.Busy + ' always=' + $ui.Always[0]); Push-RadeButton 'Cancel' }   # R28: Cancel on the checking card goes back to Choose
   elseif ($v -eq 'maint') {
     if (-not $global:RadeT.Esc) { $global:RadeT.Esc = $true; Write-Host 'WIN esc'; $ui.Form.Key('Escape'); return }   # Esc = Back: Choose again; the user chooses the same application
-    $ui.B[0].PerformClick()
+    if ($env:RADE_T_START -eq 'maint') { Push-RadeButton ('Start ' + $script:app.Name); Write-Host ('WIN maint-start started=' + $ui.Started + ' closed=' + $ui.Form.Closed); Write-Host ('WIN closed=' + $ui.Form.Closed); return }   # R28: Start runs the checks, then starts the application
+    @($ui.B | Where-Object { $_.Shown -and $_.Enabled -and $_.Text -notlike 'Start *' })[0].PerformClick()   # Repair (or Update)
   }
   elseif ($v -eq 'site') { $ui.Field.Text = 'not an address'; $ui.B[0].PerformClick(); Write-Host ('WIN site-note=' + $ui.Note.Text); $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }   # .invalid never resolves: the site check fails on every computer
   elseif ($v -in 'fail', 'need') {
@@ -91,6 +93,9 @@ function global:Push-RadeButton([string]$Text) {
     & $ui.Next
   }
   elseif ($v -eq 'ready') {
+    if ($env:RADE_T_START -eq 'maint') { return }   # Start on Maintenance: the window starts the application when the checks have passed
+    if ($env:RADE_T_LINK -and $ui.FieldRow.Shown -and -not $global:RadeT.Linked) {   # R29 N8: a folder that does not exist is refused; then the folder of the test
+      $global:RadeT.Linked = $true; $ui.Field.Text = (Join-Path $env:RADE_T_LINK 'no-such-folder'); Push-RadeButton 'Install'; Write-Host ('WIN link-bad view=' + $ui.View + ' note=' + $ui.Note.Text) }
     if (-not $global:RadeT.Min) {   # a minimized window: RADE brings it back when it needs the person; it has its own taskbar button
       $global:RadeT.Min = $true; $ui.Form.WindowState = 'Minimized'; & $ui.ToFront
       Write-Host ('WIN restored=' + $ui.Form.WindowState + ' taskbar=' + $ui.Form.Values['ShowInTaskbar'] + ' minbox=' + $ui.Form.Values['MinimizeBox'] + ' shown-by=' + [RadeStub.Driver]::ShownBy)
@@ -116,6 +121,7 @@ function global:Push-RadeButton([string]$Text) {
       Write-Host ('WIN start-button=' + $sb.Text + ' main=' + $ui.Form.Values['AcceptButton'].Text)
       if ($env:RADE_T_START -eq '1') { $sb.PerformClick(); Write-Host ('WIN started=' + $ui.Started + ' closed=' + $ui.Form.Closed + ' note=' + $ui.Note.Text); Write-Host ('WIN closed=' + $ui.Form.Closed); return }
     }
+    if ($env:RADE_T_LINK -and $ui.FieldRow.Shown) { $ui.Field.Text = $env:RADE_T_LINK }   # the folder is set last: the Record redraws the card
     $ib = @($ui.B | Where-Object { $_.Shown -and $_.Text -in 'Install', 'Run' })[0]; $ib.PerformClick()
   }
   elseif ($v -eq 'hand') {
@@ -123,10 +129,20 @@ function global:Push-RadeButton([string]$Text) {
     Write-Host ('WIN mid hand label=' + (& $m $ui.FieldL) + ' box=' + (& $m $ui.FieldBox) + ' button=' + (& $m $ui.FieldB) + ' box-h=' + $ui.FieldBox.Height + ' button-h=' + $ui.FieldB.PreferredSize.Height + ' gaps=' + ($ui.FieldL.Margin.Right + $ui.FieldBox.Margin.Left) + ',' + ($ui.FieldBox.Margin.Right + $ui.FieldB.Margin.Left) + ' inner=' + $ui.Field.Width + '/' + $ui.FieldBox.Width + ' tick=' + $ui.TickP.Margin.Left)
     Write-Host ('WIN mid header logo=' + ($ui.Logo.Margin.Top + $ui.Logo.Height / 2.0) + ' word=' + (& $m $ui.WordL) + ' app=' + (& $m $ui.AppL))
     $bc = @($ui.Body.Controls); $tc = @($ui.Tail.Controls)
-    Write-Host ('WIN hand-order address-above-lines=' + ($bc.IndexOf($ui.FieldRow) -lt $bc.IndexOf($ui.Steps)) + ' steps-above-rest=' + ($bc.IndexOf($ui.Steps) -lt $bc.IndexOf($ui.Rest)) + ' closing-above-buttons=' + ($tc.IndexOf($ui.Close) + 1 -eq $tc.IndexOf($ui.BtnRow)) + ' closing-gap=' + $ui.BtnRow.Margin.Top)
+    Write-Host ('WIN hand-order address-above-lines=' + ($bc.IndexOf($ui.FieldRow) -lt $bc.IndexOf($ui.Guide)) + ' lines-above-path=' + ($bc.IndexOf($ui.Guide) -lt $bc.IndexOf($ui.PathL) -and $bc.IndexOf($ui.PathL) + 1 -eq $bc.IndexOf($ui.PathT)) + ' path-above-links=' + ($bc.IndexOf($ui.PathT) -lt $bc.IndexOf($ui.LinkRow)) + ' closing-above-buttons=' + ($tc.IndexOf($ui.Close) + 1 -eq $tc.IndexOf($ui.BtnRow)) + ' closing-gap=' + $ui.BtnRow.Margin.Top)
     Write-Host ('WIN F tokens=' + ((@($ui.F.Keys) | Sort-Object) -join ',') + ' mono-only-in-record=' + [bool]([object]::ReferenceEquals($ui.RecText.Font, $ui.F.Mono) -and -not @($ui.F.Keys | Where-Object { $_ -ne 'Mono' -and $ui.F[$_].Name -eq 'Consolas' }).Count) + ' sent=' + $ui.F.Sent.Name + $ui.F.Sent.SizeInPoints + ' body=' + $ui.F.Body.Name + $ui.F.Body.SizeInPoints + ' small=' + $ui.F.Small.SizeInPoints + ' smallb=' + $ui.F.SmallB.Name + $ui.F.SmallB.SizeInPoints + ' help=' + $ui.Help.Font.SizeInPoints + ' kick=' + $ui.Kick.Font.Name + ' label=' + $ui.FieldL.Font.Name + ' plainbtn=' + $ui.B[1].Font.Name + ' link=' + $ui.CopyPathB.Font.Name + ' lastlog=' + $ui.LastLog.Font.Name)
     if (-not $ui.Field.Shown -or $ui.Form.Values['AcceptButton']) { Write-Host 'WIN BAD hand card: no address box, or Enter answers' }
     $ui.FieldB.PerformClick(); if ($ui.CopyPathB.Shown) { $ui.CopyPathB.PerformClick() }; Write-Host ('WIN hand-note=' + $ui.Note.Text + ' clip=' + [bool][RadeStub.Driver]::Clip)
+    if (-not $global:RadeT.NoAddr) {   # R28: one text for the lines (copy across lines gives the lines as written); a broken path copies whole; no address row without an address
+      $global:RadeT.NoAddr = $true
+      Write-Host ('WIN guide one-box=' + ($ui.Guide -is [System.Windows.Forms.RichTextBox]) + ' rtf=' + [bool]([string]$ui.Guide.Values['Rtf'] -match '\\tqr\\tx\d+\\tx\d+.*\\tab 1\.\\tab Open the import page\.') + ' selectable=' + ($ui.Guide.ReadOnly -and $ui.Guide.Values['ContextMenuStrip'] -eq $ui.Menu))
+      $ui.Guide.SelectedText = "`t1.`tOpen the import page.`n`t2.`tChoose"; $ui.Guide.SelectionLength = 30; $null = & $ui.CopyText $ui.Guide; $c1 = [RadeStub.Driver]::Clip -replace "`r`n", '|'
+      $ui.PathT.SelectedText = "C:\a`nb.zip"; $ui.PathT.SelectionLength = 9; $null = & $ui.CopyText $ui.PathT; Write-Host ('WIN guide-copy=' + $c1 + ' path-copy=' + [RadeStub.Driver]::Clip)
+      Write-Host ('WIN elapsed=' + (& $ui.Elapsed 252) + '|' + (& $ui.Elapsed 5) + '|' + (& $ui.Elapsed 3725))
+      $g0 = $ui.GUrl; $s0 = $ui.G.Step; $ui.GUrl = ''; $ui.G.Step = $s0.Clone(); $ui.G.Step.UrlConfig = ''; & $ui.VHand
+      Write-Host ('WIN no-address field=' + $ui.FieldRow.Shown + ' close=' + $ui.Close.Text + ' focus-text=' + $ui.Guide.Focused + ' accept=' + [bool]$ui.Form.Values['AcceptButton'])
+      $ui.GUrl = $g0; $ui.G.Step = $s0; & $ui.VHand
+    }
     if ($ui.B[1].Text -ne 'It failed') { $ui.B[0].PerformClick() }   # a look-and-answer check: Yes
     elseif ($global:RadeT.Hand -eq 'fail') { Push-RadeButton 'It failed' } elseif ($global:RadeT.Hand -eq 'skip') { $ui.B[2].PerformClick() } else { $ui.B[0].PerformClick() }
   }
