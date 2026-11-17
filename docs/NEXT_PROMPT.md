@@ -25,7 +25,7 @@ Updated: 2026-11-17 by Claude (R28 engine fixes and Rho Bold; ENGINE_RELEASE = 1
 12. R28 leftovers (reviews of PR 72): no test for the kept runner copy; release.yml does not check ENGINE_RELEASE against the tag (guard file: the Administrator decides); Start waits 2.5 s; the shortcut's minimized console hides text-mode fallback; the no-app card cannot be reached in a real build. Device proof pending: 125/150 % text, .lnk, runner copy, ISE text capture (round R28 of 90-161.Z).
 
 13. Runner polish leftovers (reviews of pull request 71): `$ui.Say` sets the last log line without a new edge fit (stale edge possible, not seen in the job); `$ui.Fit` breaks long words before `FitSteps` sets the numbered widths (the 400 ms refit corrects it); no stand-in test covers `OnStatus`/`ShowRun`; option: only the numbered lines scroll on a hand card (today the whole text above the buttons scrolls).
-14. R28 fixes leftovers: N8 is built as the folder of the RADE shortcut (agent's reading; the Administrator confirms); the guide box edge and height use GetPositionFromCharIndex (a rich text box cannot be drawn into a bitmap): the Windows job measures it, a work-computer round (R29) is the proof; the 90-161.Z lock moves to engine-v10 only when the PFM asks.
+14. R28 fixes leftovers (pull request 78): N8 = the folder of the RADE shortcut (the Administrator confirmed, 17 Nov); no tests yet for: a path shown as <a path> in the layout line, a saved shortcut folder used on a later deploy, the Start-on-Maintenance note, GuideInkAt; right alignment of 1-9 beside 10 (figure spaces) is not measured; device proof in 90-161.Z R29; full lane 90 s vs baseline 45.7 s (efficiency skill); the 90-161.Z lock moves to engine-v10 only when the PFM asks.
 
 ## Needs the Administrator
 
