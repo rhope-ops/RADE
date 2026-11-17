@@ -1606,7 +1606,7 @@ if ($gui) {
     [System.Windows.Forms.Application]::EnableVisualStyles()
     $ui = @{ View = ''; Running = $false; Busy = $false; RecOn = $false; Edit = $false; Answer = ''; Acts = @(); Back = $null; OnOpt = $null; FieldDo = $null
       Log = (New-Object System.Collections.Generic.List[string]); Summary = @(); Sel = @{}; Clean = $true; StepState = @{}; Plan = $null; Picked = $false
-      BaseIds = @(); BaseRes = @{}; Blocked = @{}; Newer = @{}; Bars = @{}; G = $null; GUrl = ''; CurId = ''; StepI = 0; StepN = 0; StepNow = ''; Dpi = 96.0; ScreenDpi = 96.0; FontK = 1.0; FontDpi = 96.0; Scaled = $false; Full = @{}; Clock = [System.Diagnostics.Stopwatch]::StartNew(); CardAt = -1000000.0; GuardMs = 400; Calm = $false; ContentW = 780 }
+      BaseIds = @(); BaseRes = @{}; Blocked = @{}; Newer = @{}; Bars = @{}; G = $null; GUrl = ''; CurId = ''; StepI = 0; StepN = 0; StepNow = ''; BusyShown = $false; Always = @($false, $false, $false, $false, $false); Cancel = $false; Dpi = 96.0; ScreenDpi = 96.0; FontK = 1.0; FontDpi = 96.0; Scaled = $false; Full = @{}; Clock = [System.Diagnostics.Stopwatch]::StartNew(); CardAt = -1000000.0; GuardMs = 400; Calm = $false; ContentW = 780 }
     $ui.Hist = Read-RoundHistory (Get-BasePath)
     $script:secret = Get-Secret (Get-ProfileLeaf) (Get-ProfileLeaf)   # saved checks are masked before they are written
     try { $ui.Calm = -not [System.Windows.Forms.SystemInformation]::UIEffectsEnabled } catch { $null = $_ }
@@ -1622,6 +1622,7 @@ if ($gui) {
     # ---- The fixed parts: the light (6 px), the logo line, the card, the bottom line and the bar on the bottom edge.
     $ui.Light = New-Object System.Windows.Forms.Panel
     $ui.Light.Dock = 'Top'; $ui.Light.Height = 6; $ui.Light.BackColor = $ui.C.White; $ui.Light.AccessibleRole = 'StaticText'; $ui.Light.AccessibleName = 'Status light: off'
+    $ui.Light.Add_Paint({ try { $pn = New-Object System.Drawing.Pen($ui.C.Navy, [single]1); $_.Graphics.DrawLine($pn, 0, ($this.ClientSize.Height - 1), $this.ClientSize.Width, ($this.ClientSize.Height - 1)); $pn.Dispose() } catch { $null = $_ } })   # a 1 px navy line: the light is a part of the screen, 3 to 1 against white also when it is off
     $ui.Top = New-Object System.Windows.Forms.FlowLayoutPanel
     $ui.Top.Dock = 'Top'; $ui.Top.Height = 64; $ui.Top.WrapContents = $false; $ui.Top.Padding = (& $ui.Pad 32 12 32 0); $ui.Top.BackColor = $ui.C.White
     try {
@@ -1644,7 +1645,7 @@ if ($gui) {
     $ui.Bottom.Controls.Add($ui.RecB, 0, 0); $ui.Bottom.Controls.Add($ui.BackB, 1, 0); $ui.Bottom.Controls.Add($ui.RightL, 3, 0); & $ui.Ring $ui.Bottom
     # Bars: RADE draws them (R17). A 30 ms timer eases the fill to its value; with Windows animations off it jumps. No bar
     # moves back inside a run (all) or a step (step). The bar on the bottom edge is all steps; the short one is this step.
-    $ui.DrawBar = { param($P, $G) try { $b = $ui.Bars[[string]$P.Tag]; $G.Clear($(if ($b.On) { $ui.C.Hair } else { $ui.C.White })); $fw = [int][math]::Round($P.ClientSize.Width * $b.Shown); if ($b.On -and $fw -gt 0) { $br = New-Object System.Drawing.SolidBrush($b.Fill); $G.FillRectangle($br, 0, 0, $fw, $P.ClientSize.Height); $br.Dispose() } } catch { $null = $_ } }
+    $ui.DrawBar = { param($P, $G) try { $b = $ui.Bars[[string]$P.Tag]; $G.Clear($(if ($b.On) { $ui.C.Track } else { $ui.C.White })); $fw = [int][math]::Round($P.ClientSize.Width * $b.Shown); if ($b.On -and $fw -gt 0) { $br = New-Object System.Drawing.SolidBrush($b.Fill); $G.FillRectangle($br, 0, 0, $fw, $P.ClientSize.Height); $br.Dispose() } } catch { $null = $_ } }
     $ui.MkBar = { param([string]$Name, [string]$Label)
       $p = New-Object System.Windows.Forms.Panel; $p.Height = 4; $p.Tag = $Name; $p.AccessibleRole = 'ProgressBar'; $p.AccessibleName = $Label; $p.AccessibleDescription = '0 %'
       try { [System.Windows.Forms.Control].GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]'NonPublic, Instance').SetValue($p, $true, $null) } catch { $null = $_ }
@@ -1657,7 +1658,7 @@ if ($gui) {
     $ui.Edge = & $ui.MkBar 'all' 'Progress of all steps'; $ui.Edge.Dock = 'Bottom'
     $ui.Anim = New-Object System.Windows.Forms.Timer
     $ui.Anim.Interval = 30
-    $ui.Anim.Add_Tick({ foreach ($b in @($ui.Bars.Values)) { $d = $b.Target - $b.Shown; if ([math]::Abs($d) -gt 0.0005) { $b.Shown = $(if ($ui.Calm) { $b.Target } else { $b.Shown + $d * 0.18 }); $b.Panel.Invalidate() } } })
+    $ui.Anim.Add_Tick({ if ([bool]$ui.Busy -ne [bool]$ui.BusyShown) { $ui.BusyShown = [bool]$ui.Busy; try { $ui.Form.Invalidate($true) } catch { $null = $_ } }; foreach ($b in @($ui.Bars.Values)) { $d = $b.Target - $b.Shown; if ([math]::Abs($d) -gt 0.0005) { $b.Shown = $(if ($ui.Calm) { $b.Target } else { $b.Shown + $d * 0.18 }); $b.Panel.Invalidate() } } })
 
     # ---- The card: one block, left edge at 12 % of the width, 40 % of the spare height above it. Top to bottom: a small
     # line in capitals, the sentence, up to four paragraphs, the choices, the numbered lines of a hand step, the step line,
@@ -1721,7 +1722,7 @@ if ($gui) {
     $ui.Note = & $ui.Text $ui.F.Small $ui.C.Gray $ui.Z.G2 'Note'
     $ui.Help = & $ui.Text $ui.F.Help $ui.C.Navy $ui.Z.G4 'Help'
     $ui.BtnRow = & $ui.Flow $ui.Z.G4; $ui.BtnRow.WrapContents = $true; $ui.BtnRow.Margin = (& $ui.Pad (-$ui.Z.M) ($ui.Z.G4 - $ui.Z.M) 0 0); & $ui.Ring $ui.BtnRow   # the buttons' own 4 px margin is part of the 16 px gap
-    $ui.B = @(); foreach ($k in 0..4) { $b = & $ui.Btn 'action'; $b.Tag = $k; $b.Add_Click({ $a = $ui.Acts[[int]$this.Tag]; if ($a -and -not $ui.Busy -and (& $ui.Settled)) { & $a } }); $ui.B += $b; [void]$ui.BtnRow.Controls.Add($b) }
+    $ui.B = @(); foreach ($k in 0..4) { $b = & $ui.Btn 'action'; $b.Tag = $k; $b.Add_Click({ $a = $ui.Acts[[int]$this.Tag]; if ($a -and (-not $ui.Busy -or $ui.Always[[int]$this.Tag]) -and (& $ui.Settled)) { & $a } }); $ui.B += $b; [void]$ui.BtnRow.Controls.Add($b) }
     $ui.Foot = & $ui.Text $ui.F.Small $ui.C.Gray ($ui.Z.G6 - $ui.Z.M) 'Last line'
     # The owner's test extras (test rounds only; they go away with the test branch): the results address, the e-mail draft
     # and "the window displayed correctly". A deploy never shows them: it sends nothing.
@@ -1982,11 +1983,11 @@ if ($gui) {
       $ui.ErrRow.Visible = [bool]$c.Err; if ($c.Err) { $ui.ErrBox.Text = '' }
       $ui.LinkRow.Visible = [bool]($c.Links -or $c.PageLink); $ui.CopyPathB.Visible = [bool]$c.Links; $ui.ShowFileB.Visible = [bool]$c.Links; $ui.PageB.Visible = [bool]$c.PageLink
       & $ui.Show $ui.Note ([string]$c.Note); & $ui.Show $ui.Help ([string]$c.Help); & $ui.Show $ui.Foot ([string]$c.Foot)
-      $bs = @($c.Buttons | Where-Object { $_ }); $ui.Acts = @(); $first = $null; $accept = $null; $ui.BOn = @($false) * 5; $ui.BApart = @($false) * 5
+      $bs = @($c.Buttons | Where-Object { $_ }); $ui.Acts = @(); $first = $null; $accept = $null; $ui.BOn = @($false) * 5; $ui.BApart = @($false) * 5; $ui.Always = @($false) * 5
       for ($k = 0; $k -lt 5; $k++) {
         $b = $ui.B[$k]
         if ($k -lt $bs.Count) {
-          $b.Text = [string]$bs[$k].Text; & $ui.Style $b ([string]$bs[$k].Kind); $b.Visible = $true; $ui.Acts += $bs[$k].Act; $ui.BOn[$k] = $true; $ui.BApart[$k] = [bool]$bs[$k].Apart
+          $b.Text = [string]$bs[$k].Text; & $ui.Style $b ([string]$bs[$k].Kind); $b.Visible = $true; $ui.Acts += $bs[$k].Act; $ui.BOn[$k] = $true; $ui.BApart[$k] = [bool]$bs[$k].Apart; $ui.Always[$k] = [bool]$bs[$k].Always
           if ($b.Enabled -and -not $first) { $first = $b }; if ($b.Enabled -and -not $accept -and $bs[$k].Kind -eq 'primary') { $accept = $b }
         } else { $b.Visible = $false; $ui.Acts += $null }
       }
@@ -2031,7 +2032,19 @@ if ($gui) {
         }
         if (-not $ui.ContainsKey('NewRound')) { $ui.NewRound = [string](Get-NewerRound) }
       } finally { $ui.Busy = $false; Select-App 0 } }
+    $ui.VNoApps = {
+      # R28: a paste that lists no application (a manifest or build fault): say so, with what to do, instead of an empty list.
+      & $ui.SetCard @{ View = 'noapps'; Light = 'bad'; Kicker = 'Nothing to choose'; Sentence = 'No application is listed in this paste.'
+        P = @('This paste has nothing that RADE can install or run.', 'What to do: close this window and copy the paste again from the RADE page. If it is still empty, ask in the Teams channel.'); Help = (Get-HelpLine)
+        Buttons = @(@{ Text = 'Close'; Kind = 'primary'; Act = { $ui.Form.Close() } }) } }
+    $ui.VBootErr = { param([string]$Why)
+      # R28: the checks that run when the window opens stopped with an error: a card, not a blank window.
+      & $ui.SetCard @{ View = 'booterr'; Light = 'bad'; Kicker = 'Stopped'; Sentence = 'RADE could not check this computer.'
+        P = @($Why, 'Nothing was changed.', 'What to do: select "Try again". If it stops again, ask in the Teams channel.'); Help = (Get-HelpLine)
+        Buttons = @(@{ Text = 'Try again'; Kind = 'primary'; Act = { & $ui.Boot } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } }) }
+      & $ui.ToFront }
     $ui.VChoose = {
+      if (@($apps).Count -eq 0) { & $ui.VNoApps; return }
       Select-App 0; $ui.Picked = $false; $ui.Plan = $null; $ui.AppL.Text = ''; $list = @(); $dep = $false; $ui.Blocked = @{}; $ui.BlockedFix = @{}
       for ($j = 0; $j -lt $apps.Count; $j++) { foreach ($id in @($apps[$j].Checks)) { $r = $ui.BaseRes[$id]; if ($r -and $r.State -eq 'FAILED') { $ui.Blocked[$j] = ((Get-CheckDef $id).Name + ': ' + $r.Detail); $ui.BlockedFix[$j] = $(if ($r.Fix) { 'What to do: ' + $r.Fix } else { '' }); break } } }
       for ($j = 0; $j -lt $apps.Count; $j++) {
@@ -2048,7 +2061,7 @@ if ($gui) {
         Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Act = { & $ui.Boot } } } else { $null })); Foot = $(if ($dep) { '' } else { Get-LastRoundText $ui.Hist }) } }
     $ui.Boot = {
       & $ui.SetCard @{ View = 'boot'; Sentence = 'Checking this computer.'; P = @('This takes a few seconds. Nothing is changed.') }
-      & $ui.RunBase
+      try { & $ui.RunBase } catch { if (-not ($ui.Form.IsDisposed -or $script:closing)) { & $ui.VBootErr (ConvertTo-Masked ([string]$_.Exception.Message)) }; return }
       if (-not ($ui.Form.IsDisposed -or $script:closing)) { & $ui.VChoose } }
     $ui.InitSel = { $ui.Sel = @{}; foreach ($k in $script:appSteps) { $ui.Sel[[int]$k] = [bool](Get-StepDefault $k) }; $ui.Clean = $true; $ui.StepState = @{} }
     $ui.Pick = { param([int]$J)
@@ -2090,11 +2103,13 @@ if ($gui) {
       $bp = Get-BasePath; $site = Get-SiteUrl $bp
       if ((& $ui.NeedSite) -and -not (Test-SiteUrl $site)) { & $ui.VSite; return }
       $ids = @($script:appChecks); $cache = Read-CheckCache; $script:savedWhy = @{}
-      & $ui.SetCard @{ View = 'checking'; Sentence = 'Checking this computer and your access.'; P = @('Read-only. Nothing is changed.') }
+      $ui.Cancel = $false
+      & $ui.SetCard @{ View = 'checking'; Sentence = 'Checking this computer and your access.'; P = @('Read-only. Nothing is changed.'); Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { & $ui.CancelChecks } }) }
       & $ui.SetBar 'all' 0 $true; $ui.Bars['all'].Fill = $ui.C.Blue; $ui.Busy = $true
       try {
         for ($i = 0; $i -lt $ids.Count; $i++) {
           if ($ui.Form.IsDisposed -or $script:closing) { return }
+          if ($ui.Cancel) { break }
           $id = $ids[$i]; $d = Get-CheckDef $id; $have = $script:checkResults[$id]
           if ($d.Kind -ne 'auto') { if (-not $have) { $sv = Get-CheckToRun $d $cache $bp $site $false; if ($sv) { $script:checkResults[$id] = $sv } }; continue }   # a sign-in or look check: its saved result, else it asks later
           if ($have -and -not $Force) { continue }
@@ -2106,7 +2121,11 @@ if ($gui) {
           if ($ui.BaseRes.ContainsKey($id)) { $ui.BaseRes[$id] = $script:checkResults[$id] }   # Choose shows the newest result of a base check
         }
       } finally { $null = Save-CheckCache $script:checkResults $bp $site; $ui.Busy = $false; & $ui.SetBar 'all' 0 $false }
+      if ($ui.Cancel) { $ui.Cancel = $false; & $ui.VChoose; return }   # Cancel: back to Choose, nothing changed (a check that ran is kept)
       & $ui.Next }
+    $ui.CancelChecks = {
+      # The check that is running ends first (a sign-in window cannot be closed from here); then RADE goes back to Choose.
+      $ui.Cancel = $true; & $ui.Say1 'RADE stops after the check that is running.' }
     $ui.Next = {
       # One question at a time: the first FAILED check, else the first check that waits for you, else the plan.
       if ($ui.Form.IsDisposed -or $script:closing) { return }
@@ -2135,11 +2154,12 @@ if ($gui) {
     $ui.One = {
       # A check that needs you: the CAC sign-in opens its own window; the look-and-answer check shows a hand card.
       $d = Get-CheckDef $ui.CurId; $bp = Get-BasePath; $site = Get-SiteUrl $bp
-      & $ui.SetCard @{ View = 'checking'; Light = 'you'; Sentence = $(if ($d.Kind -eq 'signin') { 'Waiting for your sign-in.' } else { 'Checking.' }); P = @([string]$d.Name) }
+      $ui.Cancel = $false
+      & $ui.SetCard @{ View = 'checking'; Light = 'you'; Sentence = $(if ($d.Kind -eq 'signin') { 'Waiting for your sign-in.' } else { 'Checking.' }); P = @([string]$d.Name); Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { & $ui.CancelChecks } }) }
       $ui.Busy = $true
       try { $script:checkResults[$ui.CurId] = Invoke-Check $d $bp $site { [System.Windows.Forms.Application]::DoEvents() } }
       finally { $null = Save-CheckCache $script:checkResults $bp $site; $ui.Busy = $false }
-      & $ui.ToFront; & $ui.Next }
+      & $ui.ToFront; if ($ui.Cancel) { $ui.Cancel = $false; & $ui.VChoose; return }; & $ui.Next }
     $ui.VReady = {
       # The plan in three lines; the detail (each file, each step's box) is in the Record.
       if ($ui.Form.IsDisposed -or $script:closing) { return }
@@ -2193,7 +2213,8 @@ if ($gui) {
     $ui.Tick = { $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }   # a callback must emit nothing: its output would join the engine function's return value
     $ui.ShowRun = {
       & $ui.SetCard @{ View = 'run'; Kicker = $(if ($ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN } else { 'Starting' }); Sentence = $(if (Test-Deploy) { 'Installing ' + $script:app.Name + '.' } else { 'Running round ' + $round + '.' })
-        StepRow = $true; Foot = $(if (@($ui.Guides).Count) { 'RADE asks for you at "' + $ui.Guides[0] + '". Until then nothing is needed from you. Keep this window open.' } else { 'Nothing is needed from you. Keep this window open.' }) }
+        StepRow = $true; Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { $ui.Form.Close() } })   # asks first while a step runs (the window's X does the same)
+        Foot = $(if (@($ui.Guides).Count) { 'RADE asks for you at "' + $ui.Guides[0] + '". Until then nothing is needed from you. Keep this window open.' } else { 'Nothing is needed from you. Keep this window open.' }) }
       $ui.StepName.Text = [string]$ui.StepNow }
     $ui.OnStatus = { param($i, $count, $name, $estimate)
       $script:statusBase = $name; $script:stepStart = Get-Date; $script:stepEst = $estimate

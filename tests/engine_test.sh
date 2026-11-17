@@ -129,7 +129,7 @@ swap "$b" "$t/wb.ps1" "$t/wu"
 go W; {   # group W: runs in the background (see "go" above)
 win() { sed -E -e 's#Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing#$null = 0#' -e "s#^\\\$sitePrefix = 'https://usaf.dps.mil/sites/'#\$sitePrefix = 'https://rade-test.invalid/sites/'#" -e 's#System\.Drawing\.(FontStyle|Font|Pen|SolidBrush|Image|Graphics)\b#RadeDraw.\1#g' "${5:-$t/wb.ps1}" > "$t/wb2.ps1"
   cat tests/window_driver.ps1 "$t/wb2.ps1" > "$t/w.ps1"
-  RADE_T_START="${start:-}" RADE_T_SCALE="${scale:-}" RADE_T_LOOP="${loop:-}" RADE_T_STUB="$PWD/tests/window_stub.cs" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$t/wu/test1234" timeout 180 pwsh -NoProfile -File "$t/w.ps1" < /dev/null > "$t/win.txt" 2>&1; }
+  RADE_T_FAULT="${fault:-}" RADE_T_CANCEL="${cancel:-}" RADE_T_START="${start:-}" RADE_T_SCALE="${scale:-}" RADE_T_LOOP="${loop:-}" RADE_T_STUB="$PWD/tests/window_stub.cs" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$t/wu/test1234" timeout 180 pwsh -NoProfile -File "$t/w.ps1" < /dev/null > "$t/win.txt" 2>&1; }
 # has TEXT...: every text is in the window output, and the window did not fall back to text mode or miss a name.
 has() { local x; grep -q "No window could open\|WIN NONAME\|WIN NOFOCUS\|WIN BAD" "$t/win.txt" && { grep -m3 "No window could open\|WIN NONAME\|WIN NOFOCUS\|WIN BAD" "$t/win.txt" | cut -c1-300; return 1; }; for x in "$@"; do grep -qF -- "$x" "$t/win.txt" || { echo "  missing: $x"; return 1; }; done; grep -q "^WIN closed=True" "$t/win.txt"; }
 # 1. A first deploy: boot, choose with the newer-version notice, ready, the Record (boxes can change, Clean-up off), the hand step, done.
@@ -187,6 +187,13 @@ has "opts=OFF Sample app; 1 Sample app (deploy) 1.0.0" "btn=[Check this computer
 # powershell.exe process and closes RADE. A test application (no start script) has none.
 start=1 win 1 done 0 0
 has "WIN start-button=Start Sample app (deploy) main=Start Sample app (deploy)" "WIN start-process powershell.exe" "WIN started=True closed=True" && ok || { bad "window 2b: Start"; grep "start" "$t/win.txt" | cut -c1-200; }
+# 2c. States (R28): a boot error, a paste with no application and Cancel on the checking card each have a card (and the run card has Cancel).
+fault=boot win 0 done 0 0
+has "view=boot" "view=booterr light=failed kick=STOPPED sent=RADE could not check this computer. p=The test made the boot checks fail / Nothing was changed. / What to do: select \"Try again\"." "btn=[Try again] [Close]" "help=For help, ask in the Teams channel" "view=choose" && ok || { bad "window 2c: boot error card"; grep "view=booterr" "$t/win.txt" | cut -c1-300; }
+fault=noapps win 0 done 0 0
+has "view=noapps light=failed kick=NOTHING TO CHOOSE sent=No application is listed in this paste." "btn=[Close]" && ok || { bad "window 2c: no application card"; grep "view=noapps" "$t/win.txt" | cut -c1-300; }
+cancel=1 win 1 done 0 0
+has "WIN cancel busy=" "view=checking light=off kick= sent=Checking this computer and your access." "btn=[Cancel]" "view=run " && [ "$(grep -c "^WIN view=choose" "$t/win.txt")" -ge 2 ] && ok || { bad "window 2c: Cancel on the checking card"; grep "WIN cancel\|view=checking\|view=choose" "$t/win.txt" | cut -c1-200; }
 # 3. A test round: the owner's test extras show on Done; a deploy never shows them (1 and 2 have no "test=shown").
 # Here Application.Run fails as when a message loop already runs on the thread: the window opens with ShowDialog.
 loop=1 win 0 done 0 0

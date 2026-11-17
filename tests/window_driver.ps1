@@ -5,7 +5,7 @@
 # skip), RADE_T_RECORD (1 = open "Record" and clear the Clean-up box before the run), RADE_T_TOUR (1 = the
 # application also gets the site, sign-in and Power Automate checks, and a base check of the test application is FAILED),
 # RADE_T_LOOP (1 = Application.Run fails as when a message loop already runs: the window must open with ShowDialog),
-# RADE_T_START (1 = select the Start button when the Ready card has it), RADE_T_SCALE (150 = the form scales to 144 dpi while the screen dpi says 96, as on the R24 device). It prints "WIN measure"
+# RADE_T_FAULT (boot = the boot checks throw; noapps = the paste lists no application), RADE_T_CANCEL (1 = select Cancel on the first checking card), RADE_T_START (1 = select the Start button when the Ready card has it), RADE_T_SCALE (150 = the form scales to 144 dpi while the screen dpi says 96, as on the R24 device). It prints "WIN measure"
 # lines: sizes RADE sets after the form has scaled (a choice on Choose, the Record's step boxes and labels, made then).
 # A button that showed a longer text on an earlier card must be able to shrink (AutoSize GrowAndShrink): else WIN BAD.
 # Alignment (no layout here): "WIN mid" lines give the vertical midpoints of an aligned row from its margins and sizes
@@ -51,6 +51,7 @@ function global:Push-RadeButton([string]$Text) {
   Show-RadeCard
   $v = [string]$ui.View
   if ($v -eq 'choose') {
+    if ($env:RADE_T_FAULT -eq 'noapps' -and -not $global:RadeT.FaultDone) { $global:RadeT.FaultDone = $true; $global:RadeT.Apps = $script:apps; $script:apps = @(); & $ui.VChoose; return }
     if ($ui.Blocked.Count -and -not $global:RadeT.Forced) {
       $global:RadeT.Forced = $true; Write-Host ('WIN blocked=' + $ui.Blocked.Count)
       foreach ($id in @($ui.BaseRes.Keys)) { if ($ui.BaseRes[$id].State -eq 'FAILED') { $ui.BaseRes[$id] = @{ State = 'PASSED'; Detail = 'Set by the test'; Fix = '' } } }
@@ -64,6 +65,10 @@ function global:Push-RadeButton([string]$Text) {
     foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Index -eq $global:RadeT.App) { Write-Host ('WIN measure choice h=' + $o.Height + ' gap=' + $o.Margin.Bottom + ' plan-x=' + (& $ui.OptPlan $o.Tag $o.Width).X); $ui.Form.Key('D' + $o.Tag.Key); return } }
     throw 'the test user found no choice for the application'
   }
+  elseif ($v -eq 'boot' -and $env:RADE_T_FAULT -eq 'boot' -and -not $global:RadeT.FaultDone) { $global:RadeT.FaultDone = $true; $global:RadeT.RunBase = $ui.RunBase; $ui.RunBase = { throw 'The test made the boot checks fail' } }   # R28: a boot error has a card
+  elseif ($v -eq 'booterr') { $ui.RunBase = $global:RadeT.RunBase; Push-RadeButton 'Try again' }
+  elseif ($v -eq 'noapps') { $script:apps = $global:RadeT.Apps; & $ui.VChoose }   # R28: a paste with no application has a card
+  elseif ($v -eq 'checking' -and $env:RADE_T_CANCEL -eq '1' -and -not $global:RadeT.Cancelled) { $global:RadeT.Cancelled = $true; Write-Host ('WIN cancel busy=' + $ui.Busy + ' always=' + $ui.Always[0]); Push-RadeButton 'Cancel' }   # R28: Cancel on the checking card goes back to Choose
   elseif ($v -eq 'maint') {
     if (-not $global:RadeT.Esc) { $global:RadeT.Esc = $true; Write-Host 'WIN esc'; $ui.Form.Key('Escape'); return }   # Esc = Back: Choose again; the user chooses the same application
     $ui.B[0].PerformClick()

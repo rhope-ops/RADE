@@ -17,7 +17,7 @@ Decided by the Administrator, 2026-11-14. RADE owns the computer and the run. Th
 | Values asked from the user | Asks what the install needs (site address), passes it once (`RADE_SITE`) | Asks its own settings in its own setup screen |
 | Record of the install | Keeps the version, each step's state and the made list | Prints `PASS`, `FAIL` and `MADE` lines; each script is safe to run again |
 | App data (rows, files, backups) | May read and write it inside DoD365 where a run type needs it (Diagnose, Restore, backup); how is not decided | Owns it; declares what RADE may touch |
-| Starting the app | After its checks pass, a Start button opens the installed app from its local copy (no download); one desktop shortcut opens RADE (the Administrator, 2026-11-17) | Supplies its start script and its own window |
+| Starting the app | After its checks pass, a Start button opens the installed app from its local copy (no download); one desktop shortcut opens RADE (the Administrator, 2026-11-17) | Supplies its start script (manifest `start`, a path in its local folder) and its own window |
 | After the install | Not present; the app works if RADE is deleted | Flows, the Power App, health and its own alerts |
 | Help | Names the Teams channel | Says what to do when one of its steps needs review |
 
@@ -33,7 +33,7 @@ Preflight: RADE's checks are the one preflight; an app keeps a probe flow only f
 
 The Administrator, 2026-11-15. An app repo builds alone: it needs no RADE checkout.
 
-- The app keeps a lock file that names a RADE commit and every file the engine reads at that commit, each with its SHA-256. Today the engine reads 2 files: `engine/rade_build.py` and `assets/logo/logo-K-128.png`. `python3 scripts/engine_files.py` gives the list from a trace of the engine's file opens on the sample build, not from a search: a new engine can read a new file.
+- The app keeps a lock file that names a RADE commit and every file the engine reads at that commit, each with its SHA-256. Today the engine reads 3 files: `engine/rade_build.py`, `engine/rade_ui.ps1` (the shared UI file: theme tokens, builders, drawing helpers and the layout self-check; the build puts its text into every bundle, and an app window can reuse it) and `assets/logo/logo-K-128.png`. An app's lock must list all three (R28: a lock made before it lists two and builds with its old engine until the app moves the lock). `python3 scripts/engine_files.py` gives the list from a trace of the engine's file opens on the sample build, not from a search: a new engine can read a new file.
 - The app's build downloads those files from `raw.githubusercontent.com/rhope-ops/RADE/<commit>/<path>`, checks each SHA-256, and runs the engine with `--app-root`. A commit never changes, so the same lock always gives the same bundle.
 - The app owns its lock. A RADE session never edits an app repo: it reports the new commit, and a session of the app changes the lock, rebuilds and tests. Rollback = the app keeps its old lock.
 - Releases: after an engine change merges, a manual run of the workflow [release.yml](../.github/workflows/release.yml) from main (input: the next tag, `engine-v<N>`) runs the checks, signs the file list as a build attestation (keyless, no secret) and makes the tag and the GitHub release with `rade-engine.sha256` (the signed list, the authority) and `rade-engine.lock.json` (the same hashes in lock form). The app copies the commit and the hashes from that release into its lock and records the tag. The app's build still fetches by commit and checks the hashes; it needs no new tool. To check the signature by hand: `gh attestation verify engine/rade_build.py --repo rhope-ops/RADE`.
@@ -63,6 +63,9 @@ Decided by the Administrator, 2026-11-15. The RADE page picks the app, and each 
 | `installed\<12 hex>.json` | One app's install record: version, step states, the made list. Name = the first 12 hex of the SHA-256 of the lower-case record key. Contract: [../schemas/rade-installed.schema.json](../schemas/rade-installed.schema.json) | Only a deploy of that app | The app reads as not installed; with a site marker its next deploy is stopped ("Guardrails") |
 | `rade-checks.json` | Saved checks (a cache). Contract: [../schemas/rade-checks.schema.json](../schemas/rade-checks.schema.json) | Every run of every app | A check runs again |
 | `rade-mail-to.txt` | The results address (test rounds) | A test round | The owner types it again |
+| `rade-window.json` | Where the user last closed the window: bounds, state, the scale, and the client size and state at close (numbers and two words, no name or path; R28) | Every window, at close | The window opens maximized on the screen with the mouse |
+
+Outside Config: `RADE\rade-runner.ps1`, the installed runner (R28): a copy of the pasted text, saved after a deploy has passed; the newest deploy's paste replaces it. The desktop shortcut "RADE" opens it. If it is lost, the shortcut does nothing until the next deploy; the RADE page always works.
 
 - S1. An engine writes only its own app's record file. A file that holds a whole record with another app's key (two keys gave one file name), or that cannot be read at the moment, is not written and that app is not deployed.
 - S2. A record with a schema number higher than the engine knows is not read and not written, and that app is not deployed: "a newer RADE installed this application: get the newest script from the RADE page".
