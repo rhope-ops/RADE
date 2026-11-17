@@ -2888,7 +2888,7 @@ def main():
 ENGINE_SHA = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
-ENGINE_RELEASE = 8
+ENGINE_RELEASE = 9
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':
