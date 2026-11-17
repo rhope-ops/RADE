@@ -104,7 +104,7 @@ P
 # ---- sizes and text lengths (docs/window-design.md "Sizes", "Text lengths"; the Administrator, 2026-11-15)
 # Every button is made with a named kind (its size is in $ui.Z), and no other place sets a button's size.
 # (The bottom line's own minimum height, 46, is not a button size: R24. Only that one expression is left out of the count.)
-[ "$(grep -o '& \$ui\.Btn [^;)]*' engine/rade_build.py | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_build.py | grep -vxc 'MinimumSize = New-Object System\.Drawing\.Size(0, 46)')" = 2 ] && ok || bad "sizes: a button is made without a kind, or sets its own size"
+[ "$(cat engine/rade_build.py engine/rade_ui.ps1 | grep -o '& \$ui\.Btn [^;)]*' | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_ui.ps1 | wc -l)" = 2 ] && [ "$(grep -c 'MinimumSize = ' engine/rade_build.py)" = 2 ] && ok || bad "sizes: a button is made without a kind, or sets its own size"
 # The limits in the document are the limits of the build.
 python3 - <<'P' && ok || bad "text lengths: docs/window-design.md and TEXT_LIMITS (engine/rade_build.py) differ"
 import importlib.util, re, pathlib
@@ -162,37 +162,41 @@ swap "$b" "$t/wb.ps1" "$t/wu"
 go W; {   # group W: runs in the background (see "go" above)
 win() { sed -E -e 's#Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing#$null = 0#' -e "s#^\\\$sitePrefix = 'https://usaf.dps.mil/sites/'#\$sitePrefix = 'https://rade-test.invalid/sites/'#" -e 's#System\.Drawing\.(FontStyle|Font|Pen|SolidBrush|Image|Graphics)\b#RadeDraw.\1#g' "${5:-$t/wb.ps1}" > "$t/wb2.ps1"
   cat tests/window_driver.ps1 "$t/wb2.ps1" > "$t/w.ps1"
-  RADE_T_SCALE="${scale:-}" RADE_T_LOOP="${loop:-}" RADE_T_STUB="$PWD/tests/window_stub.cs" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$t/wu/test1234" timeout 180 pwsh -NoProfile -File "$t/w.ps1" < /dev/null > "$t/win.txt" 2>&1; }
+  RADE_T_FAULT="${fault:-}" RADE_T_CANCEL="${cancel:-}" RADE_T_START="${start:-}" RADE_T_SCALE="${scale:-}" RADE_T_LOOP="${loop:-}" RADE_T_STUB="$PWD/tests/window_stub.cs" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$t/wu/test1234" timeout 180 pwsh -NoProfile -File "$t/w.ps1" < /dev/null > "$t/win.txt" 2>&1; }
 # has TEXT...: every text is in the window output, and the window did not fall back to text mode or miss a name.
-has() { local x; grep -q "No window could open\|WIN NONAME\|WIN NOFOCUS\|WIN BAD" "$t/win.txt" && return 1; for x in "$@"; do grep -qF -- "$x" "$t/win.txt" || { echo "  missing: $x"; return 1; }; done; grep -q "^WIN closed=True" "$t/win.txt"; }
+has() { local x; grep -q "No window could open\|WIN NONAME\|WIN NOFOCUS\|WIN BAD" "$t/win.txt" && { grep -m3 "No window could open\|WIN NONAME\|WIN NOFOCUS\|WIN BAD" "$t/win.txt" | cut -c1-300; return 1; }; for x in "$@"; do grep -qF -- "$x" "$t/win.txt" || { echo "  missing: $x"; return 1; }; done; grep -q "^WIN closed=True" "$t/win.txt"; }
 # 1. A first deploy: boot, choose with the newer-version notice, ready, the Record (boxes can change, Clean-up off), the hand step, done.
 win 1 done 1 0
-has "view=boot" "view=choose light=off kick= sent=Which application do you want to install?" "2 Sample app (deploy) 1.0.0 NOTE Version 9.0.0 is on the app page" "view=ready light=off kick=ALL 8 CHECKS PASSED sent=Ready to install Sample app (deploy) 1.0.0." \
-  "WIN record on=True rows=10 boxes=5 enabled=True text=True name=True reused=Last check: 14-11-26 / Version [5.1] tall=True" "WIN paged=" "WIN record on=False clean=False" "view=hand light=RADE waits for you kick=STEP 2 OF 3 · YOUR TURN sent=Import the sample flow" "btn=[Imported] [It failed] [Skip]" \
-  "view=done light=off kick=ALL STEPS PASSED sent=Sample app (deploy) 1.0.0 is installed. p=Nothing was sent." "btn=[Close] [What it made] [Open results folder] [Copy summary]" "WIN made=True log=True locked=True" "WIN copied=True" && ! grep -q "foot=Site\|Change the site address" "$t/win.txt" && ok || { bad "window 1: first deploy"; tail -5 "$t/win.txt" | cut -c1-300; }
+has "view=boot" "view=choose light=off kick= sent=Which application do you want to install?" "2 Sample app (deploy) 1.0.0 NOTE Version 9.0.0 is on the RADE page" "view=ready light=off kick=ALL 8 CHECKS PASSED sent=Ready to install Sample app (deploy) 1.0.0." \
+  "WIN record on=True rows=10 boxes=5 enabled=True text=True name=True reused=Last check: 14 Nov 26 / Version [5.1] tall=True" "WIN paged=" "WIN record on=False clean=False" "view=hand light=RADE is waiting for you kick=STEP 2 OF 3 · YOUR TURN sent=Import the sample flow" "btn=[Imported] [It failed] [Skip]" \
+  "view=done light=off kick=ALL STEPS PASSED sent=Sample app (deploy) 1.0.0 is installed. p=Nothing was sent." "btn=[Close] [Record] [Open results folder] [Copy summary]" "WIN made=True log=True locked=True" "WIN copied=True" && ! grep -q "foot=Site\|Change the site address" "$t/win.txt" && ok || { bad "window 1: first deploy"; tail -5 "$t/win.txt" | cut -c1-300; }
 # 1a. The polish pass of 17 Nov (docs/window-design.md "Type", "Cards"): the manifest title is what the window shows (the hand card's
 # headline, the step line of a run, the Record's step boxes and their accessible names, the foot of the Run card), a step with no title shows
 # its name, and the report keeps the name; the hand card shows the step note under the headline, then the address row, then the numbered
 # lines (a line without a number goes after the list, small and gray), then the one closing line (with the step's doneText), above the
 # buttons; one typeface in 4 styles ($ui.F has only those tokens; every button has the strong font, also a plain one; Consolas is only the
 # Record's text box); the last log line is small.
-has "view=hand light=RADE waits for you kick=STEP 2 OF 3 · YOUR TURN sent=Import the sample flow p=You do this step in the browser. RADE cannot do it for you. steps=1. Open the import page. ~ 2. Choose the file on the clipboard. ~ 3. Select Import. rest=RADE cannot see the import page, so it asks you to confirm. close=When you finish in the browser, come back to this window and select \"Imported\"." \
+has "view=hand light=RADE is waiting for you kick=STEP 2 OF 3 · YOUR TURN sent=Import the sample flow p=You do this step in the browser. RADE cannot do it for you. steps=1. Open the import page. ~ 2. Choose the file on the clipboard. ~ 3. Select Import. rest=RADE cannot see the import page, so it asks you to confirm. close=When you finish in the browser, come back to this window and select \"Imported\"." \
   "step=Check this computer lastlog-font=Segoe UI10" "step=T03 Sample verify r1" 'foot=RADE needs you next at "Import the sample flow". Until then, keep this window open.' \
   "box-text=Clean-up|1  Check this computer|2  T04 Sample optional r1|3  Import the sample flow  (needs you)|4  T03 Sample verify r1 box-name=1  Check this computer" \
   "WIN hand-order address-above-lines=True steps-above-rest=True closing-above-buttons=True closing-gap=4" "WIN F tokens=Body,Link,Mono,Sent,Small,SmallB,Word mono-only-in-record=True sent=Segoe UI Semibold22 body=Segoe UI12 small=10 smallb=Segoe UI Semibold10 help=12 kick=Segoe UI Semibold label=Segoe UI Semibold plainbtn=Segoe UI Semibold link=Segoe UI Semibold lastlog=Segoe UI" && ok || { bad "window 1a: titles, hand card order, type styles"; grep "view=hand\|step=\|box-text\|WIN F\|hand-order\|BAD" "$t/win.txt" | cut -c1-700; }
-[ "$(grep -c Consolas engine/rade_build.py)" = 1 ] && grep -q "Mono = (& \$ui.Font 'Consolas' 9" engine/rade_build.py && [ "$(grep -c 'F\.Mono' engine/rade_build.py)" = 1 ] && grep -q "RecText.Font = \$ui.F.Mono" engine/rade_build.py && ok || bad "type: Consolas is only the Mono token, and only the Record's text box uses it"
+[ "$(cat engine/rade_build.py engine/rade_ui.ps1 | grep -c Consolas)" = 1 ] && grep -q "Mono = (& \$ui.Font 'Consolas' 9" engine/rade_ui.ps1 && [ "$(cat engine/rade_build.py engine/rade_ui.ps1 | grep -c 'F\.Mono')" = 1 ] && grep -q "RecText.Font = \$ui.F.Mono" engine/rade_build.py && ok || bad "type: Consolas is only the Mono token, and only the Record's text box uses it"
 wr="$t/wu/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt"
 ! grep -q "Import the sample flow\|Check this computer" "$wr" && grep -q "^T01 Sample check r1: PASSED" "$wr" && grep -q "^T02 Sample import r1: PASSED (confirmed by you)" "$wr" && ok || { bad "title: the report keeps the step name and never shows the title"; grep -n "Import the sample flow\|Check this computer" "$wr"; }
 # 1b. The hand step's questions after Done: one card each (No, the second choice, a text with an e-mail address), and
 # their lines under the step's line in the report, the text masked (docs/engine.md "Step contract").
 wr="$t/wu/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt"
-has "view=answer light=RADE waits for you kick=STEP 2 OF 3 · QUESTION 1 OF 3 sent=Did the flow run start? p= btn=[Yes] [No]" "kick=STEP 2 OF 3 · QUESTION 2 OF 3 sent=How many flows does the import page show? p= btn=[One] [Two] [Three or more]" \
+has "view=answer light=RADE is waiting for you kick=STEP 2 OF 3 · QUESTION 1 OF 3 sent=Did the flow run start? p= btn=[Yes] [No]" "kick=STEP 2 OF 3 · QUESTION 2 OF 3 sent=How many flows does the import page show? p= btn=[One] [Two] [Three or more]" \
   "kick=STEP 2 OF 3 · QUESTION 3 OF 3 sent=Anything else to report? p=Do not type names or addresses. btn=[Continue]" "WIN answer-box max=120 enter=Continue focus=True" && [ "$(grep -c "^WIN view=answer" "$t/win.txt")" = 3 ] &&
   [ "$(grep -A3 "^T02 Sample import r1: PASSED (confirmed by you) in " "$wr" | tail -3 | tr -d '\r' | tr '\n' '|')" = "  Answer run-started: No|  Answer flow-count: Two|  Answer note: Mail <EMAIL> about it|" ] && ! grep -q "someone@" "$wr" && ok || { bad "window 1b: the answer cards and the answers in the report"; grep -A3 "^T02 Sample" "$wr"; grep "view=answer\|answer-box" "$t/win.txt" | cut -c1-300; }
+# 1b2. After a deploy that passed (R28): RADE keeps a copy of the pasted text as the installed runner, and says in plain words what it did about the
+# desktop shortcut (here no Desktop folder exists, so it says it made none; the .lnk itself is made with WScript.Shell on Windows only).
+rn="$t/wu/test1234/OneDrive - United States Air Force/RADE/rade-runner.ps1"
+[ -f "$rn" ] && grep -q "^\$buildId = '" "$rn" && grep -q "^\$engineRelease = [0-9]" "$rn" && grep -qF "RADE could not find your Desktop folder, so it made no desktop shortcut. Open RADE from the RADE page instead." "$t/win.txt" && ok || bad "window 1b2: installed runner copy and the desktop shortcut line"
 # 1c. A minimized window comes back when RADE needs the person; it has its own taskbar button (Application.Run: no owner).
 # The layout line and the SCALE line at 100 %; the sizes RADE sets after the form has scaled, at 100 % (the same numbers as
 # before the one scale source: tests/window_driver.ps1 "WIN measure").
-has "WIN restored=Normal taskbar=True minbox=True shown-by=Run" "WIN layline=Layout self-check: PASS layout, 0 cards (1020 x 684 at 100 %) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=96x96 font=17 fontPt=10 aware=n/a screen=1280x800 work=1280x720 client=1020x684 state=Normal logo=40x40 btn=400x40" \
+has "WIN restored=Normal taskbar=True minbox=True shown-by=Run" "WIN layline=Layout self-check: PASS layout, 0 cards (1216 x 684 at 100 %) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=96x96 font=17 fontPt=10 fontScale=1 ctlScale=1 realDpi=n/a aware=n/a screen=1280x800 work=1280x720 client=1216x684 state=Normal logo=40x40 btn=400x40" \
   "WIN measure choice h=110 gap=8 plan-x=54" "WIN measure record box=5,4 label=5,6 rows=268" && ok || { bad "window 1c: restore, taskbar, the scale line"; grep "restored=\|layline=" "$t/win.txt" | cut -c1-300; }
 # 1d. Polish after the R24 pictures (docs/window-design.md "Sizes"): the header and the label-box-button rows share one
 # midpoint within 1 px (from margins and sizes; an odd height gives a half pixel; the stand-ins have no layout), a box is as tall as a compact button, gaps of 8; the
@@ -223,8 +227,19 @@ has "WIN rule wrapped=0 one-line=1 ~ LAYOUT fixture TestRow OkBox midpoint: 58, 
 win 1 fail 0 1
 has "opts=OFF Sample app; 1 Sample app (deploy) 1.0.0" "btn=[Check this computer again]" "view=maint light=off kick=SAMPLE APP (DEPLOY) 1.0.0 · INSTALLED " "sent=Maintenance" "btn=[Repair] (Diagnose) (Back up) (Restore) (Uninstall)" \
   "view=site light=off kick= sent=Which site does the application go to?" "WIN site-note=The address must look like https://rade-test.invalid/sites/name" "view=fail light=failed kick=CHECK 9 OF 11 · FAILED sent=One check failed. p=Your SharePoint site can be reached" "btn=[Run checks again] [Change the site address]" "WIN esc" "WIN again" "sent=One check failed. p=You can change the site (sign in with your CAC) / Sign-in was not finished" "btn=[Sign in and check site rights] [Change the site address]" \
-  "view=need light=RADE waits for you kick=CHECK 10 OF 11 · YOUR TURN sent=One check needs you." "btn=[Sign in and check site rights]" "btn=[Check Power Automate]" "sent=Check Power Automate" "btn=[Yes: I see both] [No: one is missing] [Not now]" "steps=1. Select Open in browser. Power Automate opens; sign in with your CAC if asked. ~ 2. Look at the left menu" "rest=You look in Power Automate and answer (about 2 minutes, an estimate). Nothing is changed. close=When you finish in the browser, come back to this window and select \"Yes: I see both\"." "kick=ALL 11 CHECKS PASSED" "btn=[Install] [Steps and files] [Change the site address] foot=Site: fake" \
-  "view=handfail" "view=review light=failed kick=NEEDS REVIEW sent=The install is not complete. p=T02 Sample import r1: FAILED (reported by you)" "flow <SITE> not found" "help=For help, ask in the Teams channel" "btn=[Copy summary] [Open results folder] [What it made] [Close]" && [ "$(grep -c "^WIN view=maint" "$t/win.txt")" = 2 ] && [ "$(grep -c "^WIN view=fail .*CHECK 9 OF 11" "$t/win.txt")" = 2 ] && ! grep -q "^WIN view=answer" "$t/win.txt" && ok || { bad "window 2: Maintenance, checks that fail or need you, needs review (and no question after It failed)"; tail -5 "$t/win.txt" | cut -c1-300; }
+  "view=need light=RADE is waiting for you kick=CHECK 10 OF 11 · YOUR TURN sent=One check needs you." "btn=[Sign in and check site rights]" "btn=[Check Power Automate]" "sent=Check Power Automate" "btn=[Yes: I see both] [No: one is missing] [Not now]" "steps=1. Select Open in browser. Power Automate opens; sign in with your CAC if asked. ~ 2. Look at the left menu" "rest=You look in Power Automate and answer (about 2 minutes, an estimate). Nothing is changed. close=When you finish in the browser, come back to this window and select \"Yes: I see both\"." "kick=ALL 11 CHECKS PASSED" "btn=[Start Sample app (deploy)] [Install] [Record] [Change the site address] foot=Site: fake" "WIN start-button=Start Sample app (deploy) main=Start Sample app (deploy)" \
+  "view=handfail" "view=review light=failed kick=NEEDS REVIEW sent=The install is not complete. p=T02 Sample import r1: FAILED (reported by you)" "flow <SITE> not found" "help=For help, ask in the Teams channel" "btn=[Copy summary] [Open results folder] [Record] [Close]" && [ "$(grep -c "^WIN view=maint" "$t/win.txt")" = 2 ] && [ "$(grep -c "^WIN view=fail .*CHECK 9 OF 11" "$t/win.txt")" = 2 ] && ! grep -q "^WIN view=answer" "$t/win.txt" && ok || { bad "window 2: Maintenance, checks that fail or need you, needs review (and no question after It failed)"; tail -5 "$t/win.txt" | cut -c1-300; }
+# 2b. Start (R28): the installed application has the Start button; selecting it runs the start script of the local copy in its own
+# powershell.exe process and closes RADE. A test application (no start script) has none.
+start=1 win 1 done 0 0
+has "WIN start-button=Start Sample app (deploy) main=Start Sample app (deploy)" "WIN start-process powershell.exe" "WIN started=True closed=True" && ok || { bad "window 2b: Start"; grep "start" "$t/win.txt" | cut -c1-200; }
+# 2c. States (R28): a boot error, a paste with no application and Cancel on the checking card each have a card (and the run card has Cancel).
+fault=boot win 0 done 0 0
+has "view=boot" "view=booterr light=failed kick=STOPPED sent=RADE could not check this computer. p=The test made the boot checks fail / Nothing was changed. / What to do: select \"Try again\"." "btn=[Try again] [Close]" "help=For help, ask in the Teams channel" "view=choose" && ok || { bad "window 2c: boot error card"; grep "view=booterr" "$t/win.txt" | cut -c1-300; }
+fault=noapps win 0 done 0 0
+has "view=noapps light=failed kick=NOTHING TO CHOOSE sent=No application is listed in this paste." "btn=[Close]" && ok || { bad "window 2c: no application card"; grep "view=noapps" "$t/win.txt" | cut -c1-300; }
+cancel=1 win 1 done 0 0
+has "WIN cancel busy=" "view=checking light=off kick= sent=Checking this computer and your access." "btn=[Cancel]" "view=run " && [ "$(grep -c "^WIN view=choose" "$t/win.txt")" -ge 2 ] && ok || { bad "window 2c: Cancel on the checking card"; grep "WIN cancel\|view=checking\|view=choose" "$t/win.txt" | cut -c1-200; }
 # 3. A test round: the owner's test extras show on Done; a deploy never shows them (1 and 2 have no "test=shown").
 # Here Application.Run fails as when a message loop already runs on the thread: the window opens with ShowDialog.
 loop=1 win 0 done 0 0
@@ -239,7 +254,15 @@ has "view=stopped light=failed kick=STOPPED sent=The install stopped. p=A file t
 # no fonts: text heights, the logo and the buttons made before the form scaled stay at their coded sizes here, and the
 # layout self-check does not run (the Windows job and a round on a work computer measure those).
 scale=150 win 1 done 1 0
-has "WIN measure choice h=120 gap=12 plan-x=81" "WIN measure record box=8,6 label=8,9 " "(1020 x 684 at 150 % (the form auto-scale; the screen dpi says 100 %)) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=144x144 " && ok || { bad "window 5: scale 150 % with a 96 dpi screen"; grep "measure\|layline" "$t/win.txt" | cut -c1-300; }
+has "WIN measure choice h=120 gap=12 plan-x=81" "WIN measure record box=8,6 label=8,9 " "(1280 x 720 at 150 % (the form auto-scale; the screen dpi says 100 %)) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=144x144 " "fontPt=15 fontScale=1.5 ctlScale=1.5 " && ok || { bad "window 5: scale 150 % with a 96 dpi screen"; grep "measure\|layline" "$t/win.txt" | cut -c1-300; }
+# 6. Window size and place (R28): the place is saved at close; bounds off every screen are ignored (first run: maximized, the screen with the
+# mouse); saved bounds are used and keep their size and state. The file holds numbers and two words only.
+wp="$t/wu/test1234/OneDrive - United States Air Force/RADE/Config/rade-window.json"
+[ -f "$wp" ] && grep -q '"closed"' "$wp" && ! grep -qi 'test1234\|http' "$wp" && ok || bad "window place: the file is written at close, numbers only"
+printf '{"x":9000,"y":9000,"w":800,"h":600,"state":"Normal","dpi":96}' > "$wp"; win 1 done 1 0
+has "placed=first run" "lastClose=" && ok || bad "window place: bounds off every screen are ignored"
+printf '{"x":50,"y":40,"w":1100,"h":650,"state":"Normal","dpi":96}' > "$wp"; win 1 done 1 0
+has "placed=saved" "shown=1100x650/Normal" && grep -q '"w": 1100' "$wp" && ok || bad "window place: saved bounds are used and saved again"
 
 echo "GROUP $pass $fail"; } > "$t/grp-W.log" 2>&1 &
 # 0. A skipped step: the run is PASSED but the version is not recorded as installed (review of deploy v1).
@@ -274,8 +297,8 @@ go F; {   # group F: runs in the background (see "go" above)
 psrun "$t/f.ps1" "$t/outf.txt" $'2\n\n\n\n' USERPROFILE="$t/fu/test1234"
 grep -q "could not be downloaded, so no step ran" "$t/outf.txt" && ! grep -q "^Step 1 of" "$t/outf.txt" && grep -q "^For help, ask in the Teams channel" "$t/outf.txt" && grep -q '"state":  *"STOPPED"' "$t/fu/test1234/OneDrive - United States Air Force/RADE/Config/installed/$(rec 'SampleApp/Sample app (deploy)')" && ok || { bad "item 5: a failed download must stop a deploy before its steps"; tail -8 "$t/outf.txt"; }
 echo "GROUP $pass $fail"; } > "$t/grp-F.log" 2>&1 &
-# A newer version in rade-release.json is named in a deploy only.
-grep -q "^A newer version, 9.0.0, of Sample app (deploy) is on the app page" "$t/out0.txt" && ok || bad "newer-version notice in a deploy"
+# A newer version in rade-release.json: in text mode it is named in a deploy only (the window shows it in a test round too).
+grep -q "^A newer version, 9.0.0, of Sample app (deploy) is on the RADE page" "$t/out0.txt" && ok || bad "newer-version notice in a deploy"
 
 # 1. First deploy: every step on, PASSED, version recorded, nothing sent.
 round 2
