@@ -136,6 +136,7 @@ def python_functions(text):
     found = []
 
     def visit(node, prefix):
+        """Add each def under `node` to `found`, named `prefix` + name; classes and nested defs add to the prefix."""
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 name = prefix + child.name
