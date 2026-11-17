@@ -12,8 +12,11 @@
  },
  "debt": {
   "comment": {
+   ".claude/skills/ui-verify/measure.mjs::alpha": 1,
    ".claude/skills/ui-verify/measure.mjs::bgOf": 1,
+   ".claude/skills/ui-verify/measure.mjs::blend": 1,
    ".claude/skills/ui-verify/measure.mjs::lum": 1,
+   ".claude/skills/ui-verify/measure.mjs::name": 1,
    ".claude/skills/ui-verify/measure.mjs::parse": 1,
    ".claude/skills/ui-verify/measure.mjs::ratio": 1,
    ".claude/skills/ui-verify/measure.mjs::visible": 1,

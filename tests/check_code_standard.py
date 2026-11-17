@@ -172,6 +172,8 @@ def python_functions(text):
                 top = min([child.lineno] + [d.lineno for d in child.decorator_list])
                 first = child.body[0].lineno if child.body else child.lineno + 1
                 lead = [x.strip() for x in lines[child.lineno:first - 1]]   # lines before the first statement
+                if child.body and isinstance(child.body[0], (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    lead = []   # a comment right above a nested def is that def's comment
                 inner = bool(ast.get_docstring(child)) or any(x.startswith('#') for x in lead) \
                     or lines[child.lineno - 1].split(':', 1)[-1].strip().startswith('#')
                 skip = 1 if ast.get_docstring(child) and len(child.body) > 1 else 0   # C5 compares code, not the docstring
@@ -191,12 +193,16 @@ foreach ($path in [Console]::In.ReadToEnd().Split("`n")) {
   if (-not $path.Trim()) { continue }
   $tokens = $null; $errors = $null
   $ast = [System.Management.Automation.Language.Parser]::ParseFile($path.Trim(), [ref]$tokens, [ref]$errors)
+  $lines = @([System.IO.File]::ReadAllLines($path.Trim()))
   $comments = @{}
-  foreach ($t in $tokens) { if ($t.Kind -eq 'Comment') { for ($l = $t.Extent.StartLineNumber; $l -le $t.Extent.EndLineNumber; $l++) { $comments[$l] = $true } } }
+  $help = @()   # comment-based help blocks (.SYNOPSIS or .DESCRIPTION), by their first line
+  foreach ($t in $tokens) { if ($t.Kind -eq 'Comment') { for ($l = $t.Extent.StartLineNumber; $l -le $t.Extent.EndLineNumber; $l++) { $comments[$l] = $true }; if ($t.Text -match '\.(SYNOPSIS|DESCRIPTION)') { $help += $t.Extent.StartLineNumber } } }
   $list = @(); $blocks = @()
   foreach ($f in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) {
     $s = $f.Extent.StartLineNumber; $e = $f.Extent.EndLineNumber
-    $list += @{ name = $f.Name; start = $s; end = $e; inner = ($e -gt $s + 1) -and [bool]$comments[$s + 1] }
+    $brace = 0; if ($e -gt $s + 1 -and $lines[$s].Trim() -eq '{') { $brace = 1 }   # `{` on its own line after `function`
+    $inside = @($help | Where-Object { $_ -gt $s -and $_ -lt $e }).Count -gt 0
+    $list += @{ name = $f.Name; start = $s; end = $e; inner = $inside -or (($e -gt $s + 1 + $brace) -and [bool]$comments[$s + 1 + $brace]) }
   }
   # A script block kept in a variable or a hashtable key ($ui.Say = { ... }) is a function too: the window code uses
   # them. Any other script block (an argument, such as $b.Add_Click({ ... })) is measured for its length only.
@@ -258,17 +264,21 @@ def brace_functions(text, pattern, comment_mark):
         if not m:
             continue
         name = next(g for g in m.groups() if g)
+        arrow = '=>' in line and m.lastindex == 2   # `const f = (...) =>`: its body must open on this line or the next
         depth, end, opened = 0, i, False
         for j in range(i, len(lines)):
-            if j > i + 1 and not opened:
-                break   # no body opens on this line or the next: not a function (for example `const f = x => x + 1;`)
+            if arrow and j > i + 1 and not opened:
+                break
             depth, opened = count_braces(lines[j], depth, opened, comment_mark)
             if opened and depth <= 0:
                 end = j
                 break
         if not opened:
+            if arrow:   # an arrow with no braces (`const f = x => x + 1;`) is a one-line function
+                found.append((name, i + 1, i + 1, i + 1, False, line))
             continue
-        first = lines[i + 1].strip() if end > i + 1 else ''   # a one-line function has no inner first line
+        k = i + 2 if i + 1 < len(lines) and lines[i + 1].strip() == '{' else i + 1   # skip a `{` on its own line
+        first = lines[k].strip() if end > k else ''   # a one-line function has no inner first line
         found.append((name, i + 1, i + 1, end + 1, first.startswith(comment_mark), '\n'.join(lines[i + 1:end + 1])))
     return found
 

@@ -126,7 +126,7 @@ def self_test_forms(cs, root, g, config):
                                'def lead(x):\n    # Returns x.\n    return x\n\n\n' + ''.join(
                                    'def %s(x):\n    """%s"""\n    y = x + 1\n    y = y * 2\n    y = y - 3\n    return y\n\n\n'
                                    % (n, doc) for n, doc in (('p', 'One.'), ('q', 'Two.'))))
-    (root / 'k.js').write_text('// Sample JavaScript file: an arrow with no braces, for the check self-test only.\n'
+    (root / 'k.js').write_text('// Sample JavaScript file: an arrow with no braces, for the check self-test only.\n\n'
                                '// Adds one.\nconst inc = x => x + 1;\n// Doubles.\nfunction dbl(x) {\n  return 2 * x;\n}\n')
     (root / 'l.py').write_text('"""Sample module that does not parse, for the check self-test only (rule C10)."""\ndef (:\n')
     g('add', '.')
@@ -137,6 +137,30 @@ def self_test_forms(cs, root, g, config):
     assert {'j.py::p', 'j.py::q'} <= set(v['duplicate']), 'docstring-only difference is a duplicate: %s' % v['duplicate']
     assert not any(k.startswith('k.js::') for k in v['comment'].keys() | v['length'].keys()), 'arrow: %s' % v['length']
     assert v['parse'].get('l.py'), 'a Python parse error fails: %s' % v['parse']
+    self_test_edges(cs, root, g, config)
     for f in ('h.sh', 'i.ps1', 'j.py', 'k.js', 'l.py'):
         (root / f).unlink()
     g('add', '-A')
+
+
+def self_test_edges(cs, root, g, config):
+    """Self-test of edge forms: a JS function whose `{` comes after long parameters is measured; a bare arrow without a
+    comment fails; a comment above a nested Python def is not the outer function's; PowerShell help after a `{` on its
+    own line, or at the end of the body, counts; a shell comment after a `{` on its own line counts."""
+    (root / 'm.js').write_text('// Sample JavaScript file: edge forms, for the check self-test only.\n'
+                               'function longParams(\n  alpha,\n  beta\n) {\n  return alpha + beta;\n}\nconst bare = x => x * 3;\n')
+    (root / 'n.py').write_text('"""Sample module: a nested def, for the check self-test only."""\n\n\n'
+                               'def outer(x):\n    # Helper.\n    def inner(y):\n        return y\n    return inner(x)\n')
+    (root / 'o.ps1').write_text('<#\n  Sample PowerShell file: help in the body, for the check self-test only.\n#>\n\n'
+                                'function Get-X\n{\n  <#\n  .SYNOPSIS\n  Returns one.\n  #>\n  1\n}\n\n'
+                                'function Get-Y {\n  2\n  <#\n  .SYNOPSIS\n  Returns two.\n  #>\n}\n')
+    (root / 'p.sh').write_text('#!/bin/sh\n# Sample shell file: a brace on its own line, for the check self-test only.\n\n'
+                               'next()\n{\n  # Does b.\n  b=2\n}\n')
+    g('add', '.')
+    v = cs.measure(config)['violations']
+    assert 'm.js::longParams' in v['comment'] and 'm.js::bare' in v['comment'], 'JS edge forms: %s' % v['comment']
+    assert 'n.py::outer' in v['comment'] and 'n.py::outer.inner' not in v['comment'], 'nested def: %s' % v['comment']
+    assert not {'o.ps1::Get-X', 'o.ps1::Get-Y'} & set(v['comment']), 'help in the body counts: %s' % v['comment']
+    assert 'p.sh::next' not in v['comment'], 'a shell comment after `{` counts: %s' % v['comment']
+    for f in ('m.js', 'n.py', 'o.ps1', 'p.sh'):
+        (root / f).unlink()
