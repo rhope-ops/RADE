@@ -54,7 +54,7 @@ namespace RadeDraw {
 }
 namespace System.Windows.Forms {
   using System.Drawing; using RadeDraw;
-  [Flags] public enum TextFormatFlags { Left = 0, Top = 0, HorizontalCenter = 1, Right = 2, VerticalCenter = 4, SingleLine = 32, WordBreak = 16, NoPrefix = 2048, TextBoxControl = 8192, EndEllipsis = 32768 }
+  [Flags] public enum TextFormatFlags { Left = 0, Top = 0, HorizontalCenter = 1, Right = 2, VerticalCenter = 4, SingleLine = 32, WordBreak = 16, NoPrefix = 2048, TextBoxControl = 8192, EndEllipsis = 32768, NoPadding = 268435456 }
   public enum MessageBoxButtons { OK, YesNo } public enum MessageBoxIcon { None, Warning } public enum MessageBoxDefaultButton { Button1, Button2 }
   public struct Padding { public int Left, Top, Right, Bottom; public Padding(int l, int t, int r, int b) { Left = l; Top = t; Right = r; Bottom = b; } public Padding(int a) { Left = Top = Right = Bottom = a; } }
   public class ColumnStyle { public ColumnStyle(object a) { } public ColumnStyle(object a, object b) { } }
@@ -91,7 +91,9 @@ namespace System.Windows.Forms {
   public class Bag { public int Count; public void Add(object o) { Count++; } public void Clear() { Count = 0; } }
   public class TableLayoutPanel : Control { public Bag ColumnStyles = new Bag(); public Bag RowStyles = new Bag(); public void SetColumnSpan(Control c, int n) { } }
   public class Button : Control { public override Size PreferredSize { get { object m; Size min = new Size(0, 0); if (Values.TryGetValue("MinimumSize", out m) && m is PSObject) m = ((PSObject)m).BaseObject; if (m is Size) min = (Size)m; return new Size(Math.Max((Text ?? "").Length * 7 + 24, min.Width), Math.Max(23, min.Height)); } } }
-  public class TextBox : Control { public bool ReadOnly; public int SelectionLength; public void Copy() { RadeStub.Driver.Clip = "selected"; } public void SelectAll() { SelectionLength = (Text ?? "").Length; } public int GetLineFromCharIndex(int i) { return 0; } }
+  public class TextBoxBase : Control { public bool ReadOnly; public int SelectionLength; public string SelectedText = ""; public void Copy() { RadeStub.Driver.Clip = "selected"; } public void SelectAll() { SelectionLength = (Text ?? "").Length; } }
+  public class TextBox : TextBoxBase { public int GetLineFromCharIndex(int i) { return 0; } }
+  public class RichTextBox : TextBoxBase { }   // the lines of a hand step: its Rtf is kept as given (Dyn); the window keeps the plain lines too
   public class MenuItemStub : RadeStub.Dyn { public bool Enabled = true; }
   public class MenuItems { public List<MenuItemStub> Items = new List<MenuItemStub>(); public MenuItemStub Add(string t) { MenuItemStub m = new MenuItemStub(); Items.Add(m); return m; } public MenuItemStub this[int i] { get { return Items[i]; } } }
   public class ContextMenuStrip : RadeStub.Dyn { public MenuItems Items = new MenuItems(); public Control SourceControl; }

@@ -28,7 +28,7 @@ python3 -c "import json,re; c=json.load(open('apps.json')); assert c['apps'] and
 # a browser render (scripts/render_logo.js), which is not byte-stable, so they are not compared.
 lt="$(mktemp -d)"; trap 'rm -rf "$lt"' EXIT; mkdir -p "$lt/scripts"; cp scripts/build_logo.py "$lt/scripts/"
 python3 "$lt/scripts/build_logo.py" > /dev/null
-cmp -s "$lt/assets/logo/logo-K.svg" assets/logo/logo-K.svg || { echo "FAIL assets/logo/logo-K.svg is stale: run python3 scripts/build_logo.py, then node scripts/render_logo.js"; exit 1; }
+cmp -s "$lt/assets/logo/logo-rho.svg" assets/logo/logo-rho.svg || { echo "FAIL assets/logo/logo-rho.svg is stale: run python3 scripts/build_logo.py, then node scripts/render_logo.js"; exit 1; }
 # App canary (the Administrator, 2026-11-15): this engine and schema still build every real application in apps.json
 # (a read-only copy of each app's main branch; needs network access to github.com). Its own test is offline.
 python3 tests/check_apps_test.py
