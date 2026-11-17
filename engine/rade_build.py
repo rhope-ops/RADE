@@ -1846,6 +1846,7 @@ if ($gui) {
         $paras += ('\pard\li0\fi0\sb' + $(if ($i -or @($ui.GuideNums).Count) { $(if ($i) { 0 } else { $g3 }) } else { 0 }) + '\cf2\fs' + $fs + ' ' + (& $ui.RtfEsc ([string]$ui.GuideRest[$i]))) }
       if (-not @($ui.GuideNums).Count) { $ui.GuideInkAt = 0 }
       $rtf = '{\rtf1\ansi\ansicpg1252\deff0\uc1{\fonttbl{\f0\fnil ' + (& $ui.RtfEsc ([string]$ui.F.Body.Name)) + ';}}{\colortbl ;' + (& $col $ui.C.Navy) + (& $col $ui.C.Gray) + '}\f0 ' + ($paras -join "\par`r`n") + '}'
+      if ([int]$ui.ContentW -gt 0 -and $ui.Guide.Width -ne [int]$ui.ContentW) { $ui.Guide.Width = [int]$ui.ContentW }   # its final width first: a text laid out at the default 100 px kept a wrong place for its first letter (R28 job)
       $ui.GuideH = 0; $ui.Guide.Rtf = $rtf
       $ui.Guide.AccessibleDescription = ((@(for ($i = 0; $i -lt @($ui.GuideNums).Count; $i++) { [string]$ui.GuideNums[$i] + ' ' + [string]$ui.GuideTexts[$i] }) + @($ui.GuideRest)) -join ' ') }
     # How tall the text is: the rich text box says it (ContentsResized), or the place of its last letter plus one line.
