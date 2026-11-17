@@ -1,10 +1,10 @@
 # Next prompt: RADE
 
-Updated: 2026-11-17 by Claude (R28 engine work, releases engine-v7 and engine-v8). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
+Updated: 2026-11-17 by Claude (runner polish, pull request 71; release engine-v9 after ENGINE_RELEASE = 9 merges). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
 
 ## State
 
-- Engine: engine/rade_build.py; apps fetch it by commit and own their lock (docs/engine.md). Last release engine-v8 (f720098; engine-v7 619c78b): R28 work of pull requests 72 and 73 (scaling at 125/150 %, Kick fix, window size and place, Start and desktop icon, update notice on the RADE page, selectable text, shared UI file engine/rade_ui.ps1, cancel/boot-error/no-app cards). Tests: `ENGINE pass=101 fail=0`. Next release: raise ENGINE_RELEASE first (docs/engine.md "Releases"). Nothing after R20 is verified on a device.
+- Engine: engine/rade_build.py; apps fetch it by commit and own their lock (docs/engine.md). Last release engine-v8 (f720098; engine-v7 619c78b): R28 work of pull requests 72 and 73 (scaling at 125/150 %, Kick fix, window size and place, Start and desktop icon, update notice on the RADE page, selectable text, shared UI file engine/rade_ui.ps1, cancel/boot-error/no-app cards). Runner polish (pull request 71, 6cfc29c; the Administrator, 17 Nov 26): 4 text styles in 1 typeface, manifest step `title`, hand card order with numbered columns and a closing line, hand cards may scroll, guide line 100 / 10 lines (WARNINGs); release engine-v9. Tests: `ENGINE pass=105 fail=0`. Next release: raise ENGINE_RELEASE first (docs/engine.md "Releases"). Nothing after R20 is verified on a device.
 - Kit: ported to archimedes_lever c523a21 (kit pull requests 19-25); next port starts there (`port` skill).
 - RADE page: https://rhope-ops.github.io/RADE/ (index.html + apps.json on main); NOT verified on a work computer.
 
@@ -23,6 +23,8 @@ Updated: 2026-11-17 by Claude (R28 engine work, releases engine-v7 and engine-v8
 10. After R24: questions, taskbar restore, bottom line, SCALE line built, release pending; the question-card PNGs need the Administrator's approval.
 11. MINOR review leftovers (PR 33, 44, 54 and others): the list in the detail file, for the next engine change.
 12. R28 leftovers (reviews of PR 72): no test for the kept runner copy; release.yml does not check ENGINE_RELEASE against the tag (guard file: the Administrator decides); Start waits 2.5 s; the shortcut's minimized console hides text-mode fallback; the no-app card cannot be reached in a real build. Device proof pending: 125/150 % text, .lnk, runner copy, ISE text capture (round R28 of 90-161.Z).
+
+13. Runner polish leftovers (reviews of pull request 71): `$ui.Say` sets the last log line without a new edge fit (stale edge possible, not seen in the job); `$ui.Fit` breaks long words before `FitSteps` sets the numbered widths (the 400 ms refit corrects it); no stand-in test covers `OnStatus`/`ShowRun`; option: only the numbered lines scroll on a hand card (today the whole text above the buttons scrolls).
 
 ## Needs the Administrator
 
