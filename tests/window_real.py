@@ -8,7 +8,8 @@ lines for each card and saves one PNG of each card.
 
 Usage: python tests/window_real.py OUT_DIR
 Pass = every run ends with "WIN closed=True", prints no "LAYOUT " line (the engine's layout self-check), a SCALE line,
-and no card scrolls at a size larger than the smallest; the first run draws the 3 question cards of the hand step
+and no card scrolls at a size larger than the smallest, except a hand card ("Your turn"), whose text may scroll at
+any size (the Administrator, 2026-11-17); the first run draws the 3 question cards of the hand step
 and each run in the smallest window draws the text question (exit 0). Output: OUT_DIR/<run>/*.png
 (NN-answer-yesno, NN-answer-pick, NN-answer-text), out.txt.
 """
