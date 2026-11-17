@@ -1,6 +1,7 @@
 # RADE window part 07, the run: the callbacks Invoke-Round uses (log line, tick, step state), the Run button,
 # and the Done, Needs review and Stopped cards. Uses the card parts and Invoke-Round.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # ---- The run. Invoke-Round calls back: a log line ($ui.Say), a tick ($ui.Tick), a step that starts ($ui.OnStatus) and
 # a step that ends ($ui.OnStep). A step you do by hand comes in through $script:guideUi.
 $ui.Say = { param($t) Add-RunLog $t; $ui.Log.Add([string]$t); $x = ([string]$t).Trim(); if ($x -and $ui.View -eq 'run') { & $ui.Show $ui.LastLog (& $ui.BreakLong $x $ui.LastLog.Font (& $ui.GetWrap $ui.LastLog)) }; if ($ui.RecOn) { try { $ui.RecText.AppendText([string]$t + "`r`n") } catch { $null = $_ } }; try { [System.Windows.Forms.Application]::DoEvents() } catch { $null = $_ } }
@@ -21,13 +22,18 @@ $ui.Elapsed = { param([double]$Sec) $q = [int][math]::Floor([math]::Max(0, $Sec)
 # Shows the time in this step on the step line, once for each second. Takes nothing; a failure is ignored.
 $ui.ShowTime = { try { if ($ui.View -eq 'run' -and $script:stepStart) { $t = & $ui.Elapsed ((Get-Date) - $script:stepStart).TotalSeconds; if ($ui.StepTime.Text -ne $t) { $ui.StepTime.Text = $t } } } catch { $null = $_ } }
 $ui.TimeT = New-Object System.Windows.Forms.Timer; $ui.TimeT.Interval = 1000; $ui.TimeT.Add_Tick({ & $ui.ShowTime })
+# The tick callback of a running step: repaints the bars and lets the window handle its events. Emits nothing.
 $ui.Tick = { $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }   # a callback must emit nothing: its output would join the engine function's return value
+# Returns the title the window shows for a step (its manifest title, else its name). Takes the step name.
 $ui.TitleOf = { param([string]$Name) foreach ($s in @($steps)) { if ([string]$s.Name -ceq $Name) { return (Get-StepTitle $s) } }; return $Name }   # the title of the step with this name
+# Shows the run card: step k of n, the step name, the bars, Cancel and the next step that needs you.
 $ui.ShowRun = {
   & $ui.SetCard @{ View = 'run'; Kicker = $(if ($ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN } else { 'Starting' }); Sentence = $(if (Test-Deploy) { 'Installing ' + $script:app.Name + '.' } else { 'Running round ' + $round + '.' })
     StepRow = $true; Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { $ui.Form.Close() } })   # asks first while a step runs (the window's X does the same)
     Foot = $(if (@($ui.Guides).Count) { 'RADE needs you next at "' + (& $ui.TitleOf $ui.Guides[0]) + '". Until then, keep this window open.' } else { 'Nothing is needed from you. Keep this window open.' }) }
   $ui.StepName.Text = (& $ui.TitleOf $ui.StepNow); $null = & $ui.FitEdges; $null = & $ui.ShowTime }   # the edge follows the ink of the new text's first letter (titles start with any letter)
+# Invoke-Round calls this when a step starts: keeps its name, start and estimate, and moves the run card on.
+# Takes the step index, the step count, the name and the estimate.
 $ui.OnStatus = { param($i, $count, $name, $estimate)
   $script:statusBase = $name; $script:stepStart = Get-Date; $script:stepEst = $estimate
   if ($i -le 1) { $null = & $ui.SetBar 'all' 0 $true }

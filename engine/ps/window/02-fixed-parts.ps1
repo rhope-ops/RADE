@@ -1,6 +1,7 @@
 # RADE window part 02, the fixed parts: the status light, the logo line, the bottom line (Record and Back
 # links) and the progress bars with the timer that eases them. Builds on 01-setup.ps1.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # ---- The fixed parts: the light (6 px), the logo line, the card, the bottom line and the bar on the bottom edge.
 $ui.Light = New-Object System.Windows.Forms.Panel
 $ui.Light.Dock = 'Top'; $ui.Light.Height = 6; $ui.Light.BackColor = $ui.C.White; $ui.Light.AccessibleRole = 'StaticText'; $ui.Light.AccessibleName = 'Status light: off'

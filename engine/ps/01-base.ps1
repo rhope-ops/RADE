@@ -1,7 +1,10 @@
 # RADE engine part 01, the base: finds the user's OneDrive and RADE folders, masks the DODID in text,
 # moves an old app folder into OneDrive\RADE, and resolves the working folder. Used by every later part.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # ---------------- RADE, the Redacted Application Deployment Engine (generated; same engine in every round bundle) ----------------
+# Returns the secrets to mask (the DODID, the profile folder name, the user name), each 4 or more characters, longest
+# first so a longer one is masked before a shorter one inside it. Takes the DODID and the profile folder name.
 function Get-Secret([string]$Id, [string]$Leaf) {
   @($Id, $Leaf, $env:USERNAME) | Where-Object { $_ -and $_.Length -ge 4 } | Sort-Object -Unique | Sort-Object Length -Descending
 }

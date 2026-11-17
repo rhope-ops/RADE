@@ -1,6 +1,7 @@
 # RADE engine part 05, the install record: one record file for each app in RADE\Config\installed, the newer-
 # version look-up, the runner copy and desktop shortcut, and the lines that tell a user what was made. Used by 04 and 06.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # ---- Installed versions (the Administrator, 14 Nov 26, deploy v1): RADE\Config\installed keeps, one file per app, the
 # version a deploy last installed and the last deploy run. It holds no user name, path, site or DODID. A deploy run sends
 # nothing: no e-mail draft, no saved address; its report stays in Rounds\<round> on this computer.

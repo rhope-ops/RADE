@@ -1,6 +1,7 @@
 # RADE engine part 09, the start: step weights and progress, the shared state variables, Select-App and Get-AppFact, the
 # NIPR guard that stops an unsupported computer before anything is written, and the load of Windows Forms for the window.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # ---- Progress (PFM 14 Nov 26: two bars, overall and this step, so the finish time can be estimated). Weights are seconds:
 # the last successful run on this computer, else the step's estimate from the round, else 2 minutes. Inside a step the bar
 # follows "PROGRESS n/m" lines from the step script; without them it follows elapsed time against the weight (at most 95 %).

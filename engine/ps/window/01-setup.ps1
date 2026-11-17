@@ -1,6 +1,7 @@
 # RADE window part 01, setup: asks Windows for the real screen dpi, creates the $ui table that holds every
 # window value, and creates the form. The window parts run inside "if ($gui) { try {" of 10-window.ps1 and use no other part before this one.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # The "One thing" window (the Administrator, 2026-11-14; docs/window-design.md): the window shows one statement or one
 # question at a time; everything else (all checks, the step boxes, the files, the made list, the log) is in the Record
 # (F2). Each answer moves on: there is no Next / Back row and no Exit button (Esc goes back, and exits on Choose; the window's X exits).

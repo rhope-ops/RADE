@@ -1,7 +1,9 @@
 # RADE window part 09, the Record (F2): lists the checks, the steps and the log, and closes it again.
 # Builds on the Record parts in 04-record-parts.ps1.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # ---- The Record
+# Returns the text color of a state in the Record (green PASSED, red FAILED or NEEDS REVIEW, ...). Takes the state.
 $ui.StateInk = { param([string]$St) $(if ($St -eq 'PASSED') { $ui.C.GreenInk } elseif ($St -in 'FAILED', 'NEEDS REVIEW') { $ui.C.Red } elseif ($St -in 'WARNING', 'RUNNING') { $ui.C.Navy } else { $ui.C.Gray }) }   # the word is always shown: never color alone
 $ui.RecRows = {
   # The checks to list: the chosen application's, or (before a choice) the base checks. Group, name, state, and the rows under it.
@@ -50,6 +52,7 @@ $ui.RecChecks.Add_Resize({ if ($ui.RecOn -and [int]$ui.RecW -ne [int]$this.Clien
 $ui.RecFit = { if (-not $ui.Scaled) { return }; try { $mw = [math]::Max((& $ui.Sc 120), ($ui.RecSteps.ClientSize.Width - (& $ui.Sc 28))); foreach ($l in @($ui.RecSteps.Controls)) { if ($l -is [System.Windows.Forms.CheckBox]) { $fu = $ui.Full[$l]; if ($null -ne $fu) { & $ui.Shorten $l ([string]$fu) $mw }; $l.Size = New-Object System.Drawing.Size($mw, $l.PreferredSize.Height) } else { $l.MaximumSize = New-Object System.Drawing.Size($mw, 0) } } } catch { $null = $_ } }   # a step box is one line, as wide as the column, and ends with "..." when its text is longer
 $ui.RecSteps.Add_SizeChanged({ & $ui.RecFit })
 & $ui.Ring $ui.RecSteps; & $ui.Ring $ui.Rec; & $ui.Cue $ui.RecText   # focus is always visible: the step boxes and the text box too
+# Opens the Record (F2): every check, the step boxes, the files, the made list and the log, sized to its rows.
 $ui.VRecord = {
   & $ui.Check
   $ui.RecOn = $true; $ui.RecData = @(& $ui.RecRows)

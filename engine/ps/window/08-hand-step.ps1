@@ -1,6 +1,7 @@
 # RADE window part 08, a hand step: the cards for a step the user does by hand (It failed, questions,
 # open the address) and $script:guideUi, which the engine waits in until the user answers.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # ---- A step you do by hand, or a check you answer by looking (R13, R14, R18): the card holds the numbered lines, the
 # address (it can be changed; it is remembered in Config), the file path on the clipboard, and the answers. The engine
 # waits in $script:guideUi until an answer is set: OK = Done or Yes, No, Abort = It failed (with the error text),

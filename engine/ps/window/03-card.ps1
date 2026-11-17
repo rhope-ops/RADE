@@ -1,6 +1,7 @@
 # RADE window part 03, the card: the one block that shows a statement or a question, with its parts (line,
 # sentence, paragraphs, choices, box, hand-step text, step line, buttons) and the one-line text box helper.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # ---- The card: one block, left edge at 12 % of the width, 40 % of the spare height above it. Top to bottom: a small
 # line in capitals, the sentence, up to four paragraphs, the choices, a box with its label, the lines of a hand step (one
 # selectable text: the numbered lines, then the unnumbered ones), the file path of a hand step, the step line (name, bar,

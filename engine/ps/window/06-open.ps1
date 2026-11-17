@@ -1,6 +1,7 @@
 # RADE window part 06, the opening views: boot, Choose (pick an application), the site address card, and the
 # check cards (needs you, failed). Uses the card of 03-card.ps1 and the engine checks.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # ---- When the window opens: the Local checks of every application in the paste run once (base checks before Choose).
 # An application with a FAILED one cannot be chosen. A newer version on the RADE page is read here too (test and deploy).
 $ui.RunBase = {
@@ -88,6 +89,7 @@ $ui.VMaint = { param($Inst)
 # Says whether the chosen application has a check that needs the site address. Takes nothing; gives back $true or
 # $false.
 $ui.NeedSite = { [bool](@($script:appChecks | Where-Object { $_ -in 'net-site', 'site-rights' }).Count) }
+# Shows the card that asks for the site address (filled with the saved one, or the DAF SharePoint start).
 $ui.VSite = {
   $v = Get-SiteUrl (Get-BasePath); if (-not $v) { $v = $sitePrefix }   # PFM 14 Nov 26: the box starts with the DAF SharePoint address
   & $ui.SetCard @{ View = 'site'; Sentence = 'Which site does the application go to?'; P = @('RADE writes to this SharePoint site. The address is saved for next time.')

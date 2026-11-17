@@ -1,6 +1,7 @@
 # RADE engine part 02, settings and history: time text, step titles, the saved window place, the results
 # e-mail address, the round history file, the newer-round look-up and the "What to do" help lines. Uses 01-base.ps1.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # Turns seconds into text like "3m 05s". Takes the seconds (a number); gives back the text.
 function Format-Duration([double]$Seconds) {
   $s = [int][math]::Round($Seconds)
@@ -17,7 +18,9 @@ function Test-MailTo([string]$To) {
   $one = '[^@\s;,]+@[^@\s;,]+\.[^@\s;,]+'
   return ($To -match ('^\s*' + $one + '(\s*;\s*' + $one + ')*\s*;?\s*$'))
 }
+# Returns the path of a file in the app's Config folder. Takes the app folder and the file name.
 function Get-ConfigFile([string]$Base, [string]$Name) { return (Join-Path (Join-Path $Base 'Config') $Name) }
+# Returns the path of a file in RADE's own Config folder (a test can set $script:configOver). Takes the file name.
 function Get-RadeConfigFile([string]$Name) { if ($script:configOver) { return (Join-Path $script:configOver $Name) }; return (Join-Path (Join-Path (Get-RadePath) 'Config') $Name) }   # the engine's own settings (R17)
 function Read-WindowState {
   # R28 (the Administrator, 2026-11-17): where the user last closed the window. RADE\Config\rade-window.json (a cache: when it
@@ -99,6 +102,7 @@ function Get-LastRoundText($Hist) {
   $word = @{ OK = 'passed'; CHECK = 'needed review'; STOPPED = 'stopped' }[[string]$l.Status]; if (-not $word) { $word = [string]$l.Status }
   return ('Last round on this computer: ' + $l.Round + ' ' + $word + ' on ' + $l.Finished + ' (took ' + (Format-Duration ([double]$l.Seconds)) + ').')
 }
+# Returns the seconds of the last successful run of a step on this computer, or 0. Takes the history and the step name.
 function Get-StepEstimate($Hist, [string]$Name) {
   $r = @($Hist | Where-Object { $_.Step -eq $Name -and $_.Status -eq 'OK' -and $_.Seconds })   # last good run only
   if ($r.Count) { return [int]$r[-1].Seconds }

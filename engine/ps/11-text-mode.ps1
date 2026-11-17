@@ -1,6 +1,7 @@
 # RADE engine part 11, text mode: runs the whole round in the console (checks, plan, the Enter prompt,
 # the round and the summary) when no window is open. Uses the parts before it.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 try {
   $script:textMode = $true
   # Writes a line to the run log and the console. Takes the line; gives back nothing.
@@ -45,6 +46,7 @@ try {
   $go = ([string](Read-Host 'Press Enter to start the round, or type N and press Enter to stop with no changes')).Trim()
   if ($go -match '^[Nn]') { Write-Host 'Stopped. Only the saved checks (RADE\Config\rade-checks.json) were written.'; return }
   $sel = @(); for ($k = 0; $k -lt $steps.Count; $k++) { $sel += ($script:appSteps -contains $k -and (Get-StepDefault $k) -and -not $steps[$k].AskParam) }   # text mode: steps that need a folder are skipped
+  # Text mode: prints the overall line when a step starts (step i of count and the percent). Takes the Invoke-Round values.
   $onStatusText = { param($i, $count, $name, $estimate) $null = $name; $null = $estimate; $g = Get-Progress; Write-Host ('  Overall: step ' + $i + ' of ' + $count + ', ' + [int]($g.All * 100) + ' % done, about ' + (Format-Duration $g.Left) + ' left (a guess)') }
   $checkLines = Get-CheckSummary $script:checkResults
   $sum = Invoke-Round $true $sel $to $say { } { } $onStatusText { 'Window: text mode (no window opened)' } @() $checkLines

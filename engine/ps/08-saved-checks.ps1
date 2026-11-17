@@ -1,6 +1,7 @@
 # RADE engine part 08, saved checks: keeps each check that passed in RADE\Config\rade-checks.json and
 # decides whether a later run may skip it (age, computer, PowerShell and PnP versions, scope). Uses 07-checks.ps1.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # ---- Saved checks (PFM 14 Nov 26, R17): RADE\Config\rade-checks.json keeps each check that PASSED, so a later run (of
 # any app on this computer) can skip it. A saved result is used only when it is at most $checkMaxDays days old, the
 # PowerShell and PnP versions and the computer are the same, and its scope (the site or the Power Automate address, as a

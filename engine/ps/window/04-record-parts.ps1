@@ -1,6 +1,7 @@
 # RADE window part 04, the hand-step text and the Record's first parts: builds the rich text of the numbered
 # lines of a hand step and fits its box. Builds on 03-card.ps1 (the Guide box).
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # ---- The Record (F2): all checks by group with their result, the steps with a box each (they can be changed only
 # before the run), and one text box with the files (New, Replace, Recycle), what the installs made, and the log.
 $ui.Rec = New-Object System.Windows.Forms.TableLayoutPanel
@@ -99,6 +100,7 @@ $ui.GuideInk = { try { $i = [int]$ui.GuideInkAt; $t = [string]$ui.Guide.Text; if
     $f = $(if (@($ui.GuideNums).Count) { $ui.F.Body } else { $ui.F.Small }); return ([int]$ui.Guide.GetPositionFromCharIndex($i).X + (& $ui.Bearing ([string]$t[$i]) $f)) } catch { return 0 } }
 # Fits the hand-step box after its text or the window width changed. Takes nothing; calls $ui.GuideFit.
 $ui.FitSteps = { & $ui.GuideFit }
+# Lays the card out again for the window's size: text widths, the choices, the step boxes and the buttons.
 $ui.Fit = {
   if (-not $ui.Scaled) { return }   # R1 review: a size set while Windows Forms scales the form would be scaled again
   # Text wraps at the card's width; the choices are as wide as the card.

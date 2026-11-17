@@ -1,6 +1,7 @@
 # RADE engine part 07, the checks: the NIPR guard, the site address, the web and sign-in checks, the install
 # record on the site, and Invoke-Check, which runs one check. Its results are saved by 08-saved-checks.ps1.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # ---- Checks (PFM 14 Nov 26: RADE checks, from its window, that this computer can install the chosen app and
 # that the PFM has the rights to see it done end to end). Read-only except: one test file in the OneDrive folder and one
 # temporary script in the Windows temp folder, each deleted at once, and the site address in Config when the PFM enters it.

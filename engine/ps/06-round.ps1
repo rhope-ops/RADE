@@ -2,6 +2,7 @@
 # and makes the draft or the install record, through the phase functions below (one run table, $run). Uses parts 01
 # to 05 and the progress state of 09; called by the window and text mode.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # Starts the record of one run: the folder, the history, the summary lines (line 1 = the e-mail subject), the mode
 # line, whether the install can be whole, and the overall progress weights. Takes the Invoke-Round inputs; returns the
 # run table that the other Round functions read and change ($run).

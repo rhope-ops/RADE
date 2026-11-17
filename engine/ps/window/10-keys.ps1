@@ -1,6 +1,7 @@
 # RADE window part 10, keys and form events: the key handlers (F2, Esc, Enter, Ctrl+C), the window place
 # saved and restored, and the call that shows the form. It is the last window part.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # ---- Keys: F2 = the Record (Page Down and Page Up move its check list, and on a card that is taller than the window its text); Esc = close the Record, else Back, and on Choose (no Back) it exits; 1 to 9 = a choice. Tab reaches every control.
 $ui.Form.Add_KeyDown({
   $k = [string]$_.KeyCode

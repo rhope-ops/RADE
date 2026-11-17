@@ -1,6 +1,7 @@
 # RADE window part 05, alignment and layout: centers a row of controls, breaks and fits long text, keeps the
 # card inside the window (Squeeze) and runs the layout self-check. Builds on 03-card.ps1.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
 # ---- Alignment (the Administrator, 2026-11-15, after the R24 pictures; docs/window-design.md "Sizes"). An aligned row:
 # its parts share one vertical midpoint (each part's top margin is set from the tallest part). One left edge per card:
 # a label draws its text after a padding that grows with its font (Windows text padding: about 1/6 of the line), so a
@@ -26,7 +27,9 @@ $ui.AlignRow = { param($Parts, [int]$Base)
   try { $hs = @($Parts | ForEach-Object { if ($_.AutoSize) { [int]$_.PreferredSize.Height } else { [int]$_.Height } }); $hh = [int]($hs | Measure-Object -Maximum).Maximum
     for ($i = 0; $i -lt $Parts.Count; $i++) { $m = $Parts[$i].Margin; $t = $Base + [int][math]::Floor(($hh - $hs[$i]) / 2); $b = $Base + $hh - $hs[$i] - ($t - $Base)
       if ($m.Top -ne $t -or $m.Bottom -ne $b) { $Parts[$i].Margin = New-Object System.Windows.Forms.Padding($m.Left, $t, $m.Right, $b) } } } catch { $null = $_ } }
+# Returns the controls of one aligned row (Top, FieldRow, ...). Takes the row name.
 $ui.RowParts = { param([string]$Row) switch ($Row) { 'Top' { @(@($ui.Logo) + @($ui.WordL, $ui.AppL) | Where-Object { $_ }) } 'FieldRow' { @($ui.FieldL, $ui.FieldBox) + @($(if ($ui.FieldBOn) { $ui.FieldB })) } 'TestRow' { @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox) } } }
+# Lines up every fixed row: box heights, the text box in its frame, then each row on one center line.
 $ui.AlignRows = { try { $bh = [int]$ui.FieldB.PreferredSize.Height; if ($bh -gt 0) { foreach ($p in $ui.Boxes) { if ($p.Height -ne $bh) { $p.Height = $bh } } } } catch { $null = $_ }   # a box is as tall as the compact button, measured
   foreach ($p in $ui.Boxes) { & $ui.BoxFit $p }   # the text box fills its frame (R24 job: a frame whose size never changed kept a 100 px text box at its top)
   & $ui.AlignRow (& $ui.RowParts 'Top') 0; $mm = & $ui.Sc $ui.Z.M; & $ui.AlignRow (& $ui.RowParts 'FieldRow') $mm; & $ui.AlignRow (& $ui.RowParts 'TestRow') $mm }
@@ -132,6 +135,8 @@ $ui.PaintOpt = { param($P, $G)
       if ($o.R2) { & $ui.Word $G ([string]$o.R2) $ui.F.Small $ui.C.Gray $rx ($y + $h1) $rw $h2 'Right, Top, NoPrefix, SingleLine' }
     }
   } catch { $null = $_ } }
+# Fills the choice list with one button for each item (the old ones are kept to dispose after the window closes).
+# Takes the list of items (name, version, notes).
 $ui.FillOpts = { param($List)
   $ui.Trash = @($ui.Trash) + @($ui.Opts.Controls); $ui.Opts.Controls.Clear()   # old choices are disposed after the window has closed: a button is never disposed inside its own Click
   $n = 0
@@ -157,6 +162,7 @@ $ui.Measure = { param([string]$Card)
     $out += & $ui.RowBad $Card $row @($ps | ForEach-Object { $rr = & $sr $_; @{ N = (& $ui.NameOf $_); Top = $rr.Top; H = $rr.Height; Line = $rr.Top - $_.Margin.Top; Kind = $(if ($ui.Boxes -contains $_) { 'box' } elseif ($_ -is [System.Windows.Forms.Button] -and $_.FlatAppearance.BorderSize -gt 0) { 'button' } else { 'other' }) } })
   }
   if (-not $ui.RecOn) {
+    # Returns where a control's ink starts (its left edge plus the measured ink offset). Takes the control.
     $tx = { param($C) (& $sr $C).Left + (& $ui.Ink $C) }   # where its ink starts (text, edge or drawing), measured
     $es = @()
     if ($ui.Kick.Visible) { $es += @{ N = 'Kick'; X = (& $tx $ui.Kick) } }
@@ -243,6 +249,8 @@ $ui.SetCard = { param($c)
   # queue while the card was built comes in during this DoEvents, inside the guard, and is dropped.
   $ui.CardAt = $ui.Clock.Elapsed.TotalMilliseconds
   [System.Windows.Forms.Application]::DoEvents() }
+# Brings the window to the front (restores it when minimized) without keeping it on top.
 $ui.ToFront = { try { if ([string]$ui.Form.WindowState -eq 'Minimized') { $ui.Form.WindowState = 'Normal' }; $ui.Form.TopMost = $true; $ui.Form.Activate(); $ui.Form.TopMost = $false } catch { $null = $_ } }
+# Shows one gray line under the card's box or buttons, or hides it for empty text. Takes the text.
 $ui.Say1 = { param([string]$Text) $ui.Note.Text = $Text; $ui.Note.Visible = [bool]$Text }   # one gray line under the card's box or buttons
 
