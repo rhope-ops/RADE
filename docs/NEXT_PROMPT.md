@@ -1,10 +1,10 @@
 # Next prompt: RADE
 
-Updated: 2026-11-16 by Claude (delta kit port to archimedes_lever c523a21, pull request 61). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
+Updated: 2026-11-17 by Claude (R28 engine work, releases engine-v7 and engine-v8). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
 
 ## State
 
-- Engine: engine/rade_build.py; apps fetch it by commit and own their lock (docs/engine.md). Last release engine-v4 (4a0fbad). Tests: `ENGINE pass=93 fail=0` (tests/engine_test.sh). Nothing after R20 is verified on a device.
+- Engine: engine/rade_build.py; apps fetch it by commit and own their lock (docs/engine.md). Last release engine-v8 (f720098; engine-v7 619c78b): R28 work of pull requests 72 and 73 (scaling at 125/150 %, Kick fix, window size and place, Start and desktop icon, update notice on the RADE page, selectable text, shared UI file engine/rade_ui.ps1, cancel/boot-error/no-app cards). Tests: `ENGINE pass=101 fail=0`. Next release: raise ENGINE_RELEASE first (docs/engine.md "Releases"). Nothing after R20 is verified on a device.
 - Kit: ported to archimedes_lever c523a21 (kit pull requests 19-25); next port starts there (`port` skill).
 - RADE page: https://rhope-ops.github.io/RADE/ (index.html + apps.json on main); NOT verified on a work computer.
 
@@ -22,6 +22,7 @@ Updated: 2026-11-16 by Claude (delta kit port to archimedes_lever c523a21, pull 
 9. Shared files: built; a 90-161.Z round must show 4 `PASS shared files` lines (the 5.1 proof).
 10. After R24: questions, taskbar restore, bottom line, SCALE line built, release pending; the question-card PNGs need the Administrator's approval.
 11. MINOR review leftovers (PR 33, 44, 54 and others): the list in the detail file, for the next engine change.
+12. R28 leftovers (reviews of PR 72): no test for the kept runner copy; release.yml does not check ENGINE_RELEASE against the tag (guard file: the Administrator decides); Start waits 2.5 s; the shortcut's minimized console hides text-mode fallback; the no-app card cannot be reached in a real build. Device proof pending: 125/150 % text, .lnk, runner copy, ISE text capture (round R28 of 90-161.Z).
 
 ## Needs the Administrator
 
