@@ -52,6 +52,7 @@ def stretch(m, limits):
         for st in b["steps"]:
             names[st["name"]] = fill(st["name"], limits["step name"])
             st["name"] = names[st["name"]]
+            st["title"] = fill(st.get("title", st["name"]), limits["step title"])
             st["note"] = fill(st.get("note", "Note"), limits["step note"])
             st["help"] = fill(st.get("help", "Help"), limits["step help"])
             if st.get("kind") == "guide":
@@ -87,7 +88,12 @@ def bundle(t, long, keep=None):
     shutil.copytree(ROOT / "tests" / "fixture-app", app)
     m = json.loads((ROOT / "schemas" / "examples" / "sample-manifest.json").read_text(encoding="utf-8"))
     qa = json.loads((ROOT / "tests" / "fixture-app" / "answers.json").read_text(encoding="utf-8"))   # the hand step's questions, as in tests/engine_test.sh
-    [st for st in m["bundles"][0]["steps"] if st["name"] == qa["step"]][0]["answers"] = qa["answers"]
+    for st in m["bundles"][0]["steps"]:
+        if st["name"] in qa["titles"]:
+            st["title"] = qa["titles"][st["name"]]
+        if st["name"] == qa["step"]:
+            st["answers"] = qa["answers"]
+            st.update(qa["set"])
     names = [a["name"] for a in m["bundles"][0]["apps"]]
     if long:
         sp = importlib.util.spec_from_file_location("rade_build", str(ROOT / "engine" / "rade_build.py"))

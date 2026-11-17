@@ -182,6 +182,11 @@
           "minLength": 1,
           "description": "Unique in the bundle; apps and collect refer to it."
         },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional. What the RADE window shows a person where it shows the step name (the hand step's headline, the step line of a run, the Record's step boxes). 1 to 56 characters, the same limit as the name; longer is a build WARNING, not a failure. The log, the report, the summary, the results files and every key keep the name. Without a title the window shows the name."
+        },
         "dir": {
           "$ref": "#/$defs/relPath"
         },

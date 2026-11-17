@@ -22,11 +22,15 @@ od="$t/u/test1234/OneDrive - United States Air Force"; cfg="$od/RADE/Config"
 # rec KEY: the record file name of one app (the first 12 hex of the SHA-256 of the lower-case key), as the engine names it.
 rec() { python3 -c "import hashlib,sys; print(hashlib.sha256(sys.argv[1].lower().rstrip('/').encode()).hexdigest()[:12] + '.json')" "$1"; }
 inst="$cfg/installed/$(rec 'SampleApp/Sample app (deploy)')"
-# ans FILE: the hand step T02 of a manifest gets the questions in tests/fixture-app/answers.json (manifest "answers").
+# ans FILE: the sample manifest gets what tests/fixture-app/answers.json holds: titles, and for the hand step T02 its questions
+# (manifest "answers"), a note and a guide with one line that has no number.
 ans() { python3 - "$1" <<'P'
 import json, sys
 p = sys.argv[1]; m = json.load(open(p)); a = json.load(open('tests/fixture-app/answers.json'))
-[s for s in m['bundles'][0]['steps'] if s['name'] == a['step']][0]['answers'] = a['answers']; json.dump(m, open(p, 'w'), indent=2)
+for s in m['bundles'][0]['steps']:
+    if s['name'] in a['titles']: s['title'] = a['titles'][s['name']]
+    if s['name'] == a['step']: s['answers'] = a['answers']; s.update(a['set'])
+json.dump(m, open(p, 'w'), indent=2)
 P
 }
 mkdir -p "$od" "$t/app/scripts"; cp -r tests/fixture-app/. "$t/app/"; cp schemas/examples/sample-manifest.json "$t/app/scripts/paste_bundles.json"; ans "$t/app/scripts/paste_bundles.json"
@@ -121,6 +125,35 @@ r = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t 
 assert 'WARNING' not in r.stdout, r.stdout
 P
 
+# A step title (manifest "title") of 56 characters is fine, one of 57 is a WARNING (like the step name), an empty one fails the schema; a
+# guide of 10 numbered lines is fine, 11 is a WARNING of the build (a count: docs/window-design.md "Text lengths"); a line without a number
+# is not counted; the title reaches the bundle and the name stays the key.
+python3 - "$t" <<'P' && ok || bad "title and guide lines: build WARNINGs, schema, bundle line"
+import json, subprocess, sys, pathlib, shutil
+t = pathlib.Path(sys.argv[1])
+def build(n, title=None, lines=None, check=False):
+    a = t / ('tl%s' % n); shutil.copytree(t / 'app', a)
+    p = a / 'scripts/paste_bundles.json'; m = json.loads(p.read_text())
+    st = [s for s in m['bundles'][0]['steps'] if s['name'] == 'T02 Sample import r1'][0]
+    if title is not None: st['title'] = title
+    if lines is not None: st['guide'] = lines
+    p.write_text(json.dumps(m))
+    r = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(a)], capture_output=True, text=True)
+    c = subprocess.run([sys.executable, 'scripts/check_manifest.py', str(p)], capture_output=True, text=True)
+    return r, c, a
+r, c, a = build(1, 't' * 56); assert r.returncode == 0 and 'WARNING' not in r.stdout and c.returncode == 0, r.stdout + r.stderr + c.stdout
+r, c, a = build(2, 't' * 57); assert r.returncode == 0 and r.stdout.count('WARNING text length: ') == 1 and 'step title has 57 characters, the limit is 56' in r.stdout, r.stdout + r.stderr
+r, c, a = build(3, ''); assert c.returncode == 1 and 'title' in c.stdout, c.stdout
+ten = ['%d. Do thing %d.' % (i, i) for i in range(1, 11)]
+r, c, a = build(4, None, ten); assert r.returncode == 0 and 'WARNING' not in r.stdout, r.stdout + r.stderr
+r, c, a = build(5, None, ten + ['11. One more.']); assert r.returncode == 0 and r.stdout.count('WARNING text length: ') == 1 and 'guide has 11 numbered lines, the limit is 10' in r.stdout, r.stdout + r.stderr
+r, c, a = build(6, None, ten + ['A line with no number.', 'Another one.']); assert r.returncode == 0 and 'WARNING' not in r.stdout, r.stdout + r.stderr
+r, c, a = build(7, 'Import it'); line = [l for l in (a / 'scripts/gov/paste/SAMPLE-R01-round-r1.ps1').read_text().split('\n') if l.startswith("$steps += @{ Name = 'T02 Sample import r1'")][0]
+assert "Name = 'T02 Sample import r1'; Title = 'Import it'; Dir = " in line, line
+r, c, a = build(8); line = [l for l in (a / 'scripts/gov/paste/SAMPLE-R01-round-r1.ps1').read_text().split('\n') if l.startswith("$steps += @{ Name = 'T03 Sample verify r1'")][0]
+assert "Name = 'T03 Sample verify r1'; Title = ''; Dir = " in line, line
+P
+
 # ---- window: the "One thing" window (docs/window-design.md) with stand-in Windows Forms types (tests/window_stub.cs) and
 # a scripted user (tests/window_driver.ps1) that prints one WIN line per card, runs every Paint handler and checks names.
 # win APP HAND RECORD TOUR [BUNDLE]: runs the window for application APP (0 = test, 1 = deploy); output in $t/win.txt.
@@ -135,8 +168,21 @@ has() { local x; grep -q "No window could open\|WIN NONAME\|WIN NOFOCUS\|WIN BAD
 # 1. A first deploy: boot, choose with the newer-version notice, ready, the Record (boxes can change, Clean-up off), the hand step, done.
 win 1 done 1 0
 has "view=boot" "view=choose light=off kick= sent=Which application do you want to install?" "2 Sample app (deploy) 1.0.0 NOTE Version 9.0.0 is on the app page" "view=ready light=off kick=ALL 8 CHECKS PASSED sent=Ready to install Sample app (deploy) 1.0.0." \
-  "WIN record on=True rows=10 boxes=5 enabled=True text=True name=True reused=Last check: 14-11-26 / Version [5.1] tall=True" "WIN paged=" "WIN record on=False clean=False" "view=hand light=RADE waits for you kick=STEP 2 OF 3 · YOUR TURN sent=T02 Sample import r1" "btn=[Imported] [It failed] [Skip]" \
+  "WIN record on=True rows=10 boxes=5 enabled=True text=True name=True reused=Last check: 14-11-26 / Version [5.1] tall=True" "WIN paged=" "WIN record on=False clean=False" "view=hand light=RADE waits for you kick=STEP 2 OF 3 · YOUR TURN sent=Import the sample flow" "btn=[Imported] [It failed] [Skip]" \
   "view=done light=off kick=ALL STEPS PASSED sent=Sample app (deploy) 1.0.0 is installed. p=Nothing was sent." "btn=[Close] [What it made] [Open results folder] [Copy summary]" "WIN made=True log=True locked=True" "WIN copied=True" && ! grep -q "foot=Site\|Change the site address" "$t/win.txt" && ok || { bad "window 1: first deploy"; tail -5 "$t/win.txt" | cut -c1-300; }
+# 1a. The polish pass of 17 Nov (docs/window-design.md "Type", "Cards"): the manifest title is what the window shows (the hand card's
+# headline, the step line of a run, the Record's step boxes and their accessible names, the foot of the Run card), a step with no title shows
+# its name, and the report keeps the name; the hand card shows the step note under the headline, then the address row, then the numbered
+# lines (a line without a number goes after the list, small and gray), then the one closing line (with the step's doneText), above the
+# buttons; one typeface in 4 styles ($ui.F has only those tokens; every button has the strong font, also a plain one; Consolas is only the
+# Record's text box); the last log line is small.
+has "view=hand light=RADE waits for you kick=STEP 2 OF 3 · YOUR TURN sent=Import the sample flow p=You do this step in the browser. RADE cannot do it for you. steps=1. Open the import page. ~ 2. Choose the file on the clipboard. ~ 3. Select Import. rest=RADE cannot see the import page, so it asks you to confirm. close=When you finish in the browser, come back to this window and select \"Imported\"." \
+  "step=Check this computer lastlog-font=Segoe UI10" "step=T03 Sample verify r1" 'foot=RADE needs you next at "Import the sample flow". Until then, keep this window open.' \
+  "box-text=Clean-up|1  Check this computer|2  T04 Sample optional r1|3  Import the sample flow  (needs you)|4  T03 Sample verify r1 box-name=1  Check this computer" \
+  "WIN hand-order address-above-lines=True steps-above-rest=True closing-above-buttons=True closing-gap=4" "WIN F tokens=Body,Link,Mono,Sent,Small,SmallB,Word mono-only-in-record=True sent=Segoe UI Semibold22 body=Segoe UI12 small=10 smallb=Segoe UI Semibold10 help=12 kick=Segoe UI Semibold label=Segoe UI Semibold plainbtn=Segoe UI Semibold link=Segoe UI Semibold lastlog=Segoe UI" && ok || { bad "window 1a: titles, hand card order, type styles"; grep "view=hand\|step=\|box-text\|WIN F\|hand-order\|BAD" "$t/win.txt" | cut -c1-700; }
+[ "$(grep -c Consolas engine/rade_build.py)" = 1 ] && grep -q "Mono = (& \$ui.Font 'Consolas' 9" engine/rade_build.py && [ "$(grep -c 'F\.Mono' engine/rade_build.py)" = 1 ] && grep -q "RecText.Font = \$ui.F.Mono" engine/rade_build.py && ok || bad "type: Consolas is only the Mono token, and only the Record's text box uses it"
+wr="$t/wu/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt"
+! grep -q "Import the sample flow\|Check this computer" "$wr" && grep -q "^T01 Sample check r1: PASSED" "$wr" && grep -q "^T02 Sample import r1: PASSED (confirmed by you)" "$wr" && ok || { bad "title: the report keeps the step name and never shows the title"; grep -n "Import the sample flow\|Check this computer" "$wr"; }
 # 1b. The hand step's questions after Done: one card each (No, the second choice, a text with an e-mail address), and
 # their lines under the step's line in the report, the text masked (docs/engine.md "Step contract").
 wr="$t/wu/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt"
@@ -177,7 +223,7 @@ has "WIN rule wrapped=0 one-line=1 ~ LAYOUT fixture TestRow OkBox midpoint: 58, 
 win 1 fail 0 1
 has "opts=OFF Sample app; 1 Sample app (deploy) 1.0.0" "btn=[Check this computer again]" "view=maint light=off kick=SAMPLE APP (DEPLOY) 1.0.0 · INSTALLED " "sent=Maintenance" "btn=[Repair] (Diagnose) (Back up) (Restore) (Uninstall)" \
   "view=site light=off kick= sent=Which site does the application go to?" "WIN site-note=The address must look like https://rade-test.invalid/sites/name" "view=fail light=failed kick=CHECK 9 OF 11 · FAILED sent=One check failed. p=Your SharePoint site can be reached" "btn=[Run checks again] [Change the site address]" "WIN esc" "WIN again" "sent=One check failed. p=You can change the site (sign in with your CAC) / Sign-in was not finished" "btn=[Sign in and check site rights] [Change the site address]" \
-  "view=need light=RADE waits for you kick=CHECK 10 OF 11 · YOUR TURN sent=One check needs you." "btn=[Sign in and check site rights]" "btn=[Check Power Automate]" "sent=Check Power Automate" "btn=[Yes: I see both] [No: one is missing] [Not now]" "kick=ALL 11 CHECKS PASSED" "btn=[Install] [Steps and files] [Change the site address] foot=Site: fake" \
+  "view=need light=RADE waits for you kick=CHECK 10 OF 11 · YOUR TURN sent=One check needs you." "btn=[Sign in and check site rights]" "btn=[Check Power Automate]" "sent=Check Power Automate" "btn=[Yes: I see both] [No: one is missing] [Not now]" "steps=1. Select Open in browser. Power Automate opens; sign in with your CAC if asked. ~ 2. Look at the left menu" "rest=You look in Power Automate and answer (about 2 minutes, an estimate). Nothing is changed. close=When you finish in the browser, come back to this window and select \"Yes: I see both\"." "kick=ALL 11 CHECKS PASSED" "btn=[Install] [Steps and files] [Change the site address] foot=Site: fake" \
   "view=handfail" "view=review light=failed kick=NEEDS REVIEW sent=The install is not complete. p=T02 Sample import r1: FAILED (reported by you)" "flow <SITE> not found" "help=For help, ask in the Teams channel" "btn=[Copy summary] [Open results folder] [What it made] [Close]" && [ "$(grep -c "^WIN view=maint" "$t/win.txt")" = 2 ] && [ "$(grep -c "^WIN view=fail .*CHECK 9 OF 11" "$t/win.txt")" = 2 ] && ! grep -q "^WIN view=answer" "$t/win.txt" && ok || { bad "window 2: Maintenance, checks that fail or need you, needs review (and no question after It failed)"; tail -5 "$t/win.txt" | cut -c1-300; }
 # 3. A test round: the owner's test extras show on Done; a deploy never shows them (1 and 2 have no "test=shown").
 # Here Application.Run fails as when a message loop already runs on the thread: the window opens with ShowDialog.
