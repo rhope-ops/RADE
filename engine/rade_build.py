@@ -770,10 +770,12 @@ function Get-StepDefault([int]$K) {
   if ($all) { return $true }
   return ($prior[[string]$steps[$K].Name] -ne 'PASSED')
 }
+# The RADE page (R28: the newer-version notice points here, not to the app page; the Administrator, 2026-11-17).
+$radeUrl = 'https://rhope-ops.github.io/RADE'
 function Get-NewerVersion {
-  # Deploy: reads rade-release.json in the app repository (data, not code): { "apps": { "<app name>": "<version>" } }.
+  # Reads rade-release.json in the app repository (data, not code): { "apps": { "<app name>": "<version>" } }.
   # Returns that version when it is newer than the one this bundle installs, else ''. Short timeout; any failure is silent.
-  if (-not (Test-Deploy)) { return '' }
+  # R28: in a test round too (the Administrator, 2026-11-17): the notice shows for every application that names a version.
   try {
     try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { $null = $_ }
     $rq = [System.Net.WebRequest]::Create($releaseUrl)
@@ -790,7 +792,7 @@ function Get-NewerVersion {
 }
 function Get-NewerVersionText {
   $v = Get-NewerVersion
-  if ($v) { return ('A newer version, ' + $v + ', of ' + $script:app.Name + ' is on the app page (' + $homeUrl + '). Use that one instead.') }
+  if ($v) { return ('A newer version, ' + $v + ', of ' + $script:app.Name + ' is on the RADE page (' + $radeUrl + '). Use that one instead.') }
   return ''
 }
 function Get-MadeLine {
@@ -1652,8 +1654,9 @@ if ($gui) {
     $ui.ErrBox.Multiline = $true; $ui.ErrBox.ScrollBars = 'Vertical'; $ui.ErrBox.Size = New-Object System.Drawing.Size(600, 96); $ui.ErrBox.Margin = (& $ui.Pad 4 4 4 4); $ui.ErrBox.BorderStyle = 'FixedSingle'; $ui.ErrBox.AccessibleName = 'Error message'; & $ui.Cue $ui.ErrBox
     [void]$ui.ErrRow.Controls.Add($ui.ErrBox)
     $ui.LinkRow = & $ui.Flow 0; $ui.LinkRow.WrapContents = $true; $ui.LinkRow.Margin = (& $ui.Pad (-$ui.Z.M) 0 0 0); & $ui.Ring $ui.LinkRow
-    $ui.CopyPathB = & $ui.LinkBtn 'Copy file path'; $ui.ShowFileB = & $ui.LinkBtn 'Show file in folder'
-    [void]$ui.LinkRow.Controls.Add($ui.CopyPathB); [void]$ui.LinkRow.Controls.Add($ui.ShowFileB)
+    $ui.CopyPathB = & $ui.LinkBtn 'Copy file path'; $ui.ShowFileB = & $ui.LinkBtn 'Show file in folder'; $ui.PageB = & $ui.LinkBtn 'Open the RADE page'
+    $ui.PageB.AccessibleName = 'Open the RADE page in your browser'; $ui.PageB.Visible = $false
+    foreach ($c in @($ui.CopyPathB, $ui.ShowFileB, $ui.PageB)) { [void]$ui.LinkRow.Controls.Add($c) }
     $ui.Note = & $ui.Label $ui.F.Small $ui.C.Gray $ui.Z.G2
     $ui.Help = & $ui.Label $ui.F.Help $ui.C.Navy $ui.Z.G4
     $ui.BtnRow = & $ui.Flow $ui.Z.G4; $ui.BtnRow.WrapContents = $true; $ui.BtnRow.Margin = (& $ui.Pad (-$ui.Z.M) ($ui.Z.G4 - $ui.Z.M) 0 0); & $ui.Ring $ui.BtnRow   # the buttons' own 4 px margin is part of the 16 px gap
@@ -1735,7 +1738,7 @@ if ($gui) {
         & $ui.SetLeft $ui.TickP 0; & $ui.SetLeft $ui.SentRow ($x - $(if ($ui.TickP.Visible) { & $ui.Ink $ui.TickP } else { & $ui.Ink $ui.Sent }))
         & $ui.SetLeft $ui.StepRow ($x - (& $ui.Ink $ui.StepName)); & $ui.SetLeft $ui.ErrRow ($x - $ui.ErrBox.Margin.Left)
         & $ui.SetLeft $ui.BtnRow ($x - $mm)   # a button's own 4 px margin (room for the ring)
-        $l1 = @($ui.LinkRow.Controls)[0]; & $ui.SetLeft $ui.LinkRow ($x - $mm - (& $ui.Ink $l1))   # a link's text is in the middle of its box
+        $l1 = @($ui.LinkRow.Controls | Where-Object { $_.Visible })[0]; if ($l1) { & $ui.SetLeft $ui.LinkRow ($x - $mm - (& $ui.Ink $l1)) }   # a link's text is in the middle of its box
         & $ui.SetLeft $ui.Opts $x } catch { $null = $_ } }
     $ui.AlignRow = { param($Parts, [int]$Base)
       try { $hs = @($Parts | ForEach-Object { if ($_.AutoSize) { [int]$_.PreferredSize.Height } else { [int]$_.Height } }); $hh = [int]($hs | Measure-Object -Maximum).Maximum
@@ -1870,7 +1873,7 @@ if ($gui) {
         if ($ui.TickP.Visible) { $es += @{ N = 'TickP'; X = (& $tx $ui.TickP) } } elseif ($ui.Sent.Visible -and $ui.Sent.Text) { $es += @{ N = 'Sent'; X = (& $tx $ui.Sent) } }
         foreach ($l in @(@($ui.P) + @($ui.Lines, $ui.StepName, $ui.LastLog, $ui.FieldL, $ui.Note, $ui.Help, $ui.Foot, $ui.TestL))) { if ($l.Visible -and $l.Text) { $es += @{ N = (& $ui.NameOf $l); X = (& $tx $l) } } }
         if ($ui.ErrBox.Visible) { $es += @{ N = 'ErrBox'; X = (& $sr $ui.ErrBox).Left } }
-        $k1 = @($ui.LinkRow.Controls | Where-Object { $_.Visible })[0]; if ($k1) { $es += @{ N = (& $ui.NameOf $k1); X = (& $tx $k1) } }
+        $k1 = @($ui.LinkRow.Controls | Where-Object { $_.Visible })[0]; if ($k1) { $es += @{ N = (& $ui.NameOf $k1); X = (& $tx $k1); D = ('link ink ' + (& $ui.Ink $k1) + ', width ' + $k1.Width + ', margin ' + $k1.Margin.Left + ', row margin ' + $ui.LinkRow.Margin.Left) } }
         $o1 = @($ui.Opts.Controls | Where-Object { $_.Visible })[0]; if ($o1) { $es += @{ N = 'choice 1'; X = (& $sr $o1).Left } }
         $b1 = @($ui.B | Where-Object { $_.Visible })[0]; if ($b1) { $es += @{ N = (& $ui.NameOf $b1); X = (& $tx $b1) } }
         $out += & $ui.EdgeBad $Card $es
@@ -1917,7 +1920,7 @@ if ($gui) {
       $ui.FieldRow.Visible = [bool]$c.Field; $ui.FieldDo = $null
       if ($c.Field) { $ui.FieldL.Text = [string]$c.Field.Label; $ui.Field.Text = [string]$c.Field.Text; $ui.Field.AccessibleName = [string]$c.Field.Name; $ui.FieldB.Visible = [bool]$c.Field.Button; $ui.FieldBOn = [bool]$c.Field.Button; $ui.FieldB.Text = [string]$c.Field.Button; $ui.FieldDo = $c.Field.Act; $ui.Field.MaxLength = $(if ($c.Field.Max) { [int]$c.Field.Max } else { 32767 }); & $ui.FitRow }
       $ui.ErrRow.Visible = [bool]$c.Err; if ($c.Err) { $ui.ErrBox.Text = '' }
-      $ui.LinkRow.Visible = [bool]$c.Links
+      $ui.LinkRow.Visible = [bool]($c.Links -or $c.PageLink); $ui.CopyPathB.Visible = [bool]$c.Links; $ui.ShowFileB.Visible = [bool]$c.Links; $ui.PageB.Visible = [bool]$c.PageLink
       & $ui.Show $ui.Note ([string]$c.Note); & $ui.Show $ui.Help ([string]$c.Help); & $ui.Show $ui.Foot ([string]$c.Foot)
       $bs = @($c.Buttons | Where-Object { $_ }); $ui.Acts = @(); $first = $null; $accept = $null; $ui.BOn = @($false) * 5; $ui.BApart = @($false) * 5
       for ($k = 0; $k -lt 5; $k++) {
@@ -1948,7 +1951,7 @@ if ($gui) {
     $ui.Say1 = { param([string]$Text) $ui.Note.Text = $Text; $ui.Note.Visible = [bool]$Text }   # one gray line under the card's box or buttons
 
     # ---- When the window opens: the Local checks of every application in the paste run once (base checks before Choose).
-    # An application with a FAILED one cannot be chosen. For a deploy, a newer version on the app page is read here too.
+    # An application with a FAILED one cannot be chosen. A newer version on the RADE page is read here too (test and deploy).
     $ui.RunBase = {
       $ui.BaseIds = @(); foreach ($a in $apps) { foreach ($id in @($a.Checks)) { $d = Get-CheckDef $id; if ($d -and $d.Group -eq 'Local' -and $d.Kind -eq 'auto' -and $ui.BaseIds -notcontains $id) { $ui.BaseIds += $id } } }
       $cache = Read-CheckCache; $bp = Get-BasePath; $site = Get-SiteUrl $bp; $i = 0; $ui.Busy = $true; $ui.BaseRes = @{}
@@ -1960,10 +1963,10 @@ if ($gui) {
           if (-not $r) { $r = Invoke-Check $d $bp $site { [System.Windows.Forms.Application]::DoEvents() } }
           $ui.BaseRes[$id] = $r
         }
-        # One read per deploy application (4 s at most each); after one slow read the others are not tried.
+        # One read per application (4 s at most each); after one slow read the others are not tried.
         $slow = $false
         for ($j = 0; $j -lt $apps.Count; $j++) {
-          if ($slow -or [string]$apps[$j].Mode -ne 'deploy' -or $ui.Newer.ContainsKey($j)) { continue }
+          if ($slow -or $ui.Newer.ContainsKey($j)) { continue }
           $t0 = Get-Date; $script:app = $apps[$j]; $ui.Newer[$j] = [string](Get-NewerVersion); if (((Get-Date) - $t0).TotalSeconds -gt 3) { $slow = $true }
         }
         if (-not $ui.ContainsKey('NewRound')) { $ui.NewRound = [string](Get-NewerRound) }
@@ -1976,11 +1979,12 @@ if ($gui) {
         if ($ui.Blocked.ContainsKey($j)) { $list += @{ Off = $true; Index = $j; Name = [string]$a.Name; Ver = $(if ($a.Version) { ' ' + $a.Version } else { '' }); Sub = [string]$ui.Blocked[$j]; Sub2 = [string]$ui.BlockedFix[$j]; R1 = 'FAILED' }; continue }
         $f = Get-AppFact $a $ui.Hist
         $list += @{ Index = $j; Name = [string]$a.Name; Ver = $(if ($a.Version) { ' ' + $a.Version } else { '' }); Sub = [string]$a.Summary; R1 = $f.Steps; R2 = $f.Installed
-          Note = $(if ($ui.Newer[$j]) { 'Version ' + $ui.Newer[$j] + ' is on the app page. This paste installs ' + $a.Version + '.' } else { '' }) }
+          Note = $(if ($ui.Newer[$j]) { 'Version ' + $ui.Newer[$j] + ' is on the RADE page. This paste installs ' + $a.Version + '.' } else { '' }) }
       }
       $nr = [string]$ui.NewRound
       & $ui.SetCard @{ View = 'choose'; Sentence = $(if ($dep) { 'Which application do you want to install?' } else { 'Which application do you want to run?' })
         P = @($(if ($nr) { 'A newer round, ' + $nr + ', is in the repository. Close this window and run ' + $nr + ' instead.' } else { '' })); Options = $list; OnOption = { param($j) & $ui.Pick $j }
+        PageLink = [bool](@($ui.Newer.Values | Where-Object { $_ }).Count)
         Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Act = { & $ui.Boot } } } else { $null })); Foot = $(if ($dep) { '' } else { Get-LastRoundText $ui.Hist }) } }
     $ui.Boot = {
       & $ui.SetCard @{ View = 'boot'; Sentence = 'Checking this computer.'; P = @('This takes a few seconds. Nothing is changed.') }
@@ -2252,6 +2256,7 @@ if ($gui) {
       $ui.GUrl = $u; try { if ($ui.G.UrlFile) { Set-Content -LiteralPath $ui.G.UrlFile -Value $u -Encoding UTF8 } } catch { $null = $_ }
       try { Start-Process -FilePath $u; & $ui.Say1 'Opened in your browser. Do the lines above, then come back to this window.' } catch { & $ui.Say1 ('The browser could not be opened: ' + $_.Exception.Message) } }
     $ui.CopyPathB.Add_Click({ & $ui.Say1 $(if (Copy-TextToClipboard ([string]$ui.G.File)) { 'File path copied. Press Ctrl+V in the "File name" box' } else { 'The clipboard is busy. Select "Copy file path" again.' }) })
+    $ui.PageB.Add_Click({ try { Start-Process -FilePath $radeUrl } catch { & $ui.Say1 'The browser could not be opened. Open the RADE page from your bookmarks.' } })
     $ui.ShowFileB.Add_Click({ if ($ui.G.File) { Start-Process -FilePath 'explorer.exe' -ArgumentList ('/select,"' + $ui.G.File + '"') } })
     $script:guideUi = { param($Step, [string]$File, [string]$Url, [string]$UrlFile)
       $ui.G = @{ Step = $Step; File = $File; UrlFile = $UrlFile }; $ui.GUrl = $Url; $script:guideError = ''; $ui.Answer = ''; $was = $ui.Busy; $ui.Busy = $false
@@ -2612,8 +2617,8 @@ def build(b):
     own = '$ownPatterns = @(' + ', '.join(q(p) for p in APP['own']) + ')\n'
     go = q('https://raw.githubusercontent.com/' + APP['repo'] + '/main/go.md')
     rel = q('https://raw.githubusercontent.com/' + APP['repo'] + '/main/rade-release.json')
-    body = ('$goUrl = %s\n$releaseUrl = %s\n$homeUrl = %s\n$webAgent = \'Mozilla/5.0 (Windows NT 10.0; Win64; x64) RADE\'\n$logoPng = \'%s\'\n%s$round = %s\n$appFolder = %s\n$usersRoot = \'C:\\Users\'\n$files = @()\n%s\n$fetch = @()\n%s\n$steps = @()\n%s\n$collect = @()\n%s\n$cleanup = @()\n%s\n$known = @(%s)\n$apps = @()\n%s\n%s'
-            % (go, rel, q(APP['home']), logo, own, q(b['round']), q(APP['folder']), '\n'.join(parts), '\n'.join(fetchs), '\n'.join(steps), '\n'.join(collect), '\n'.join(cleanup), ', '.join(q(k) for k in known), '\n'.join(apps), engine))
+    body = ('$goUrl = %s\n$releaseUrl = %s\n$webAgent = \'Mozilla/5.0 (Windows NT 10.0; Win64; x64) RADE\'\n$logoPng = \'%s\'\n%s$round = %s\n$appFolder = %s\n$usersRoot = \'C:\\Users\'\n$files = @()\n%s\n$fetch = @()\n%s\n$steps = @()\n%s\n$collect = @()\n%s\n$cleanup = @()\n%s\n$known = @(%s)\n$apps = @()\n%s\n%s'
+            % (go, rel, logo, own, q(b['round']), q(APP['folder']), '\n'.join(parts), '\n'.join(fetchs), '\n'.join(steps), '\n'.join(collect), '\n'.join(cleanup), ', '.join(q(k) for k in known), '\n'.join(apps), engine))
     build_id = hashlib.sha256(body.encode('ascii')).hexdigest()[:8]
     modes = {a.get('mode', 'test') for a in b.get('apps', [])} or {'test'}
     sends = ' on this computer. It sends nothing.' if modes == {'deploy'} else ', then opens an Outlook draft with them (never sent; a deploy makes no draft).' if 'deploy' in modes else ', then opens an Outlook draft with them (never sent).'
