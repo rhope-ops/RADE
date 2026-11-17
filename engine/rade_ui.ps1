@@ -23,8 +23,16 @@ $ui.C = @{ Navy = [System.Drawing.Color]::FromArgb(11, 37, 69); Blue = [System.D
 # Cosmetics never stop the window (R06: Font('Segoe UI', 10, 'Bold') failed with "Multiple ambiguous overloads"): a typed
 # style and size, and the window font when a font cannot be made.
 $ui.Bold = [Enum]::Parse(('System.Drawing.FontStyle' -as [type]), 'Bold')
-$ui.Font = { param([string]$Fam, [double]$Pt, $Style) try { if ($null -ne $Style) { return (New-Object System.Drawing.Font($Fam, [single]$Pt, $Style)) }; return (New-Object System.Drawing.Font($Fam, [single]$Pt)) } catch { return $ui.Form.Font } }
-& $ui.FormDpi; $ui.Form.Font = (& $ui.Font 'Segoe UI' 10 $null)
+# $Pt is the size at 100 % scaling; $ui.FontK (R28: text scales with the controls) makes it as much bigger as the controls are.
+$ui.Font = { param([string]$Fam, [double]$Pt, $Style) try { $pk = [single]($Pt * $ui.FontK); if ($null -ne $Style) { return (New-Object System.Drawing.Font($Fam, $pk, $Style)) }; return (New-Object System.Drawing.Font($Fam, $pk)) } catch { return $ui.Form.Font } }
+# FontScale: how much bigger than the screen's own text scaling the fonts must be, so that text follows the controls. A probe
+# font of 100 pt Segoe UI is 177 px tall when the screen draws text at 96 dpi; its real height gives the dpi the text is drawn
+# at. On the R25 device (autoScale 144, text at 96) the answer is 1.5; where Windows scales both, it is 1. The factor is
+# kept to steps of 0.25 (the Windows scales); anything odd gives 1.
+$ui.FontScale = { $ui.FontK = 1.0; $ui.FontDpi = 96.0
+  try { $pf = New-Object System.Drawing.Font('Segoe UI', [single]100); $r = [double]$pf.Height / 177.3; try { $pf.Dispose() } catch { $null = $_ }
+    if ($r -gt 0.6 -and $r -lt 4) { $k = [math]::Round(($ui.Dpi / 96.0) / $r * 4) / 4; if ($k -ge 0.5 -and $k -le 4) { $ui.FontK = [double]$k }; $ui.FontDpi = 96.0 * [math]::Max(1.0, [math]::Round($r * 4) / 4) } } catch { $null = $_ } }
+& $ui.FormDpi; & $ui.FontScale; $ui.Form.Font = (& $ui.Font 'Segoe UI' 10 $null)
 $ui.F = @{ Small = $ui.Form.Font; SmallB = (& $ui.Font 'Segoe UI' 10 $ui.Bold); Cap = (& $ui.Font 'Segoe UI' 9 $ui.Bold); Body = (& $ui.Font 'Segoe UI' 11 $null); BodyB = (& $ui.Font 'Segoe UI' 11 $ui.Bold)
   Sent = (& $ui.Font 'Segoe UI Semibold' 22 $null); Help = (& $ui.Font 'Segoe UI' 13.5 $null); Word = (& $ui.Font 'Segoe UI' 15 $ui.Bold); Opt = (& $ui.Font 'Segoe UI' 12 $ui.Bold); OptV = (& $ui.Font 'Segoe UI' 12 $null)
   Mono = (& $ui.Font 'Consolas' 9 $null); Link = (& $ui.Font 'Segoe UI' 10 ([Enum]::Parse(('System.Drawing.FontStyle' -as [type]), 'Bold, Underline'))); CapR = (& $ui.Font 'Segoe UI' 9 $null) }
@@ -82,7 +90,7 @@ $ui.Ink = { param($C)
   if ($C -is [System.Windows.Forms.ButtonBase] -and [int]$C.FlatAppearance.BorderSize -gt 0) { return 0 }
   $f = $C.Font; $k = $C.GetType().Name + '|' + $f.Name + '|' + $f.SizeInPoints + '|' + $f.Style + '|' + ([string]$C.Text).PadRight(2).Substring(0, 2) + '|' + $(if ($C -is [System.Windows.Forms.ButtonBase] -or $C -is [System.Windows.Forms.Panel]) { $C.Width } else { '' })
   if ($ui.Inks.ContainsKey($k)) { return [int]$ui.Inks[$k] }
-  $v = [int][math]::Ceiling([double]$f.SizeInPoints * $ui.Dpi / 72.0 / 6.0); $got = $false
+  $v = [int][math]::Ceiling([double]$f.SizeInPoints * $ui.FontDpi / 72.0 / 6.0); $got = $false
   if (-not $C.Text -and -not ($C -is [System.Windows.Forms.Panel])) { return $v }   # nothing drawn: nothing to measure
   try { if ($C.AutoSize -and $C.Text) { $pz = $C.PreferredSize; if ($C.Width -ne $pz.Width -or $C.Height -ne $pz.Height) { $C.Size = $pz } }   # a new text: the size the layout will give it
     $w = [math]::Max(1, $C.Width); $h = [math]::Max(1, $C.Height); $bm = New-Object System.Drawing.Bitmap($w, $h)
