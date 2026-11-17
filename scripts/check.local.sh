@@ -20,8 +20,8 @@ changed() {
 python3 scripts/check_manifest.py
 # Code standard (the Administrator, 2026-11-17; docs/code-standard.md): the check proves itself, then measures every
 # source file against the shrink-only baseline. Both lanes: it reads every file in about 1 s.
-python3 tests/check_code_standard.py --self-test
-python3 tests/check_code_standard.py
+python3 scripts/code_standard.py --test
+python3 scripts/code_standard.py
 # Engine (moved from rhope-ops/90-161.Z, 2026-11-14): it compiles. Each app's own tests build and check its bundles.
 python3 -m py_compile engine/rade_build.py
 # Engine file list (apps lock these files; the release workflow signs the list): the trace runs and names the engine.
