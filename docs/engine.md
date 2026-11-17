@@ -1,6 +1,6 @@
 # RADE engine requirements
 
-Status: decided by the Administrator, 2026-11-14 (docs/DECISIONS.md); not all built. The engine is [../engine/rade_build.py](../engine/rade_build.py) (moved from rhope-ops/90-161.Z on 2026-11-14; apps fetch it by commit: "How an app gets the engine"). Drift check: [drift-check.md](drift-check.md). Input contract: [../schemas/rade-manifest.schema.json](../schemas/rade-manifest.schema.json).
+Status: decided by the Administrator, 2026-11-14 (docs/DECISIONS.md); not all built. The engine is the build [../engine/rade_build.py](../engine/rade_build.py) and its PowerShell parts in [../engine/ps](../engine/ps) (file list: "How an app gets the engine"; moved from rhope-ops/90-161.Z on 2026-11-14; apps fetch it by commit: "How an app gets the engine"). Drift check: [drift-check.md](drift-check.md). Input contract: [../schemas/rade-manifest.schema.json](../schemas/rade-manifest.schema.json).
 
 ## RADE and the app
 
