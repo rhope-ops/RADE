@@ -41,6 +41,7 @@ if [ "$lane" = full ]; then python3 scripts/check_apps.py; else echo "SKIP app c
 if changed '^(engine/|tests/|schemas/|assets/|docs/window-design\.md$|scripts/check_manifest\.py$|scripts/check\.local\.sh$)'; then
   bash tests/engine_test.sh
   python3 tests/bundle_layout_test.py   # the Contents list and the shared blocks (docs/engine.md "Bundle layout")
+  bash scripts/lint.sh   # PSScriptAnalyzer on the built sample bundle (apps lint their bundles with the same settings)
 else
   echo "SKIP engine tests (fast lane: no file they read changed; the full lane runs them)"
 fi

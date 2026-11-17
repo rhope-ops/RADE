@@ -53,3 +53,19 @@ Reviewer: fresh `reviewer` subagent, Opus tier, given only the changed lines, AG
 5. DECISIONS row of 2026-11-14 placed `$helpChannel` in engine/rade_build.py. Fixed: a dated note names engine/ps/09-start.ps1.
 
 rule-conflict-check: e1ad6b78cbec
+
+---
+
+## Rule conflict check: "Engine source" (answer 1A) and "Lint" lines, 2026-11-17
+
+Changed lines (`python3 scripts/bloat_check.py --rules`), texts approved by the Administrator (17 Nov 26): "Engine source" names the files docs/engine.md lists (the engine/ folder and the RADE logo) and "Apps' builds fetch them"; "Lint" names scripts/lint.sh.
+
+Reviewer: fresh `reviewer` subagent, Opus tier, given only the changed lines, AGENTS.md, docs/DECISIONS.md and the brief. No MAJOR finding.
+
+1. The pass string: lint.sh printed "LINT bundles=n findings=n". Fixed: its last line is now "LINT findings=n".
+2. "check.local.sh runs it when engine files change": it runs with the engine tests (the full lane, or a change to engine/, tests/, schemas/, assets/ and a few others). Open: a wording change needs the Administrator's approval.
+3. Overlap with "Verification" (run the checks in Commands) and "Checks" (do not run by hand a lane the hook runs next): already there for every command; lint adds one case. Open: same.
+4. Overlap: the 5.1 syntax part of the lint enforces part of "Windows PowerShell 5.1". Open (optional pointer): same.
+5. The replaced "Engine source" decision row was still in the table. Fixed: moved unchanged to docs/decisions-archive.md.
+
+rule-conflict-check: 05fabac151f0
