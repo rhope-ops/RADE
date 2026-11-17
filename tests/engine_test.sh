@@ -208,7 +208,7 @@ has "WIN mid hand label=18.5 box=19 button=19 box-h=30 button-h=30 gaps=8,8 inne
 # "..." (R24 job: "(needs you)" was cut to "(ne"), shortened by RADE (no AutoEllipsis: no tooltip); the click guard runs on a
 # monotonic clock (a reference "in the future", as after the clock stepped back, never blocks; 401 ms after a card the click
 # is taken, 100 ms after it is not); long words break by text element (a surrogate pair stays whole) and in body lines too.
-has "WIN measure record box=5,4 label=5,6 rows=268 one-line=True" "WIN guard held=True then=Yes" "WIN break=ab|cd|ef|gh|ij word-bad=LAYOUT fixture P0 text: the word \"abcdefghij\" needs 70, the line is 50 word-ok=True" && ok || { bad "window 1f: click guard, long words"; grep "WIN guard\|WIN break" "$t/win.txt" | cut -c1-300; }
+has "WIN measure record box=5,4 label=5,6 rows=268 one-line=True" "WIN guard held=True then=Yes" "WIN break=abc|def|ghi|j word-bad=LAYOUT fixture P0 text: the word \"abcdefghij\" needs 70, the line is 50 word-ok=True" && ok || { bad "window 1f: click guard, long words"; grep "WIN guard\|WIN break" "$t/win.txt" | cut -c1-300; }
 # 1g. Second review of 9d71b28: the click guard on a monotonic clock, breaks by text element and in body lines, and a step
 # name shortened by RADE with "..." (no AutoEllipsis).
 has "WIN clock future=True after400=True within=False" && ok || { bad "window 1g: monotonic click guard"; grep "WIN clock" "$t/win.txt"; }

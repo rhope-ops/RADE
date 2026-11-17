@@ -1861,9 +1861,6 @@ if ($gui) {
     $ui.WordW = { param([string]$T, $F) try { $ui.Probe.Font = $F; $ui.Probe.Text = $T; return [int]$ui.Probe.PreferredSize.Width } catch { return [int][System.Windows.Forms.TextRenderer]::MeasureText($T, $F).Width } }
     $ui.BreakLong = { param([string]$T, $F, [int]$W)
       if ($W -le 0 -or -not $T) { return $T }
-      # 6 px to spare (R28 polish, Windows job): a label that wraps lays a line out up to 9 px narrower than the one-line
-      # probe measures (R24), so a piece cut to the full width could still be 3 px too wide for its label at 12 pt.
-      $W = [math]::Max(1, $W - (& $ui.Sc 6))
       $parts = foreach ($ln in ($T -split '(\r?\n)')) {   # line by line; the line breaks are kept
         if ($ln -match '^\r?\n$') { $ln; continue }
         $ws = foreach ($wd in ($ln -split ' ')) {
@@ -1888,7 +1885,9 @@ if ($gui) {
       $si = New-Object System.Globalization.StringInfo($Full); $lo = 0; $hi = $si.LengthInTextElements
       while ($lo -lt $hi) { $mid = [int][math]::Ceiling(($lo + $hi) / 2.0); $C.Text = $si.SubstringByTextElements(0, $mid).TrimEnd() + '...'; if ($C.PreferredSize.Width -le $W) { $lo = $mid } else { $hi = $mid - 1 } }
       $C.Text = $(if ($lo -gt 0) { $si.SubstringByTextElements(0, $lo).TrimEnd() } else { '' }) + '...' }
-    # The self-check's rule for it: a word of a label that wraps is never wider than the label (else the word is cut).
+    # The self-check's rule for it: a word of a label that wraps is never wider than the line the label may take (its
+    # MaximumSize; else the word is cut). Not the label's own width: a wrapping label is as wide as its widest line by its own
+    # measure, about 1 % narrower than the probe's, so a cut piece that is the widest line would always seem too wide (R28 job).
     $ui.WordBad = { param([string]$Card, [string]$Name, [string]$Text, $F, [int]$W)
       foreach ($wd in ($Text -split '\s+')) { if ($wd) { $ww = & $ui.WordW $wd $F; if ($ww -gt $W + 1) { return ('LAYOUT ' + $Card + ' ' + $Name + ' text: the word "' + $(if ($wd.Length -gt 20) { $wd.Substring(0, 20) + '...' } else { $wd }) + '" needs ' + $ww + ', the line is ' + $W) } } }
       return $null }
@@ -2059,7 +2058,7 @@ if ($gui) {
           for ($i = 0; $i -lt $kids.Count; $i++) {
             $c = $kids[$i]; $r = $c.RectangleToScreen($c.ClientRectangle); if ($r.Width -le 0 -or $r.Height -le 0) { continue }
             if (-not $scroll -and -not $clip.Contains($r)) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' cut: needs ' + $r.Width + 'x' + $r.Height + ' at ' + ($r.Left - $clip.Left) + ',' + ($r.Top - $clip.Top) + ' in ' + $clip.Width + 'x' + $clip.Height) }
-            if ($c -is [System.Windows.Forms.Label] -and $c.AutoSize -and $c.MaximumSize.Width -gt 0 -and $c.Text) { $wb = & $ui.WordBad $card (& $ui.NameOf $c) ([string]$c.Text) $c.Font $c.Width; if ($wb) { $ui.LayBad.Add($wb) } }
+            if ($c -is [System.Windows.Forms.Label] -and $c.AutoSize -and $c.MaximumSize.Width -gt 0 -and $c.Text) { $wb = & $ui.WordBad $card (& $ui.NameOf $c) ([string]$c.Text) $c.Font $c.MaximumSize.Width; if ($wb) { $ui.LayBad.Add($wb) } }
             if ($c -is [System.Windows.Forms.CheckBox] -and $c.Text -and -not $c.AutoEllipsis) {   # a one-line check box whose text alone is wider than it is cut (the Record's step boxes before R24 fix round 3)
               $tw = [System.Windows.Forms.TextRenderer]::MeasureText([string]$c.Text, $c.Font).Width; if ($tw -gt $c.ClientSize.Width + 1) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' text cut: needs ' + $tw + ' has ' + $c.ClientSize.Width) } }
             $isText = ($c -is [System.Windows.Forms.Label] -or $c -is [System.Windows.Forms.ButtonBase])

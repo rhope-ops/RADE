@@ -129,7 +129,7 @@ function global:Push-RadeButton([string]$Text) {
       $sp = 'ab' + [char]::ConvertFromUtf32(0x1F600) + 'cd'; $pcs = @((& $ui.BreakLong $sp $ui.F.Body 21) -split "`n")
       Write-Host ('WIN surrogate pieces=' + $pcs.Count + ' whole=' + (-not @($pcs | Where-Object { $_ -match '[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]' }).Count -and ($pcs -join '') -eq $sp))
       $pl = New-Object System.Windows.Forms.Label; & $ui.Shorten $pl 'abcdefghij' 50
-      $ui.P[1].MaximumSize = New-Object System.Drawing.Size(50, 0); $ui.P[1].Text = 'see abcdefghijkl'; & $ui.BreakAll; $bb = ($ui.P[1].Text -eq "see abcdef`nghijkl")   # 50 px less the 6 px BreakLong keeps spare: 6 letters of 7 px; $ui.P[1].Text = ''
+      $ui.P[1].MaximumSize = New-Object System.Drawing.Size(50, 0); $ui.P[1].Text = 'see abcdefghijkl'; & $ui.BreakAll; $bb = ($ui.P[1].Text -eq "see abcdefg`nhijkl"); $ui.P[1].Text = ''
       Write-Host ('WIN shorten=' + $pl.Text + ' body-break=' + $bb)
       Write-Host ('WIN break=' + ((& $ui.BreakLong 'abcdefghij' $ui.F.Body 21) -replace "`n", '|') + ' word-bad=' + (& $ui.WordBad 'fixture' 'P0' 'abcdefghij' $ui.F.Body 50) + ' word-ok=' + ($null -eq (& $ui.WordBad 'fixture' 'P0' 'abc def ghi' $ui.F.Body 50)))
     }
