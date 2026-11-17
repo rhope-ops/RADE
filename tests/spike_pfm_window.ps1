@@ -333,13 +333,13 @@ function New-Board($parent, [int]$x, [int]$y, [int]$w, [int]$h, [bool]$wide) {
 }
 
 # one ".co" row of the side panels: label left, a chip or a text right
-function New-CoRow($parent, [int]$x, [int]$y, [int]$w, [string]$label, [string]$right, [string]$chip, [bool]$border) {
+function New-CoRow($parent, [int]$x, [int]$y, [int]$w, [string]$label, [string]$right, [string]$chipKind, [bool]$border) {
     $hh = 36
-    if ($chip) { $hh = 43 }
+    if ($chipKind) { $hh = 43 }
     $null = New-Lbl $parent $label $x ($y + 8) ($w - 120) 19 14 $false $INK
-    if ($chip) {
+    if ($chipKind) {
         $cw = (TextW $right (Fnt 13 $true)) + 20
-        $null = New-Chip $parent $chip $right ($x + $w - $cw) ($y + 8) $cw 26 13
+        $null = New-Chip $parent $chipKind $right ($x + $w - $cw) ($y + 8) $cw 26 13
     } else {
         $null = New-Lbl $parent $right ($x + $w - 200) ($y + 8) 200 19 14 $false $INK 'R'
     }
@@ -354,9 +354,10 @@ function Build-Home($root, [int]$W, [int]$H) {
     $null = Build-Nav $root $navW $H
     $lx = $navW + 28
     $lw = $W - $navW - 56 - 18 - $rw
-    $null = New-Lbl $root 'Your Work' $lx 22 130 34 28 $true $NAVY
+    $tw1 = (TextW 'Your Work' (Fnt 28 $true)) + 4
+    $null = New-Lbl $root 'Your Work' $lx 22 $tw1 34 28 $true $NAVY
     $sub = 'Tuesday, 17 Nov 26 ' + $mid + ' 2 items need you ' + $mid + ' 2 offices late'
-    $null = New-Lbl $root $sub ($lx + 138) 34 500 19 14 $false $MUTED
+    $null = New-Lbl $root $sub ($lx + $tw1 + 8) 34 500 19 14 $false $MUTED
 
     # Needs You Today
     $nh = 222
@@ -600,7 +601,7 @@ function Show-Spike([string]$name, [int]$W, [int]$H, [scriptblock]$build) {
     $root = New-Object System.Windows.Forms.Panel
     $root.AccessibleName = $name + ' page'
     $root.BackColor = $PAGE
-    $root.Dock = 'Fill'
+    $root.SetBounds(0, 0, $W, $H)
     $form.Controls.Add($root)
     $grid = & $build $root $W $H
     $form.Show()
