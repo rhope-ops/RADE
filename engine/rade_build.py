@@ -1861,6 +1861,9 @@ if ($gui) {
     $ui.WordW = { param([string]$T, $F) try { $ui.Probe.Font = $F; $ui.Probe.Text = $T; return [int]$ui.Probe.PreferredSize.Width } catch { return [int][System.Windows.Forms.TextRenderer]::MeasureText($T, $F).Width } }
     $ui.BreakLong = { param([string]$T, $F, [int]$W)
       if ($W -le 0 -or -not $T) { return $T }
+      # 6 px to spare (R28 polish, Windows job): a label that wraps lays a line out up to 9 px narrower than the one-line
+      # probe measures (R24), so a piece cut to the full width could still be 3 px too wide for its label at 12 pt.
+      $W = [math]::Max(1, $W - (& $ui.Sc 6))
       $parts = foreach ($ln in ($T -split '(\r?\n)')) {   # line by line; the line breaks are kept
         if ($ln -match '^\r?\n$') { $ln; continue }
         $ws = foreach ($wd in ($ln -split ' ')) {
