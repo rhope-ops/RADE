@@ -8,7 +8,8 @@ lines for each card and saves one PNG of each card.
 
 Usage: python tests/window_real.py OUT_DIR
 Pass = every run ends with "WIN closed=True", prints no "LAYOUT " line (the engine's layout self-check), a SCALE line,
-and no card scrolls at a size larger than the smallest; the first run draws the 3 question cards of the hand step
+and no card scrolls at a size larger than the smallest, except a hand card ("Your turn"), whose text may scroll at
+any size (the Administrator, 2026-11-17); the first run draws the 3 question cards of the hand step
 and each run in the smallest window draws the text question (exit 0). Output: OUT_DIR/<run>/*.png
 (NN-answer-yesno, NN-answer-pick, NN-answer-text), out.txt.
 """
@@ -52,10 +53,13 @@ def stretch(m, limits):
         for st in b["steps"]:
             names[st["name"]] = fill(st["name"], limits["step name"])
             st["name"] = names[st["name"]]
+            st["title"] = fill(st.get("title", st["name"]), limits["step title"])
             st["note"] = fill(st.get("note", "Note"), limits["step note"])
             st["help"] = fill(st.get("help", "Help"), limits["step help"])
             if st.get("kind") == "guide":
-                st["guide"] = [fill(g, limits["guide line"]) for g in st.get("guide", [])]
+                # as many numbered lines as the soft limit allows ('guide lines'), each at its length limit, then the unnumbered extras
+                extra = [fill(g, limits["guide line"]) for g in st.get("guide", []) if not re.match(r"\d+\.\s+\S", g)]  # the engine's pattern
+                st["guide"] = [fill("%d. Select" % k, limits["guide line"]) for k in range(1, limits["guide lines"] + 1)] + extra
                 st["doneText"] = fill(st.get("doneText", "Done"), limits["doneText"])
             for a in st.get("answers", []):
                 # the text question: one long first sentence (no "?", "." or ":"), so its headline shrinks and then wraps;
@@ -87,7 +91,12 @@ def bundle(t, long, keep=None):
     shutil.copytree(ROOT / "tests" / "fixture-app", app)
     m = json.loads((ROOT / "schemas" / "examples" / "sample-manifest.json").read_text(encoding="utf-8"))
     qa = json.loads((ROOT / "tests" / "fixture-app" / "answers.json").read_text(encoding="utf-8"))   # the hand step's questions, as in tests/engine_test.sh
-    [st for st in m["bundles"][0]["steps"] if st["name"] == qa["step"]][0]["answers"] = qa["answers"]
+    for st in m["bundles"][0]["steps"]:
+        if st["name"] in qa["titles"]:
+            st["title"] = qa["titles"][st["name"]]
+        if st["name"] == qa["step"]:
+            st["answers"] = qa["answers"]
+            st.update(qa["set"])
     names = [a["name"] for a in m["bundles"][0]["apps"]]
     if long:
         sp = importlib.util.spec_from_file_location("rade_build", str(ROOT / "engine" / "rade_build.py"))
@@ -154,7 +163,8 @@ def main():
             print("   --- last lines ---")
             for l in lines[-25:]:
                 print("   " + l[:300])
-        scrolls = [l for l in lines if l.startswith("WIN scrolls ")]
+        # a hand card ("Your turn") may scroll at any size (the Administrator, 2026-11-17); every other card only at the smallest
+        scrolls = [l for l in lines if l.startswith("WIN scrolls ") and not l.rstrip().endswith("-hand")]
         why = []
         if not closed:
             why.append("the window did not reach its end")

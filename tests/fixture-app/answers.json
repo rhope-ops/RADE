@@ -1,6 +1,19 @@
 {
-  "_doc": "Fake sample: the questions of the hand step T02 (manifest field \"answers\", one of each kind). tests/engine_test.sh and tests/window_real.py add them to that step of schemas/examples/sample-manifest.json in their test copy.",
+  "_doc": "Fake sample: what tests/engine_test.sh and tests/window_real.py add to the sample manifest (schemas/examples/sample-manifest.json) in their test copy: the questions of the hand step T02 (manifest field \"answers\", one of each kind); \"titles\" (manifest field \"title\" of some steps); \"set\" (more fields of the hand step: its note, and a guide with numbered lines and one line without a number).",
   "step": "T02 Sample import r1",
+  "titles": {
+    "T01 Sample check r1": "Check this computer",
+    "T02 Sample import r1": "Import the sample flow"
+  },
+  "set": {
+    "note": "You do this step in the browser. RADE cannot do it for you.",
+    "guide": [
+      "1. Open the import page.",
+      "2. Choose the file on the clipboard.",
+      "3. Select Import.",
+      "RADE cannot see the import page, so it asks you to confirm."
+    ]
+  },
   "answers": [
     {
       "key": "run-started",
