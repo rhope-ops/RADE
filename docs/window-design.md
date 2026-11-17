@@ -106,5 +106,8 @@ The Record (F2, or its links): three columns. Checks by group (Local, Network, A
 | No tooltips; AccessibleName on every control; every control by keyboard (Tab, Enter, F2 = Record, Page Down and Page Up = the Record's check list and the text of a card that is taller than the window, 1 to 9 = a choice; Esc = close the Record, else Back, and on Choose, which has no Back, it exits) | R21 W9; RADE 2026-11-14 |
 | The same steps run as text when no window can open | Z 2026-11-13 |
 | A card's buttons and choices take no click in the first 400 ms after the card shows (Enter and Space too): a double-click never answers the next card unseen. A word wider than its line (no space in it) is cut into pieces that fit, one per line, in the headline and in every body, help and last line: never clipped. The 400 ms count on a monotonic clock from the moment the card is on screen | Review of the R24 polish, 2026-11-15 |
+| Card text is selectable: highlight part of a card, Ctrl+C or right-click Copy and Select All; same look as a label (read-only, borderless, no tab stop) | the Administrator 2026-11-17 |
+| Start: after the checks pass, the Ready card has a Start button that opens the installed app; the update notice links the RADE page | the Administrator 2026-11-17 |
+| The window keeps the size and place the user gives it (Windows Snap too) and opens there next time; text scales with the window at 125 % and 150 % | the Administrator 2026-11-17 |
 
 Not in the window yet: bundle size in the summary, engine version and sha256 in the window, a JSON results block (RADE 2026-11-14, engine work row); the Maintenance actions other than Install.

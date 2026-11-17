@@ -17,6 +17,7 @@ Decided by the Administrator, 2026-11-14. RADE owns the computer and the run. Th
 | Values asked from the user | Asks what the install needs (site address), passes it once (`RADE_SITE`) | Asks its own settings in its own setup screen |
 | Record of the install | Keeps the version, each step's state and the made list | Prints `PASS`, `FAIL` and `MADE` lines; each script is safe to run again |
 | App data (rows, files, backups) | May read and write it inside DoD365 where a run type needs it (Diagnose, Restore, backup); how is not decided | Owns it; declares what RADE may touch |
+| Starting the app | After its checks pass, a Start button opens the installed app from its local copy (no download); one desktop shortcut opens RADE (the Administrator, 2026-11-17) | Supplies its start script and its own window |
 | After the install | Not present; the app works if RADE is deleted | Flows, the Power App, health and its own alerts |
 | Help | Names the Teams channel | Says what to do when one of its steps needs review |
 
