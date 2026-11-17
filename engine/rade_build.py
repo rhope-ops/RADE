@@ -479,7 +479,7 @@ def main():
 
 
 # The engine's hash: this file and each engine/ps part, in build order (path, then bytes). An app's lock still checks each
-# file on its own (docs/engine.md "How an app gets the engine"); this one value names the engine in a bundle's header.
+# file on its own, and a bundle's header names each file with its own hash (part_lines); this one value is what --sha prints.
 ENGINE_SHA = hashlib.sha256(b''.join(rel.encode() + b'\0' + (ENGINE_ROOT / rel).read_bytes() + b'\0' for rel in
                                      ['engine/rade_build.py'] + ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS])).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
