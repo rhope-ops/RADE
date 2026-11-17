@@ -125,4 +125,5 @@ Nothing else is a rule. docs/DECISIONS.md is the record of what the Administrato
 - Windows PowerShell 5.1 (the Administrator, 2026-11-14): engine code must run on Windows PowerShell 5.1, the floor on every NIPR computer; cloud tests run PowerShell 7, and a work-computer round is the 5.1 proof.
 - Personal-data guard (the Administrator, 2026-11-15): this repo runs the DoD tier (`profile: dod`), and a push with no name denylist fails. The master denylist is in the Administrator's Google Drive; an agent never opens it.
 - Public repo (the Administrator, 2026-11-14): no e-mail address, DoD ID or its hash goes in this repo; help text names the Teams channel only, with no link or address.
+- Code standard (the Administrator, 2026-11-17): all code is modular, clearly commented and human inspectable, per docs/code-standard.md; tests/check_code_standard.py enforces it, and its baseline may only shrink.
 - Window (the Administrator, 2026-11-14): the window's UI decisions live in docs/window-design.md; read it before a window change, and record each new window decision there.
