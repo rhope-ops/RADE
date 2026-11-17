@@ -34,6 +34,7 @@ namespace RadeStub {
     public static ScriptBlock Pump; public static System.Windows.Forms.Control Focus; public static string Clip = "";
     public static List<System.Windows.Forms.Timer> Timers = new List<System.Windows.Forms.Timer>();
     public static int Pumps = 0;
+    public static System.Windows.Forms.Screen[] Screens() { return new System.Windows.Forms.Screen[] { new System.Windows.Forms.Screen() }; }
     public static float FormDpi = 96f;   // the dpi the form scales to (RADE_T_SCALE=150: 144); the screen dpi (Graphics.DpiX) stays 96
     public static bool RunThrows = false; public static string ShownBy = "";   // RunThrows: Application.Run fails as when a message loop already runs
   }
@@ -72,7 +73,7 @@ namespace System.Windows.Forms {
     protected bool DoubleBuffered { get; set; }
     public Size ClientSize { get { return new Size(Width, Height); } set { Width = value.Width; Height = value.Height; } }
     public Size Size { get { return new Size(Width, Height); } set { Width = value.Width; Height = value.Height; } }
-    public Rectangle Bounds { get { return new Rectangle(Left, Top, Width, Height); } }
+    public Rectangle Bounds { get { return new Rectangle(Left, Top, Width, Height); } set { Left = value.Left; Top = value.Top; Width = value.Width; Height = value.Height; } }
     public bool Focused { get { return RadeStub.Driver.Focus == this; } }
     public bool ContainsFocus { get { for (Control c = RadeStub.Driver.Focus; c != null; c = c.Parent) { if (c == this) return true; } return false; } }
     // The size the control asks for (no layout here): its own size; a label: its text in one line at its font; a button: its
@@ -90,13 +91,17 @@ namespace System.Windows.Forms {
   public class Bag { public int Count; public void Add(object o) { Count++; } public void Clear() { Count = 0; } }
   public class TableLayoutPanel : Control { public Bag ColumnStyles = new Bag(); public Bag RowStyles = new Bag(); public void SetColumnSpan(Control c, int n) { } }
   public class Button : Control { public override Size PreferredSize { get { object m; Size min = new Size(0, 0); if (Values.TryGetValue("MinimumSize", out m) && m is PSObject) m = ((PSObject)m).BaseObject; if (m is Size) min = (Size)m; return new Size(Math.Max((Text ?? "").Length * 7 + 24, min.Width), Math.Max(23, min.Height)); } } }
-  public class TextBox : Control { }
+  public class TextBox : Control { public bool ReadOnly; public int SelectionLength; public void Copy() { RadeStub.Driver.Clip = "selected"; } public void SelectAll() { SelectionLength = (Text ?? "").Length; } public int GetLineFromCharIndex(int i) { return 0; } }
+  public class MenuItemStub : RadeStub.Dyn { public bool Enabled = true; }
+  public class MenuItems { public List<MenuItemStub> Items = new List<MenuItemStub>(); public MenuItemStub Add(string t) { MenuItemStub m = new MenuItemStub(); Items.Add(m); return m; } public MenuItemStub this[int i] { get { return Items[i]; } } }
+  public class ContextMenuStrip : RadeStub.Dyn { public MenuItems Items = new MenuItems(); public Control SourceControl; }
   public class CheckBox : Control { bool on; public bool Checked { get { return on; } set { bool ch = on != value; on = value; if (ch) Fire("CheckedChanged", new RadeStub.Dyn()); } } }
   public class FolderBrowserDialog : RadeStub.Dyn { public string ShowDialog(object owner) { return "Cancel"; } public void Dispose() { } }
   public class Timer : RadeStub.Dyn { public bool On; public void Start() { On = true; if (!RadeStub.Driver.Timers.Contains(this)) RadeStub.Driver.Timers.Add(this); } public void Stop() { On = false; } }
   public class Form : Control {
     public bool Closed; public Form() { Width = 1020; Height = 760; }
     public string WindowState = "Normal";
+    public Rectangle RestoreBounds { get { return new Rectangle(Left, Top, Width, Height); } }
     public System.Drawing.SizeF CurrentAutoScaleDimensions { get { return new System.Drawing.SizeF(RadeStub.Driver.FormDpi, RadeStub.Driver.FormDpi); } }   // 144 = the R24 device: the form scales 1.5 x while the screen dpi says 96
     public Control ActiveControl { get { return RadeStub.Driver.Focus; } }
     public void Activate() { }
@@ -130,6 +135,9 @@ namespace System.Windows.Forms {
     public static void DrawText(object g, string t, object f, Rectangle r, Color c, TextFormatFlags fl) { if (t == null) throw new ArgumentNullException("text"); }
   }
   public static class Clipboard { public static void SetText(string t) { if (string.IsNullOrEmpty(t)) throw new ArgumentNullException("text"); RadeStub.Driver.Clip = t; } }
-  public class Screen { public Rectangle Bounds = new Rectangle(0, 0, 1280, 800); public Rectangle WorkingArea = new Rectangle(0, 0, 1280, 720); public static Screen FromControl(Control c) { return new Screen(); } }
+  public class Screen { public Rectangle Bounds = new Rectangle(0, 0, 1280, 800); public Rectangle WorkingArea = new Rectangle(0, 0, 1280, 720); public static Screen FromControl(Control c) { return new Screen(); }
+    public static Screen FromPoint(Point p) { return new Screen(); }
+    public static Screen[] AllScreens { get { return RadeStub.Driver.Screens(); } } }
+  public static class Cursor { public static Point Position { get { return new Point(100, 100); } } }
   public static class MessageBox { public static string Show(object owner, string text, string caption, MessageBoxButtons b, MessageBoxIcon i, MessageBoxDefaultButton d) { return "Yes"; } }
 }

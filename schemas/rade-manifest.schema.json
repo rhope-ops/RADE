@@ -530,6 +530,11 @@
           "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$",
           "description": "The app version this bundle installs (for example 1.0.0). Required for mode deploy; written to the installed-version record."
         },
+        "start": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]*(/[A-Za-z0-9][A-Za-z0-9 ._-]*)*\\.ps1$",
+          "description": "Optional. A PowerShell script in the app's local install folder (OneDrive\\RADE\\<application folder>), as a path with / between folders, for example App/Start-App.ps1. After the checks pass, the Ready screen of an installed app shows a Start button that runs it in its own powershell.exe process from that folder (nothing is downloaded), then RADE closes. Without it there is no Start button. The script is one an install step or a bundle file puts there."
+        },
         "steps": {
           "type": "array",
           "minItems": 1,

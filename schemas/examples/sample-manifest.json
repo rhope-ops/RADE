@@ -120,6 +120,7 @@
           "summary": "The same fake app as a deploy.",
           "mode": "deploy",
           "version": "1.0.0",
+          "start": "T01/SAMPLE-T01-check-r1.ps1",
           "steps": [
             "T01 Sample check r1",
             "T04 Sample optional r1",
