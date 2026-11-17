@@ -68,12 +68,15 @@ def step_default(s):
 
 
 def files_hash(paths):
+    """Return the first 16 hex of one SHA-256 over the given app files (path, then bytes, in path order)."""
     h = hashlib.sha256()
     for rel in sorted(paths):
         h.update(rel.encode() + b'\0' + (ROOT / rel).read_bytes() + b'\0')
     return h.hexdigest()[:16]
 
 def here(text):
+    """Return `text` as a PowerShell single-quoted here-string (@' ... '@), with LF line ends. Stops the build when a
+    line starts with '@ (it would end the here-string) or the text is not ASCII."""
     text = text.replace('\r\n', '\n')
     if text.endswith('\n'):
         text = text[:-1]
@@ -86,6 +89,7 @@ def here(text):
 
 
 def q(s):
+    """Return `s` as a PowerShell single-quoted string ('' for each quote inside)."""
     return "'" + s.replace("'", "''") + "'"
 
 
@@ -111,8 +115,9 @@ def engine_text():
     """Return the engine's PowerShell: the parts of ENGINE_PARTS in order, with the window parts (indented 4 spaces)
     in the slot of 10-window.ps1. The text starts with a newline, as the bundle layout expects."""
     read = lambda rel: (ENGINE_DIR / rel).read_text(encoding='ascii')
-    window = ''.join(indent(read(w), '    ') for w in WINDOW_PARTS)
-    text = ''.join(read(p).replace(WINDOW_SLOT, window) for p in ENGINE_PARTS)
+    banner = lambda rel: '# ==== Engine part: engine/ps/%s\n' % rel   # listed in the bundle's Contents
+    window = ''.join(indent(banner(w) + read(w), '    ') for w in WINDOW_PARTS)
+    text = ''.join(banner(p) + read(p).replace(WINDOW_SLOT, window) for p in ENGINE_PARTS)
     return '\n' + text
 
 
@@ -189,6 +194,7 @@ def answers_part(s):
         return ''
     qs = s['answers']
     def no(why):
+        """Stop the build with the step name and the reason its answers are not valid."""
         raise SystemExit('step %r: answers: %s' % (s['name'], why))
     if s.get('kind', 'script') != 'guide':
         no('only a guide step (kind "guide") can ask questions')
@@ -219,20 +225,65 @@ def answers_part(s):
     return '; Answers = @(%s)' % ', '.join(out)
 
 
-def build(b):
+# ---- Bundle layout (the Administrator, 2026-11-17: docs/code-standard.md C5, C6). A bundle is read by a person before it
+# runs, so it starts with a list of its parts and their line numbers, and each part and each file has a banner line.
+BANNER = re.compile(r'^\s*# (==== |---- File )')
+# A block between "# >>> <name>: generated from ..." and "# <<< <name>" that two or more text files hold (a shared
+# source copied into each script that must run alone) is kept once, in $shared, and each file holds one line in its
+# place; the engine puts the block back when it writes the file (Write-BundleFile), so every file is the same as before.
+SHARED_RE = re.compile(r'^# >>> ([\w-]+): generated from .*?\n# <<< \1\n', re.M | re.S)
+SHARED_LINE = '# @@SHARED %s@@ (RADE writes the shared block "%s" here; its text is in the bundle part "Shared blocks")'
+
+
+def shared_blocks(texts):
+    """Find the marked blocks that two or more of the text files hold. Takes {source path: text}; returns
+    {key: block text}, where key = the block name and the first 8 hex of its SHA-256 (two versions get two keys)."""
+    seen = {}
+    for text in texts.values():
+        for m in SHARED_RE.finditer(text):
+            key = '%s-%s' % (m.group(1), hashlib.sha256(m.group(0).encode()).hexdigest()[:8])
+            seen.setdefault(key, [m.group(0), 0])[1] += 1
+    return {k: v[0] for k, v in seen.items() if v[1] > 1}
+
+
+def use_shared(text, shared):
+    """Return `text` with each shared block replaced by its one SHARED line; the build checks that the engine's rule
+    (one line back to the block) gives the same text again."""
+    def one(m):
+        """Return the SHARED line for a block that is in `shared`, else the block itself."""
+        key = '%s-%s' % (m.group(1), hashlib.sha256(m.group(0).encode()).hexdigest()[:8])
+        return (SHARED_LINE % (key, m.group(1)) + '\n') if key in shared else m.group(0)
+    out = SHARED_RE.sub(one, text)
+    back = re.sub(r'^# @@SHARED (\S+)@@.*\n', lambda m: shared[m.group(1)], out, flags=re.M)
+    assert back == text, 'a shared block does not round-trip'
+    return out
+
+
+def file_parts(b):
+    """Return (the $shared lines, the $files lines with a banner each) for the bundle's files: text files as readable
+    here-strings (shared blocks once), other files as base64."""
+    texts = {f['src']: (ROOT / f['src']).read_bytes().decode('ascii') for f in b['files'] if (ROOT / f['src']).suffix.lower() in TEXT}
+    shared = shared_blocks(texts)
+    lines = ["$shared[%s] = %s" % (q(k), here(v)) for k, v in sorted(shared.items())]
     parts = []
-    for f in b['files']:
+    for i, f in enumerate(b['files'], 1):
         src = ROOT / f['src']
         data = src.read_bytes()
         sha = hashlib.sha256(data).hexdigest()[:12]
-        if src.suffix.lower() in TEXT:
-            body, kind = here(data.decode('ascii')), 'text'
+        if f['src'] in texts:
+            body, kind = here(use_shared(texts[f['src']], shared)), 'text'
         else:
             b64 = base64.b64encode(data).decode('ascii')
             body, kind = "@'\n" + '\n'.join(textwrap.wrap(b64, 100)) + "\n'@", 'base64'
+        parts.append('# ---- File %d of %d: %s\\%s (from %s, sha256 %s)' % (i, len(b['files']), f['dir'], src.name, f['src'], sha))
         parts.append("$files += @{ Dir = %s; Name = %s; Kind = '%s'; Sha = '%s'; Data = %s }"
                      % (q(f['dir']), q(src.name), kind, sha, body))
-    # kind "guide": a step the PFM does in another program (guide lines, an address to open, a marker file on Done).
+    return lines, parts
+
+
+def step_lines(b):
+    """Return the $steps lines of the bundle, one per manifest step (kind "guide": a step the PFM does in another
+    program, with guide lines, an address to open and a marker file on Done)."""
     steps = ['$steps += @{ Name = %s; Title = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s; Makes = @(%s); After = @(%s); Optional = $%s; Help = %s }'
              % (q(s['name']), q(s.get('title', '')), q(s['dir']), q(s['file']), 'true' if step_default(s) else 'false',
                 q(s.get('ask', {}).get('param', '')), q(s.get('ask', {}).get('prompt', '')), q(s.get('screenOnly', '')),
@@ -242,35 +293,78 @@ def build(b):
                 ', '.join('@{ kind = %s; name = %s }' % (q(m['kind']), q(m['name'])) for m in s.get('makes', [])), ', '.join(q(a) for a in s.get('after', [])),
                 'true' if s.get('default', True) is False else 'false', q(s.get('help', '')))   # optional = "default": false only; a files-changed default is still a needed step
              for s in b['steps']]
-    steps = [line[:-2] + answers_part(s) + ' }' for line, s in zip(steps, b['steps'])]   # a step without "answers": the line as before
-    apps = app_lines(b)
-    # Data files the round downloads (not code, PFM 3A): repo files from raw main, checked by SHA-256; public pages as they are.
+    for s in b['steps']:
+        assert (s.get('kind') == 'guide' and not s['file']) or any(f['dir'] == s['dir'] and Path(f['src']).name == s['file'] for f in b['files']), s
+    return [line[:-2] + answers_part(s) + ' }' for line, s in zip(steps, b['steps'])]   # a step without "answers": the line as before
+
+
+def fetch_lines(b):
+    """Return the $fetch lines: data files the round downloads (not code, PFM 3A). Repo files come from raw main, or
+    from the bundle's tagged "release" (a fixed address), checked by SHA-256; public pages come as they are."""
     fetch = []
     for f in b.get('fetch', []):
         if 'src' in f:
             data = (ROOT / f['src']).read_bytes()
-            # A tagged release (bundle "release") gives a fixed address; without it the file comes from main.
             url = 'https://raw.githubusercontent.com/' + APP['repo'] + '/' + b.get('release', 'main') + '/' + f['src']
             fetch.append((f['dir'], Path(f['src']).name, url, hashlib.sha256(data).hexdigest()))
         else:
             fetch.append((f['dir'], f['name'], f['url'], ''))
-    fetchs = ['$fetch += @{ Dir = %s; Name = %s; Url = %s; Sha = %s }' % tuple(q(x) for x in t) for t in fetch]
-    for s in b['steps']:
-        assert (s.get('kind') == 'guide' and not s['file']) or any(f['dir'] == s['dir'] and Path(f['src']).name == s['file'] for f in b['files']), s
-    collect = ['$collect += @{ Dir = %s; Name = %s; Step = %s }' % (q(c['dir']), q(c['name']), q(c.get('step', ''))) for c in b['collect']]
-    cleanup = ['$cleanup += @{ Path = %s; Kind = %s }' % (q(c['path']), q(c['kind'])) for c in b.get('cleanup', [])]
-    # Support scripts that keep their names (they load each other) and samples: made by 90-161.Z, so cleanup may recycle them.
-    known = sorted({f.name for d, pat in APP['knownDirs'] for f in (ROOT / d).glob(pat)})
-    logo = base64.b64encode(LOGO.read_bytes()).decode('ascii')   # the window's logo
-    ui_text = UI_FILE.read_text(encoding='ascii')
+    return ['$fetch += @{ Dir = %s; Name = %s; Url = %s; Sha = %s }' % tuple(q(x) for x in t) for t in fetch]
+
+
+def engine_for_app(ui_text):
+    """Return the engine text for this application: the shared UI file in its slot and the app's facts (home page,
+    file prefix, folder) in their placeholders."""
     assert '@@' not in ui_text, 'engine/rade_ui.ps1 must not hold a placeholder'
     engine = ENGINE.replace('    # @@UI@@', '\n'.join(('    ' + x) if x else x for x in ui_text.rstrip('\n').split('\n')))
-    engine = engine.replace('@@HOME@@', APP['home']).replace('@@PREFIX@@', APP['prefix']).replace('@@APP@@', APP['folder'])
-    own = '$ownPatterns = @(' + ', '.join(q(p) for p in APP['own']) + ')\n'
+    return engine.replace('@@HOME@@', APP['home']).replace('@@PREFIX@@', APP['prefix']).replace('@@APP@@', APP['folder'])
+
+
+def bundle_body(b, ui_text):
+    """Return the bundle text after its header: the settings, the shared blocks, the files, the steps and the other
+    lists, the applications and the engine, each part after a banner line."""
+    shared, files = file_parts(b)
+    collect = ['$collect += @{ Dir = %s; Name = %s; Step = %s }' % (q(c['dir']), q(c['name']), q(c.get('step', ''))) for c in b['collect']]
+    cleanup = ['$cleanup += @{ Path = %s; Kind = %s }' % (q(c['path']), q(c['kind'])) for c in b.get('cleanup', [])]
+    # Support scripts that keep their names (they load each other) and samples: made by the app, so cleanup may recycle them.
+    known = sorted({f.name for d, pat in APP['knownDirs'] for f in (ROOT / d).glob(pat)})
+    logo = base64.b64encode(LOGO.read_bytes()).decode('ascii')   # the window's logo
     go = q('https://raw.githubusercontent.com/' + APP['repo'] + '/main/go.md')
     rel = q('https://raw.githubusercontent.com/' + APP['repo'] + '/main/rade-release.json')
-    body = ('$goUrl = %s\n$releaseUrl = %s\n$webAgent = \'Mozilla/5.0 (Windows NT 10.0; Win64; x64) RADE\'\n$logoPng = \'%s\'\n%s$round = %s\n$appFolder = %s\n$usersRoot = \'C:\\Users\'\n$files = @()\n%s\n$fetch = @()\n%s\n$steps = @()\n%s\n$collect = @()\n%s\n$cleanup = @()\n%s\n$known = @(%s)\n$apps = @()\n%s\n%s'
-            % (go, rel, logo, own, q(b['round']), q(APP['folder']), '\n'.join(parts), '\n'.join(fetchs), '\n'.join(steps), '\n'.join(collect), '\n'.join(cleanup), ', '.join(q(k) for k in known), '\n'.join(apps), engine))
+    parts = [
+        ('Settings', ['$goUrl = %s' % go, '$releaseUrl = %s' % rel, "$webAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) RADE'",
+                      "$logoPng = '%s'" % logo, '$ownPatterns = @(' + ', '.join(q(p) for p in APP['own']) + ')', '$round = %s' % q(b['round']),
+                      '$appFolder = %s' % q(APP['folder']), "$usersRoot = 'C:\\Users'"]),
+        ('Shared blocks (%d): each is written back into the files that name it' % len(shared), ['$shared = @{}'] + shared),
+        ('Files written to this computer (%d)' % len(b['files']), ['$files = @()'] + files),
+        ('Steps (%d), downloads, results to collect, clean-up' % len(b['steps']),
+         ['$fetch = @()'] + fetch_lines(b) + ['$steps = @()'] + step_lines(b) + ['$collect = @()'] + collect + ['$cleanup = @()'] + cleanup),
+        ('Applications', ['$known = @(%s)' % ', '.join(q(k) for k in known), '$apps = @()'] + app_lines(b)),
+    ]
+    text = ''.join('# ==== Part %d of %d: %s\n%s\n' % (i, len(parts) + 1, title, '\n'.join(lines)) for i, (title, lines) in enumerate(parts, 1))
+    return text + '# ==== Part %d of %d: the RADE engine (engine/ps, in run order)' % (len(parts) + 1, len(parts) + 1) + engine_for_app(ui_text)
+
+
+def contents(head, body):
+    """Return the "Contents" comment: every banner line of the body with the line number it has in the whole bundle."""
+    marks, inside = [], False   # inside: a line of a here-string (a file's own text), never a banner
+    for n, line in enumerate(body.split('\n'), 1):
+        if inside:
+            inside = not line.startswith("'@")
+        elif BANNER.match(line):
+            marks.append((n, line.strip()[7:]))
+        elif line.endswith("@'"):
+            inside = True
+    first = head.count('\n') + len(marks) + 2   # the bundle line of body line 1: after the header and this list
+    rows = ['#   line %5d  %s' % (first + n - 1, (('  ' if line.startswith('File') else '') + line)[:150]) for n, line in marks]
+    return '# ==== Contents (GENERATED; the line numbers are lines of this bundle)\n' + '\n'.join(rows) + '\n'
+
+
+def build(b):
+    """Return the whole bundle text for one manifest bundle: the header (what it is, how to run it, its sources), the
+    contents list and the body. The build id is the first 8 hex of the body's SHA-256."""
+    ui_text = UI_FILE.read_text(encoding='ascii')
+    body = bundle_body(b, ui_text)
     build_id = hashlib.sha256(body.encode('ascii')).hexdigest()[:8]
     modes = {a.get('mode', 'test') for a in b.get('apps', [])} or {'test'}
     sends = ' on this computer. It sends nothing.' if modes == {'deploy'} else ', then opens an Outlook draft with them (never sent; a deploy makes no draft).' if 'deploy' in modes else ', then opens an Outlook draft with them (never sent).'
@@ -280,8 +374,9 @@ def build(b):
             '  The RADE window opens: press Enter (or Run); it uses your Windows profile folder. It writes the files below into the task folders under\n'
             '  C:\\Users\\<DODID>\\OneDrive - United States Air Force\\RADE\\%s (replacing older copies), runs the steps,\n'
             '  and saves its results in Rounds\\%s%s No download, no admin rights.\n'
+            '  To read it: the Contents list below gives the line of each part and file; each part starts with a "# ====" line.\n'
             '#>\n$buildId = \'%s\'\n$engineRelease = %d\n' % (b['title'], ENGINE_SHA[:12], hashlib.sha256(ui_text.encode('ascii')).hexdigest()[:12], MANIFEST, APP['folder'], b['round'], sends, build_id, ENGINE_RELEASE))
-    return head + body
+    return head + contents(head, body) + body
 
 
 # Text lengths (the Administrator, 2026-11-15; docs/window-design.md "Text lengths"). The most characters of each text an
@@ -298,6 +393,7 @@ def text_lengths(b):
     """One WARNING line for each text of a bundle that is longer than its limit."""
     found = []
     def over(what, field, value):
+        """Add a WARNING line to `found` when `value` is longer than the limit of `field`."""
         if isinstance(value, str) and len(value) > TEXT_LIMITS[field]:
             found.append('WARNING text length: %s: %s has %d characters, the limit is %d (docs/window-design.md "Text lengths")'
                          % (what, field, len(value), TEXT_LIMITS[field]))
@@ -325,6 +421,7 @@ def text_lengths(b):
 
 
 def main():
+    """Read the arguments and the app's manifest, then build (or, with --check, compare) every bundle it names."""
     global ROOT, APP, MANIFEST
     import argparse
     ap = argparse.ArgumentParser(description='Build RADE round bundles for one application.')
@@ -364,7 +461,7 @@ ENGINE_SHA = hashlib.sha256(b''.join(rel.encode() + b'\0' + (ENGINE_ROOT / rel).
                                      ['engine/rade_build.py'] + ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS])).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
-ENGINE_RELEASE = 10
+ENGINE_RELEASE = 11
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':

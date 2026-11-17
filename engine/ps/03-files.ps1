@@ -67,6 +67,14 @@ function Get-FolderInventory([string]$Base) {
   }
   return ('Files left by folder: ' + ($parts -join ', ') + $(if ($odd) { '; other folders: ' + $odd } else { '' }) + '.')
 }
+# Puts each shared block back into a file's text: a line "# @@SHARED <key>@@ ..." becomes the block $shared[<key>]
+# (the bundle keeps a block that many files hold only once; engine/rade_build.py checks the round trip). Takes the
+# text of one file; returns the text as it was in the app's repository.
+function Expand-SharedBlock([string]$Text) {
+  if (-not $Text.Contains('# @@SHARED ')) { return $Text }
+  $out = foreach ($line in ($Text -split "`n")) { if ($line -match '^# @@SHARED (\S+)@@') { [string]$shared[$Matches[1]] } else { $line } }
+  return ($out -join "`n")
+}
 # Saves every file of the bundle (text with CRLF and a BOM, or decoded binary) into its folder under the base folder.
 # Takes the base folder and a Say block; gives back nothing.
 function Write-BundleFile([string]$Base, [scriptblock]$Say) {
@@ -76,7 +84,7 @@ function Write-BundleFile([string]$Base, [scriptblock]$Say) {
     $dir = Join-Path $Base $f.Dir
     if (-not (Test-Path -LiteralPath $dir -PathType Container)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
     $path = Join-Path $dir $f.Name
-    if ($f.Kind -eq 'text') { [System.IO.File]::WriteAllText($path, (($f.Data -replace "`r?`n", "`r`n") + "`r`n"), $utf8Bom) }
+    if ($f.Kind -eq 'text') { [System.IO.File]::WriteAllText($path, (((Expand-SharedBlock $f.Data) -replace "`r?`n", "`r`n") + "`r`n"), $utf8Bom) }
     else { [System.IO.File]::WriteAllBytes($path, [System.Convert]::FromBase64String(($f.Data -replace '\s', ''))) }
     & $Say ('  Saved   ' + $f.Dir + '\' + $f.Name + '  (SHA-256 ' + $f.Sha + ')')
   }
