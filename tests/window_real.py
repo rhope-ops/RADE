@@ -57,7 +57,7 @@ def stretch(m, limits):
             st["help"] = fill(st.get("help", "Help"), limits["step help"])
             if st.get("kind") == "guide":
                 # as many numbered lines as the soft limit allows ('guide lines'), each at its length limit, then the unnumbered extras
-                extra = [fill(g, limits["guide line"]) for g in st.get("guide", []) if not re.match(r"\d+\. ", g)]
+                extra = [fill(g, limits["guide line"]) for g in st.get("guide", []) if not re.match(r"\d+\.\s+\S", g)]  # the engine's pattern
                 st["guide"] = [fill("%d. Select" % k, limits["guide line"]) for k in range(1, limits["guide lines"] + 1)] + extra
                 st["doneText"] = fill(st.get("doneText", "Done"), limits["doneText"])
             for a in st.get("answers", []):
@@ -162,7 +162,8 @@ def main():
             print("   --- last lines ---")
             for l in lines[-25:]:
                 print("   " + l[:300])
-        scrolls = [l for l in lines if l.startswith("WIN scrolls ")]
+        # a hand card ("Your turn") may scroll at any size (the Administrator, 2026-11-17); every other card only at the smallest
+        scrolls = [l for l in lines if l.startswith("WIN scrolls ") and not l.rstrip().endswith("-hand")]
         why = []
         if not closed:
             why.append("the window did not reach its end")
