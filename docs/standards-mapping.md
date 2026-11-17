@@ -28,7 +28,7 @@ Rules: [code-standard.md](code-standard.md).
 
 | Practice | Status | Where RADE does it, or REC |
 |---|---|---|
-| PO.1 Define Security Requirements for Software Development | Met | AGENTS.md "Project rules" (No reconnaissance, DoD365 boundary, Windows PowerShell 5.1, Public repo); [engine.md](engine.md) "Guardrails" |
+| PO.1 Define Security Requirements for Software Development | Partial | AGENTS.md "Project rules" (No reconnaissance, DoD365 boundary, Windows PowerShell 5.1, Public repo) state the limits. The [engine.md](engine.md) "Guardrails" stop honest mistakes and are not security controls (engine.md says so). REC: one list of security requirements |
 | PO.2 Implement Roles and Responsibilities | Partial | AGENTS.md "Authority" and "Delegation" (the Administrator decides; author, worker and fresh reviewer roles). REC: name a security reviewer role for releases |
 | PO.3 Implement Supporting Toolchains | Met | scripts/check.sh and scripts/check.local.sh (both lanes), scripts/code_standard.py, scripts/pii_guard.py, the pre-push hook |
 | PO.4 Define and Use Criteria for Software Security Checks | Met | `CHECK PASS` lanes; `CODE-STANDARD pass`; the merge gate in AGENTS.md "Delivery" and "Checks" |
@@ -43,7 +43,7 @@ Rules: [code-standard.md](code-standard.md).
 | PW.6 Configure the Compilation, Interpreter, and Build Processes to Improve Executable Security | Partial | The build fetches by commit and checks SHA-256; interpreted code. REC: name `Set-StrictMode` use in the X rules if the Administrator wants it |
 | PW.7 Analyze Human-Readable Code to Identify Vulnerabilities and Verify Compliance with Security Requirements | Met | Fresh review of each code change; scripts/code_standard.py; the PowerShell parser (C10) |
 | PW.8 Test Executable Code to Identify Vulnerabilities and Verify Compliance with Security Requirements | Partial | tests/engine_test.sh, the app canary, the Windows job (.github/workflows/window.yml), work-computer rounds. No security-specific tests. REC: one test per guardrail in [engine.md](engine.md) |
-| PW.9 Configure Software to Have Secure Settings by Default | Met | Guardrails are always on: NIPR name check, site prefix, one install per site |
+| PW.9 Configure Software to Have Secure Settings by Default | Partial | Guardrails are always on (NIPR name check, site prefix, one install per site), but they stop honest mistakes, not attacks (engine.md "Guardrails"); default credentials are sent by the reach test (open task) |
 | RV.1 Identify and Confirm Vulnerabilities on an Ongoing Basis | Gap | REC: a "report a problem" line in the review guide that names the Teams channel (no address; AGENTS.md "Public repo") |
 | RV.2 Assess, Prioritize, and Remediate Vulnerabilities | Partial | Review findings by severity; MAJOR blocks a merge |
 | RV.3 Analyze Vulnerabilities to Identify Their Root Causes | Partial | Misses are logged in the private project log |

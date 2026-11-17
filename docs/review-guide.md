@@ -12,7 +12,7 @@ Read these first. Each is short.
 |---|---|
 | RADE [AGENTS.md](../AGENTS.md) "Project rules" | The fixed limits: no network reconnaissance, no data across the DoD365 boundary, no code download at run time, Windows PowerShell 5.1 only |
 | [engine.md](engine.md) "Guardrails" | What RADE checks before it writes anything (NIPR computer name, the SharePoint address prefix, one install per site) and what each check reads |
-| The app's AGENTS.md "Project rules" | The app's own limits (for 90-161.Z: no government data in the repo, credentials only through Get-Credential at run time) |
+| The app's AGENTS.md "Project rules" | The app's own limits (for 90-161.Z: no government data in the repo; its "Commands" section: credentials only through Get-Credential at run time) |
 | [standards-mapping.md](standards-mapping.md) | Which NIST SSDF practices and DISA ASD STIG items the project meets, in part or not yet (a self-assessment, not an ATO artifact) |
 
 ## 2. Check that the bundle is the reviewed code
@@ -57,6 +57,8 @@ Checklist for the rules a script cannot check ([code-standard.md](code-standard.
 - [ ] Names say what a thing does (PowerShell Verb-Noun), and fixed values are named constants.
 
 ## 4. Run the project's own checks (optional)
+
+Do this only after parts 2 and 3: the checks run the repo's code, build every app (it downloads the app repos from GitHub) and run the bundle tests in PowerShell.
 
 On a throwaway computer or virtual machine with git, Python 3 and PowerShell 7 (the checks are code from the repo too, so do not run them on a computer you depend on):
 
