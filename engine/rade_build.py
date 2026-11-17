@@ -847,7 +847,7 @@ function Save-RunnerCopy {
       if ($m.Success -and [int]$m.Groups[1].Value -ge [int]$engineRelease) { return $false } }
     Write-FileWhole $rp $script:selfText; return $true } catch { return $false }
 }
-function Set-DesktopIcon {
+function Add-DesktopIcon {
   # One shortcut named RADE in the user's own Desktop folder (it follows OneDrive), made once, only when missing, with no
   # administrator rights (WScript.Shell). Returns the plain line the Done card shows, or '' when there is nothing to say.
   try { $runner = Join-Path (Get-RadePath) 'rade-runner.ps1'
@@ -2291,7 +2291,7 @@ if ($gui) {
       $ui.Bars['all'].Fill = $(if ($bad) { $ui.C.Blue } else { $ui.C.Green }); & $ui.SetBar 'all' $(if ($bad) { $ui.Bars['all'].Target } else { 1 }) $true
       $mail = $(if ($script:draftMade) { 'An Outlook draft is open with the summary and all result files. Review it, then select Send.' } else { 'The results folder is open and the summary is on the clipboard. Paste it into an e-mail and attach the files.' })
       $bMade = $(if ($made) { @{ Text = 'Record'; Act = { & $ui.VRecord } } } else { $null })
-      $iconNote = ''; if ($dep -and -not $bad) { $null = Save-RunnerCopy; $iconNote = [string](Set-DesktopIcon) }   # R28: the runner copy and the desktop shortcut (a deploy that passed)
+      $iconNote = ''; if ($dep -and -not $bad) { $null = Save-RunnerCopy; $iconNote = [string](Add-DesktopIcon) }   # R28: the runner copy and the desktop shortcut (a deploy that passed)
       if (-not $bad) {
         $inst = ($dep -and (Get-InstalledText $script:app) -match 'is installed$')
         & $ui.SetCard @{ View = 'done'; Tick = $true; Kicker = $(if ($dep -and -not $inst) { 'Passed' } else { 'All steps passed' }); Right = $took
@@ -2845,7 +2845,7 @@ def main():
 ENGINE_SHA = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
-ENGINE_RELEASE = 7
+ENGINE_RELEASE = 8
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':
