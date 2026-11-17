@@ -135,8 +135,8 @@ function global:Push-RadeButton([string]$Text) {
     $ui.FieldB.PerformClick(); if ($ui.CopyPathB.Shown) { $ui.CopyPathB.PerformClick() }; Write-Host ('WIN hand-note=' + $ui.Note.Text + ' clip=' + [bool][RadeStub.Driver]::Clip)
     if (-not $global:RadeT.NoAddr) {   # R28: one text for the lines (copy across lines gives the lines as written); a broken path copies whole; no address row without an address
       $global:RadeT.NoAddr = $true
-      Write-Host ('WIN guide one-box=' + ($ui.Guide -is [System.Windows.Forms.RichTextBox]) + ' rtf=' + [bool]([string]$ui.Guide.Values['Rtf'] -match '\\tqr\\tx\d+\\tx\d+.*\\tab 1\.\\tab Open the import page\.') + ' selectable=' + ($ui.Guide.ReadOnly -and $ui.Guide.Values['ContextMenuStrip'] -eq $ui.Menu))
-      $ui.Guide.SelectedText = "`t1.`tOpen the import page.`n`t2.`tChoose"; $ui.Guide.SelectionLength = 30; $null = & $ui.CopyText $ui.Guide; $c1 = [RadeStub.Driver]::Clip -replace "`r`n", '|'
+      Write-Host ('WIN guide one-box=' + ($ui.Guide -is [System.Windows.Forms.RichTextBox]) + ' rtf=' + [bool]([string]$ui.Guide.Values['Rtf'] -match '\\li(\d+)\\fi-\1\\tx\1.* 1\.\\tab Open the import page\.') + ' selectable=' + ($ui.Guide.ReadOnly -and $ui.Guide.Values['ContextMenuStrip'] -eq $ui.Menu))
+      $ui.Guide.SelectedText = "1.`tOpen the import page.`n" + [char]0x2007 + "2.`tChoose"; $ui.Guide.SelectionLength = 30; $null = & $ui.CopyText $ui.Guide; $c1 = [RadeStub.Driver]::Clip -replace "`r`n", '|'
       $ui.PathT.SelectedText = "C:\a`nb.zip"; $ui.PathT.SelectionLength = 9; $null = & $ui.CopyText $ui.PathT; Write-Host ('WIN guide-copy=' + $c1 + ' path-copy=' + [RadeStub.Driver]::Clip)
       Write-Host ('WIN elapsed=' + (& $ui.Elapsed 252) + '|' + (& $ui.Elapsed 5) + '|' + (& $ui.Elapsed 3725))
       $g0 = $ui.GUrl; $s0 = $ui.G.Step; $ui.GUrl = ''; $ui.G.Step = $s0.Clone(); $ui.G.Step.UrlConfig = ''; & $ui.VHand

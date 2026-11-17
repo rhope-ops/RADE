@@ -1719,7 +1719,7 @@ if ($gui) {
     $ui.Opts = & $ui.Flow $ui.Z.G6; $ui.Opts.FlowDirection = 'TopDown'; $ui.Opts.AccessibleName = 'Choices'
     # The lines of a hand step (R28 N4, the Administrator, 2026-11-17: the text can be selected across many lines): ONE read-only
     # rich text box. A numbered line has its number right-aligned in a column and its text, wrapped, in the text column (a
-    # right tab and a hanging indent); a line with no number follows the list, small and gray. Filled by $ui.SetSteps.
+    # figure spaces in front of a shorter number, a tab and a hanging indent); a line with no number follows the list, small and gray. Filled by $ui.SetSteps.
     $ui.Guide = New-Object System.Windows.Forms.RichTextBox
     $ui.Guide.ReadOnly = $true; $ui.Guide.BorderStyle = 'None'; $ui.Guide.ScrollBars = 'None'; $ui.Guide.WordWrap = $true; $ui.Guide.DetectUrls = $false; $ui.Guide.TabStop = $false; $ui.Guide.Multiline = $true
     $ui.Guide.BackColor = $ui.C.White; $ui.Guide.ForeColor = $ui.C.Navy; $ui.Guide.Font = $ui.F.Body; $ui.Guide.Margin = (& $ui.Pad 0 $ui.Z.G3 0 0); $ui.Guide.Visible = $false; $ui.Guide.ContextMenuStrip = $ui.Menu; $ui.Guide.AccessibleName = 'Steps to do'
@@ -1815,7 +1815,7 @@ if ($gui) {
     # The lines of a hand step (the Administrator, 2026-11-17; R28 N4): a guide line that starts with "<digits>. " is numbered:
     # its number right-aligned in the left column, its text wrapped in the right column; any other line follows the list,
     # small and gray. All of it is ONE rich text box ($ui.Guide), so a person can select across lines. The plain parts stay in
-    # $ui.GuideNums, $ui.GuideTexts and $ui.GuideRest (the tests read them). RTF: a right tab ends the number column, a left tab
+    # $ui.GuideNums, $ui.GuideTexts and $ui.GuideRest (the tests read them). RTF: figure spaces right-align the numbers, a tab
     # and a hanging indent start the text column; sizes in twips from the pixels the box draws at.
     $ui.SetSteps = { param($Guide)
       $ui.GuideNums = @(); $ui.GuideTexts = @(); $ui.GuideRest = @()
@@ -1833,15 +1833,18 @@ if ($gui) {
       $tw = { param([double]$Px) [int][math]::Round($Px * 1440.0 / $dpi) }
       $nw = 0; foreach ($n in @($ui.GuideNums)) { $w = 0; try { $w = [int][System.Windows.Forms.TextRenderer]::MeasureText($g, $n, $ui.F.Body, (New-Object System.Drawing.Size(100000, 0)), [System.Windows.Forms.TextFormatFlags]'NoPadding, SingleLine').Width } catch { $w = [int][System.Windows.Forms.TextRenderer]::MeasureText($n, $ui.F.Body).Width }; $nw = [math]::Max($nw, $w) }
       try { if ($g) { $g.Dispose() } } catch { $null = $_ }
-      $nT = & $tw $nw; $cT = & $tw ($nw + (& $ui.Sc 8)); $g1 = & $tw (& $ui.Sc $ui.Z.G1); $g3 = & $tw (& $ui.Sc $ui.Z.G3)
+      $cT = & $tw ($nw + (& $ui.Sc 8)); $g1 = & $tw (& $ui.Sc $ui.Z.G1); $g3 = & $tw (& $ui.Sc $ui.Z.G3)
       $col = { param($C) '\red' + $C.R + '\green' + $C.G + '\blue' + $C.B + ';' }
       $fb = [int][math]::Round([double]$ui.F.Body.SizeInPoints * 2); $fs = [int][math]::Round([double]$ui.F.Small.SizeInPoints * 2)
       $paras = @(); $plain = 0; $wide = ''; $ui.GuideInkAt = 0
+      # A shorter number gets figure spaces (as wide as a digit) in front: the numbers end on one line, and every line starts at
+      # the left indent, so the first letter's place never depends on a tab (R28 job: a right tab was laid out late).
+      $ml = 0; foreach ($n in @($ui.GuideNums)) { $ml = [math]::Max($ml, ([string]$n).Length) }
       for ($i = 0; $i -lt @($ui.GuideNums).Count; $i++) {
-        $n = [string]$ui.GuideNums[$i]; $t = [string]$ui.GuideTexts[$i]
-        if ($n.Length -gt $wide.Length) { $wide = $n; $ui.GuideInkAt = $plain + 1 }   # the widest number: its first letter is on the card edge
-        $paras += ('\pard\li' + $cT + '\fi-' + $cT + '\tqr\tx' + $nT + '\tx' + $cT + '\sb' + $(if ($i) { $g1 } else { 0 }) + '\cf1\fs' + $fb + ' \tab ' + (& $ui.RtfEsc $n) + '\tab ' + (& $ui.RtfEsc $t))
-        $plain += 3 + $n.Length + $t.Length }   # tab, number, tab, text, and the line break
+        $n = [string]$ui.GuideNums[$i]; $t = [string]$ui.GuideTexts[$i]; $pad = ([string][char]0x2007) * ($ml - $n.Length)
+        if ($n.Length -eq $ml -and -not $wide) { $wide = $n; $ui.GuideInkAt = $plain }   # a widest number: its first letter is on the card edge
+        $paras += ('\pard\li' + $cT + '\fi-' + $cT + '\tx' + $cT + '\sb' + $(if ($i) { $g1 } else { 0 }) + '\cf1\fs' + $fb + ' ' + (& $ui.RtfEsc ($pad + $n)) + '\tab ' + (& $ui.RtfEsc $t))
+        $plain += 2 + $pad.Length + $n.Length + $t.Length }   # padding, number, tab, text, and the line break
       for ($i = 0; $i -lt @($ui.GuideRest).Count; $i++) {
         $paras += ('\pard\li0\fi0\sb' + $(if ($i -or @($ui.GuideNums).Count) { $(if ($i) { 0 } else { $g3 }) } else { 0 }) + '\cf2\fs' + $fs + ' ' + (& $ui.RtfEsc ([string]$ui.GuideRest[$i]))) }
       if (-not @($ui.GuideNums).Count) { $ui.GuideInkAt = 0 }

@@ -67,7 +67,7 @@ $ui.MenuCopy = $ui.Menu.Items.Add('Copy'); $ui.MenuAll = $ui.Menu.Items.Add('Sel
 $ui.CopyText = { param($C)
   try { if (-not ($C -is [System.Windows.Forms.TextBoxBase]) -or $C.SelectionLength -le 0) { return $false }
     $s = [string]$C.SelectedText
-    if ($C -is [System.Windows.Forms.RichTextBox]) { $s = ($s -replace '\r?\n', "`n" -replace '(?m)^\t', '' -replace '\t', ' ') -replace "`n", "`r`n" }
+    if ($C -is [System.Windows.Forms.RichTextBox]) { $s = ($s -replace '\r?\n', "`n" -replace ([string][char]0x2007), '' -replace '\t', ' ') -replace "`n", "`r`n" }
     elseif (& $ui.IsCardText $C) { $s = $s -replace '(?<!\r)\n', '' }
     if ($s) { [System.Windows.Forms.Clipboard]::SetText($s); return $true } } catch { $null = $_ }
   return $false }
