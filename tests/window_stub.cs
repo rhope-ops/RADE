@@ -91,7 +91,10 @@ namespace System.Windows.Forms {
   public class Bag { public int Count; public void Add(object o) { Count++; } public void Clear() { Count = 0; } }
   public class TableLayoutPanel : Control { public Bag ColumnStyles = new Bag(); public Bag RowStyles = new Bag(); public void SetColumnSpan(Control c, int n) { } }
   public class Button : Control { public override Size PreferredSize { get { object m; Size min = new Size(0, 0); if (Values.TryGetValue("MinimumSize", out m) && m is PSObject) m = ((PSObject)m).BaseObject; if (m is Size) min = (Size)m; return new Size(Math.Max((Text ?? "").Length * 7 + 24, min.Width), Math.Max(23, min.Height)); } } }
-  public class TextBox : Control { }
+  public class TextBox : Control { public bool ReadOnly; public int SelectionLength; public void Copy() { RadeStub.Driver.Clip = "selected"; } public void SelectAll() { SelectionLength = (Text ?? "").Length; } public int GetLineFromCharIndex(int i) { return 0; } }
+  public class MenuItemStub : RadeStub.Dyn { public bool Enabled = true; }
+  public class MenuItems { public List<MenuItemStub> Items = new List<MenuItemStub>(); public MenuItemStub Add(string t) { MenuItemStub m = new MenuItemStub(); Items.Add(m); return m; } public MenuItemStub this[int i] { get { return Items[i]; } } }
+  public class ContextMenuStrip : RadeStub.Dyn { public MenuItems Items = new MenuItems(); public Control SourceControl; }
   public class CheckBox : Control { bool on; public bool Checked { get { return on; } set { bool ch = on != value; on = value; if (ch) Fire("CheckedChanged", new RadeStub.Dyn()); } } }
   public class FolderBrowserDialog : RadeStub.Dyn { public string ShowDialog(object owner) { return "Cancel"; } public void Dispose() { } }
   public class Timer : RadeStub.Dyn { public bool On; public void Start() { On = true; if (!RadeStub.Driver.Timers.Contains(this)) RadeStub.Driver.Timers.Add(this); } public void Stop() { On = false; } }
