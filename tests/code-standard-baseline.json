@@ -12,6 +12,14 @@
  },
  "debt": {
   "comment": {
+   ".claude/skills/ui-verify/measure.mjs::alpha": 1,
+   ".claude/skills/ui-verify/measure.mjs::bgOf": 1,
+   ".claude/skills/ui-verify/measure.mjs::blend": 1,
+   ".claude/skills/ui-verify/measure.mjs::lum": 1,
+   ".claude/skills/ui-verify/measure.mjs::name": 1,
+   ".claude/skills/ui-verify/measure.mjs::parse": 1,
+   ".claude/skills/ui-verify/measure.mjs::ratio": 1,
+   ".claude/skills/ui-verify/measure.mjs::visible": 1,
    "engine/rade_build.py::answers_part.no": 1,
    "engine/rade_build.py::build": 1,
    "engine/rade_build.py::files_hash": 1,
@@ -24,7 +32,9 @@
    "engine/rade_ui.ps1::$ui.EdgeBad": 1,
    "engine/rade_ui.ps1::$ui.Face": 1,
    "engine/rade_ui.ps1::$ui.GetWrap": 1,
+   "engine/rade_ui.ps1::$ui.InField": 1,
    "engine/rade_ui.ps1::$ui.Ink": 1,
+   "engine/rade_ui.ps1::$ui.NameOf": 1,
    "engine/rade_ui.ps1::$ui.NoCaret": 1,
    "engine/rade_ui.ps1::$ui.Own": 1,
    "engine/rade_ui.ps1::$ui.Pad": 1,
@@ -32,6 +42,7 @@
    "engine/rade_ui.ps1::$ui.Ring": 1,
    "engine/rade_ui.ps1::$ui.SetWrap": 1,
    "engine/rade_ui.ps1::$ui.Text": 1,
+   "engine/rade_ui.ps1::$ui.WordW": 1,
    "scripts/bloat_check.py::audit_due": 1,
    "scripts/bloat_check.py::big_files": 1,
    "scripts/bloat_check.py::conflict_recorded": 1,
@@ -73,6 +84,13 @@
    "scripts/first_use_check.py::origin_name": 1,
    "scripts/first_use_check.py::self_test": 1,
    "scripts/first_use_check.py::self_test.expect": 1,
+   "scripts/git-hooks/pre-push::check": 1,
+   "scripts/git-hooks/pre-push::cm": 1,
+   "scripts/git-hooks/pre-push::default_branches": 1,
+   "scripts/git-hooks/pre-push::eq": 1,
+   "scripts/git-hooks/pre-push::is_zero": 1,
+   "scripts/git-hooks/pre-push::lane": 1,
+   "scripts/git-hooks/pre-push::run": 1,
    "scripts/log_check.py::main": 1,
    "scripts/log_check.py::self_test": 1,
    "scripts/log_check.py::self_test.expect": 1,
@@ -138,6 +156,7 @@
    "tests/pwsh_batch.ps1::get_Encoding": 1,
    "tests/window_driver.ps1::$m": 1,
    "tests/window_driver.ps1::$m#2": 1,
+   "tests/window_driver.ps1::$ui.RunBase": 1,
    "tests/window_driver.ps1::Start-Process": 1,
    "tests/window_driver.ps1::[RadeStub.Driver]::Pump": 1,
    "tests/window_driver.ps1::global:Push-RadeButton": 1,
@@ -145,6 +164,7 @@
    "tests/window_real.py::bundle": 1,
    "tests/window_real.py::file_url": 1,
    "tests/window_real.py::main": 1,
+   "tests/window_real_driver.ps1::Start-Process": 1,
    "tests/window_real_driver.ps1::global:Save-RadeCard": 1,
    "tests/window_real_driver.ps1::global:Step-Rade": 1
   },
@@ -158,6 +178,7 @@
   "generated": {},
   "header": {},
   "length": {
+   ".claude/skills/ui-verify/measure.mjs::audit": 65,
    "engine/rade_build.py::build": 63,
    "scripts/bloat_check.py::self_test": 193,
    "scripts/log_check.py::check": 77,
@@ -167,6 +188,7 @@
    "scripts/stop_check.py::self_test": 90,
    "tests/window_driver.ps1::[RadeStub.Driver]::Pump": 137,
    "tests/window_real.py::main": 64
-  }
+  },
+  "parse": {}
  }
 }
