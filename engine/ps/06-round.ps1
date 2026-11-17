@@ -6,7 +6,7 @@
 # Starts the record of one run: the folder, the history, the summary lines (line 1 = the e-mail subject), the mode
 # line, whether the install can be whole, and the overall progress weights. Takes the Invoke-Round inputs; returns the
 # run table that the other Round functions read and change ($run).
-function New-RoundRun([bool]$Clean, [bool[]]$Selected, [scriptblock]$Say, [string[]]$CheckLines) {
+function Initialize-RoundRun([bool]$Clean, [bool[]]$Selected, [scriptblock]$Say, [string[]]$CheckLines) {
   $script:ranSteps = @()
   $script:roundBad = $false
   $script:runLog = New-Object System.Collections.Generic.List[string]
@@ -39,7 +39,7 @@ function New-RoundRun([bool]$Clean, [bool[]]$Selected, [scriptblock]$Say, [strin
 # Gets the computer ready before the first step: the RADE folder, the notes (mode, newer version, text mode, Word), the
 # bundle's files, the downloads, the saved e-mail address and the clean-up. Throws when a deploy must not go on.
 # Takes the run table, the Clean switch and the To address; changes $run.Base and $run.Summary.
-function Start-RoundRun($run, [bool]$Clean, [string]$To, [scriptblock]$OnStatus) {
+function Invoke-RoundSetup($run, [bool]$Clean, [string]$To, [scriptblock]$OnStatus) {
   $speak = $run.Speak
   & $speak ('RADE, round ' + $round + ' (build ' + $buildId + '), started ' + (Get-Date -Format 'yyyy-MM-dd HH:mm'))
   $run.Base = Move-ToRade $speak
@@ -131,7 +131,7 @@ function Test-RoundSharedFile($run) {
 
 # A run that stops midway still leaves a report to send (the summary so far and the log up to the stop); a deploy also
 # records the part install, here and (when the app keeps one) on the site. Takes the run table and the error record.
-function Stop-RoundRun($run, $Err) {
+function Save-StoppedRound($run, $Err) {
   $run.Summary[0] = '@@PREFIX@@ ' + $round + ' STOPPED'
   $run.Summary += ('STOPPED: ' + (ConvertTo-Masked ([string]$Err)))
   if ($run.Deploy) { $run.Summary += (Get-HelpLine); & $run.SayRaw (Get-HelpLine); $sv = Save-Installed 'STOPPED' $run.Whole $run.StepRecs; if ($sv) { $run.Summary += ('NOTE: the installed-version record could not be saved: ' + $sv) }
@@ -184,14 +184,14 @@ function Complete-TestRun($run, $Z, [string]$To, [scriptblock]$WindowLine, [bool
 # do" line after a known problem). Takes the window's choices and callbacks; returns the summary lines (line 1 = the
 # subject). A run that stops writes its report first, then throws again.
 function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock]$Say, [scriptblock]$Tick, [scriptblock]$OnStep, [scriptblock]$OnStatus, [scriptblock]$WindowLine, [string[]]$Answers, [string[]]$CheckLines) {
-  $run = New-RoundRun $Clean $Selected $Say $CheckLines
+  $run = Initialize-RoundRun $Clean $Selected $Say $CheckLines
   $sayRaw = $Say
   # Logs a line, then a "what to do" line when the line names a known problem. Not a closure (GetNewClosure would hide
   # the bundle's own functions): the Round functions are called from here, so they find $sayRaw in this scope.
   $run.Speak = { param($t) & $sayRaw $t; $w = Get-WhatToDo $t; if ($w) { & $sayRaw $w } }
   $speak = $run.Speak
   try {
-    Start-RoundRun $run $Clean $To $OnStatus
+    Invoke-RoundSetup $run $Clean $To $OnStatus
     for ($k = 0; $k -lt $steps.Count; $k++) {
       if ($script:closing) { throw 'the window was closed (Exit) while the round ran; the steps after it did not run' }
       if (-not $Selected[$k]) { if ($script:appSteps -contains $k) { $run.Summary += ($steps[$k].Name + $(if ($run.Prior[[string]$steps[$k].Name] -eq 'PASSED') { ': already done for version ' + $script:app.Version + ', not run again' } else { ': not selected' })) }; continue }
@@ -203,7 +203,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     if ($script:closing) { throw 'the window was closed (Exit) while the round ran' }
     $run.Summary += (Get-FolderInventory $run.Base)
   } catch {
-    Stop-RoundRun $run $_
+    Save-StoppedRound $run $_
     throw
   }
   $z = Export-RoundResult $run.Base $run.Summary
