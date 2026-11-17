@@ -1,4 +1,7 @@
-function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]$Tick, [string]$Answer) {
+# Builds the start information of a step's child powershell.exe (pwsh when there is none): the step file with -Id and
+# -NoPause, the round's fixed arguments, the person's answer as -<AskParam>, and the step's input variables.
+# Takes the RADE app folder, the step and the answer; returns the ProcessStartInfo (nothing is started here).
+function New-StepStartInfo([string]$Base, $Step, [string]$Answer, [scriptblock]$Say) {
   $exe = 'powershell.exe'
   if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) { $exe = 'pwsh' }
   $dir = Join-Path $Base $Step.Dir
@@ -17,6 +20,45 @@ function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]
   $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true
   $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
   try { $envs = Get-StepEnv $Base $Step; foreach ($k in @($envs.Keys)) { $psi.EnvironmentVariables[[string]$k] = [string]$envs[$k] } } catch { & $Say ('    NOTE: the step inputs could not be set: ' + (ConvertTo-Masked $_.Exception.Message)) }
+  return $psi
+}
+
+# Reads one output line of a running step (the step contract, docs/engine.md "Step contract"): masks it, then a
+# PROGRESS line moves the step bar, a MADE line goes to the undo list, a FALLBACK line names the fallback route, and any
+# other line is logged and counted as PASS, SKIP or FAIL. Takes the line, the step, the result record $R (changed in
+# place), the site address (for cleaned names) and the log callback; returns nothing.
+function Add-StepLine([string]$Line, $Step, $R, [string]$Site, [scriptblock]$Say) {
+  $line = ConvertTo-Masked $Line
+  # "PROGRESS n/m" (or "n of m") from a step script moves the step bar and stays out of the log (PFM 14 Nov 26).
+  if ($line -match '^\s*PROGRESS\s+(\d+)\s*(?:/|of)\s*(\d+)\s*$') {
+    if ($script:prog -and [int]$Matches[2] -gt 0) { $script:prog.Frac = [math]::Min(1.0, [double]$Matches[1] / [double]$Matches[2]); $script:prog.FracText = $Matches[1] + ' of ' + $Matches[2] }
+    return
+  }
+  # "MADE <kind>: <name>": something the step created (a list, a flow, a file); kept for the undo list (step contract).
+  # A MADE line is never a result: it is logged with the cleaned name and not counted as PASS, FAIL or SKIP (review).
+  if ($line -cmatch '^\s*MADE\s+([a-z][a-z-]{0,30}):\s+(\S.*)$') {
+    $mk = $Matches[1]; $mn = ConvertTo-MadeName $Matches[2] $Site; $R.Made += @{ kind = $mk; name = $mn }
+    & $Say ('    MADE ' + $mk + ': ' + $mn); return
+  }
+  # "FALLBACK: <route>": the step used its documented fallback route (for a user with fewer rights). Not a result line;
+  # a step that passes this way reads PASSED (fallback) and counts as passed (docs/engine.md "Results").
+  if ($line -cmatch '^\s*FALLBACK:\s+(\S.*)$') {
+    $R.Fallback = ConvertTo-MadeName $Matches[1] $Site
+    & $Say ('    FALLBACK: ' + $R.Fallback); return
+  }
+  # Lines that may name a unit or a file (for example seal details) never reach the report (data boundary).
+  if ($Step.ScreenOnly -and $line -match $Step.ScreenOnly) { $line = ($line -replace '^(\S+).*$', '$1') + ' (detail hidden: it may hold a name; run the step script by hand to see it)' }
+  if ($line -match '(^|\s)PASS(\s|$)') { $R.Pass++ }
+  if ($line -cmatch '(^|\s)SKIP(\s|$)') { $R.Skip++ }   # upper case only: prose such as "skip this" is not a result
+  if ($line -match '(^|\s)(FAIL|FORMAT-FAIL|RENDER-ERROR|MEASURE-ERROR|STOPPED:)(\s|$)') { $R.Fail++ }
+  if ($line.Trim()) { & $Say ('    ' + $line) }   # step output, indented under its step heading
+}
+
+# Runs one step script as a child PowerShell and follows its output line by line until it ends or passes its time
+# limit ($stepMinutes, or the step's own Minutes); the window's bars move every 30 ms ($Tick). Takes the RADE app folder,
+# the step, the log and tick callbacks and the person's answer; returns @{ Pass; Fail; Skip; Exit; Made; Fallback }.
+function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]$Tick, [string]$Answer) {
+  $psi = New-StepStartInfo $Base $Step $Answer $Say
   $r = @{ Pass = 0; Fail = 0; Skip = 0; Exit = $null; Made = @(); Fallback = '' }
   $siteNow = [string](Get-SiteUrl $Base)
   $p = [System.Diagnostics.Process]::Start($psi)
@@ -33,30 +75,7 @@ function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]
     if (-not $lineTask.IsCompleted) { break }
     $line = $lineTask.Result
     if ($null -eq $line) { break }
-    $line = ConvertTo-Masked $line
-    # "PROGRESS n/m" (or "n of m") from a step script moves the step bar and stays out of the log (PFM 14 Nov 26).
-    if ($line -match '^\s*PROGRESS\s+(\d+)\s*(?:/|of)\s*(\d+)\s*$') {
-      if ($script:prog -and [int]$Matches[2] -gt 0) { $script:prog.Frac = [math]::Min(1.0, [double]$Matches[1] / [double]$Matches[2]); $script:prog.FracText = $Matches[1] + ' of ' + $Matches[2] }
-      $lineTask = $p.StandardOutput.ReadLineAsync(); continue
-    }
-    # "MADE <kind>: <name>": something the step created (a list, a flow, a file); kept for the undo list (step contract).
-    # A MADE line is never a result: it is logged with the cleaned name and not counted as PASS, FAIL or SKIP (review).
-    if ($line -cmatch '^\s*MADE\s+([a-z][a-z-]{0,30}):\s+(\S.*)$') {
-      $mk = $Matches[1]; $mn = ConvertTo-MadeName $Matches[2] $siteNow; $r.Made += @{ kind = $mk; name = $mn }
-      & $Say ('    MADE ' + $mk + ': ' + $mn); $lineTask = $p.StandardOutput.ReadLineAsync(); continue
-    }
-    # "FALLBACK: <route>": the step used its documented fallback route (for a user with fewer rights). Not a result line;
-    # a step that passes this way reads PASSED (fallback) and counts as passed (docs/engine.md "Results").
-    if ($line -cmatch '^\s*FALLBACK:\s+(\S.*)$') {
-      $r.Fallback = ConvertTo-MadeName $Matches[1] $siteNow
-      & $Say ('    FALLBACK: ' + $r.Fallback); $lineTask = $p.StandardOutput.ReadLineAsync(); continue
-    }
-    # Lines that may name a unit or a file (for example seal details) never reach the report (data boundary).
-    if ($Step.ScreenOnly -and $line -match $Step.ScreenOnly) { $line = ($line -replace '^(\S+).*$', '$1') + ' (detail hidden: it may hold a name; run the step script by hand to see it)' }
-    if ($line -match '(^|\s)PASS(\s|$)') { $r.Pass++ }
-    if ($line -cmatch '(^|\s)SKIP(\s|$)') { $r.Skip++ }   # upper case only: prose such as "skip this" is not a result
-    if ($line -match '(^|\s)(FAIL|FORMAT-FAIL|RENDER-ERROR|MEASURE-ERROR|STOPPED:)(\s|$)') { $r.Fail++ }
-    if ($line.Trim()) { & $Say ('    ' + $line) }   # step output, indented under its step heading
+    Add-StepLine $line $Step $r $siteNow $Say
     $lineTask = $p.StandardOutput.ReadLineAsync()
   }
   $p.WaitForExit()

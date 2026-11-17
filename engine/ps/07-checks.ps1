@@ -241,145 +241,190 @@ function Format-CheckResult([string]$State, [string]$Detail, [string]$Fix) {
   if ($Fix) { $Fix = $Fix -replace '\.$', '' }
   return @{ State = $State; Detail = $Detail; Fix = $Fix }
 }
+# Checks of this computer itself: NIPR name, PowerShell version and language mode, OneDrive, free space, a test file,
+# and a child script. Takes the check id and the tick callback (for the child script); returns a check result
+# (Format-CheckResult), or $null for an id it does not handle.
+function Get-ComputerCheck([string]$Id, [scriptblock]$Tick) {
+  $one = $null
+  switch ($Id) {
+  'nipr' {
+    # Reads only this computer's own full name (Test-NiprDevice); the name itself is never shown or saved.
+    if (Test-NiprDevice) { $one = Format-CheckResult 'PASSED' 'Read this computer''s own full name: it is in the area52 domain' '' }
+    else { $one = Format-CheckResult 'FAILED' 'This application cannot be installed in your environment.' '' }
+  }
+  'ps' {
+    $v = $PSVersionTable.PSVersion
+    if ($v -ge [version]'5.1') { $one = Format-CheckResult 'PASSED' ('version [' + $v + ']') '' }
+    else { $one = Format-CheckResult 'FAILED' ('version [' + $v + ']') 'Open Windows PowerShell ISE from the Start menu, then paste the round again' }
+  }
+  'lang' {
+    $m = [string]$ExecutionContext.SessionState.LanguageMode
+    if ($m -eq 'FullLanguage') { $one = Format-CheckResult 'PASSED' 'Not restricted' '' }
+    else { $one = Format-CheckResult 'FAILED' ('Restricted [' + $m + ']') 'PowerShell is restricted on this computer. Contact your ISSM and send the results e-mail as is' }
+  }
+  'onedrive' {
+    $od = Get-OneDrivePath
+    if (Test-Path -LiteralPath $od -PathType Container) { $one = Format-CheckResult 'PASSED' 'found' '' }
+    else { $one = Format-CheckResult 'FAILED' 'not found' 'Sign in to OneDrive, wait until it is up to date, then select "Run checks again"' }
+  }
+  'disk' {
+    $od = Get-OneDrivePath
+    $root = [System.IO.Path]::GetPathRoot($od); if (-not $root) { $root = [System.IO.Path]::GetPathRoot([System.IO.Path]::GetTempPath()) }
+    $free = (New-Object System.IO.DriveInfo($root)).AvailableFreeSpace
+    $need = 200MB; foreach ($f in $files) { $need += 2 * $f.Data.Length }
+    $mb = [math]::Floor($free / 1MB)
+    if ($free -lt $need) { $one = Format-CheckResult 'FAILED' ('{0:N0} MB free, {1:N0} MB needed' -f $mb, [math]::Ceiling($need / 1MB)) 'Free up space (for example, empty the Recycle Bin), then select "Run checks again"' }
+    elseif ($free -lt 1GB) { $one = Format-CheckResult 'WARNING' ('{0:N0} MB free' -f $mb) 'Enough for this deployment. Free up space soon' }
+    else { $one = Format-CheckResult 'PASSED' ('{0:N0} MB free' -f $mb) '' }
+  }
+  'write' {
+    $od = Get-OneDrivePath
+    if (-not (Test-Path -LiteralPath $od -PathType Container)) { $one = Format-CheckResult 'NOT RUN' 'No OneDrive folder' 'Resolve the OneDrive check first' }
+    else {
+      $t = Join-Path $od ('@@PREFIX@@-write-test-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.tmp')
+      [System.IO.File]::WriteAllText($t, 'test'); Remove-Item -LiteralPath $t -Force
+      $one = Format-CheckResult 'PASSED' 'Test file saved and deleted' ''
+    }
+  }
+  'child' {
+    # Steps run as child scripts with -ExecutionPolicy Bypass; a Group Policy can still block them.
+    $r = Invoke-ChildScript "'child ok'`r`nexit 7`r`n" '' 60 $Tick
+    $pol = ''
+    try { $pol = (@(Get-ExecutionPolicy -List | Where-Object { $_.Scope -match 'Policy$' -and [string]$_.ExecutionPolicy -ne 'Undefined' } | ForEach-Object { [string]$_.Scope + '=' + [string]$_.ExecutionPolicy }) -join ', ') } catch { $null = $_ }
+    if ($r.Exit -eq 7) { $one = Format-CheckResult 'PASSED' ('Test script ran' + $(if ($pol) { ', policy [' + $pol + ']' } else { '' })) '' }
+    else { $one = Format-CheckResult 'FAILED' ('Test script did not run, exit code [' + $r.Exit + ']' + $(if ($r.Why) { ', ' + $r.Why } else { '' }) + $(if ($pol) { ', policy [' + $pol + ']' } else { '' })) 'This computer blocks RADE scripts. Contact your ISSM and send the results e-mail as is' }
+  }
+  }
+  return $one
+}
+
+# Checks of installed programs: classic Outlook (drafts), Word (renders; it must also be closed) and PnP.PowerShell.
+# Takes the check id; returns a check result, or $null for an id it does not handle.
+function Get-ProgramCheck([string]$Id) {
+  $one = $null
+  switch ($Id) {
+  'outlook' {
+    if ($env:OS -ne 'Windows_NT') { $one = Format-CheckResult 'WARNING' 'Not Windows' 'RADE opens the results folder and copies the summary for your e-mail' }
+    elseif ([type]::GetTypeFromProgID('Outlook.Application')) { $one = Format-CheckResult 'PASSED' 'Installed' '' }
+    else { $one = Format-CheckResult 'WARNING' 'Classic Outlook not found (new Outlook cannot make drafts)' 'RADE opens the results folder and copies the summary for your e-mail' }
+  }
+  'word' {
+    if ($env:OS -eq 'Windows_NT' -and [type]::GetTypeFromProgID('Word.Application')) {
+      if (Test-WordOpen) { $one = Format-CheckResult 'FAILED' 'Installed, but open now' 'Save your work, close Word, then select "Run checks again"' }   # PFM 14 Nov 26: blocks (1B)
+      else { $one = Format-CheckResult 'PASSED' 'Installed' '' }
+    } else { $one = Format-CheckResult 'FAILED' 'Not found' 'This application requires Microsoft Word' }
+  }
+  'pnp' {
+    $m = @(Get-Module -ListAvailable -Name PnP.PowerShell | Sort-Object Version -Descending)
+    if (-not $m.Count) { $one = Format-CheckResult 'FAILED' 'Not installed' 'Site steps require it. Use the manual steps in the repository' }
+    elseif ([string]$m[0].Version -eq '1.12.0') { $one = Format-CheckResult 'PASSED' 'version [1.12.0]' '' }
+    else { $one = Format-CheckResult 'WARNING' ('Version [' + $m[0].Version + '], tested with [1.12.0]') 'Likely compatible. If a site step fails, send the results as is' }
+  }
+  }
+  return $one
+}
+
+# Checks that a fixed address answers (the repository's go file, the site, Power Automate). Only these addresses: no
+# host finding (AGENTS.md "No reconnaissance"). Takes the check id, the RADE app folder and the site address; returns
+# a check result, or $null for an id it does not handle.
+function Get-NetworkCheck([string]$Id, [string]$Base, [string]$Site) {
+  $one = $null
+  switch ($Id) {
+  'net-bookmark' {
+    $w = Test-WebReach $goUrl   # the file the "newer round" notice reads
+    if ($w.Ok) { $one = Format-CheckResult 'PASSED' ('reached' + $(if ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
+    else { $one = Format-CheckResult 'WARNING' ('Not reached: ' + $w.Why) 'Optional: only the new-round notice uses it' }
+  }
+  'net-site' {
+    if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'No site address' ('Complete the "Site address" box (it starts with ' + $sitePrefix + '), then select "Run checks again"') }
+    else {
+      $w = Test-WebReach $Site
+      if ($w.Ok) { $one = Format-CheckResult 'PASSED' ('Reached' + $(if ($w.Code -in 401, 403) { ', code [' + $w.Code + '] (sign-in required, as expected)' } elseif ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
+      else { $one = Format-CheckResult 'FAILED' ('Not reached: ' + $w.Why) 'Verify the address opens in Edge, then select "Run checks again"' }
+    }
+  }
+  'net-flow' {
+    $fp = Get-FlowPortal $Base
+    if (-not $fp.Url) { $one = Format-CheckResult 'NOT RUN' 'No Power Automate address' '' }
+    else {
+      $w = Test-WebReach $fp.Url
+      if ($w.Ok) { $one = Format-CheckResult 'PASSED' ('reached' + $(if ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
+      else { $one = Format-CheckResult 'FAILED' ('Not reached: ' + $w.Why) 'If Power Automate opens in Edge, select "Check Power Automate"' }
+    }
+  }
+  }
+  return $one
+}
+
+# The site rights check: a child script signs in with the CAC and prints only right names, True/False, the admin flag
+# and the install record's version ($rightsScript). Fails on a missing right or on another account's install record.
+# Takes the RADE app folder, the site address and the tick callback; returns a check result.
+function Get-SiteRightsCheck([string]$Base, [string]$Site, [scriptblock]$Tick) {
+  if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'No site address' ('Complete the "Site address" box first (it starts with ' + $sitePrefix + ')') }
+  else {
+    $r = Invoke-ChildScript $rightsScript ('-Site "' + $Site + '"' + (Get-MarkerArg)) 300 $Tick
+    $have = @{}; $adm = 'unknown'; $mk = ''
+    foreach ($l in $r.Lines) {
+      if ($l -match '^RIGHT (\w+) (True|False)$') { $have[$Matches[1]] = ($Matches[2] -eq 'True') }
+      if ($l -match '^ADMIN (True|False|unknown)$') { $adm = $Matches[1] }
+      if ($l -match '^MARKER (none|unknown|found [0-9.]+)$') { $mk = $Matches[1] }
+    }
+    $admText = 'Site collection administrator: ' + $(switch ($adm) { 'True' { 'yes' } 'False' { 'no' } default { 'not read' } }) + ' (shown only, not required)'
+    if (-not $have.Count) {
+      $why = 'Sign-in did not finish'; foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $why = $Matches[1] } }
+      if ($why -eq 'not-connected') { $why = 'Sign-in did not finish' }
+      if ($why -eq 'no-pnp') { $one = Format-CheckResult 'FAILED' 'SharePoint tool not installed' 'See the SharePoint tool check' }
+      else { $one = Format-CheckResult 'FAILED' ($why + $(if ($r.Why) { ', ' + $r.Why } else { '' })) 'Select "Sign in and check site rights" and complete the CAC sign-in' }
+    } else {
+      $miss = @($rightsNeeded | Where-Object { -not $have[$_] } | ForEach-Object { $rightWords[$_] })
+      $got = @($have.Keys | Sort-Object | Where-Object { $have[$_] } | ForEach-Object { $rightWords[$_] })
+      if ($miss.Count) { $one = Format-CheckResult 'FAILED' ('Missing: ' + ($miss -join ', ')) 'Ask a site owner to add you to the site Owners group' }
+      elseif ((Test-FirstInstall) -and $mk -like 'found *') { $one = Format-CheckResult 'FAILED' ('This site already has an install of this application [version ' + $(if ($mk -eq 'found 0') { 'not readable' } else { $mk.Substring(6) }) + '], made from another account or for another site') 'Do not install again: every flow would run twice. Ask the person who installed it to run RADE' }
+      elseif ((Test-FirstInstall) -and $mk -ne 'none') { $one = Format-CheckResult 'FAILED' 'The install record on the site could not be read' 'Select "Sign in and check site rights" again' }
+      else { $one = Format-CheckResult 'PASSED' ('Rights: ' + ($got -join ', ') + '. ' + $admText) '' }
+    }
+  }
+  return $one
+}
+
+# The Power Automate check that a person answers by looking: in text mode at the prompt, in the window on a hand card
+# ($script:guideUi). Takes the RADE app folder; returns a check result (NOT RUN when it is not answered).
+function Get-FlowGuideCheck([string]$Base) {
+  if ($script:textMode) {
+    $fp = Get-FlowPortal $Base
+    Write-Host ('  Open Power Automate (' + $fp.Url + '). Look at the left menu for "Solutions" (it may be under "More"), then select "My flows" and look for "Import".')
+    $a = ([string](Read-Host 'Did you see both "Solutions" and "Import"? Type Y or N and press Enter')).Trim()
+    if ($a -match '^[Yy]') { $one = Format-CheckResult 'PASSED' 'Confirmed by you' '' }
+    else { $one = Format-CheckResult 'FAILED' '"Solutions" or "Import" not shown' 'Ask your Power Automate administrator for maker access' }
+  }
+  else {
+    $fp = Get-FlowPortal $Base
+    $g = @{ Name = 'Check Power Automate'; File = ''; Url = $fp.Url; DoneText = 'Yes: I see both'; NoText = 'No: one is missing'; SkipText = 'Not now'
+      Guide = @('You look in Power Automate and answer (about 2 minutes, an estimate). Nothing is changed.',
+        '1. Select Open in browser. Power Automate opens; sign in with your CAC if asked.',
+        '2. Look at the left menu: it must show Solutions (it may be under More).',
+        '3. Select My flows: Import must show at the top of the page.',
+        '4. Come back here. Select Yes if you saw both, No if one is missing.') }
+    $a = 'Cancel'; if ($script:guideUi) { $a = [string](@(& $script:guideUi $g '' $fp.Url $fp.Config))[-1] }
+    if ($a -eq 'OK') { $one = Format-CheckResult 'PASSED' 'Confirmed by you' '' }
+    elseif ($a -eq 'No') { $one = Format-CheckResult 'FAILED' '"Solutions" or "Import" not shown' 'Ask your Power Automate administrator for maker access' }
+    else { $one = Format-CheckResult 'NOT RUN' 'Not answered' 'Select "Check Power Automate" when ready' }
+  }
+  return $one
+}
+
+# Runs one check (the ids of $checkDefs) and gives its result. States: PASSED, WARNING, FAILED, NOT RUN. Detail and Fix
+# never hold the site address or the DODID. An error in a check is a FAILED result, and an advisory check never
+# FAILS (WARNING instead). Takes the check definition, the RADE app folder, the site address and the tick callback.
 function Invoke-Check($Def, [string]$Base, [string]$Site, [scriptblock]$Tick) {
-  # One check. States: PASSED, WARNING, FAILED, NOT RUN. Detail and Fix never hold the site address or the DODID.
   $one = $null
   try {
     switch ($Def.Id) {
-      'nipr' {
-        # Reads only this computer's own full name (Test-NiprDevice); the name itself is never shown or saved.
-        if (Test-NiprDevice) { $one = Format-CheckResult 'PASSED' 'Read this computer''s own full name: it is in the area52 domain' '' }
-        else { $one = Format-CheckResult 'FAILED' 'This application cannot be installed in your environment.' '' }
-      }
-      'ps' {
-        $v = $PSVersionTable.PSVersion
-        if ($v -ge [version]'5.1') { $one = Format-CheckResult 'PASSED' ('version [' + $v + ']') '' }
-        else { $one = Format-CheckResult 'FAILED' ('version [' + $v + ']') 'Open Windows PowerShell ISE from the Start menu, then paste the round again' }
-      }
-      'lang' {
-        $m = [string]$ExecutionContext.SessionState.LanguageMode
-        if ($m -eq 'FullLanguage') { $one = Format-CheckResult 'PASSED' 'Not restricted' '' }
-        else { $one = Format-CheckResult 'FAILED' ('Restricted [' + $m + ']') 'PowerShell is restricted on this computer. Contact your ISSM and send the results e-mail as is' }
-      }
-      'onedrive' {
-        $od = Get-OneDrivePath
-        if (Test-Path -LiteralPath $od -PathType Container) { $one = Format-CheckResult 'PASSED' 'found' '' }
-        else { $one = Format-CheckResult 'FAILED' 'not found' 'Sign in to OneDrive, wait until it is up to date, then select "Run checks again"' }
-      }
-      'disk' {
-        $od = Get-OneDrivePath
-        $root = [System.IO.Path]::GetPathRoot($od); if (-not $root) { $root = [System.IO.Path]::GetPathRoot([System.IO.Path]::GetTempPath()) }
-        $free = (New-Object System.IO.DriveInfo($root)).AvailableFreeSpace
-        $need = 200MB; foreach ($f in $files) { $need += 2 * $f.Data.Length }
-        $mb = [math]::Floor($free / 1MB)
-        if ($free -lt $need) { $one = Format-CheckResult 'FAILED' ('{0:N0} MB free, {1:N0} MB needed' -f $mb, [math]::Ceiling($need / 1MB)) 'Free up space (for example, empty the Recycle Bin), then select "Run checks again"' }
-        elseif ($free -lt 1GB) { $one = Format-CheckResult 'WARNING' ('{0:N0} MB free' -f $mb) 'Enough for this deployment. Free up space soon' }
-        else { $one = Format-CheckResult 'PASSED' ('{0:N0} MB free' -f $mb) '' }
-      }
-      'write' {
-        $od = Get-OneDrivePath
-        if (-not (Test-Path -LiteralPath $od -PathType Container)) { $one = Format-CheckResult 'NOT RUN' 'No OneDrive folder' 'Resolve the OneDrive check first' }
-        else {
-          $t = Join-Path $od ('@@PREFIX@@-write-test-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.tmp')
-          [System.IO.File]::WriteAllText($t, 'test'); Remove-Item -LiteralPath $t -Force
-          $one = Format-CheckResult 'PASSED' 'Test file saved and deleted' ''
-        }
-      }
-      'child' {
-        # Steps run as child scripts with -ExecutionPolicy Bypass; a Group Policy can still block them.
-        $r = Invoke-ChildScript "'child ok'`r`nexit 7`r`n" '' 60 $Tick
-        $pol = ''
-        try { $pol = (@(Get-ExecutionPolicy -List | Where-Object { $_.Scope -match 'Policy$' -and [string]$_.ExecutionPolicy -ne 'Undefined' } | ForEach-Object { [string]$_.Scope + '=' + [string]$_.ExecutionPolicy }) -join ', ') } catch { $null = $_ }
-        if ($r.Exit -eq 7) { $one = Format-CheckResult 'PASSED' ('Test script ran' + $(if ($pol) { ', policy [' + $pol + ']' } else { '' })) '' }
-        else { $one = Format-CheckResult 'FAILED' ('Test script did not run, exit code [' + $r.Exit + ']' + $(if ($r.Why) { ', ' + $r.Why } else { '' }) + $(if ($pol) { ', policy [' + $pol + ']' } else { '' })) 'This computer blocks RADE scripts. Contact your ISSM and send the results e-mail as is' }
-      }
-      'outlook' {
-        if ($env:OS -ne 'Windows_NT') { $one = Format-CheckResult 'WARNING' 'Not Windows' 'RADE opens the results folder and copies the summary for your e-mail' }
-        elseif ([type]::GetTypeFromProgID('Outlook.Application')) { $one = Format-CheckResult 'PASSED' 'Installed' '' }
-        else { $one = Format-CheckResult 'WARNING' 'Classic Outlook not found (new Outlook cannot make drafts)' 'RADE opens the results folder and copies the summary for your e-mail' }
-      }
-      'word' {
-        if ($env:OS -eq 'Windows_NT' -and [type]::GetTypeFromProgID('Word.Application')) {
-          if (Test-WordOpen) { $one = Format-CheckResult 'FAILED' 'Installed, but open now' 'Save your work, close Word, then select "Run checks again"' }   # PFM 14 Nov 26: blocks (1B)
-          else { $one = Format-CheckResult 'PASSED' 'Installed' '' }
-        } else { $one = Format-CheckResult 'FAILED' 'Not found' 'This application requires Microsoft Word' }
-      }
-      'pnp' {
-        $m = @(Get-Module -ListAvailable -Name PnP.PowerShell | Sort-Object Version -Descending)
-        if (-not $m.Count) { $one = Format-CheckResult 'FAILED' 'Not installed' 'Site steps require it. Use the manual steps in the repository' }
-        elseif ([string]$m[0].Version -eq '1.12.0') { $one = Format-CheckResult 'PASSED' 'version [1.12.0]' '' }
-        else { $one = Format-CheckResult 'WARNING' ('Version [' + $m[0].Version + '], tested with [1.12.0]') 'Likely compatible. If a site step fails, send the results as is' }
-      }
-      'net-bookmark' {
-        $w = Test-WebReach $goUrl   # the file the "newer round" notice reads
-        if ($w.Ok) { $one = Format-CheckResult 'PASSED' ('reached' + $(if ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
-        else { $one = Format-CheckResult 'WARNING' ('Not reached: ' + $w.Why) 'Optional: only the new-round notice uses it' }
-      }
-      'net-site' {
-        if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'No site address' ('Complete the "Site address" box (it starts with ' + $sitePrefix + '), then select "Run checks again"') }
-        else {
-          $w = Test-WebReach $Site
-          if ($w.Ok) { $one = Format-CheckResult 'PASSED' ('Reached' + $(if ($w.Code -in 401, 403) { ', code [' + $w.Code + '] (sign-in required, as expected)' } elseif ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
-          else { $one = Format-CheckResult 'FAILED' ('Not reached: ' + $w.Why) 'Verify the address opens in Edge, then select "Run checks again"' }
-        }
-      }
-      'net-flow' {
-        $fp = Get-FlowPortal $Base
-        if (-not $fp.Url) { $one = Format-CheckResult 'NOT RUN' 'No Power Automate address' '' }
-        else {
-          $w = Test-WebReach $fp.Url
-          if ($w.Ok) { $one = Format-CheckResult 'PASSED' ('reached' + $(if ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
-          else { $one = Format-CheckResult 'FAILED' ('Not reached: ' + $w.Why) 'If Power Automate opens in Edge, select "Check Power Automate"' }
-        }
-      }
-      'site-rights' {
-        if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'No site address' ('Complete the "Site address" box first (it starts with ' + $sitePrefix + ')') }
-        else {
-          $r = Invoke-ChildScript $rightsScript ('-Site "' + $Site + '"' + (Get-MarkerArg)) 300 $Tick
-          $have = @{}; $adm = 'unknown'; $mk = ''
-          foreach ($l in $r.Lines) {
-            if ($l -match '^RIGHT (\w+) (True|False)$') { $have[$Matches[1]] = ($Matches[2] -eq 'True') }
-            if ($l -match '^ADMIN (True|False|unknown)$') { $adm = $Matches[1] }
-            if ($l -match '^MARKER (none|unknown|found [0-9.]+)$') { $mk = $Matches[1] }
-          }
-          $admText = 'Site collection administrator: ' + $(switch ($adm) { 'True' { 'yes' } 'False' { 'no' } default { 'not read' } }) + ' (shown only, not required)'
-          if (-not $have.Count) {
-            $why = 'Sign-in did not finish'; foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $why = $Matches[1] } }
-            if ($why -eq 'not-connected') { $why = 'Sign-in did not finish' }
-            if ($why -eq 'no-pnp') { $one = Format-CheckResult 'FAILED' 'SharePoint tool not installed' 'See the SharePoint tool check' }
-            else { $one = Format-CheckResult 'FAILED' ($why + $(if ($r.Why) { ', ' + $r.Why } else { '' })) 'Select "Sign in and check site rights" and complete the CAC sign-in' }
-          } else {
-            $miss = @($rightsNeeded | Where-Object { -not $have[$_] } | ForEach-Object { $rightWords[$_] })
-            $got = @($have.Keys | Sort-Object | Where-Object { $have[$_] } | ForEach-Object { $rightWords[$_] })
-            if ($miss.Count) { $one = Format-CheckResult 'FAILED' ('Missing: ' + ($miss -join ', ')) 'Ask a site owner to add you to the site Owners group' }
-            elseif ((Test-FirstInstall) -and $mk -like 'found *') { $one = Format-CheckResult 'FAILED' ('This site already has an install of this application [version ' + $(if ($mk -eq 'found 0') { 'not readable' } else { $mk.Substring(6) }) + '], made from another account or for another site') 'Do not install again: every flow would run twice. Ask the person who installed it to run RADE' }
-            elseif ((Test-FirstInstall) -and $mk -ne 'none') { $one = Format-CheckResult 'FAILED' 'The install record on the site could not be read' 'Select "Sign in and check site rights" again' }
-            else { $one = Format-CheckResult 'PASSED' ('Rights: ' + ($got -join ', ') + '. ' + $admText) '' }
-          }
-        }
-      }
-      'flow-guide' {
-        if ($script:textMode) {
-          $fp = Get-FlowPortal $Base
-          Write-Host ('  Open Power Automate (' + $fp.Url + '). Look at the left menu for "Solutions" (it may be under "More"), then select "My flows" and look for "Import".')
-          $a = ([string](Read-Host 'Did you see both "Solutions" and "Import"? Type Y or N and press Enter')).Trim()
-          if ($a -match '^[Yy]') { $one = Format-CheckResult 'PASSED' 'Confirmed by you' '' }
-          else { $one = Format-CheckResult 'FAILED' '"Solutions" or "Import" not shown' 'Ask your Power Automate administrator for maker access' }
-        }
-        else {
-          $fp = Get-FlowPortal $Base
-          $g = @{ Name = 'Check Power Automate'; File = ''; Url = $fp.Url; DoneText = 'Yes: I see both'; NoText = 'No: one is missing'; SkipText = 'Not now'
-            Guide = @('You look in Power Automate and answer (about 2 minutes, an estimate). Nothing is changed.',
-              '1. Select Open in browser. Power Automate opens; sign in with your CAC if asked.',
-              '2. Look at the left menu: it must show Solutions (it may be under More).',
-              '3. Select My flows: Import must show at the top of the page.',
-              '4. Come back here. Select Yes if you saw both, No if one is missing.') }
-          $a = 'Cancel'; if ($script:guideUi) { $a = [string](@(& $script:guideUi $g '' $fp.Url $fp.Config))[-1] }
-          if ($a -eq 'OK') { $one = Format-CheckResult 'PASSED' 'Confirmed by you' '' }
-          elseif ($a -eq 'No') { $one = Format-CheckResult 'FAILED' '"Solutions" or "Import" not shown' 'Ask your Power Automate administrator for maker access' }
-          else { $one = Format-CheckResult 'NOT RUN' 'Not answered' 'Select "Check Power Automate" when ready' }
-        }
-      }
+      { $_ -in 'nipr', 'ps', 'lang', 'onedrive', 'disk', 'write', 'child' } { $one = Get-ComputerCheck $Def.Id $Tick; break }
+      { $_ -in 'outlook', 'word', 'pnp' } { $one = Get-ProgramCheck $Def.Id; break }
+      { $_ -in 'net-bookmark', 'net-site', 'net-flow' } { $one = Get-NetworkCheck $Def.Id $Base $Site; break }
+      'site-rights' { $one = Get-SiteRightsCheck $Base $Site $Tick; break }
+      'flow-guide' { $one = Get-FlowGuideCheck $Base; break }
       default { $one = Format-CheckResult 'NOT RUN' 'unknown check' '' }
     }
   } catch { $one = Format-CheckResult 'FAILED' ('Check stopped with an error [' + $_.Exception.GetType().Name + ']') 'Select "Run checks again". If it repeats, send the results as is' }
