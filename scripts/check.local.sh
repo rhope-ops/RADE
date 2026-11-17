@@ -38,9 +38,10 @@ cmp -s "$lt/assets/logo/logo-rho.svg" assets/logo/logo-rho.svg || { echo "FAIL a
 python3 tests/check_apps_test.py
 if [ "$lane" = full ]; then python3 scripts/check_apps.py; else echo "SKIP app canary (fast lane: the full lane runs it)"; fi
 # Engine behavior (deploy v1): build the sample bundle and run it in pwsh text mode.
-if changed '^(engine/|tests/|schemas/|assets/|docs/window-design\.md$|scripts/check_manifest\.py$|scripts/check\.local\.sh$)'; then
+if changed '^(engine/|tests/|schemas/|assets/|docs/window-design\.md$|scripts/check_manifest\.py$|scripts/check\.local\.sh$|scripts/lint\.sh$)'; then
   bash tests/engine_test.sh
   python3 tests/bundle_layout_test.py   # the Contents list and the shared blocks (docs/engine.md "Bundle layout")
+  bash scripts/lint.sh   # PSScriptAnalyzer on the built sample bundle (apps lint their bundles with the same settings)
 else
   echo "SKIP engine tests (fast lane: no file they read changed; the full lane runs them)"
 fi
