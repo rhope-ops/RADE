@@ -45,7 +45,8 @@ The Administrator, 2026-11-15. An app repo builds alone: it needs no RADE checko
 
 The Administrator, 2026-11-17 (docs/code-standard.md C5, C6; from engine-v11). A person reads a bundle before it runs, so:
 
-- After the header, a "Contents" list gives the line of each part, each embedded file and each engine part. Each part starts with a `# ==== Part k of n` line, each file with a `# ---- File i of n` line (its folder, name, source path and SHA-256) and each engine part with a `# ==== Engine part: engine/ps/<file>` line.
+- The header names each engine file with its own SHA-256 (`<file>, sha256 <12 hex>`): engine/rade_build.py, engine/rade_ui.ps1 and every engine/ps part, so an app can match a bundle to its lock.
+- After the header, a "Contents" list gives the line of each part, each embedded file and each engine part. Each part starts with a `# ==== Part k of n` line, each file with a `# ---- File i of n` line (its folder, name, source path and SHA-256) and each engine part with a `# ==== Engine part: engine/ps/<file> (sha256 <12 hex>)` line.
 - Shared blocks: a block between `# >>> <name>: generated from ...` and `# <<< <name>` that two or more text files hold is kept once in `$shared` (part 2). Each file holds one `# @@SHARED <key>@@` line in its place, and `Write-BundleFile` puts the block back before it writes the file, so each file on the computer is the same as in the app's repository. The build checks the round trip.
 
 ## Guardrails
