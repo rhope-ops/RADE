@@ -20,13 +20,6 @@
    ".claude/skills/ui-verify/measure.mjs::parse": 1,
    ".claude/skills/ui-verify/measure.mjs::ratio": 1,
    ".claude/skills/ui-verify/measure.mjs::visible": 1,
-   "engine/rade_build.py::answers_part.no": 1,
-   "engine/rade_build.py::build": 1,
-   "engine/rade_build.py::files_hash": 1,
-   "engine/rade_build.py::here": 1,
-   "engine/rade_build.py::main": 1,
-   "engine/rade_build.py::q": 1,
-   "engine/rade_build.py::text_lengths.over": 1,
    "engine/rade_ui.ps1::$ui.BreakLong": 1,
    "engine/rade_ui.ps1::$ui.Check": 1,
    "engine/rade_ui.ps1::$ui.EdgeBad": 1,
@@ -178,7 +171,6 @@
   },
   "duplicate": {},
   "file_size": {
-   "engine/rade_build.py": 2986,
    "scripts/bloat_check.py": 825,
    "scripts/pii_guard.py": 1218,
    "tests/engine_test.sh": 612
@@ -187,7 +179,6 @@
   "header": {},
   "length": {
    ".claude/skills/ui-verify/measure.mjs::audit": 65,
-   "engine/rade_build.py::build": 63,
    "scripts/bloat_check.py::self_test": 193,
    "scripts/log_check.py::check": 77,
    "scripts/pii_guard.py::_milhost_spans": 68,
