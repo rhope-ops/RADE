@@ -2258,12 +2258,12 @@ if ($gui) {
       & $ui.SetCard @{ View = 'run'; Kicker = $(if ($ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN } else { 'Starting' }); Sentence = $(if (Test-Deploy) { 'Installing ' + $script:app.Name + '.' } else { 'Running round ' + $round + '.' })
         StepRow = $true; Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { $ui.Form.Close() } })   # asks first while a step runs (the window's X does the same)
         Foot = $(if (@($ui.Guides).Count) { 'RADE needs you next at "' + (& $ui.TitleOf $ui.Guides[0]) + '". Until then, keep this window open.' } else { 'Nothing is needed from you. Keep this window open.' }) }
-      $ui.StepName.Text = (& $ui.TitleOf $ui.StepNow) }
+      $ui.StepName.Text = (& $ui.TitleOf $ui.StepNow); $null = & $ui.FitEdges }   # the edge follows the ink of the new text's first letter (titles start with any letter)
     $ui.OnStatus = { param($i, $count, $name, $estimate)
       $script:statusBase = $name; $script:stepStart = Get-Date; $script:stepEst = $estimate
       if ($i -le 1) { $null = & $ui.SetBar 'all' 0 $true }
       $ui.StepI = [int]$i; $ui.StepN = [int]$count; $ui.StepNow = [string]$name
-      if ($ui.View -ne 'run') { $null = & $ui.ShowRun } else { $ui.Kick.Text = ('Step ' + $i + ' of ' + $count).ToUpperInvariant(); $ui.StepName.Text = (& $ui.TitleOf $name) }
+      if ($ui.View -ne 'run') { $null = & $ui.ShowRun } else { $ui.Kick.Text = ('Step ' + $i + ' of ' + $count).ToUpperInvariant(); $ui.StepName.Text = (& $ui.TitleOf $name); $null = & $ui.FitEdges }
       $null = & $ui.SetBar 'step' 0 $true; $ui.StepFrac.Text = ''
       $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }
     $ui.OnStep = { param($k, $line)
