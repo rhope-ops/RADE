@@ -56,7 +56,9 @@ def stretch(m, limits):
             st["note"] = fill(st.get("note", "Note"), limits["step note"])
             st["help"] = fill(st.get("help", "Help"), limits["step help"])
             if st.get("kind") == "guide":
-                st["guide"] = [fill(g, limits["guide line"]) for g in st.get("guide", [])]
+                # as many numbered lines as the soft limit allows ('guide lines'), each at its length limit, then the unnumbered extras
+                extra = [fill(g, limits["guide line"]) for g in st.get("guide", []) if not re.match(r"\d+\. ", g)]
+                st["guide"] = [fill("%d. Select" % k, limits["guide line"]) for k in range(1, limits["guide lines"] + 1)] + extra
                 st["doneText"] = fill(st.get("doneText", "Done"), limits["doneText"])
             for a in st.get("answers", []):
                 # the text question: one long first sentence (no "?", "." or ":"), so its headline shrinks and then wraps;

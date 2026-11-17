@@ -61,13 +61,14 @@
         },
         {
           "name": "T02 Sample import r1",
+          "title": "Import the sample file",
           "dir": "T02",
           "file": "SAMPLE-T02-import-r1.zip",
           "kind": "guide",
           "guide": [
-            "Open the import page.",
-            "Choose the file on the clipboard.",
-            "Select Import."
+            "1. Select \"Open in browser\" above.",
+            "2. In the \"File name\" box, press Ctrl+V.",
+            "3. Select \"Import\"."
           ],
           "url": "https://example.invalid/import",
           "doneText": "Imported",
