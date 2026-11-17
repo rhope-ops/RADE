@@ -59,5 +59,5 @@ if __name__ == '__main__':
             sys.exit('FAIL cannot read the commit id (git rev-parse HEAD)')
         print(json.dumps({'repo': REPO, 'commit': commit, 'engine': ENGINE, 'files': files}, indent=2))
     else:
-        for p, h in files.items():
-            print('%s  %s' % (h, p))
+        # One write: a reader that stops at its first match (grep -q) cannot break the pipe in the middle of the list.
+        sys.stdout.write(''.join('%s  %s\n' % (h, p) for p, h in files.items()))

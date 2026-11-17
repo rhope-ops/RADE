@@ -4,6 +4,7 @@ A record that agents read on demand, not at start (the Administrator, 2026-11-16
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-17 | The saved runner copy (rade-runner.ps1, opened by the desktop shortcut) is replaced only by a newer RADE: a bundle whose engine release number is higher than the saved one. An older or equal paste never replaces it. Scope: R28 engine work. | the Administrator | — |
 | 2026-11-17 | AGENTS.md rule "RADE and the app", exact text approved: after its checks pass, RADE's Start button opens an installed app from that app's local copy (no download). Asked by the 90-161.Z session (its plan of 17 Nov). | the Administrator | 2026-11-14 "RADE installs apps only; it does not start them." |
 | 2026-11-17 | Desktop icon: RADE may make one shortcut that opens RADE, in the user's own Desktop folder, with no administrator rights; built and tested in round R28 of 90-161.Z; fallback the RADE page bookmark. A decision, not a rule line. | the Administrator | — |
 | 2026-11-17 | Window text is selectable: card text can be highlighted and copied (Ctrl+C, right-click Copy); same look. Engine work for R28 (docs/window-design.md "Rules that stay"). | the Administrator | — |

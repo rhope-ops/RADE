@@ -146,7 +146,7 @@ has "view=answer light=RADE is waiting for you kick=STEP 2 OF 3 · QUESTION 1 OF
 # 1b2. After a deploy that passed (R28): RADE keeps a copy of the pasted text as the installed runner, and says in plain words what it did about the
 # desktop shortcut (here no Desktop folder exists, so it says it made none; the .lnk itself is made with WScript.Shell on Windows only).
 rn="$t/wu/test1234/OneDrive - United States Air Force/RADE/rade-runner.ps1"
-[ -f "$rn" ] && grep -q "^\$buildId = '" "$rn" && grep -qF "RADE could not find your Desktop folder, so it made no desktop shortcut. Open RADE from the RADE page instead." "$t/win.txt" && ok || bad "window 1b2: installed runner copy and the desktop shortcut line"
+[ -f "$rn" ] && grep -q "^\$buildId = '" "$rn" && grep -q "^\$engineRelease = [0-9]" "$rn" && grep -qF "RADE could not find your Desktop folder, so it made no desktop shortcut. Open RADE from the RADE page instead." "$t/win.txt" && ok || bad "window 1b2: installed runner copy and the desktop shortcut line"
 # 1c. A minimized window comes back when RADE needs the person; it has its own taskbar button (Application.Run: no owner).
 # The layout line and the SCALE line at 100 %; the sizes RADE sets after the form has scaled, at 100 % (the same numbers as
 # before the one scale source: tests/window_driver.ps1 "WIN measure").

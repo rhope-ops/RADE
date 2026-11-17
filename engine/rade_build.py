@@ -794,6 +794,7 @@ function Get-NewerVersion {
   # Reads rade-release.json in the app repository (data, not code): { "apps": { "<app name>": "<version>" } }.
   # Returns that version when it is newer than the one this bundle installs, else ''. Short timeout; any failure is silent.
   # R28: in a test round too (the Administrator, 2026-11-17): the notice shows for every application that names a version.
+  if (-not [string]$script:app.Version) { return '' }   # no version: nothing to compare, no request
   try {
     try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { $null = $_ }
     $rq = [System.Net.WebRequest]::Create($releaseUrl)
@@ -838,8 +839,13 @@ if (-not $script:selfText) { try { if ($psISE -and $psISE.CurrentFile) { $script
 if (-not $script:selfText) { try { $script:selfText = [string]$MyInvocation.MyCommand.ScriptBlock } catch { $null = $_ } }
 function Save-RunnerCopy {
   # Returns $true when the runner is saved. Only the text of this bundle is saved (its build id must be in it). Never an error.
+  # Only a newer RADE replaces a saved copy (the Administrator, 2026-11-17): a copy with a higher or equal engine release stays.
   try { if (-not $script:selfText -or -not $script:selfText.Contains("`$buildId = '" + $buildId + "'")) { return $false }
-    Write-FileWhole (Join-Path (Get-RadePath) 'rade-runner.ps1') $script:selfText; return $true } catch { return $false }
+    $rp = Join-Path (Get-RadePath) 'rade-runner.ps1'
+    if (Test-Path -LiteralPath $rp -PathType Leaf) {
+      $m = [regex]::Match([IO.File]::ReadAllText($rp), '(?m)^\$engineRelease = (\d+)')
+      if ($m.Success -and [int]$m.Groups[1].Value -ge [int]$engineRelease) { return $false } }
+    Write-FileWhole $rp $script:selfText; return $true } catch { return $false }
 }
 function Set-DesktopIcon {
   # One shortcut named RADE in the user's own Desktop folder (it follows OneDrive), made once, only when missing, with no
@@ -2028,7 +2034,6 @@ if ($gui) {
         $slow = $false
         for ($j = 0; $j -lt $apps.Count; $j++) {
           if ($slow -or $ui.Newer.ContainsKey($j)) { continue }
-          if (-not [string]$apps[$j].Version) { $ui.Newer[$j] = ''; continue }   # no version: nothing to compare, no request
           $t0 = Get-Date; $script:app = $apps[$j]; $ui.Newer[$j] = [string](Get-NewerVersion); if (((Get-Date) - $t0).TotalSeconds -gt 3) { $slow = $true }
         }
         if (-not $ui.ContainsKey('NewRound')) { $ui.NewRound = [string](Get-NewerRound) }
@@ -2233,6 +2238,7 @@ if ($gui) {
       # The installed app opens from its local copy in its own powershell.exe process; then RADE closes.
       $p = Get-StartPath; if (-not $p) { & $ui.Say1 'The start file of this application was not found. Select "Install" to put it back.'; return }
       try { $pr = Start-Process -FilePath (Get-PowerShellExe) -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -STA -File "' + $p + '"') -WorkingDirectory (Split-Path -Parent $p) -PassThru
+        if ($pr) { $null = $pr.Handle }   # Windows PowerShell 5.1 keeps the exit code only when the handle is held
         # A start script that a policy blocks or that fails at once ends within a moment: say so and keep RADE open.
         if ($pr -and $pr.WaitForExit(2500) -and $pr.ExitCode -ne 0) { & $ui.Say1 ('The application stopped as soon as it started (exit code ' + $pr.ExitCode + '). Ask in the Teams channel.'); return }
         $ui.Started = $true; $ui.Form.Close() } catch { & $ui.Say1 'The application could not be started. Select "Start" again, or ask in the Teams channel.' } }
@@ -2763,7 +2769,7 @@ def build(b):
             '  The RADE window opens: press Enter (or Run); it uses your Windows profile folder. It writes the files below into the task folders under\n'
             '  C:\\Users\\<DODID>\\OneDrive - United States Air Force\\RADE\\%s (replacing older copies), runs the steps,\n'
             '  and saves its results in Rounds\\%s%s No download, no admin rights.\n'
-            '#>\n$buildId = \'%s\'\n' % (b['title'], ENGINE_SHA[:12], hashlib.sha256(ui_text.encode('ascii')).hexdigest()[:12], MANIFEST, APP['folder'], b['round'], sends, build_id))
+            '#>\n$buildId = \'%s\'\n$engineRelease = %d\n' % (b['title'], ENGINE_SHA[:12], hashlib.sha256(ui_text.encode('ascii')).hexdigest()[:12], MANIFEST, APP['folder'], b['round'], sends, build_id, ENGINE_RELEASE))
     return head + body
 
 
@@ -2837,6 +2843,9 @@ def main():
 
 
 ENGINE_SHA = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+# The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
+# The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
+ENGINE_RELEASE = 7
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':
