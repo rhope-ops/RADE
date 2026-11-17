@@ -874,7 +874,7 @@ function Add-DesktopIcon([string]$Dir) {
   # or '' when there is nothing to say.
   try { $runner = Join-Path (Get-RadePath) 'rade-runner.ps1'
     if (-not (Test-Path -LiteralPath $runner -PathType Leaf)) { return '' }
-    $desk = $(if ($Dir) { $Dir } else { Get-DesktopDir }); $isDesk = (-not $Dir -or $Dir -eq (Get-DesktopDir))
+    $desk = $(if ($Dir) { $Dir } else { Get-ShortcutDir }); $isDesk = (-not $desk -or $desk -eq (Get-DesktopDir))   # no folder given: the one chosen before (review of PR 78), else the Desktop
     if (-not $desk -or -not (Test-Path -LiteralPath $desk -PathType Container)) { return $(if ($isDesk) { 'RADE could not find your Desktop folder, so it made no desktop shortcut. Open RADE from the RADE page instead.' } else { 'RADE could not find the folder you chose, so it made no shortcut. Open RADE from the RADE page instead.' }) }
     $lnk = Join-Path $desk 'RADE.lnk'
     if (Test-Path -LiteralPath $lnk) { return '' }
@@ -1853,7 +1853,7 @@ if ($gui) {
       try { $n = [int]$ui.Guide.TextLength; if ($n -gt 0) { $pt = $ui.Guide.GetPositionFromCharIndex($n - 1); $lf = $(if (@($ui.GuideRest).Count) { $ui.F.Small } else { $ui.F.Body }); $h = [math]::Max($h, [int]$pt.Y + [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $lf).Height) } } catch { $null = $_ }
       return $h }
     $ui.GuideFit = { if ($ui.InGuideFit) { return }; $ui.InGuideFit = $true
-      try { if ($ui.Guide.Visible) { $w = [int]$ui.ContentW; $h = [math]::Max(1, (& $ui.GuideNeed) + (& $ui.Sc 2)); if ($ui.Guide.Width -ne $w) { $ui.Guide.Width = $w; $h = [math]::Max(1, (& $ui.GuideNeed) + (& $ui.Sc 2)) }; if ($ui.Guide.Height -ne $h) { $ui.Guide.Height = $h } } } catch { $null = $_ } finally { $ui.InGuideFit = $false } }
+      try { if ($ui.Guide.Visible) { $w = [int]$ui.ContentW; $h = [math]::Max(1, (& $ui.GuideNeed) + (& $ui.Sc 2)); if ($ui.Guide.Width -ne $w) { $ui.GuideH = 0; $ui.Guide.Width = $w; $h = [math]::Max(1, (& $ui.GuideNeed) + (& $ui.Sc 2)) }; if ($ui.Guide.Height -ne $h) { $ui.Guide.Height = $h } } } catch { $null = $_ } finally { $ui.InGuideFit = $false } }
     # Where the ink of the guide's first number starts in the box: the place of the letter (as the box lays it out) plus the
     # letter's own left side (drawn once into a bitmap). A rich text box cannot be drawn into a bitmap, so $ui.Ink cannot measure it.
     $ui.Bearing = { param([string]$Ch, $F)
@@ -2305,7 +2305,7 @@ if ($gui) {
         Foot = $(if ($siteName) { 'Site: ' + $siteName } else { '' })
         Field = $(if ($dep -and -not (Test-ShortcutMade)) { @{ Label = 'RADE shortcut in'; Text = (Get-ShortcutDir); Name = 'Folder for the RADE shortcut'; Button = 'Browse'; Act = { & $ui.BrowseDir } } } else { $null })
         Back = { & $ui.VChoose } }
-      if ($ui.StartAfter) { $ui.StartAfter = $false; if ($startB) { & $ui.StartApp } } }   # Start on Maintenance: the checks passed, so the application starts
+      if ($ui.StartAfter) { $ui.StartAfter = $false; if ($startB) { & $ui.StartApp } else { & $ui.Say1 ('The checks passed, but ' + $script:app.Name + ' cannot be started: it is not recorded as installed, or its start file was not found. Select "Install" to install it again.') } } }   # Start on Maintenance: the checks passed, so the application starts
     # R29 N8 (the PFM, 17 Nov 26): the install asks where the RADE shortcut goes; the box starts with the Desktop folder.
     $ui.BrowseDir = {
       $pick = New-Object System.Windows.Forms.FolderBrowserDialog
