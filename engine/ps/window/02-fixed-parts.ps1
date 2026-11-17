@@ -1,3 +1,6 @@
+# RADE window part 02, the fixed parts: the status light, the logo line, the bottom line (Record and Back
+# links) and the progress bars with the timer that eases them. Builds on 01-setup.ps1.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 # ---- The fixed parts: the light (6 px), the logo line, the card, the bottom line and the bar on the bottom edge.
 $ui.Light = New-Object System.Windows.Forms.Panel
 $ui.Light.Dock = 'Top'; $ui.Light.Height = 6; $ui.Light.BackColor = $ui.C.White; $ui.Light.AccessibleRole = 'StaticText'; $ui.Light.AccessibleName = 'Status light: off'
@@ -26,11 +29,15 @@ $ui.Bottom.Controls.Add($ui.RecB, 0, 0); $ui.Bottom.Controls.Add($ui.BackB, 1, 0
 # Bars: RADE draws them (R17). A 30 ms timer eases the fill to its value; with Windows animations off it jumps. No bar
 # moves back inside a run (all) or a step (step). The bar on the bottom edge is all steps; the short one is this step.
 $ui.DrawBar = { param($P, $G) try { $b = $ui.Bars[[string]$P.Tag]; $G.Clear($(if ($b.On) { $ui.C.Track } else { $ui.C.White })); $fw = [int][math]::Round($P.ClientSize.Width * $b.Shown); if ($b.On -and $fw -gt 0) { $br = New-Object System.Drawing.SolidBrush($b.Fill); $G.FillRectangle($br, 0, 0, $fw, $P.ClientSize.Height); $br.Dispose() } } catch { $null = $_ } }
+# Makes one thin progress bar (a panel the engine draws itself) and registers it in $ui.Bars. Takes the bar name and its
+# screen-reader label; gives back the panel.
 $ui.MkBar = { param([string]$Name, [string]$Label)
   $p = New-Object System.Windows.Forms.Panel; $p.Height = 4; $p.Tag = $Name; $p.AccessibleRole = 'ProgressBar'; $p.AccessibleName = $Label; $p.AccessibleDescription = '0 %'
   try { [System.Windows.Forms.Control].GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]'NonPublic, Instance').SetValue($p, $true, $null) } catch { $null = $_ }
   $ui.Bars[$Name] = @{ Panel = $p; Target = 0.0; Shown = 0.0; On = $false; Fill = $ui.C.Blue }
   $p.Add_Paint({ & $ui.DrawBar $this $_.Graphics }); $p }
+# Sets what a bar shows. Takes the bar name, the fraction (0 to 1) and whether it is on; the fill eases to it, and a
+# smaller value jumps back at once. Gives back nothing.
 $ui.SetBar = { param([string]$Name, [double]$Value, [bool]$On)
   $b = $ui.Bars[$Name]; $v = [math]::Max(0.0, [math]::Min(1.0, $Value))
   if ($v -lt $b.Target - 0.001 -or $ui.Calm) { $b.Shown = $v }   # a new step starts at 0 with no slide back

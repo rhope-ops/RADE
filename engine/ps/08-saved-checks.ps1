@@ -1,3 +1,6 @@
+# RADE engine part 08, saved checks: keeps each check that passed in RADE\Config\rade-checks.json and
+# decides whether a later run may skip it (age, computer, PowerShell and PnP versions, scope). Uses 07-checks.ps1.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 # ---- Saved checks (PFM 14 Nov 26, R17): RADE\Config\rade-checks.json keeps each check that PASSED, so a later run (of
 # any app on this computer) can skip it. A saved result is used only when it is at most $checkMaxDays days old, the
 # PowerShell and PnP versions and the computer are the same, and its scope (the site or the Power Automate address, as a
@@ -6,6 +9,8 @@ $checkMaxDays = 7
 # Checks whose answer can change between two runs on the same day always run (review R17 MAJOR 2: "Word is open" blocks a
 # deploy, PFM 14 Nov 26 1B; free space; a test file in OneDrive).
 $checkNoSave = @('nipr', 'word', 'disk', 'write')
+# Gives the first 6 bytes (12 hex characters) of the SHA-256 of the text, lower case and without a trailing "/". Takes
+# the text; gives back the hash, or an empty text for no text.
 function Get-ShortHash([string]$Text) {
   if (-not $Text) { return '' }
   $sha = [System.Security.Cryptography.SHA256]::Create()
@@ -24,6 +29,8 @@ function Get-CheckScope([string]$Id, [string]$Base, [string]$Site) {
   if ($Id -in 'net-flow', 'flow-guide') { return ('flow:' + (Get-ShortHash (Get-FlowPortal $Base).Url)) }
   return ''
 }
+# Reads the saved checks from RADE\Config\rade-checks.json. Takes nothing; gives back a table of saved results, empty
+# when the file is missing or was made on another computer, PowerShell or PnP version.
 function Read-CheckCache {
   $p = Get-RadeConfigFile 'rade-checks.json'
   $res = @{}

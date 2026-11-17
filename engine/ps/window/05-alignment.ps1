@@ -1,3 +1,6 @@
+# RADE window part 05, alignment and layout: centers a row of controls, breaks and fits long text, keeps the
+# card inside the window (Squeeze) and runs the layout self-check. Builds on 03-card.ps1.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 # ---- Alignment (the Administrator, 2026-11-15, after the R24 pictures; docs/window-design.md "Sizes"). An aligned row:
 # its parts share one vertical midpoint (each part's top margin is set from the tallest part). One left edge per card:
 # a label draws its text after a padding that grows with its font (Windows text padding: about 1/6 of the line), so a
@@ -17,6 +20,8 @@ $ui.FitEdges = { try {
     $l1 = @($ui.LinkRow.Controls | Where-Object { $_.Visible })[0]; if ($l1) { & $ui.SetLeft $ui.LinkRow ($x - $mm - (& $ui.Ink $l1)) }   # a link's text is in the middle of its box
     if ($ui.Guide.Visible) { & $ui.SetLeft $ui.Guide ($x - (& $ui.GuideInk)) }   # the widest number sits on the edge; shorter ones are right-aligned to it
     & $ui.SetLeft $ui.Opts $x } catch { $null = $_ } }
+# Centers a row of controls up and down by changing their top and bottom margins. Takes the controls and the top margin
+# of the row; gives back nothing.
 $ui.AlignRow = { param($Parts, [int]$Base)
   try { $hs = @($Parts | ForEach-Object { if ($_.AutoSize) { [int]$_.PreferredSize.Height } else { [int]$_.Height } }); $hh = [int]($hs | Measure-Object -Maximum).Maximum
     for ($i = 0; $i -lt $Parts.Count; $i++) { $m = $Parts[$i].Margin; $t = $Base + [int][math]::Floor(($hh - $hs[$i]) / 2); $b = $Base + $hh - $hs[$i] - ($t - $Base)
@@ -31,10 +36,14 @@ $ui.SentFonts = @{}
 # Every text the window puts into a wrapping label of the card: a word wider than the line is broken (M3 review). A
 # label's text set elsewhere since the last break (for example a note) is taken as its new text.
 $ui.Raw = @{}
+# Re-breaks the long words of every card text so each line fits its width. Takes nothing; changes the label texts (the
+# raw text is kept in $ui.Raw).
 $ui.BreakAll = { foreach ($l in @($ui.Kick, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathT, $ui.LastLog, $ui.StepName, $ui.Note, $ui.Help, $ui.Foot, $ui.Close)) {
     try { $w = [int](& $ui.GetWrap $l); if ($w -le 0 -or -not $l.Text) { continue }
       $e = $ui.Raw[$l]; $raw = $(if ($e -and [string]$l.Text -ceq [string]$e.Out) { [string]$e.Raw } else { [string]$l.Text })
       $b = & $ui.BreakLong $raw $l.Font $w; $ui.Raw[$l] = @{ Raw = $raw; Out = $b }; if ([string]$l.Text -cne $b) { $l.Text = $b } } catch { $null = $_ } } }
+# Fits the headline: on an answer card the font shrinks, not below the body size, until the text fits one line; then it
+# breaks long words and calls $ui.BreakAll. Takes nothing; changes $ui.Sent.
 $ui.FitSent = { try {
     $f = $ui.F.Sent; $w = [int](& $ui.GetWrap $ui.Sent); $t = [string]$ui.SentRaw
     if ($ui.View -eq 'answer') { $pt = [double]$ui.F.Sent.SizeInPoints / $ui.FontK; $floor = [math]::Max($pt * 0.6, [double]$ui.F.Body.SizeInPoints / $ui.FontK)
@@ -60,6 +69,8 @@ $ui.Apart = {
     if ($prev -lt 0) { return }
     if ($left -ge (& $ui.Sc 32)) { $ui.B[$n].Margin = (& $ui.Pad ([int]$left) $mm $mm $mm) } else { $ui.BtnRow.SetFlowBreak($ui.B[$prev], $true) }
   } catch { $null = $_ } }
+# Lets the card scroll when it is taller than the window, so the buttons stay in view. Takes nothing; sets the size of
+# $ui.Scroll and $ui.Scrolls.
 $ui.Squeeze = {
   if (-not $ui.Scaled) { return }
   # The body is as tall as its parts. Only when the card is then taller than the window, the body gets the height
@@ -72,6 +83,8 @@ $ui.Squeeze = {
   } catch { $null = $_ } finally { $ui.InSqueeze = $false } }
 $ui.Body.Add_SizeChanged({ & $ui.Squeeze }); $ui.Tail.Add_SizeChanged({ & $ui.Squeeze })
 $ui.Card.Add_SizeChanged({ try { & $ui.Fit } catch { $null = $_ } })
+# Counts how many lines a text takes at a width, at least 1 and at most a limit (0 for no text). Takes the text, font,
+# width, one line's height and the limit; gives back the number.
 $ui.Rows = { param([string]$Text, $Font, [int]$W, [int]$LineH, [int]$Most) if (-not $Text) { return 0 }; [math]::Min($Most, [math]::Max(1, [int][math]::Round((& $ui.Meas $Text $Font $W).Height / [math]::Max(1, $LineH)))) }
 $ui.OptPlan = { param($o, [int]$w)
   # Where the parts of one choice go, and how tall it is. The name gets its width first. The two facts stay on the
@@ -170,6 +183,8 @@ $ui.Scale = {
     return ('SCALE dpiX=' + [int]$ui.ScreenDpi + ' deviceDpi=' + $dd + ' mode=' + [string]$f.AutoScaleMode + ' asd=' + [int]$sd.Width + 'x' + [int]$sd.Height + ' autoScale=' + [int]$as.Width + 'x' + [int]$as.Height + ' font=' + [int]$f.Font.Height + ' fontPt=' + $f.Font.SizeInPoints + ' fontScale=' + $ui.FontK + ' ctlScale=' + [math]::Round($ui.Dpi / 96.0, 2) + ' realDpi=' + $rd + ' aware=' + $aw + ' screen=' + $sn.Bounds.Width + 'x' + $sn.Bounds.Height +
       ' work=' + $sn.WorkingArea.Width + 'x' + $sn.WorkingArea.Height + ' client=' + $f.ClientSize.Width + 'x' + $f.ClientSize.Height + ' state=' + [string]$f.WindowState + ' logo=' + $lg + ' btn=' + $bt + ' shown=' + $(if ($ui.ShownAt) { $ui.ShownAt } else { 'n/a' }) + ' placed=' + $ui.Placed + ' lastClose=' + $(if ($ui.LastClose) { $ui.LastClose } else { 'n/a' }))
   } catch { return ('SCALE could not be read: ' + (ConvertTo-Masked ([string]$_.Exception.Message))) } }
+# Gives the result of the layout self-check: its pass line, or the defects found, with the window size and scale. Takes
+# nothing; gives back the text.
 $ui.LayLine = {
   & $ui.Check
   $pct = [int][math]::Round($ui.Dpi / 96.0 * 100); $sp = [int][math]::Round($ui.ScreenDpi / 96.0 * 100)   # the form's scale (the one source); the screen dpi beside it when it differs
@@ -177,6 +192,7 @@ $ui.LayLine = {
   $sc = $(if ($ui.LayScroll.Count) { '; the text scrolls on: ' + ((@($ui.LayScroll.Keys) | Sort-Object) -join ', ') } else { '' })
   if ($ui.LayBad.Count) { return ('Layout self-check: ' + $ui.LayBad.Count + ' defects in ' + $ui.LayCards.Count + ' cards (' + $size + ')' + $sc + "`r`n" + (& $ui.Scale) + "`r`n" + (@($ui.LayBad) -join "`r`n")) }
   return ('Layout self-check: PASS layout, ' + $ui.LayCards.Count + ' cards (' + $size + ')' + $sc + "`r`n" + (& $ui.Scale)) }
+# Sets a label's text and shows it only when the text is not empty. Takes the label and the text; gives back nothing.
 $ui.Show = { param($C, [string]$Text) $C.Text = $Text; $C.Visible = [bool]$Text }
 $ui.SetCard = { param($c)
   # Shows one card. $c names the parts: View, Light ('you' = yellow, 'bad' = dark red), Kicker, Sentence, Tick, P (up to 4

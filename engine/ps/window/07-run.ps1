@@ -1,6 +1,11 @@
+# RADE window part 07, the run: the callbacks Invoke-Round uses (log line, tick, step state), the Run button,
+# and the Done, Needs review and Stopped cards. Uses the card parts and Invoke-Round.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 # ---- The run. Invoke-Round calls back: a log line ($ui.Say), a tick ($ui.Tick), a step that starts ($ui.OnStatus) and
 # a step that ends ($ui.OnStep). A step you do by hand comes in through $script:guideUi.
 $ui.Say = { param($t) Add-RunLog $t; $ui.Log.Add([string]$t); $x = ([string]$t).Trim(); if ($x -and $ui.View -eq 'run') { & $ui.Show $ui.LastLog (& $ui.BreakLong $x $ui.LastLog.Font (& $ui.GetWrap $ui.LastLog)) }; if ($ui.RecOn) { try { $ui.RecText.AppendText([string]$t + "`r`n") } catch { $null = $_ } }; try { [System.Windows.Forms.Application]::DoEvents() } catch { $null = $_ } }
+# Draws the progress: both bars, the time in the step, the step fraction and the overall percent with the time left
+# (only when earlier runs give one). Takes nothing; does nothing when no step runs.
 $ui.Paint = {
   if (-not $script:prog -or -not $script:stepStart) { return }
   $g = Get-Progress
@@ -13,6 +18,7 @@ $ui.Paint = {
 # The time in this step (R28 N10): "4m 12s"; with hours "1h 04m 12s".
 $ui.Elapsed = { param([double]$Sec) $q = [int][math]::Floor([math]::Max(0, $Sec)); $h = [int][math]::Floor($q / 3600); $m = [int][math]::Floor(($q % 3600) / 60); $x = $q % 60
   if ($h) { return ('{0}h {1:00}m {2:00}s' -f $h, $m, $x) }; return ('{0}m {1:00}s' -f $m, $x) }
+# Shows the time in this step on the step line, once for each second. Takes nothing; a failure is ignored.
 $ui.ShowTime = { try { if ($ui.View -eq 'run' -and $script:stepStart) { $t = & $ui.Elapsed ((Get-Date) - $script:stepStart).TotalSeconds; if ($ui.StepTime.Text -ne $t) { $ui.StepTime.Text = $t } } } catch { $null = $_ } }
 $ui.TimeT = New-Object System.Windows.Forms.Timer; $ui.TimeT.Interval = 1000; $ui.TimeT.Add_Tick({ & $ui.ShowTime })
 $ui.Tick = { $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }   # a callback must emit nothing: its output would join the engine function's return value
@@ -29,10 +35,14 @@ $ui.OnStatus = { param($i, $count, $name, $estimate)
   if ($ui.View -ne 'run') { $null = & $ui.ShowRun } else { $ui.Kick.Text = ('Step ' + $i + ' of ' + $count).ToUpperInvariant(); $ui.StepName.Text = (& $ui.TitleOf $name); $null = & $ui.FitEdges }
   $null = & $ui.SetBar 'step' 0 $true; $ui.StepFrac.Text = ''; $null = & $ui.ShowTime
   $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }
+# Called when a step ends: keeps its state word (DONE, PASSED, SKIPPED, ...) from the result line and redraws. Takes the
+# step number and its result line.
 $ui.OnStep = { param($k, $line)
   $nm = [string]$steps[$k].Name + ': '; $rest = [string]$line; if ($rest.StartsWith($nm, [System.StringComparison]::Ordinal)) { $rest = $rest.Substring($nm.Length) }
   $st = 'DONE'; foreach ($w in 'NEEDS REVIEW', 'FAILED', 'SKIPPED', 'PASSED') { if ($rest.StartsWith($w, [System.StringComparison]::Ordinal)) { $st = $w; break } }
   $ui.StepState[[int]$k] = $st; $null = & $ui.Paint }
+# Gives the "Window: OK" or "Window: NOT OK" line for the report, with the layout self-check when it is on. Takes
+# nothing; gives back the text.
 $ui.WindowLine = { $w = $(if ($ui.OkBox.Checked) { 'Window: OK' } else { 'Window: NOT OK - write here what overlapped or was cut off' }); if ($ui.LayOn -and ($env:RADE_LAYOUT -eq '1' -or -not (Test-Deploy))) { $w + "`r`n" + (& $ui.LayLine) } else { $w } }
 $ui.StartApp = {
   # The installed app opens from its local copy in its own powershell.exe process; then RADE closes.
@@ -42,6 +52,8 @@ $ui.StartApp = {
     # A start script that a policy blocks or that fails at once ends within a moment: say so and keep RADE open.
     if ($pr -and $pr.WaitForExit(2500) -and $pr.ExitCode -ne 0) { & $ui.Say1 ('The application stopped as soon as it started (exit code ' + $pr.ExitCode + '). Ask in the Teams channel.'); return }
     $ui.Started = $true; $ui.Form.Close() } catch { & $ui.Say1 'The application could not be started. Select "Start" again, or ask in the Teams channel.' } }
+# Starts the run: saves the shortcut folder, asks for the folder some steps need, then calls Invoke-Round with the
+# window callbacks and shows Done, Needs review or Stopped. Takes nothing.
 $ui.Run = {
   $ui.LinkDir = ''; $ui.FieldAsked = $false
   if ($ui.View -eq 'ready' -and $ui.FieldRow.Visible -and $ui.FieldL.Text -eq 'RADE shortcut in') {   # R29 N8: the folder for the RADE shortcut
@@ -86,10 +98,14 @@ $ui.MadeText = {
   if (-not $c.Count) { return '' }
   $parts = @(); foreach ($k in @($c.Keys)) { $parts += ([string]$c[$k] + ' ' + $k + $(if ($c[$k] -ne 1) { 's' } else { '' })) }
   return ('The installs of this application made: ' + ($parts -join ', ') + '.') }
+# Copies the summary (else the log) to the clipboard and says "Copied.". Takes nothing.
 $ui.Copy = {
   $t = $(if (@($ui.Summary).Count) { @($ui.Summary) } else { @($ui.Log) }) -join "`r`n"
   try { [System.Windows.Forms.Clipboard]::SetText($t); & $ui.Say1 'Copied.' } catch { & $ui.Say1 'The clipboard is busy. Select the button again.' } }
+# Opens the results folder in Explorer, when there is one. Takes nothing.
 $ui.Open = { if ($script:resultsDir) { Start-Process -FilePath 'explorer.exe' -ArgumentList ('"' + $script:resultsDir + '"') } }
+# Shows the card at the end of a run: Done when every step passed, else Needs review with the first problem. Copies the
+# summary and opens the folder in a test round. Takes nothing.
 $ui.VDone = {
   $sum = @($ui.Summary); $dep = Test-Deploy; $bad = ([string]$sum[0] -match 'NEEDS REVIEW'); $made = ''; if ($dep) { $made = [string](& $ui.MadeText) }
   $took = Format-Duration ((Get-Date) - $script:roundStart).TotalSeconds
@@ -119,6 +135,8 @@ $ui.VDone = {
   }
   if (-not $dep) { & $ui.Copy; if (-not $script:draftMade) { & $ui.Open } }   # a test round: the summary is on the clipboard, and with no draft the folder opens
   & $ui.ToFront }
+# Shows the Stopped card with why the run stopped and what to do. Takes the reason and the help text; does nothing when
+# the window is closing.
 $ui.VStopped = { param([string]$Why, [string]$What)
   if ($script:closing -or $ui.Form.IsDisposed) { return }
   $dep = Test-Deploy

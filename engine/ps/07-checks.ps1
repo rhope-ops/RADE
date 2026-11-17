@@ -1,3 +1,6 @@
+# RADE engine part 07, the checks: the NIPR guard, the site address, the web and sign-in checks, the install
+# record on the site, and Invoke-Check, which runs one check. Its results are saved by 08-saved-checks.ps1.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 # ---- Checks (PFM 14 Nov 26: RADE checks, from its window, that this computer can install the chosen app and
 # that the PFM has the rights to see it done end to end). Read-only except: one test file in the OneDrive folder and one
 # temporary script in the Windows temp folder, each deleted at once, and the site address in Config when the PFM enters it.
@@ -26,8 +29,12 @@ $dot = ' ' + [char]0x00B7 + ' '   # a middle dot between facts, made at run time
 # full name (host name and its domain: two local values; nothing is sent and no host is contacted) and goes on only when
 # that name contains the NIPR domain label below. It cannot prove NIPR; it stops an honest mistake. The name is never shown or saved.
 $niprLabel = '.area52.'
+# Reads this computer's own host name and domain name (two local values; no host is contacted). Takes nothing; gives
+# back "host.domain", or an empty text on an error.
 function Get-OwnFqdn { try { $g = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties(); return [string]$g.HostName + '.' + [string]$g.DomainName } catch { return '' } }
+# Says whether this computer's full name has the NIPR domain label. Takes nothing; gives back $true or $false.
 function Test-NiprDevice { return ([string](Get-OwnFqdn)).Trim().ToLowerInvariant().Contains($niprLabel) }
+# Finds the definition of a check by its id. Takes the id; gives back the definition, or $null.
 function Get-CheckDef([string]$Id) { foreach ($d in $checkDefs) { if ($d.Id -eq $Id) { return $d } }; return $null }
 function Get-SiteUrl([string]$Base) {
   # Config\@@PREFIX@@-site.txt: the same file T16 site setup keeps (one place for the site address; never in the repo).
@@ -39,6 +46,8 @@ $sitePrefix = 'https://usaf.dps.mil/sites/'   # the DAF SharePoint address every
 # Guardrail (the Administrator, 14 Nov 26): only a site on the DAF SharePoint host is accepted, so RADE never signs in to
 # or writes to another host.
 function Test-SiteUrl([string]$Url) { return ($Url -match ('^' + [regex]::Escape($sitePrefix) + '[^/\\\s"]+/?$')) }
+# Writes the site address to Config\<prefix>-site.txt, creating the folder if needed. Takes the base folder and the
+# address; gives back nothing.
 function Save-SiteUrl([string]$Base, [string]$Url) {
   $p = Get-ConfigFile $Base '@@PREFIX@@-site.txt'
   $dir = Split-Path -Parent $p
@@ -179,6 +188,8 @@ function Get-MarkerArg {
   if (-not $m) { return '' }
   return (' -MarkerList "' + $m.List + '" -MarkerKey "' + $m.Key + '" -MarkerField "' + $m.Field + '"')
 }
+# Gives a short hash that stands for a site address (so the record never holds the address). Takes the site address;
+# gives back the hash, or an empty text when the address is not valid.
 function Get-SiteMark([string]$Site) {
   if (-not (Test-SiteUrl $Site)) { return '' }
   return (Get-ShortHash $Site.Trim().TrimEnd('/').ToLowerInvariant())
@@ -190,6 +201,8 @@ function Test-InstalledHere {
   $e = (Read-Installed (Get-InstalledKey $script:app))
   return [bool]($e -and $e.steps -and $e.steps.Count)
 }
+# Says whether this is a deploy of an app that keeps a row on the site and this account has not installed it on that
+# site yet. Takes nothing; gives back $true or $false.
 function Test-FirstInstall { return ((Test-Deploy) -and [bool]$script:app.Marker -and -not (Test-InstalledHere)) }
 $markerScript = @'
 param([string]$Site, [string]$MarkerList, [string]$MarkerKey, [string]$MarkerField, [string]$Value)

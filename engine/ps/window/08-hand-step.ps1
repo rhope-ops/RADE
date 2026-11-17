@@ -1,3 +1,6 @@
+# RADE window part 08, a hand step: the cards for a step the user does by hand (It failed, questions,
+# open the address) and $script:guideUi, which the engine waits in until the user answers.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 # ---- A step you do by hand, or a check you answer by looking (R13, R14, R18): the card holds the numbered lines, the
 # address (it can be changed; it is remembered in Config), the file path on the clipboard, and the answers. The engine
 # waits in $script:guideUi until an answer is set: OK = Done or Yes, No, Abort = It failed (with the error text),
@@ -13,12 +16,16 @@ $ui.VHand = {
     Field = $(if ($addr) { @{ Label = 'Address'; Text = $ui.GUrl; Name = 'Address to open'; Button = 'Open in browser'; Act = { & $ui.OpenUrl } } } else { $null }); Path = $file; Links = [bool]$file; Note = $clip
     Buttons = @(@{ Text = $dw; Kind = 'primary'; Act = { $ui.Answer = 'OK' } }, $two, @{ Text = $(if ($st.SkipText) { [string]$st.SkipText } else { 'Skip' }); Act = { $ui.Answer = 'Cancel' } })
     Right = 'RADE is waiting for you'; NoAccept = $true; Focus = $(if ($addr) { 'fieldbutton' } else { 'text' }) } }
+# Shows the card where the user pastes the error of a hand step that failed; its button sets the answer to Abort. Takes
+# nothing.
 $ui.VHandFail = {
   & $ui.SetCard @{ View = 'handfail'; Light = 'you'; Kicker = 'It failed'; Sentence = 'What did the error say?'; P = @('Paste the error message here. Do not include names or a site address.'); Err = $true
     Buttons = @(@{ Text = 'Report the failure'; Kind = 'primary'; Act = { $script:guideError = [string]$ui.ErrBox.Text; $ui.Answer = 'Abort' } }, @{ Text = 'Back'; Act = { & $ui.VHand } }); Right = 'RADE is waiting for you'; NoAccept = $true; Focus = 'err' } }
 # A question of a hand step (manifest "answers"), after Done: the prompt is the sentence; yes/no and pick answer with
 # one button per word, a text with one line (2,000 characters at most; empty is allowed; R28: kept whole) and "Continue". No Back.
 $ui.ReplyActs = @({ $ui.Reply = [string]$ui.B[0].Text }, { $ui.Reply = [string]$ui.B[1].Text }, { $ui.Reply = [string]$ui.B[2].Text }, { $ui.Reply = [string]$ui.B[3].Text })
+# Shows one question of a hand step (text, yes or no, or a pick). The first sentence of the prompt is the headline.
+# Takes the question, its number and the count; the answer is set in $ui.Reply.
 $ui.VAnswer = { param($Q, [int]$I, [int]$N)
   $ui.Reply = $null
   $c = @{ View = 'answer'; Light = 'you'; Kicker = ($(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot } else { '' }) + 'Question ' + $I + ' of ' + $N); Sentence = [string]$Q.Prompt; Right = 'RADE is waiting for you' }
@@ -28,6 +35,8 @@ $ui.VAnswer = { param($Q, [int]$I, [int]$N)
   if ($Q.Kind -eq 'text') { $c.Field = @{ Label = 'Your answer'; Text = ''; Name = [string]$Q.Prompt; Max = 2000 }; $c.Focus = 'field'; $c.Buttons = @(@{ Text = 'Continue'; Kind = 'primary'; Act = { $ui.Reply = [string]$ui.Field.Text } }) }
   else { $ws = @($(if ($Q.Kind -eq 'yesno') { 'Yes', 'No' } else { $Q.Choices })); $c.Buttons = @(for ($k = 0; $k -lt $ws.Count; $k++) { @{ Text = [string]$ws[$k]; Act = $ui.ReplyActs[$k] } }) }
   & $ui.SetCard $c }
+# Opens the address in the box in the browser and remembers it (also in its file). Takes nothing; says so when the
+# address does not start with https://.
 $ui.OpenUrl = {
   $u = $ui.Field.Text.Trim()
   if ($u -notmatch '^https://') { & $ui.Say1 'The address must start with https://'; return }
@@ -36,6 +45,8 @@ $ui.OpenUrl = {
 $ui.CopyPathB.Add_Click({ & $ui.Say1 $(if (Copy-TextToClipboard ([string]$ui.G.File)) { 'File path copied. Press Ctrl+V in the "File name" box' } else { 'The clipboard is busy. Select "Copy file path" again.' }) })
 $ui.PageB.Add_Click({ try { Start-Process -FilePath $radeUrl } catch { & $ui.Say1 'The browser could not be opened. Open the RADE page from your bookmarks.' } })
 $ui.ShowFileB.Add_Click({ if ($ui.G.File) { Start-Process -FilePath 'explorer.exe' -ArgumentList ('/select,"' + $ui.G.File + '"') } })
+# Shows a hand step and waits until the user answers, then asks the step's questions. Takes the step, the file path, the
+# address and the address file; gives back OK, Abort or Cancel.
 $script:guideUi = { param($Step, [string]$File, [string]$Url, [string]$UrlFile)
   $ui.G = @{ Step = $Step; File = $File; UrlFile = $UrlFile }; $ui.GUrl = $Url; $script:guideError = ''; $ui.Answer = ''; $was = $ui.Busy; $ui.Busy = $false
   $null = & $ui.VHand; $null = & $ui.ToFront

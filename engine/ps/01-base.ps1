@@ -1,18 +1,28 @@
+# RADE engine part 01, the base: finds the user's OneDrive and RADE folders, masks the DODID in text,
+# moves an old app folder into OneDrive\RADE, and resolves the working folder. Used by every later part.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 # ---------------- RADE, the Redacted Application Deployment Engine (generated; same engine in every round bundle) ----------------
 function Get-Secret([string]$Id, [string]$Leaf) {
   @($Id, $Leaf, $env:USERNAME) | Where-Object { $_ -and $_.Length -ge 4 } | Sort-Object -Unique | Sort-Object Length -Descending
 }
+# Replaces every secret (the DODID, the profile folder name, the user name) in the text with <DODID>. Takes the text;
+# gives back the masked text.
 function ConvertTo-Masked([string]$Text) {
   foreach ($x in $script:secret) { $Text = $Text -replace [regex]::Escape($x), '<DODID>' }
   return $Text
 }
+# Gives the name of the Windows profile folder (the DODID); an empty text when there is none. Takes nothing.
 function Get-ProfileLeaf { if ($env:USERPROFILE) { return (Split-Path -Leaf $env:USERPROFILE) }; return '' }
+# Gives the path of the user's OneDrive folder (under $usersRoot, from the profile folder name). It only builds the
+# path; takes nothing.
 function Get-OneDrivePath {
   $leaf = Get-ProfileLeaf
   if (-not $leaf) { $leaf = 'no-profile-folder' }
   return (Join-Path (Join-Path $usersRoot $leaf) 'OneDrive - United States Air Force')
 }
+# Gives the path of the RADE folder inside OneDrive (OneDrive\RADE). Takes nothing; creates nothing.
 function Get-RadePath { return (Join-Path (Get-OneDrivePath) 'RADE') }
+# Gives the path of the app's old folder (OneDrive\<app>), from before RADE had its own folder. Takes nothing.
 function Get-OldBasePath { return (Join-Path (Get-OneDrivePath) $appFolder) }
 function Get-BasePath {
   # The real path (shown on screen, PFM 13 Nov: no placeholder). Reports and e-mails show <DODID> instead.

@@ -1,3 +1,6 @@
+# RADE window part 06, the opening views: boot, Choose (pick an application), the site address card, and the
+# check cards (needs you, failed). Uses the card of 03-card.ps1 and the engine checks.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 # ---- When the window opens: the Local checks of every application in the paste run once (base checks before Choose).
 # An application with a FAILED one cannot be chosen. A newer version on the RADE page is read here too (test and deploy).
 $ui.RunBase = {
@@ -30,6 +33,8 @@ $ui.VBootErr = { param([string]$Why)
     P = @($Why, 'Nothing was changed.', 'What to do: select "Try again". If it stops again, ask in the Teams channel.'); Help = (Get-HelpLine)
     Buttons = @(@{ Text = 'Try again'; Kind = 'primary'; Act = { & $ui.Boot } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } }) }
   & $ui.ToFront }
+# Shows the Choose card: one option for each application, off when one of its checks failed. Takes nothing; selects the
+# first application and sets the card.
 $ui.VChoose = {
   if (@($apps).Count -eq 0) { & $ui.VNoApps; return }
   Select-App 0; $ui.Picked = $false; $ui.Plan = $null; $ui.StartAfter = $false; $ui.AppL.Text = ''; $list = @(); $dep = $false; $ui.Blocked = @{}; $ui.BlockedFix = @{}
@@ -46,11 +51,16 @@ $ui.VChoose = {
     P = @($(if ($nr) { 'A newer round, ' + $nr + ', is in the repository. Close this window and run ' + $nr + ' instead.' } else { '' })); Options = $list; OnOption = { param($j) & $ui.Pick $j }
     PageLink = [bool](@($ui.Newer.Values | Where-Object { $_ }).Count)
     Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Act = { & $ui.Boot } } } else { $null })); Foot = $(if ($dep) { '' } else { Get-LastRoundText $ui.Hist }) } }
+# Shows "Checking this computer", runs the base checks and then shows Choose; shows the error card when they stop. Takes
+# nothing.
 $ui.Boot = {
   & $ui.SetCard @{ View = 'boot'; Sentence = 'Checking this computer.'; P = @('This takes a few seconds. Nothing is changed.') }
   try { & $ui.RunBase } catch { if (-not ($ui.Form.IsDisposed -or $script:closing)) { & $ui.VBootErr (ConvertTo-Masked ([string]$_.Exception.Message)) }; return }
   if (-not ($ui.Form.IsDisposed -or $script:closing)) { & $ui.VChoose } }
+# Resets what the user chose: each step to its default, clean-up on, no step states. Takes nothing.
 $ui.InitSel = { $ui.Sel = @{}; foreach ($k in $script:appSteps) { $ui.Sel[[int]$k] = [bool](Get-StepDefault $k) }; $ui.Clean = $true; $ui.StepState = @{} }
+# Takes the application the user chose: selects it, reuses base check results that can be reused, and shows Maintenance
+# (already installed) or the checks. Takes the application number.
 $ui.Pick = { param([int]$J)
   Select-App $J; $ui.Picked = $true
   # The base checks are not run twice, except the ones whose answer can change at any time ($checkNoSave: Word open, disk, write).
@@ -75,6 +85,8 @@ $ui.VMaint = { param($Inst)
     Note = 'Diagnose, Back up, Restore and Uninstall are not in this version of RADE yet.'
     Buttons = @($startB, @{ Text = $verb; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.Checks $false } }, @{ Text = 'Diagnose'; Kind = 'off' }, @{ Text = 'Back up'; Kind = 'off' }, @{ Text = 'Restore'; Kind = 'off' }, @{ Text = 'Uninstall'; Kind = 'dangeroff'; Apart = $true })
     Back = { & $ui.VChoose } } }
+# Says whether the chosen application has a check that needs the site address. Takes nothing; gives back $true or
+# $false.
 $ui.NeedSite = { [bool](@($script:appChecks | Where-Object { $_ -in 'net-site', 'site-rights' }).Count) }
 $ui.VSite = {
   $v = Get-SiteUrl (Get-BasePath); if (-not $v) { $v = $sitePrefix }   # PFM 14 Nov 26: the box starts with the DAF SharePoint address
@@ -82,6 +94,8 @@ $ui.VSite = {
     Field = @{ Label = 'Site address'; Text = $v; Name = 'Site address, starts with https://' }; Focus = 'field'
     Buttons = @(@{ Text = 'Continue'; Kind = 'primary'; Act = { & $ui.SaveSite } }); Back = { & $ui.VChoose } }
   try { $ui.Field.SelectionStart = $ui.Field.Text.Length; $ui.Field.SelectionLength = 0 } catch { $null = $_ } }
+# Saves the address in the box when it is a valid site address, drops the site checks' old results and runs the checks
+# again; else says what is wrong. Takes nothing.
 $ui.SaveSite = {
   $v = $ui.Field.Text.Trim()
   if (-not (Test-SiteUrl $v)) { & $ui.Say1 ('The address must look like ' + $sitePrefix + 'name'); return }
@@ -125,6 +139,8 @@ $ui.Next = {
   if ($fails.Count) { & $ui.VFail $fails[0] $fails.Count; return }
   if ($needs.Count) { & $ui.VNeed $needs[0]; return }
   & $ui.VReady }
+# Shows the card of a failed check with what to do and a button to run it again. Takes the check number and the count of
+# failed checks.
 $ui.VFail = { param([int]$I, [int]$Count)
   $ids = @($script:appChecks); $ui.CurId = [string]$ids[$I]; $d = Get-CheckDef $ids[$I]; $r = $script:checkResults[$ids[$I]]
   # A check that runs on its own: "Run checks again". A sign-in or look-and-answer check: its own button, as on the card that asks for it.
@@ -135,6 +151,7 @@ $ui.VFail = { param([int]$I, [int]$Count)
     Buttons = @($again, $(if (& $ui.NeedSite) { @{ Text = 'Change the site address'; Act = { & $ui.VSite } } } else { $null }))
     Foot = ([string]$ok + ' of ' + $ids.Count + ' checks passed. RADE changes nothing until every check passes.'); Back = { & $ui.VChoose } }
   & $ui.ToFront }
+# Shows the card of a check that needs the user (a sign-in, a look-and-answer, or not run yet). Takes the check number.
 $ui.VNeed = { param([int]$I)
   $ids = @($script:appChecks); $ui.CurId = [string]$ids[$I]; $d = Get-CheckDef $ui.CurId; $r = $script:checkResults[$ui.CurId]
   $how = $(if ($d.Kind -eq 'signin') { 'CAC sign-in, read-only' } elseif ($d.Kind -eq 'guide') { 'You look and answer, read-only' } else { 'Not run yet' })

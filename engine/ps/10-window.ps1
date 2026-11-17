@@ -1,3 +1,6 @@
+# RADE engine part 10, the window slot: the window parts (engine/ps/window) are put in here when the bundle
+# is built. If the window cannot open, the round falls back to text mode (11-text-mode.ps1).
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 if ($gui) {
   try {
     # @@WINDOW@@

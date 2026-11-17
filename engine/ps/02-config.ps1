@@ -1,3 +1,7 @@
+# RADE engine part 02, settings and history: time text, step titles, the saved window place, the results
+# e-mail address, the round history file, the newer-round look-up and the "What to do" help lines. Uses 01-base.ps1.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+# Turns seconds into text like "3m 05s". Takes the seconds (a number); gives back the text.
 function Format-Duration([double]$Seconds) {
   $s = [int][math]::Round($Seconds)
   return ('{0}m {1:00}s' -f [math]::Floor($s / 60), ($s % 60))
@@ -5,7 +9,10 @@ function Format-Duration([double]$Seconds) {
 # What the window calls a step to a person: its manifest "title", else its name. The log, the report, the summary, the results
 # files and every key keep the name.
 function Get-StepTitle($Step) { if ($Step -and [string]$Step.Title) { return [string]$Step.Title }; return [string]$Step.Name }
+# Says whether Word is running. Takes nothing; gives back $true or $false.
 function Test-WordOpen { return (@(Get-Process -Name WINWORD -ErrorAction SilentlyContinue).Count -gt 0) }
+# Says whether the text is one or more e-mail addresses separated by ";". Takes the text; gives back $true or $false.
+# Sends nothing.
 function Test-MailTo([string]$To) {
   $one = '[^@\s;,]+@[^@\s;,]+\.[^@\s;,]+'
   return ($To -match ('^\s*' + $one + '(\s*;\s*' + $one + ')*\s*;?\s*$'))
@@ -38,6 +45,8 @@ function Get-MailTo([string]$Base) {
   }
   return ''
 }
+# Writes the results e-mail address to RADE\Config\rade-mail-to.txt, creating the folder if needed. Takes the base
+# folder (not used) and the address; gives back nothing.
 function Save-MailTo([string]$Base, [string]$To) {
   $null = $Base
   $p = Get-RadeConfigFile 'rade-mail-to.txt'
@@ -51,6 +60,8 @@ function Read-RoundHistory([string]$Base) {
   if (Test-Path -LiteralPath $p -PathType Leaf) { try { return @(Import-Csv -LiteralPath $p) } catch { return @() } }
   return @()
 }
+# Adds one row (round, step, time, status, seconds) to the history file; a failure is ignored. Takes the base folder,
+# step name, status and seconds; gives back nothing.
 function Add-RoundHistory([string]$Base, [string]$Step, [string]$Status, [int]$Seconds) {
   try {
     $p = Get-ConfigFile $Base '@@PREFIX@@-history.csv'
@@ -79,6 +90,8 @@ function Get-NewerRound {
   } catch { $null = $_ }
   return ''
 }
+# Gives the one line about the last round on this computer, or says none is recorded. Takes the history rows; gives back
+# the text.
 function Get-LastRoundText($Hist) {
   $r = @($Hist | Where-Object { $_.Step -eq 'ROUND' })
   if (-not $r.Count) { return 'Last round on this computer: none recorded yet.' }
@@ -104,6 +117,8 @@ $helpRules = @(
   @{ Re = 'Clean-up could not'; Text = 'A file could not go to the Recycle Bin (it may be open). Close it; the next round tries again.' },
   @{ Re = 'e-mail address does not look right'; Text = 'Type one address like name@example.com (several: separate with ;), or leave the box empty.' }
 )
+# Gives a "What to do: ..." help line for a log line that matches a known problem, once for each problem in a round;
+# else an empty text. Takes the log line; marks the problem as helped.
 function Get-WhatToDo([string]$Line) {
   foreach ($h in $helpRules) {
     if ($Line -match $h.Re -and -not $script:helped.ContainsKey($h.Re)) { $script:helped[$h.Re] = $true; return ('What to do: ' + $h.Text) }

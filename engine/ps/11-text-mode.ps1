@@ -1,5 +1,9 @@
+# RADE engine part 11, text mode: runs the whole round in the console (checks, plan, the Enter prompt,
+# the round and the summary) when no window is open. Uses the parts before it.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 try {
   $script:textMode = $true
+  # Writes a line to the run log and the console. Takes the line; gives back nothing.
   $say = { param($t) Add-RunLog $t; Write-Host $t }
   Write-Host ('RADE - ' + $round + ' - build ' + $buildId)
   Write-Host (Get-LastRoundText (Read-RoundHistory (Get-BasePath)))

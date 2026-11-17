@@ -1,3 +1,6 @@
+# RADE window part 10, keys and form events: the key handlers (F2, Esc, Enter, Ctrl+C), the window place
+# saved and restored, and the call that shows the form. It is the last window part.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 # ---- Keys: F2 = the Record (Page Down and Page Up move its check list, and on a card that is taller than the window its text); Esc = close the Record, else Back, and on Choose (no Back) it exits; 1 to 9 = a choice. Tab reaches every control.
 $ui.Form.Add_KeyDown({
   $k = [string]$_.KeyCode
@@ -34,6 +37,7 @@ $ui.Place = {
     }
     $f.MinimumSize = New-Object System.Drawing.Size([math]::Min((& $ui.Sc 1280), $wa.Width), [math]::Min((& $ui.Sc 720), $wa.Height))
   } catch { $null = $_ } }
+# Gives the form's client size and window state as text like "1020x760/Normal". Takes nothing.
 $ui.WinNow = { $f = $ui.Form; $s = [string]$f.WindowState; if ($s -notin 'Normal', 'Maximized', 'Minimized') { $s = 'Normal' }; return ([string]$f.ClientSize.Width + 'x' + $f.ClientSize.Height + '/' + $s) }
 $ui.ResizeT = New-Object System.Windows.Forms.Timer; $ui.ResizeT.Interval = 400
 $ui.ResizeT.Add_Tick({ $ui.ResizeT.Stop(); try { if ($ui.Scaled -and [string]$ui.Form.WindowState -ne 'Minimized') { & $ui.Fit; & $ui.Check } } catch { $null = $_ } })

@@ -1,3 +1,6 @@
+# RADE window part 04, the hand-step text and the Record's first parts: builds the rich text of the numbered
+# lines of a hand step and fits its box. Builds on 03-card.ps1 (the Guide box).
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 # ---- The Record (F2): all checks by group with their result, the steps with a box each (they can be changed only
 # before the run), and one text box with the files (New, Replace, Recycle), what the installs made, and the log.
 $ui.Rec = New-Object System.Windows.Forms.TableLayoutPanel
@@ -38,16 +41,23 @@ $ui.SetSteps = { param($Guide)
   $on = [bool](@($ui.GuideNums).Count -or @($ui.GuideRest).Count); $ui.Guide.Visible = $on
   if (-not $on) { try { $ui.Guide.Clear() } catch { $null = $_ }; return }
   & $ui.GuideBuild; & $ui.FitSteps }
+# Escapes text for rich text (RTF): backslash and braces, and characters above 126 as \u codes. Takes the text; gives
+# back the escaped text.
 $ui.RtfEsc = { param([string]$T) $sb = New-Object System.Text.StringBuilder
   foreach ($ch in $T.ToCharArray()) { $n = [int]$ch; if ($ch -eq [char]92 -or $ch -eq '{' -or $ch -eq '}') { [void]$sb.Append([char]92).Append($ch) } elseif ($n -gt 126) { [void]$sb.Append('\u' + $(if ($n -gt 32767) { $n - 65536 } else { $n }) + '?') } elseif ($n -lt 32) { [void]$sb.Append(' ') } else { [void]$sb.Append($ch) } }
   return $sb.ToString() }
+# Builds the rich text of the hand-step box from $ui.GuideNums, $ui.GuideTexts and $ui.GuideRest (numbers right-aligned
+# in a column, then the small gray lines) and sets it into the box. Takes nothing; sets $ui.Guide.Rtf, $ui.GuideInkAt
+# and the box's screen-reader text.
 $ui.GuideBuild = {
   $g = $null; try { $g = $ui.Guide.CreateGraphics() } catch { $null = $_ }
   $dpi = 96.0; try { if ($g -and [double]$g.DpiX -gt 0) { $dpi = [double]$g.DpiX } } catch { $null = $_ }
+  # Turns screen pixels into twips (1/1440 inch) at the box's dpi. Takes the pixels; gives back a whole number.
   $tw = { param([double]$Px) [int][math]::Round($Px * 1440.0 / $dpi) }
   $nw = 0; foreach ($n in @($ui.GuideNums)) { $w = 0; try { $w = [int][System.Windows.Forms.TextRenderer]::MeasureText($g, $n, $ui.F.Body, (New-Object System.Drawing.Size(100000, 0)), [System.Windows.Forms.TextFormatFlags]'NoPadding, SingleLine').Width } catch { $w = [int][System.Windows.Forms.TextRenderer]::MeasureText($n, $ui.F.Body).Width }; $nw = [math]::Max($nw, $w) }
   try { if ($g) { $g.Dispose() } } catch { $null = $_ }
   $cT = & $tw ($nw + (& $ui.Sc 8)); $g1 = & $tw (& $ui.Sc $ui.Z.G1); $g3 = & $tw (& $ui.Sc $ui.Z.G3)
+  # Writes a color as the RTF color text (red, green, blue). Takes the color; gives back the text.
   $col = { param($C) '\red' + $C.R + '\green' + $C.G + '\blue' + $C.B + ';' }
   $fb = [int][math]::Round([double]$ui.F.Body.SizeInPoints * 2); $fs = [int][math]::Round([double]$ui.F.Small.SizeInPoints * 2)
   $paras = @(); $plain = 0; $wide = ''; $ui.GuideInkAt = 0
@@ -70,6 +80,8 @@ $ui.GuideBuild = {
 $ui.GuideNeed = { $h = [int]$ui.GuideH
   try { $n = [int]$ui.Guide.TextLength; if ($n -gt 0) { $pt = $ui.Guide.GetPositionFromCharIndex($n - 1); $lf = $(if (@($ui.GuideRest).Count) { $ui.F.Small } else { $ui.F.Body }); $h = [math]::Max($h, [int]$pt.Y + [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $lf).Height) } } catch { $null = $_ }
   return $h }
+# Sets the hand-step box to its width and the height its text needs. Takes nothing; changes the box size and does
+# nothing while it is already fitting.
 $ui.GuideFit = { if ($ui.InGuideFit) { return }; $ui.InGuideFit = $true
   try { if ($ui.Guide.Visible) { $w = [int]$ui.ContentW; $h = [math]::Max(1, (& $ui.GuideNeed) + (& $ui.Sc 2)); if ($ui.Guide.Width -ne $w) { $ui.GuideH = 0; $ui.Guide.Width = $w; $h = [math]::Max(1, (& $ui.GuideNeed) + (& $ui.Sc 2)) }; if ($ui.Guide.Height -ne $h) { $ui.Guide.Height = $h } } } catch { $null = $_ } finally { $ui.InGuideFit = $false } }
 # Where the ink of the guide's first number starts in the box: the place of the letter (as the box lays it out) plus the
@@ -81,8 +93,11 @@ $ui.Bearing = { param([string]$Ch, $F)
       for ($x = 0; $x -lt 80 -and $hit -lt 0; $x++) { for ($y = 0; $y -lt 160; $y++) { $px = $bm.GetPixel($x, $y); if ($px.R + $px.G + $px.B -lt 600) { $hit = $x; break } } }
       if ($hit -ge 0) { $v = $hit; $ui.Inks[$k] = $v } } finally { $bm.Dispose() } } catch { $null = $_ }
   return $v }
+# Gives the x place where the ink of the first number starts in the hand-step box (the letter's place plus its side
+# bearing); 0 when it cannot be read. Takes nothing.
 $ui.GuideInk = { try { $i = [int]$ui.GuideInkAt; $t = [string]$ui.Guide.Text; if ($i -ge $t.Length) { $i = 0 }; if (-not $t) { return 0 }
     $f = $(if (@($ui.GuideNums).Count) { $ui.F.Body } else { $ui.F.Small }); return ([int]$ui.Guide.GetPositionFromCharIndex($i).X + (& $ui.Bearing ([string]$t[$i]) $f)) } catch { return 0 } }
+# Fits the hand-step box after its text or the window width changed. Takes nothing; calls $ui.GuideFit.
 $ui.FitSteps = { & $ui.GuideFit }
 $ui.Fit = {
   if (-not $ui.Scaled) { return }   # R1 review: a size set while Windows Forms scales the form would be scaled again

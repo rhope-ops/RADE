@@ -1,3 +1,6 @@
+# RADE engine part 04, steps: runs one step as a child process, runs a hand (guide) step, builds the step
+# lines, the results folder and the round plan, and makes the Outlook draft. Called by 06-round.ps1.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 # Builds the start information of a step's child powershell.exe (pwsh when there is none): the step file with -Id and
 # -NoPause, the round's fixed arguments, the person's answer as -<AskParam>, and the step's input variables.
 # Takes the RADE app folder, the step and the answer; returns the ProcessStartInfo (nothing is started here).
@@ -84,6 +87,7 @@ function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]
   $r.Exit = $p.ExitCode
   return $r
 }
+# Gives the state word for a step result: SKIPPED, NEEDS REVIEW or PASSED. Takes the result table; gives back the word.
 function Get-StepState($R) {
   if ($R.Skipped) { return 'SKIPPED' }
   if ($R.Fail -gt 0 -or $R.Exit -ne 0) { return 'NEEDS REVIEW' }
@@ -99,6 +103,8 @@ function Get-StepLine($Step, $R, [double]$Seconds) {
   if ($state -eq 'PASSED' -and $R.Fallback) { $state = 'PASSED (fallback: ' + $R.Fallback + ')' }
   return ($Step.Name + ': ' + $state + ' (' + $R.Pass + ' passed, ' + $R.Fail + ' failed' + $(if ($R.Skip) { ', ' + $R.Skip + ' skipped' } else { '' }) + ', exit code ' + $R.Exit + ') in ' + (Format-Duration $Seconds))
 }
+# Puts the text on the clipboard, by Windows Forms or else Set-Clipboard. Takes the text; gives back $true if it worked,
+# else $false.
 function Copy-TextToClipboard([string]$Text) {
   try { [System.Windows.Forms.Clipboard]::SetText($Text); return $true } catch { $null = $_ }
   try { if (Get-Command Set-Clipboard -ErrorAction SilentlyContinue) { Set-Clipboard -Value $Text; return $true } } catch { $null = $_ }
@@ -110,6 +116,8 @@ function ConvertTo-UserText([string]$Text) {
   $t = $t -replace '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', '<EMAIL>'   # e-mail first: the site rule would leave the name before @
   return ($t -replace 'https?://\S+', '<SITE>' -replace '[A-Za-z0-9.-]+\.(sharepoint|sharepoint-mil|onmicrosoft)\.[A-Za-z.]+\S*', '<SITE>')   # no address reaches the e-mail
 }
+# Runs a hand step: shows it (in the window or as console text), waits for Done, It failed or Skip, and asks the step's
+# questions. Takes the base folder, the step and a Say block; gives back the result table.
 function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
   $r = @{ Pass = 0; Fail = 0; Exit = 0; Skipped = $false; FailText = ''; Answers = @() }
   $script:guideAnswers = @{}
@@ -157,6 +165,7 @@ function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
   } else { $r.Skipped = $true; & $Say '    Skipped by you.' }
   return $r
 }
+# Adds one line to the run log, when a log exists. Takes the line; gives back nothing.
 function Add-RunLog([string]$T) { if ($null -ne $script:runLog) { $script:runLog.Add($T) } }
 function Export-RoundResult([string]$Base, [string[]]$Summary) {
   # One folder of plain files to attach to one e-mail (zips do not cross the boundary, PFM 13 Nov).
@@ -240,4 +249,6 @@ function Save-RoundDraft([string]$Dir, [string[]]$Summary, [string]$To, [string]
     return ''
   } catch { return (ConvertTo-Masked $_.Exception.Message) }
 }
+# Says whether the chosen app runs in deploy mode (an install) and not as a test round. Takes nothing; gives back $true
+# or $false.
 function Test-Deploy { return ([string]$script:app.Mode -eq 'deploy') }

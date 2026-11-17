@@ -1,3 +1,6 @@
+# RADE engine part 05, the install record: one record file for each app in RADE\Config\installed, the newer-
+# version look-up, the runner copy and desktop shortcut, and the lines that tell a user what was made. Used by 04 and 06.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 # ---- Installed versions (the Administrator, 14 Nov 26, deploy v1): RADE\Config\installed keeps, one file per app, the
 # version a deploy last installed and the last deploy run. It holds no user name, path, site or DODID. A deploy run sends
 # nothing: no e-mail draft, no saved address; its report stays in Rounds\<round> on this computer.
@@ -9,6 +12,8 @@ function Get-InstalledKey($A) {
   if ($A.Marker) { $h = Get-SiteMark (Get-SiteUrl (Get-BasePath)); if ($h) { $k += '@' + $h } }
   return $k
 }
+# Turns a saved run of a record (version, build, round, time, state) into a plain ordered table of text, fixing a date
+# that PowerShell 7 reads as a date. Takes the run; gives back the table, or $null for none.
 function ConvertTo-InstalledRun($V) {
   if ($null -eq $V) { return $null }
   $at = $V.at; if ($at -is [datetime]) { $at = $at.ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }   # PowerShell 7 reads it as a date
@@ -36,6 +41,8 @@ function Write-FileWhole([string]$Path, [string]$Text) {
     } else { [System.IO.File]::Move($tmp, $Path) }
   } finally { if (Test-Path -LiteralPath $tmp -PathType Leaf) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue } }
 }
+# Gives the path of the record file of one app: RADE\Config\installed\<12 hex of the key>.json. Takes the record key;
+# gives back the path.
 function Get-InstalledFile([string]$Key) { return (Join-Path (Get-RadeConfigFile 'installed') ((Get-ShortHash $Key) + '.json')) }
 function Read-InstalledRaw([string]$Key) {
   # State: none (no file), ok, damaged (not JSON, or no record of this schema), newer (a higher schema number: S2),
@@ -54,6 +61,8 @@ function Read-InstalledRaw([string]$Key) {
     return @{ State = 'ok'; Path = $p; Json = $j }
   } catch { return @{ State = 'damaged'; Path = $p } }
 }
+# Says whether the app's record was written by a newer RADE (a higher schema number). Takes the app; gives back $true or
+# $false.
 function Test-InstalledNewer($A) { return ((Read-InstalledRaw (Get-InstalledKey $A)).State -eq 'newer') }
 $newerRadeText = 'a newer RADE installed this application: get the newest script from the RADE page'
 function Get-InstalledBlock($A) {
@@ -195,6 +204,8 @@ function Get-NewerVersion {
   } catch { $null = $_ }
   return ''
 }
+# Gives the line that tells the user a newer version of the app is on the RADE page, or an empty text when there is
+# none. Takes nothing.
 function Get-NewerVersionText {
   $v = Get-NewerVersion
   if ($v) { return ('A newer version, ' + $v + ', of ' + $script:app.Name + ' is on the RADE page (' + $radeUrl + '). Use that one instead.') }
@@ -212,6 +223,8 @@ function Get-StartPath {
   } catch { $null = $_ }
   return ''
 }
+# Gives the full path of Windows PowerShell (powershell.exe), or just its name when the system folder is not known.
+# Takes nothing.
 function Get-PowerShellExe {
   if ($env:SystemRoot) { $x = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'; if (Test-Path -LiteralPath $x -PathType Leaf) { return $x } }
   return 'powershell.exe'
@@ -245,11 +258,14 @@ function Get-ShortcutDir {
     if (Test-Path -LiteralPath $p -PathType Leaf) { $v = ([string](Get-Content -LiteralPath $p -TotalCount 1)).Trim(); if ($v -and (Test-Path -LiteralPath $v -PathType Container)) { return $v } } } catch { $null = $_ }
   return (Get-DesktopDir)
 }
+# Saves the folder chosen for the RADE shortcut to RADE\Config\rade-shortcut.txt; a failure is ignored. Takes the
+# folder; gives back nothing.
 function Save-ShortcutDir([string]$Dir) {
   try { $p = Get-RadeConfigFile 'rade-shortcut.txt'; $d = Split-Path -Parent $p
     if (-not (Test-Path -LiteralPath $d -PathType Container)) { [void](New-Item -ItemType Directory -Path $d -Force) }
     Write-FileWhole $p ($Dir + "`r`n") } catch { $null = $_ }
 }
+# Says whether a shortcut named RADE.lnk is in the saved shortcut folder. Takes nothing; gives back $true or $false.
 function Test-ShortcutMade { $d = Get-ShortcutDir; return [bool]($d -and (Test-Path -LiteralPath (Join-Path $d 'RADE.lnk'))) }
 function Add-DesktopIcon([string]$Dir) {
   # One shortcut named RADE in the folder the user chose on the install card ($Dir; R29), else the user's own Desktop folder,
@@ -275,4 +291,5 @@ function Get-MadeLine {
   if ($out.Count) { return (@('Made by this app''s installs on this computer and site (to remove the app, remove these by hand):') + $out) }
   return @()
 }
+# Gives the help line that names the Teams channel (a name only, no link). Takes nothing; gives back the text.
 function Get-HelpLine { return ('For help, ask in the Teams channel ' + $helpChannel + '.') }

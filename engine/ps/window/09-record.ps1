@@ -1,3 +1,6 @@
+# RADE window part 09, the Record (F2): lists the checks, the steps and the log, and closes it again.
+# Builds on the Record parts in 04-record-parts.ps1.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 # ---- The Record
 $ui.StateInk = { param([string]$St) $(if ($St -eq 'PASSED') { $ui.C.GreenInk } elseif ($St -in 'FAILED', 'NEEDS REVIEW') { $ui.C.Red } elseif ($St -in 'WARNING', 'RUNNING') { $ui.C.Navy } else { $ui.C.Gray }) }   # the word is always shown: never color alone
 $ui.RecRows = {
@@ -39,6 +42,8 @@ $ui.RecChecks.Add_Paint({
       foreach ($m in @($q.More)) { & $ui.Word $g $m.T $ui.F.Small $ui.C.Gray $pl.In ($m.Y + (& $ui.Sc 1)) ($lw - $pl.In) ($m.H - (& $ui.Sc 1)) $wrap }   # what was found, then what to do
     }
   } catch { $null = $_ } })
+# Sets the height of the check list to the height of its rows. Takes nothing; does nothing before the window has its
+# scale.
 $ui.RecTall = { if (-not $ui.Scaled) { return }; try { $t = (& $ui.RecPlan $ui.RecChecks.ClientSize.Width).Tall + (& $ui.Sc 4); if ($ui.RecChecks.Height -ne $t) { $ui.RecChecks.Height = $t } } catch { $null = $_ } }
 $ui.RecChecks.Add_Resize({ if ($ui.RecOn -and [int]$ui.RecW -ne [int]$this.ClientSize.Width) { $ui.RecW = [int]$this.ClientSize.Width; & $ui.RecTall }; $this.Invalidate() })
 # The step list: a label or a long step name wraps at the column's width, also after the window changes its size.
@@ -51,6 +56,7 @@ $ui.VRecord = {
   $ui.RecW = 0; & $ui.RecTall   # as tall as its rows (the same plan as the Paint handler)
   $ui.RecChecks.AccessibleName = 'Checks. ' + ((@($ui.RecData) | ForEach-Object { if ($_.Head) { $_.Head + ':' } else { $_.Name + ' ' + $_.State + $(if (@($_.More).Count) { ', ' + (@($_.More) -join ', ') } else { '' }) } }) -join '. ')
   $old = @($ui.RecSteps.Controls); $ui.RecSteps.Controls.Clear(); foreach ($o in $old) { $o.Dispose() }; $ui.Full = @{}
+  # Adds one label to the Steps part of the Record. Takes the text, the font and the color; gives back nothing.
   $mk = { param([string]$Text, $Font, $Color) $l = New-Object System.Windows.Forms.Label; $l.AutoSize = $true; $l.UseMnemonic = $false; $l.MaximumSize = New-Object System.Drawing.Size(([math]::Max((& $ui.Sc 120), $ui.RecSteps.ClientSize.Width - (& $ui.Sc 24))), 0); $l.Text = $Text; $l.Font = $Font; $l.ForeColor = $Color; $l.Margin = (& $ui.Pad (& $ui.Sc 5) 0 0 (& $ui.Sc 6)); [void]$ui.RecSteps.Controls.Add($l) }
   & $mk 'STEPS' $ui.F.SmallB $ui.C.Gray
   if (-not $ui.Picked) { & $mk 'Choose an application first.' $ui.F.Small $ui.C.Gray }
@@ -84,6 +90,7 @@ $ui.VRecord = {
   & $ui.RecFit
   $ui.Card.Visible = $false; $ui.Rec.Visible = $true; & $ui.RecTall; $ui.RecChecks.Invalidate(); $ui.RecB.Visible = $false; $ui.BackB.Visible = $false
   try { [void]$ui.RecClose.Focus() } catch { $null = $_ } }
+# Closes the Record and shows the card again; redraws the ready card when a step box was changed. Takes nothing.
 $ui.CloseRecord = {
   & $ui.Check
   $ui.RecOn = $false; $ui.Rec.Visible = $false; $ui.Card.Visible = $true; $ui.RecB.Visible = $true; $ui.BackB.Visible = [bool]$ui.Back

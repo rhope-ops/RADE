@@ -1,3 +1,6 @@
+# RADE engine part 03, files: the clean-up plan and the move to the Recycle Bin, the folder inventory,
+# saving the bundle's files, downloading data files (checked by SHA-256) and the environment a step is given. Uses 01 and 02.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 function Test-OurFile([string]$Name) {
   # Files @@APP@@ made: @@PREFIX@@-* names, sample renders, and the support scripts that keep their names.
   foreach ($pat in $ownPatterns) { if ($Name -like $pat) { return $true } }   # the app's own file names (manifest application.own)
@@ -33,6 +36,8 @@ function Move-ToRecycleBin([string]$Path, [switch]$Folder) {
     else { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($Path, 'OnlyErrorDialogs', 'SendToRecycleBin') }
   } else { Remove-Item -LiteralPath $Path -Force -Recurse:$Folder }
 }
+# Moves the files of the clean-up plan, then the folders left empty, to the Recycle Bin and says what it did. Takes the
+# base folder and a Say block; gives back the summary line and sets the round to "needs review" if one move failed.
 function Invoke-Cleanup([string]$Base, [scriptblock]$Say) {
   $plan = Get-CleanupPlan $Base
   $done = 0; $gone = 0; $failed = 0
@@ -62,6 +67,8 @@ function Get-FolderInventory([string]$Base) {
   }
   return ('Files left by folder: ' + ($parts -join ', ') + $(if ($odd) { '; other folders: ' + $odd } else { '' }) + '.')
 }
+# Saves every file of the bundle (text with CRLF and a BOM, or decoded binary) into its folder under the base folder.
+# Takes the base folder and a Say block; gives back nothing.
 function Write-BundleFile([string]$Base, [scriptblock]$Say) {
   $utf8Bom = New-Object System.Text.UTF8Encoding $true
   & $Say 'Preparing files'

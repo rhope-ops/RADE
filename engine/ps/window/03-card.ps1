@@ -1,3 +1,6 @@
+# RADE window part 03, the card: the one block that shows a statement or a question, with its parts (line,
+# sentence, paragraphs, choices, box, hand-step text, step line, buttons) and the one-line text box helper.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 # ---- The card: one block, left edge at 12 % of the width, 40 % of the spare height above it. Top to bottom: a small
 # line in capitals, the sentence, up to four paragraphs, the choices, a box with its label, the lines of a hand step (one
 # selectable text: the numbered lines, then the unnumbered ones), the file path of a hand step, the step line (name, bar,
@@ -52,7 +55,11 @@ $ui.FieldL = & $ui.Label $ui.F.SmallB $ui.C.Gray 9; $ui.FieldL.Visible = $true
 # A one-line box: a frame as tall as a compact button with RADE's own 1 px edge, the text box inside it with no border,
 # in the middle (a text box cannot be made taller with its text in the middle). The ring goes around the frame.
 $ui.Boxes = @()
+# Sizes and centers the text box inside its one-line frame. Takes the frame panel; does nothing before the window has
+# its scale; gives back nothing.
 $ui.BoxFit = { param($P) if (-not $ui.Scaled) { return }; try { $tb = $P.Controls[0]; $in = & $ui.Sc 6; $tb.Width = [math]::Max(10, $P.ClientSize.Width - 2 * $in); $tb.Location = New-Object System.Drawing.Point($in, [int][math]::Floor(($P.ClientSize.Height - $tb.Height) / 2)) } catch { $null = $_ } }
+# Wraps a text box in a one-line frame with its own 1 px edge and a focus ring. Takes the text box and the frame width;
+# gives back the frame panel and remembers it in $ui.Boxes.
 $ui.MkBox = { param($Tb, [int]$W)
   $p = New-Object System.Windows.Forms.Panel; $p.Size = New-Object System.Drawing.Size($W, $ui.Z.CompactH); $p.BackColor = $ui.C.White; $p.AccessibleName = 'Text box'
   $Tb.BorderStyle = 'None'; $Tb.Font = $ui.F.Small; $Tb.ForeColor = $ui.C.Ink; [void]$p.Controls.Add($Tb); $Tb.Add_GotFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } }); $Tb.Add_LostFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } })
@@ -87,6 +94,8 @@ $ui.DraftB = & $ui.LinkBtn 'Make e-mail draft'
 $ui.OkBox = New-Object System.Windows.Forms.CheckBox
 $ui.OkBox.AutoSize = $true; $ui.OkBox.Checked = $true; $ui.OkBox.Text = 'The window displayed correctly'; $ui.OkBox.ForeColor = $ui.C.Gray; $ui.OkBox.Margin = (& $ui.Pad 4 9 4 4); $ui.OkBox.AccessibleName = 'The window displayed correctly (nothing overlapped or cut off)'
 foreach ($c in @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox)) { [void]$ui.TestRow.Controls.Add($c) }
+# Puts controls into a table as one auto-sized row each, top to bottom. Takes the table and the list of controls; sets
+# the row count; gives back nothing.
 $ui.Fill = { param($T, $Parts) $row = 0; foreach ($c in @($Parts)) { [void]$T.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('AutoSize'))); $T.Controls.Add($c, 0, $row); $row++ }; $T.RowCount = $row }
 & $ui.Fill $ui.Body @($ui.Kick, $ui.SentRow, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.Opts, $ui.FieldRow, $ui.Guide, $ui.PathL, $ui.PathT, $ui.StepRow, $ui.LastLog, $ui.ErrRow, $ui.LinkRow, $ui.Note, $ui.Help)
 & $ui.Fill $ui.Tail @($ui.Close, $ui.BtnRow, $ui.Foot, $ui.TestRow)
