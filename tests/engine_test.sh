@@ -6,6 +6,8 @@
 # Covers deploy v1 (docs/engine.md): a deploy sends nothing and keeps one record file for each app in RADE\Config\installed (docs/engine.md "Shared files"); a test round is unchanged.
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
+# The engine source that the text checks below read: the build file and its PowerShell parts (docs/code-standard.md C10).
+engine_src="engine/rade_build.py $(ls engine/ps/*.ps1 engine/ps/window/*.ps1 | tr '\n' ' ')"
 pass=0; fail=0
 ok() { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL $1"; }
@@ -104,7 +106,7 @@ P
 # ---- sizes and text lengths (docs/window-design.md "Sizes", "Text lengths"; the Administrator, 2026-11-15)
 # Every button is made with a named kind (its size is in $ui.Z), and no other place sets a button's size.
 # (The bottom line's own minimum height, 46, and the logo line's, 64 (R28 N9: it grows with its text), are not button sizes: R24. Only those two expressions are left out of the count.)
-[ "$(cat engine/rade_build.py engine/rade_ui.ps1 | grep -o '& \$ui\.Btn [^;)]*' | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_ui.ps1 | wc -l)" = 2 ] && [ "$(grep -c 'MinimumSize = ' engine/rade_build.py)" = 3 ] && ok || bad "sizes: a button is made without a kind, or sets its own size"
+[ "$(cat $engine_src engine/rade_ui.ps1 | grep -o '& \$ui\.Btn [^;)]*' | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_ui.ps1 | wc -l)" = 2 ] && [ "$(cat $engine_src | grep -c 'MinimumSize = ')" = 3 ] && ok || bad "sizes: a button is made without a kind, or sets its own size"
 # The limits in the document are the limits of the build.
 python3 - <<'P' && ok || bad "text lengths: docs/window-design.md and TEXT_LIMITS (engine/rade_build.py) differ"
 import importlib.util, re, pathlib
@@ -188,7 +190,7 @@ has "view=hand light=RADE is waiting for you kick=STEP 2 OF 3 · YOUR TURN sent=
 has "WIN guide one-box=True rtf=True selectable=True" "WIN guide-copy=1. Open the import page.|2. Choose path-copy=C:\\ab.zip" "WIN elapsed=4m 12s|0m 05s|1h 02m 05s" \
   'WIN no-address field=False close=When you finish, select "Imported". focus-text=True accept=False' "/RADE/SampleApp/T02/SAMPLE-T02-import-r1.zip" "time=0m 0" \
   "view=ready light=off kick=ALL 8 CHECKS PASSED" "field=RADE shortcut in:" && ok || { bad "window 1a2: R28 fixes on the hand, run and ready cards"; grep "WIN guide\|WIN elapsed\|no-address\|path=\|time=\|field=" "$t/win.txt" | cut -c1-300; }
-[ "$(cat engine/rade_build.py engine/rade_ui.ps1 | grep -c Consolas)" = 1 ] && grep -q "Mono = (& \$ui.Font 'Consolas' 9" engine/rade_ui.ps1 && [ "$(cat engine/rade_build.py engine/rade_ui.ps1 | grep -c 'F\.Mono')" = 1 ] && grep -q "RecText.Font = \$ui.F.Mono" engine/rade_build.py && ok || bad "type: Consolas is only the Mono token, and only the Record's text box uses it"
+[ "$(cat $engine_src engine/rade_ui.ps1 | grep -c Consolas)" = 1 ] && grep -q "Mono = (& \$ui.Font 'Consolas' 9" engine/rade_ui.ps1 && [ "$(cat $engine_src engine/rade_ui.ps1 | grep -c 'F\.Mono')" = 1 ] && grep -q "RecText.Font = \$ui.F.Mono" $engine_src && ok || bad "type: Consolas is only the Mono token, and only the Record's text box uses it"
 wr="$t/wu/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt"
 ! grep -q "Import the sample flow\|Check this computer" "$wr" && grep -q "^T01 Sample check r1: PASSED" "$wr" && grep -q "^T02 Sample import r1: PASSED (confirmed by you)" "$wr" && ok || { bad "title: the report keeps the step name and never shows the title"; grep -n "Import the sample flow\|Check this computer" "$wr"; }
 # 1b. The hand step's questions after Done: one card each (No, the second choice, a text with an e-mail address), and
@@ -598,14 +600,14 @@ pg=$(pwsh -NoProfile -File tests/progress_test.ps1 -Bundle "$b" 2>&1)
 [ "$(echo $pg)" = "0.10 0.28 101 | -1 0.375 0.50 | True True False gate False True True True" ] && ok || bad "progress math and gate: got '$pg'"
 # Fonts: New-Object with a string for an enum argument can match two overloads ("Multiple ambiguous overloads") and
 # drop the window to text mode. No Font() call in the engine or the sample bundle may pass a string enum.
-fa=$(grep -ohE "(New-Object System\.Drawing\.Font|\[System\.Drawing\.Font\]::new)\([^)]*,[^)]*, *[\"'][A-Za-z]+[\"'] *\)" engine/rade_build.py "$b" | wc -l)
+fa=$(grep -ohE "(New-Object System\.Drawing\.Font|\[System\.Drawing\.Font\]::new)\([^)]*,[^)]*, *[\"'][A-Za-z]+[\"'] *\)" $engine_src "$b" | wc -l)
 amb=$(pwsh -NoProfile -c 'Add-Type -AssemblyName System.Drawing.Common; try { $null = New-Object System.Drawing.Font("Segoe UI", 10, "Bold"); "bound" } catch { if ($_.Exception.Message -match "ambiguous") { "ambiguous" } else { "bound" } }' 2>&1 | tail -1)
 [ "$fa" -eq 0 ] && [ "$amb" = "ambiguous" ] && ok || bad "fonts: string enum in Font() found=$fa (pwsh: $amb)"
 # Outlook draft: made when Outlook answers, with a fallback text when it does not (the run above shows the fallback).
-grep -q '\$script:draftMade = (-not \$why)' engine/rade_build.py && grep -q "Outlook draft could not be created" engine/rade_build.py && ok || bad "Outlook draft fallback"
+grep -q '\$script:draftMade = (-not \$why)' $engine_src && grep -q "Outlook draft could not be created" $engine_src && ok || bad "Outlook draft fallback"
 
 # The tagline (the Administrator, 14 Nov 26): no "DoD".
-! grep -q "for your DoD organization" engine/rade_build.py && grep -q "'Test and deploy apps for your organization'" engine/rade_build.py && ok || bad "tagline"
+! grep -q "for your DoD organization" $engine_src && grep -q "'Test and deploy apps for your organization'" $engine_src && ok || bad "tagline"
 psclose; gather   # wait for the groups and add their results
 echo "ENGINE pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

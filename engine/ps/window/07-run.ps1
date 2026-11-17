@@ -1,0 +1,136 @@
+# ---- The run. Invoke-Round calls back: a log line ($ui.Say), a tick ($ui.Tick), a step that starts ($ui.OnStatus) and
+# a step that ends ($ui.OnStep). A step you do by hand comes in through $script:guideUi.
+$ui.Say = { param($t) Add-RunLog $t; $ui.Log.Add([string]$t); $x = ([string]$t).Trim(); if ($x -and $ui.View -eq 'run') { & $ui.Show $ui.LastLog (& $ui.BreakLong $x $ui.LastLog.Font (& $ui.GetWrap $ui.LastLog)) }; if ($ui.RecOn) { try { $ui.RecText.AppendText([string]$t + "`r`n") } catch { $null = $_ } }; try { [System.Windows.Forms.Application]::DoEvents() } catch { $null = $_ } }
+$ui.Paint = {
+  if (-not $script:prog -or -not $script:stepStart) { return }
+  $g = Get-Progress
+  & $ui.SetBar 'all' ([math]::Max($g.All, $ui.Bars['all'].Target)) $true; & $ui.SetBar 'step' ([math]::Max($g.StepShown, $ui.Bars['step'].Target)) $true
+  if ($ui.View -ne 'run') { return }
+  & $ui.ShowTime
+  $fr = $(if ($script:prog.Frac -ge 0) { [string]$script:prog.FracText } else { '' }); if ($ui.StepFrac.Text -ne $fr) { $ui.StepFrac.Text = $fr }
+  # R21 W6: a time left only when earlier runs give one; never "a guess".
+  $rt = [string][int]($g.All * 100) + ' %' + $(if ($g.Known) { $dot + 'about ' + [math]::Max(1, [int][math]::Ceiling($g.Left / 60)) + $(if ([math]::Ceiling($g.Left / 60) -le 1) { ' minute' } else { ' minutes' }) + ' left' } else { '' }); if ($ui.RightL.Text -ne $rt) { $ui.RightL.Text = $rt } }
+# The time in this step (R28 N10): "4m 12s"; with hours "1h 04m 12s".
+$ui.Elapsed = { param([double]$Sec) $q = [int][math]::Floor([math]::Max(0, $Sec)); $h = [int][math]::Floor($q / 3600); $m = [int][math]::Floor(($q % 3600) / 60); $x = $q % 60
+  if ($h) { return ('{0}h {1:00}m {2:00}s' -f $h, $m, $x) }; return ('{0}m {1:00}s' -f $m, $x) }
+$ui.ShowTime = { try { if ($ui.View -eq 'run' -and $script:stepStart) { $t = & $ui.Elapsed ((Get-Date) - $script:stepStart).TotalSeconds; if ($ui.StepTime.Text -ne $t) { $ui.StepTime.Text = $t } } } catch { $null = $_ } }
+$ui.TimeT = New-Object System.Windows.Forms.Timer; $ui.TimeT.Interval = 1000; $ui.TimeT.Add_Tick({ & $ui.ShowTime })
+$ui.Tick = { $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }   # a callback must emit nothing: its output would join the engine function's return value
+$ui.TitleOf = { param([string]$Name) foreach ($s in @($steps)) { if ([string]$s.Name -ceq $Name) { return (Get-StepTitle $s) } }; return $Name }   # the title of the step with this name
+$ui.ShowRun = {
+  & $ui.SetCard @{ View = 'run'; Kicker = $(if ($ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN } else { 'Starting' }); Sentence = $(if (Test-Deploy) { 'Installing ' + $script:app.Name + '.' } else { 'Running round ' + $round + '.' })
+    StepRow = $true; Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { $ui.Form.Close() } })   # asks first while a step runs (the window's X does the same)
+    Foot = $(if (@($ui.Guides).Count) { 'RADE needs you next at "' + (& $ui.TitleOf $ui.Guides[0]) + '". Until then, keep this window open.' } else { 'Nothing is needed from you. Keep this window open.' }) }
+  $ui.StepName.Text = (& $ui.TitleOf $ui.StepNow); $null = & $ui.FitEdges; $null = & $ui.ShowTime }   # the edge follows the ink of the new text's first letter (titles start with any letter)
+$ui.OnStatus = { param($i, $count, $name, $estimate)
+  $script:statusBase = $name; $script:stepStart = Get-Date; $script:stepEst = $estimate
+  if ($i -le 1) { $null = & $ui.SetBar 'all' 0 $true }
+  $ui.StepI = [int]$i; $ui.StepN = [int]$count; $ui.StepNow = [string]$name
+  if ($ui.View -ne 'run') { $null = & $ui.ShowRun } else { $ui.Kick.Text = ('Step ' + $i + ' of ' + $count).ToUpperInvariant(); $ui.StepName.Text = (& $ui.TitleOf $name); $null = & $ui.FitEdges }
+  $null = & $ui.SetBar 'step' 0 $true; $ui.StepFrac.Text = ''; $null = & $ui.ShowTime
+  $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }
+$ui.OnStep = { param($k, $line)
+  $nm = [string]$steps[$k].Name + ': '; $rest = [string]$line; if ($rest.StartsWith($nm, [System.StringComparison]::Ordinal)) { $rest = $rest.Substring($nm.Length) }
+  $st = 'DONE'; foreach ($w in 'NEEDS REVIEW', 'FAILED', 'SKIPPED', 'PASSED') { if ($rest.StartsWith($w, [System.StringComparison]::Ordinal)) { $st = $w; break } }
+  $ui.StepState[[int]$k] = $st; $null = & $ui.Paint }
+$ui.WindowLine = { $w = $(if ($ui.OkBox.Checked) { 'Window: OK' } else { 'Window: NOT OK - write here what overlapped or was cut off' }); if ($ui.LayOn -and ($env:RADE_LAYOUT -eq '1' -or -not (Test-Deploy))) { $w + "`r`n" + (& $ui.LayLine) } else { $w } }
+$ui.StartApp = {
+  # The installed app opens from its local copy in its own powershell.exe process; then RADE closes.
+  $p = Get-StartPath; if (-not $p) { & $ui.Say1 'The start file of this application was not found. Select "Install" to put it back.'; return }
+  try { $pr = Start-Process -FilePath (Get-PowerShellExe) -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -STA -File "' + $p + '"') -WorkingDirectory (Split-Path -Parent $p) -PassThru
+    if ($pr) { $null = $pr.Handle }   # Windows PowerShell 5.1 keeps the exit code only when the handle is held
+    # A start script that a policy blocks or that fails at once ends within a moment: say so and keep RADE open.
+    if ($pr -and $pr.WaitForExit(2500) -and $pr.ExitCode -ne 0) { & $ui.Say1 ('The application stopped as soon as it started (exit code ' + $pr.ExitCode + '). Ask in the Teams channel.'); return }
+    $ui.Started = $true; $ui.Form.Close() } catch { & $ui.Say1 'The application could not be started. Select "Start" again, or ask in the Teams channel.' } }
+$ui.Run = {
+  $ui.LinkDir = ''; $ui.FieldAsked = $false
+  if ($ui.View -eq 'ready' -and $ui.FieldRow.Visible -and $ui.FieldL.Text -eq 'RADE shortcut in') {   # R29 N8: the folder for the RADE shortcut
+    $d = $ui.Field.Text.Trim().Trim('"')
+    if ($d -and -not (Test-Path -LiteralPath $d -PathType Container)) { & $ui.Say1 'That folder was not found. Select "Browse" to choose a folder, or empty the box for no shortcut.'; return }
+    $ui.LinkDir = $d; $ui.FieldAsked = $true; if ($d) { Save-ShortcutDir $d } }
+  $dep = Test-Deploy; $ui.Running = $true; $ui.Summary = @(); $ui.Log.Clear(); $ui.StepState = @{}; $ui.StepI = 0; $ui.StepNow = ''; $ui.Edit = $false
+  $to = ''; if (-not $dep) { $to = [string](Get-MailTo (Get-BasePath)); $ui.ToBox.Text = $to }
+  $sel = @(); $ui.Guides = @()
+  for ($k = 0; $k -lt $steps.Count; $k++) { $on = [bool]($script:appSteps -contains $k -and $ui.Sel[[int]$k]); $sel += $on; if ($on -and $steps[$k].Kind -eq 'guide') { $ui.Guides += [string]$steps[$k].Name } }
+  # A step that needs a folder asks for it now (a Windows dialog); Cancel skips that step.
+  $answers = @()
+  for ($k = 0; $k -lt $steps.Count; $k++) {
+    $a = ''
+    if ($sel[$k] -and $steps[$k].AskParam) {
+      $pick = New-Object System.Windows.Forms.FolderBrowserDialog
+      $pick.Description = $steps[$k].AskPrompt; $pick.ShowNewFolderButton = $false
+      if ([string]$pick.ShowDialog($ui.Form) -eq 'OK') { $a = [string]$pick.SelectedPath } else { $sel[$k] = $false; $ui.Guides = @($ui.Guides | Where-Object { $_ -ne [string]$steps[$k].Name }); $ui.Log.Add($steps[$k].Name + ': skipped (no folder picked)') }
+      $pick.Dispose()
+    }
+    $answers += $a
+  }
+  $ui.Bars['all'].Fill = $ui.C.Blue; & $ui.SetBar 'all' 0 $true; & $ui.SetBar 'step' 0 $true
+  & $ui.ShowRun; $ui.TimeT.Start()
+  $checkLines = Get-CheckSummary $script:checkResults
+  $script:roundStart = Get-Date
+  try {
+    $ui.Summary = Invoke-Round ([bool]($cleanup.Count -and $ui.Clean)) $sel $to $ui.Say $ui.Tick $ui.OnStep $ui.OnStatus $ui.WindowLine $answers $checkLines
+    $script:stepStart = $null; $ui.Running = $false
+    if (-not ($script:closing -or $ui.Form.IsDisposed)) { & $ui.VDone }   # closed in the last moments of the run: no clipboard, no folder
+  } catch {
+    $script:stepStart = $null; $ui.Running = $false
+    if ($script:closing -or $ui.Form.IsDisposed) { return }   # Exit during a step: the report on disk says STOPPED
+    $msg = 'STOPPED: ' + (ConvertTo-Masked ([string]$_)); & $ui.Say $msg
+    $what = [string](Get-WhatToDo $msg); if ($what) { & $ui.Say $what }
+    & $ui.VStopped $msg.Substring(9) $what
+  } finally { $ui.Running = $false; try { $ui.TimeT.Stop() } catch { $null = $_ }; $sv = $ui.StepState; & $ui.InitSel; $ui.StepState = $sv } }
+$ui.MadeText = {
+  # Deploy: how many things the installs of this application made, by kind (the list is in the Record).
+  $c = [ordered]@{}; $e = (Read-Installed (Get-InstalledKey $script:app))
+  if ($e -and $e.steps) { foreach ($n in @($e.steps.Keys)) { foreach ($m in @($e.steps[$n].made)) { if ($null -ne $m) { $k = [string]$m.kind; if ($c.Contains($k)) { $c[$k] = [int]$c[$k] + 1 } else { $c[$k] = 1 } } } } }
+  if (-not $c.Count) { return '' }
+  $parts = @(); foreach ($k in @($c.Keys)) { $parts += ([string]$c[$k] + ' ' + $k + $(if ($c[$k] -ne 1) { 's' } else { '' })) }
+  return ('The installs of this application made: ' + ($parts -join ', ') + '.') }
+$ui.Copy = {
+  $t = $(if (@($ui.Summary).Count) { @($ui.Summary) } else { @($ui.Log) }) -join "`r`n"
+  try { [System.Windows.Forms.Clipboard]::SetText($t); & $ui.Say1 'Copied.' } catch { & $ui.Say1 'The clipboard is busy. Select the button again.' } }
+$ui.Open = { if ($script:resultsDir) { Start-Process -FilePath 'explorer.exe' -ArgumentList ('"' + $script:resultsDir + '"') } }
+$ui.VDone = {
+  $sum = @($ui.Summary); $dep = Test-Deploy; $bad = ([string]$sum[0] -match 'NEEDS REVIEW'); $made = ''; if ($dep) { $made = [string](& $ui.MadeText) }
+  $took = Format-Duration ((Get-Date) - $script:roundStart).TotalSeconds
+  $ui.Bars['all'].Fill = $(if ($bad) { $ui.C.Blue } else { $ui.C.Green }); & $ui.SetBar 'all' $(if ($bad) { $ui.Bars['all'].Target } else { 1 }) $true
+  $mail = $(if ($script:draftMade) { 'An Outlook draft is open with the summary and all result files. Review it, then select Send.' } else { 'The results folder is open and the summary is on the clipboard. Paste it into an e-mail and attach the files.' })
+  $bMade = $(if ($made) { @{ Text = 'Record'; Act = { & $ui.VRecord } } } else { $null })
+  $iconNote = ''; if ($dep -and -not $bad) { $null = Save-RunnerCopy; $iconNote = $(if ($ui.FieldAsked -and -not $ui.LinkDir -and (Get-DesktopDir)) { 'The shortcut folder box was empty, so RADE made no shortcut. Open RADE from the RADE page instead.' } else { [string](Add-DesktopIcon ([string]$ui.LinkDir)) }) }   # R28: the runner copy and the desktop shortcut (a deploy that passed)
+  if (-not $bad) {
+    $inst = ($dep -and (Get-InstalledText $script:app) -match 'is installed$')
+    # Start (R28 fix: after a first install the Done card had no Start button): the checks passed before the install.
+    $startB = $(if ($inst -and [string]$script:app.Start -and (Get-StartPath)) { @{ Text = 'Start ' + $script:app.Name; Kind = 'primary'; Act = { & $ui.StartApp } } } else { $null })
+    & $ui.SetCard @{ View = 'done'; Tick = $true; Kicker = $(if ($dep -and -not $inst) { 'Passed' } else { 'All steps passed' }); Right = $took
+      Sentence = $(if (-not $dep) { 'Round ' + $round + ' is done.' } elseif ($inst) { $script:app.Name + ' ' + $script:app.Version + ' is installed.' } else { 'The run passed, but version ' + $script:app.Version + ' is not recorded as installed.' })
+      P = @($(if ($dep -and -not $inst) { 'Some steps were off or skipped. Run again with every step on.' } else { '' }), $(if ($dep) { 'Nothing was sent. The report stays on this computer.' } else { $mail }), $made, $iconNote)
+      Buttons = @($startB, @{ Text = 'Close'; Kind = $(if ($startB) { '' } else { 'primary' }); Act = { $ui.Form.Close() } }, $bMade, @{ Text = 'Open results folder'; Act = { & $ui.Open } }, @{ Text = 'Copy summary'; Act = { & $ui.Copy } })
+      Test = (-not $dep); Back = { & $ui.VReady } }
+  } else {
+    # The first step that needs review, with its help line from the manifest; the rest is in the Record.
+    $one = ''; $what = ''; $more = 0
+    for ($k = 0; $k -lt $sum.Count; $k++) { if ([string]$sum[$k] -match ': (NEEDS REVIEW|FAILED) ') { if ($one) { $more++ } else { $one = [string]$sum[$k]; if ($k + 1 -lt $sum.Count -and [string]$sum[$k + 1] -match '^\s+What to do: ') { $what = ([string]$sum[$k + 1]).Trim() } } } }
+    if (-not $one) { $one = 'A file, the clean-up or a result file needs review. The Record shows which.' }
+    & $ui.SetCard @{ View = 'review'; Light = 'bad'; Kicker = 'Needs review'; Right = 'Needs review'; Sentence = $(if ($dep) { 'The install is not complete.' } else { 'The round needs review.' })
+      P = @(($one + $(if ($more) { ' (and ' + $more + ' more in the Record)' } else { '' })), $what, $(if ($dep) { 'Steps that passed stay done. If you paste the block again, RADE runs only what is left.' } else { $mail }))
+      Help = $(if ($dep) { Get-HelpLine } else { '' }); Note = $(if ($dep) { '"Copy summary" puts the report on the clipboard. Paste it in the channel. Nothing was sent.' } else { '' })
+      Buttons = @(@{ Text = 'Copy summary'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Open results folder'; Act = { & $ui.Open } }, $bMade, @{ Text = 'Close'; Act = { $ui.Form.Close() } })
+      Test = (-not $dep); Back = { & $ui.VReady } }
+  }
+  if (-not $dep) { & $ui.Copy; if (-not $script:draftMade) { & $ui.Open } }   # a test round: the summary is on the clipboard, and with no draft the folder opens
+  & $ui.ToFront }
+$ui.VStopped = { param([string]$Why, [string]$What)
+  if ($script:closing -or $ui.Form.IsDisposed) { return }
+  $dep = Test-Deploy
+  & $ui.SetCard @{ View = 'stopped'; Light = 'bad'; Kicker = 'Stopped'; Right = 'Stopped'; Sentence = $(if ($dep) { 'The install stopped.' } else { 'The round stopped.' })
+    P = @(($Why.Substring(0, 1).ToUpperInvariant() + $Why.Substring(1)), $What, 'The report in the results folder says STOPPED.'); Help = $(if ($dep) { Get-HelpLine } else { '' })
+    Buttons = @(@{ Text = 'Copy the log'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Try again'; Act = { & $ui.VReady } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } }); Back = { & $ui.VReady } }
+  & $ui.ToFront }
+$ui.OkBox.Add_CheckedChanged({ if (-not $ui.OkBox.Checked) { & $ui.Say1 'Select "Make e-mail draft" to make a draft that says "Window: NOT OK".' } elseif ($ui.Note.Text -match '^Select "Make e-mail draft"') { & $ui.Say1 '' } })   # ticking again removes only this note
+$ui.DraftB.Add_Click({
+  $to = $ui.ToBox.Text.Trim()
+  if ($to -and -not (Test-MailTo $to)) { & $ui.Say1 'The e-mail address does not look right.'; return }
+  try { $null = Save-MailTo (Get-BasePath) $to } catch { $null = $_ }
+  $why = Save-RoundDraft $script:resultsDir $ui.Summary $to (& $ui.WindowLine)
+  & $ui.Say1 $(if ($why) { 'The Outlook draft could not be created (' + $why + ').' } else { 'The Outlook draft is open.' }) })
+
