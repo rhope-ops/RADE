@@ -67,7 +67,7 @@ Nothing else is a rule. docs/DECISIONS.md is the record of what the Administrato
 <!-- Fill in when the project has them. Give exact commands. -->
 - Build: not set yet.
 - Test: `scripts/check.sh` (full lane: the kit's self-tests, the rule caps, the personal-data scan and this project's own tests in `scripts/check.local.sh`, which check.sh runs last); `scripts/check.sh --fast` (fast lane: self-tests only of changed scripts, and `check.local.sh --fast`).
-- Lint: not set yet.
+- Lint: `scripts/lint.sh` (PSScriptAnalyzer on the built sample bundle, the settings apps use: Error and Warning, Windows PowerShell 5.1 syntax; check.local.sh runs it when engine files change). Pass = `LINT findings=0`.
 - Production data: not set yet (until it is set, agents treat every data target as production).
 
 ## Verification
@@ -115,7 +115,7 @@ Nothing else is a rule. docs/DECISIONS.md is the record of what the Administrato
 
 <!-- This project's own rules: one line each, at most 15 (full tier: scripts/bloat_check.py checks the cap). Add, change or remove a line only with the Administrator's approval of its exact text; date it, for example "(the Administrator, 2026-11-09)". -->
 - Project log: https://claude.ai/artifact/5W4UUpdfMgYJqt6zdB2sBM (private Claude doc; the Administrator, 2026-11-14). This repo is public, so log entries never go in it.
-- Engine source (the Administrator, 2026-11-14; 2026-11-17): the engine/ folder here (entry engine/rade_build.py; file list: docs/engine.md "How an app gets the engine"). Apps fetch it by commit and check each file's SHA-256.
+- Engine source (the Administrator, 2026-11-14; 2026-11-17): the files docs/engine.md "How an app gets the engine" lists (the engine/ folder and the RADE logo). Apps' builds fetch them by commit and check each file's SHA-256.
 - App repos (the Administrator, 2026-11-15): a RADE session never edits an app repo. After an engine change merges, make a release (docs/engine.md "How an app gets the engine") and report its tag and commit; a session of the app changes that app's lock.
 - No kit sync (the Administrator, 2026-11-15): never run the kit's sync (`sync_baseline.py`) on this repo; it replaces project guards and rules. Port a kit fix by hand, one file at a time, by pull request with review. Apps made for RADE get the same rule when their first project-specific rule or guard appears (rhope-ops/90-161.Z has it).
 - No reconnaissance (the Administrator, 2026-11-14; cannot be changed): RADE and every app never do anything that is, or could be taken as, network reconnaissance: no host finding or pinging, no port checks, no probing of network or logical boundaries. Detail: docs/engine.md "RADE and the app".

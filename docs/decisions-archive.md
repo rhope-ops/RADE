@@ -4,6 +4,7 @@ Rows moved unchanged from [DECISIONS.md](DECISIONS.md) because later rows replac
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-17 | AGENTS.md "Engine source" line, exact text approved: the engine/ folder (entry engine/rade_build.py; file list in docs/engine.md), because the engine PowerShell now lives in engine/ps (engine-v11). Raised by the fresh rule-conflict check of the code-standard line. Scope: RADE. | the Administrator | "Engine source ... engine/rade_build.py here" (2026-11-14) |
 | 2026-11-14 | RADE installs apps only; it does not start them. | the Administrator | — |
 | 2026-11-14 | Window redesign: concept 1 "One thing" goes forward as the mockup, with Restore and Uninstall screens and a larger logo and word mark (40 px, 15 pt). Build not approved yet. Detail: docs/reviews/2026-11-14-window-redesign-proposals.md. | the Administrator | "concept not chosen" in the row below |
 | 2026-11-14 | Window redesign (concept not chosen; three concepts in docs/reviews/2026-11-14-window-redesign-proposals.md): (1) FAILED and NEEDS REVIEW are dark red #8B1A1A, added to the palette, so yellow #FFD520 means "your turn" only; (2) the redesign has no Exit button: Esc or the window's X exits, and RADE asks first only while a step runs; (3) a Maintenance screen is shown as a preview only and is not built before the Administrator approves it. | the Administrator | (2) replaces the Exit button of 90-161.Z 2026-11-14 (R17 window row) for the redesign |
