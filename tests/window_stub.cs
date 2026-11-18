@@ -90,7 +90,8 @@ namespace System.Windows.Forms {
   public class Label : Control { public override Size PreferredSize { get { object f; int h = 18; if (Values.TryGetValue("Font", out f) && f is PSObject) f = ((PSObject)f).BaseObject; if (f is RadeDraw.Font) h = ((RadeDraw.Font)f).Height; return new Size((Text ?? "").Length * 7, h); } } }
   public class Bag { public int Count; public void Add(object o) { Count++; } public void Clear() { Count = 0; } }
   public class TableLayoutPanel : Control { public Bag ColumnStyles = new Bag(); public Bag RowStyles = new Bag(); public void SetColumnSpan(Control c, int n) { } }
-  public class Button : Control { public override Size PreferredSize { get { object m; Size min = new Size(0, 0); if (Values.TryGetValue("MinimumSize", out m) && m is PSObject) m = ((PSObject)m).BaseObject; if (m is Size) min = (Size)m; return new Size(Math.Max((Text ?? "").Length * 7 + 24, min.Width), Math.Max(23, min.Height)); } } }
+  public class ButtonBase : Control { }   // R29b: $ui.Ink asks for it (a button with an edge starts at its edge)
+  public class Button : ButtonBase { public override Size PreferredSize { get { object m; Size min = new Size(0, 0); if (Values.TryGetValue("MinimumSize", out m) && m is PSObject) m = ((PSObject)m).BaseObject; if (m is Size) min = (Size)m; return new Size(Math.Max((Text ?? "").Length * 7 + 24, min.Width), Math.Max(23, min.Height)); } } }
   public class TextBoxBase : Control { public bool ReadOnly; public int SelectionLength; public string SelectedText = ""; public void Copy() { RadeStub.Driver.Clip = "selected"; } public void SelectAll() { SelectionLength = (Text ?? "").Length; } }
   public class TextBox : TextBoxBase { public int GetLineFromCharIndex(int i) { return 0; } }
   public class RichTextBox : TextBoxBase { }   // the lines of a hand step: its Rtf is kept as given (Dyn); the window keeps the plain lines too

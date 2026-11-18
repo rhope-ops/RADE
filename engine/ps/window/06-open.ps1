@@ -67,7 +67,9 @@ $ui.ShowAppRow = { param([bool]$On)
   # sized by the window) takes the row's height: the first card after the choice is measured before the next fit
   # (Windows job, 18 Nov 26: the row at 76 needed 23 px in a 98 px block).
   if ($On) { try { $ui.AppL.Height = $ui.AppL.PreferredSize.Height } catch { $null = $_ } }   # no height yet: the next fit sets it
-  $ui.AppRow.Visible = $On; $ui.LinkLine.Visible = ($On -and $ui.Logo -and $ui.AppLogo)
+  if ($ui.AppUnder) { $ui.AppL.Visible = $On } else { $ui.AppRow.Visible = $On }   # no application logo: the name is the subtitle under RADE (R29b V1)
+  $ui.LinkLine.Visible = ($On -and $ui.Logo -and $ui.AppLogo)
+  & $ui.FitHead; & $ui.AlignRow (& $ui.RowParts 'Top') 0   # the title column is taller with its subtitle: the RADE row is centered again
   try { $ui.Form.PerformLayout() } catch { $null = $_ }   # no form yet (text mode): nothing to lay out
   if ($ui.AppLogo) { $ui.AppLogo.AccessibleName = $(if ($On) { $script:app.Name + ' logo' } else { 'Application logo' }) } }
 # Takes the application the user chose: selects it, reuses base check results that can be reused, and shows Maintenance

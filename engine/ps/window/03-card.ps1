@@ -44,7 +44,7 @@ $ui.PathL = & $ui.Label $ui.F.SmallB $ui.C.Gray $ui.Z.G3; $ui.PathL.Text = 'File
 $ui.PathT = & $ui.Text $ui.F.Small $ui.C.Navy $ui.Z.G1 'File path'
 $ui.StepRow = & $ui.Flow $ui.Z.G3; $ui.StepRow.WrapContents = $true   # a long step name: the bar goes to the next line
 $ui.StepName = & $ui.Text $ui.F.Body $ui.C.Navy 0 'Step name'; $ui.StepName.Visible = $true
-$ui.StepBar = & $ui.MkBar 'step' 'Progress of this step'; $ui.StepBar.Width = 200; $ui.StepBar.Margin = (& $ui.Pad 14 11 14 0)
+$ui.StepBar = & $ui.MkBar 'step' 'Progress of this step'; $ui.StepBar.Width = 200; $ui.StepBar.Margin = (& $ui.Pad 14 $ui.Z.BarTop 14 0)
 # R28 N10: the time in this step, at the right end of its bar ("4m 12s"), every second ($ui.TimeT). The log keeps "Started".
 $ui.StepTime = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepTime.Visible = $true; $ui.StepTime.AccessibleName = 'Time in this step'
 $ui.StepFrac = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepFrac.Visible = $true; $ui.StepFrac.Margin = (& $ui.Pad $ui.Z.G3 2 0 0)
