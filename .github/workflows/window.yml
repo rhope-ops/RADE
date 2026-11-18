@@ -3,6 +3,7 @@ name: window
 # Linux cannot draw Windows Forms, so the repo checks test only the window's logic. This job draws each card of the
 # sample bundle, checks the layout (no cut text, no overlap, nothing outside its parent) and keeps one PNG per card.
 # Pull requests that change the engine or the tests, and manual runs; never on push (AGENTS.md "Checks").
+# Job text51 (Stage 6): a text-mode run of the sample bundle on Windows PowerShell 5.1 (tests/text_mode_51.py).
 # No secret, read-only token. This repo is public: standard runners use no paid minutes.
 on:
   pull_request:
@@ -32,3 +33,14 @@ jobs:
           name: window
           path: window-out
           retention-days: 14
+  text51:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Keep line ends as they are in the repository (a fetched file is checked by its SHA-256)
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          persist-credentials: false
+      - name: Run the sample bundle in text mode and check its result lines
+        run: python tests/text_mode_51.py

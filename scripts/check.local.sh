@@ -51,6 +51,7 @@ if [ "$lane" = full ]; then python3 scripts/check_apps.py; else echo "SKIP app c
 if [ -n "$et" ]; then
   if wait "$et"; then et=""; cat "$eo"; else et=""; cat "$eo"; echo "FAIL engine tests (tests/engine_test.sh)"; exit 1; fi
   python3 tests/bundle_layout_test.py   # the Contents list and the shared blocks (docs/engine.md "Bundle layout")
+  python3 tests/text_mode_51.py   # a text-mode run of the sample bundle (on Windows PowerShell 5.1 in the job text51 of window.yml)
   bash scripts/lint.sh   # PSScriptAnalyzer on the built sample bundle (apps lint their bundles with the same settings)
 else
   echo "SKIP engine tests (fast lane: no file they read changed; the full lane runs them)"
