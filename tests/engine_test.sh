@@ -76,7 +76,8 @@ grep -q "^\$appLogoPng = 'iVBORw0KGgo" "$t/app/scripts/gov/paste/SAMPLE-R01-roun
 mv "$t/app/assets/sample-logo.png" "$t/sl.png"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: no file at assets/sample-logo.png" "$t/lg.txt" && ok || bad "build stops on a missing application logo"
 echo "not a png" > "$t/app/assets/sample-logo.png"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: not a PNG file" "$t/lg.txt" && ok || bad "build stops on an application logo that is not a PNG"
 sed -i 's#"logo": "assets/sample-logo.png"#"logo": "../sample-logo.png"#' "$t/app/scripts/paste_bundles.json"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: the path must stay inside the application repo" "$t/lg.txt" && ok || bad "build stops on an application logo outside the app repo"
-sed -i 's#"logo": "../sample-logo.png"#"logo": "assets/sample-logo.png"#' "$t/app/scripts/paste_bundles.json"
+for bad in "/etc/sample-logo.png" "assets/../../sample-logo.png"; do sed -i "s#\"logo\": \"[^\"]*\"#\"logo\": \"$bad\"#" "$t/app/scripts/paste_bundles.json"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: the path must stay inside the application repo" "$t/lg.txt" && ok || bad "build stops on application logo $bad"; done
+sed -i 's#"logo": "[^"]*"#"logo": "assets/sample-logo.png"#' "$t/app/scripts/paste_bundles.json"
 mv "$t/sl.png" "$t/app/assets/sample-logo.png"; build || bad "rebuild after the application logo checks"
 b="$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1"
 grep -q "Name = 'Sample app (deploy)'.*Mode = 'deploy'; Version = '1.0.0'" "$b" && ! grep "Name = 'Sample app (deploy)'" "$b" | grep -q "'outlook'" && ok || bad "catalog: deploy app has Mode, Version and no outlook check"
