@@ -1,6 +1,6 @@
 # Next prompt: RADE
 
-Updated: 2026-11-18 by Claude (logo 64 px baseline and app row, PRs 98 and 99, ENGINE_RELEASE 15, release engine-v15 after PR 99; standards plan done, close-out in docs/reviews; engine-v14 = 783dee4 released 17 Nov 26; test speed S1-S4 merged, PR 86; check baseline 66.4 s, PR 89). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
+Updated: 2026-11-18 by Claude (logo 64 px baseline and app row, PRs 98 and 99, ENGINE_RELEASE 15, engine-v15 = 3d9ee5a released 18 Nov 26, palette stays USAF; standards plan done, close-out in docs/reviews; engine-v14 = 783dee4 released 17 Nov 26; test speed S1-S4 merged, PR 86; check baseline 66.4 s, PR 89). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
 
 ## State
 
@@ -32,7 +32,6 @@ Updated: 2026-11-18 by Claude (logo 64 px baseline and app row, PRs 98 and 99, E
 
 ## Needs the Administrator
 
-- Logo palette: the Administrator does not want the USAF blue/white/yellow look long term but kept it for engine-v15 (18 Nov 26); options A-D with contrast: https://claude.ai/artifact/VFGHZkutbbCDFE8uuoFtpr (REC A, Graphite & Teal).
 - The final Teams channel name (placeholder RHOPE-OPS in the engine and in apps.json `help`).
 
 ## Do not
