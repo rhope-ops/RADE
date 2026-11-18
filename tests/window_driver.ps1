@@ -47,15 +47,25 @@ function global:Show-RadeCard {
     if ($t -in 'Button', 'TextBox', 'CheckBox' -and -not ($c.Parent -and $c.Parent.Events.ContainsKey('Paint')) -and -not ($c.Tag -is [hashtable]) -and -not ($c.Values.ContainsKey('TabStop') -and $c.Values['TabStop'] -eq $false)) { Write-Host ('WIN NOFOCUS ' + $t + ' "' + $c.Text + '" in view ' + $ui.View) }
   }
 }
-# R29b N3: prints "WIN mid tick": the step's time and count against the bar's midpoint, from margins and sizes (no layout
-# here), at 100, 150 and 200 %: the bar's coded margin and height scaled, the small font scaled (the stand-ins' text height is
-# 1.7 x the points). Takes nothing; restores the bar and the fonts after.
+<#
+.SYNOPSIS
+R29b N3: prints "WIN mid tick", the step's time and count against the bar's midpoint, from margins and sizes (no layout here).
+.DESCRIPTION
+At 100, 150 and 200 %: the bar's coded margin and height scaled, the small font scaled (the stand-ins' text height is 1.7 x
+the points). Then a text taller than the bar's place, fitted twice. The bar, its base margin and the fonts are restored after.
+.OUTPUTS
+Nothing; one WIN line.
+#>
 function global:Show-RadeTick {
-  $tk = @(); $keep = @{ Bar = $ui.StepBar.Margin; H = $ui.StepBar.Height; F = $ui.StepTime.Font; B0 = $ui.BarTop0 }
-  foreach ($k in 1.0, 1.5, 2.0) { $ui.StepBar.Margin = (& $ui.Pad 14 ([int](11 * $k)) 14 0); $ui.BarTop0 = [int](11 * $k); $ui.StepBar.Height = [int](4 * $k); $f = New-Object RadeDraw.Font([string]$ui.F.Small.Name, [single](10 * $k))
+  $tk = @(); $keep = @{ Bar = $ui.StepBar.Margin; H = $ui.StepBar.Height; F = $ui.StepTime.Font; BT = $ui.BarTop }
+  foreach ($k in 1.0, 1.5, 2.0) { $ui.StepBar.Margin = (& $ui.Pad 14 ([int](11 * $k)) 14 0); $ui.BarTop = [scriptblock]::Create('' + [int](11 * $k)); $ui.StepBar.Height = [int](4 * $k); $f = New-Object RadeDraw.Font([string]$ui.F.Small.Name, [single](10 * $k))
     $ui.StepTime.Font = $f; $ui.StepFrac.Font = $f; & $ui.AlignTick; $mb = $ui.StepBar.Margin.Top + $ui.StepBar.Height / 2.0
     $tk += ([string]([int]($k * 100)) + '%:' + [math]::Abs(($ui.StepTime.Margin.Top + $ui.StepTime.PreferredSize.Height / 2.0) - $mb) + '/' + [math]::Abs(($ui.StepFrac.Margin.Top + $ui.StepFrac.PreferredSize.Height / 2.0) - $mb)) }
-  $ui.StepBar.Margin = $keep.Bar; $ui.BarTop0 = $keep.B0; $ui.StepBar.Height = $keep.H; $ui.StepTime.Font = $keep.F; $ui.StepFrac.Font = $keep.F; & $ui.AlignTick
+  $ui.StepBar.Margin = $keep.Bar; $ui.BarTop = $keep.BT; $ui.StepBar.Height = $keep.H; $ui.StepTime.Font = $keep.F; $ui.StepFrac.Font = $keep.F; & $ui.AlignTick
+  # A text taller than the bar's place (30 pt: 51 high) lifts the bar; a second fit keeps the same margin (the lift never adds up).
+  $f = New-Object RadeDraw.Font([string]$ui.F.Small.Name, [single]30); $ui.StepTime.Font = $f; $ui.StepFrac.Font = $f; & $ui.AlignTick; $b1 = $ui.StepBar.Margin.Top; & $ui.AlignTick
+  $tk += ('lift=' + ($b1 - 11) + ' again=' + ($ui.StepBar.Margin.Top - $b1) + ' off=' + [math]::Abs(($ui.StepTime.Margin.Top + $ui.StepTime.PreferredSize.Height / 2.0) - ($ui.StepBar.Margin.Top + $ui.StepBar.Height / 2.0)))
+  $ui.StepTime.Font = $keep.F; $ui.StepFrac.Font = $keep.F; & $ui.AlignTick
   Write-Host ('WIN mid tick ' + ($tk -join ' '))
 }
 # R29b: prints "WIN rule head": the header rule fails on any edge difference; the ticker rule allows 1 px at 100, 150 and 200 %
@@ -64,6 +74,7 @@ function global:Show-RadeR29bRules {
   $hd = @(& $ui.HeadBad 'fixture' @{ N = 'WordL'; X = 80 } @{ N = 'AppL'; X = 80 }) + @(& $ui.HeadBad 'fixture' @{ N = 'WordL'; X = 86 } @{ N = 'AppL'; X = 80 })
   $tg = @(& $ui.TickBad 'fixture' @{ Top = 11; H = 4 } @{ N = 'StepTime'; Top = 5; H = 17 }) + @(& $ui.TickBad 'fixture' @{ Top = 16; H = 6 } @{ N = 'StepTime'; Top = 7; H = 26 }) + @(& $ui.TickBad 'fixture' @{ Top = 22; H = 8 } @{ N = 'StepTime'; Top = 9; H = 34 })
   $tb = @(& $ui.TickBad 'fixture' @{ Top = 11; H = 4 } @{ N = 'StepTime'; Top = 6; H = 17 }) + @(& $ui.TickBad 'fixture' @{ Top = 16; H = 6 } @{ N = 'StepTime'; Top = 9; H = 26 }) + @(& $ui.TickBad 'fixture' @{ Top = 22; H = 8 } @{ N = 'StepTime'; Top = 7; H = 34 })
+  $hd += @(& $ui.GapBad 'fixture' 6 6) + @(& $ui.GapBad 'fixture' 7 6) + @(& $ui.GapBad 'fixture' 30 6)   # R29b V1 gap: 6 = G1 at 150 %; 1 px off passes, 45 at 150 % on the device (30 here) fails
   Write-Host ('WIN rule head=' + $hd.Count + ' tick-ok=' + $tg.Count + ' tick-off=' + $tb.Count + ' ~ ' + (@($hd) + @($tb) -join ' ~ '))
 }
 function global:Push-RadeButton([string]$Text) {

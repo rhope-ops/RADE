@@ -214,6 +214,11 @@ $ui.EdgeBad = { param([string]$Card, $Edges)
 $ui.HeadBad = { param([string]$Card, $Title, $Sub)
   if ([int]$Title.X -eq [int]$Sub.X) { return @() }
   return @('LAYOUT ' + $Card + ' header ' + $Sub.N + ' edge: starts at ' + $Sub.X + ', ' + $Title.N + ' starts at ' + $Title.X) }
+# GapBad (R29b V1): without an application logo, the name is G1 (scaled) under the word RADE, within 1 px. Takes the card,
+# the measured gap and the gap it must be; gives back the defect lines.
+$ui.GapBad = { param([string]$Card, [int]$Gap, [int]$Want)
+  if ([math]::Abs($Gap - $Want) -le 1) { return @() }
+  return @('LAYOUT ' + $Card + ' header gap: ' + $Gap + ' between WordL and AppL, the gap is ' + $Want) }
 # TickBad (R29b N3): the step's time or count (@{ N; Top; H }) has its vertical center within 1 px of the bar's (@{ Top; H }),
 # at any scale (the tolerance is not scaled).
 $ui.TickBad = { param([string]$Card, $Bar, $Tick)
