@@ -1,6 +1,6 @@
 # Next prompt: RADE
 
-Updated: 2026-11-17 by Claude (code standard and engine split; engine-v11 = 19ba54b released 17 Nov 26; ENGINE_RELEASE = 12 for the lint-clean names, release engine-v12 after the merge). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
+Updated: 2026-11-17 by Claude (code standard and engine split; engine-v11 = 19ba54b released 17 Nov 26; ENGINE_RELEASE = 13 for the reach-test sign-in fix, release engine-v13 after the merge). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
 
 ## State
 

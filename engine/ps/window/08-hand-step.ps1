@@ -37,10 +37,12 @@ $ui.VAnswer = { param($Q, [int]$I, [int]$N)
   else { $ws = @($(if ($Q.Kind -eq 'yesno') { 'Yes', 'No' } else { $Q.Choices })); $c.Buttons = @(for ($k = 0; $k -lt $ws.Count; $k++) { @{ Text = [string]$ws[$k]; Act = $ui.ReplyActs[$k] } }) }
   & $ui.SetCard $c }
 # Opens the address in the box in the browser and remembers it (also in its file). Takes nothing; says so when the
-# address does not start with https://.
+# address does not start with https://, or is not on the host of the step's own address (the Administrator, 2026-11-17).
 $ui.OpenUrl = {
   $u = $ui.Field.Text.Trim()
   if ($u -notmatch '^https://') { & $ui.Say1 'The address must start with https://'; return }
+  $fixed = [string]$ui.G.Step.Url
+  if ($fixed -and -not (Test-SameHost $u $fixed)) { & $ui.Say1 ('The address must be on ' + ([uri]$fixed).Host + ', like the address this step gives.'); return }
   $ui.GUrl = $u; try { if ($ui.G.UrlFile) { Set-Content -LiteralPath $ui.G.UrlFile -Value $u -Encoding UTF8 } } catch { $null = $_ }
   try { Start-Process -FilePath $u; & $ui.Say1 'Opened in your browser. Do the steps on this card, then come back to this window.' } catch { & $ui.Say1 ('The browser could not be opened: ' + $_.Exception.Message) } }
 $ui.CopyPathB.Add_Click({ & $ui.Say1 $(if (Copy-TextToClipboard ([string]$ui.G.File)) { 'File path copied. Press Ctrl+V in the "File name" box' } else { 'The clipboard is busy. Select "Copy file path" again.' }) })

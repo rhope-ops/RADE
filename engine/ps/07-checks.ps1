@@ -69,7 +69,7 @@ function Get-FlowPortal([string]$Base) {
   foreach ($k in $script:appSteps) {
     $s = $steps[$k]
     if ($s.Url) {
-      if ($s.UrlConfig) { $p = Get-ConfigFile $Base $s.UrlConfig; if (Test-Path -LiteralPath $p -PathType Leaf) { try { $v = ([string](Get-Content -LiteralPath $p -TotalCount 1)).Trim(); if ((Test-SameHost $v $s.Url)) { return @{ Url = $v; Config = $p } } } catch { $null = $_ } } }
+      if ($s.UrlConfig) { $p = Get-ConfigFile $Base $s.UrlConfig; if (Test-Path -LiteralPath $p -PathType Leaf) { try { $v = ([string](Get-Content -LiteralPath $p -TotalCount 1)).Trim(); if ((Test-SameHost $v $s.Url)) { return @{ Url = $v; Config = $p } } elseif ($v) { return @{ Url = $s.Url; Config = $p; Refused = $true } } } catch { $null = $_ } } }
       return @{ Url = $s.Url; Config = $(if ($s.UrlConfig) { Get-ConfigFile $Base $s.UrlConfig } else { '' }) }
     }
   }
@@ -378,7 +378,8 @@ function Get-NetworkCheck([string]$Id, [string]$Base, [string]$Site) {
     if (-not $fp.Url) { $one = Format-CheckResult 'NOT RUN' 'No Power Automate address' '' }
     else {
       $w = Test-WebReach $fp.Url
-      if ($w.Ok) { $one = Format-CheckResult 'PASSED' ('reached' + $(if ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
+      if ($w.Ok -and $fp.Refused) { $one = Format-CheckResult 'WARNING' ('reached the app''s own address; the saved address is not on ' + ([uri]$fp.Url).Host + ' and was not used') 'Enter an address on that host in the Power Automate step, or leave it as it is' }
+      elseif ($w.Ok) { $one = Format-CheckResult 'PASSED' ('reached' + $(if ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
       else { $one = Format-CheckResult 'FAILED' ('Not reached: ' + $w.Why) 'If Power Automate opens in Edge, select "Check Power Automate"' }
     }
   }
