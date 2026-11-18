@@ -96,8 +96,10 @@ def make_test_copy(t, bundle, users):
         s, n = re.subn(pat, lambda m, new=new: new, s)
         if not n:
             sys.exit("FAIL the bundle has no line for " + pat)
-    s = s.replace("https://raw.githubusercontent.com/example-org/sample-app/v1.0.0/", app + "/")
-    s = s.replace("https://example-org.github.io/sample-app", go).replace("https://example.invalid/import", go)
+    for old, new in (("https://raw.githubusercontent.com/example-org/sample-app/v1.0.0/", app + "/"), ("https://example.invalid/import", go)):
+        if old not in s:
+            sys.exit("FAIL the bundle has no address " + old + " (the run must not reach a real address)")
+        s = s.replace(old, new)
     out = t / "b.ps1"
     out.write_text(s, encoding="utf-8-sig")   # a byte order mark: Windows PowerShell 5.1 reads the file as UTF-8
     return out
@@ -122,7 +124,7 @@ def run_text(script, users):
         users: the users root (pathlib.Path); USERPROFILE points to the fake user inside it.
 
     Returns:
-        A pair: the exit code of the child and its output lines. On a timeout the last 30 lines are printed and the
+        The exit code of the child, its output lines (the error stream last), and the lines of its error stream alone. On a timeout the last 30 lines are printed and the
         process ends with FAIL (the child is stopped by subprocess.run).
     """
     env = dict(os.environ, USERPROFILE=str(users / FAKE_USER))
@@ -132,7 +134,8 @@ def run_text(script, users):
         lines = ((e.stdout or b"") + (e.stderr or b"")).decode("utf-8", "replace").splitlines()
         print("\n".join(lines[-30:]))
         sys.exit("FAIL the run did not end in %d seconds (the last 30 lines are above)" % TIME_LIMIT)
-    return r.returncode, (r.stdout + r.stderr).decode("utf-8", "replace").splitlines()
+    text = lambda b: b.decode("utf-8", "replace").splitlines()
+    return r.returncode, text(r.stdout + r.stderr), [l for l in text(r.stderr) if l.strip()]
 
 
 def read_record(users):
@@ -144,25 +147,33 @@ def read_record(users):
     return (a["lastRun"]["state"], (a.get("installed") or {}).get("version"), a["lastRun"]["version"])
 
 
+# What a PowerShell error looks like in the output, anywhere in a line: the lines both engines print under an error
+# (its position, its category, its id), the usual words, and "<command> : <message>" as Windows PowerShell 5.1 starts one.
+ERROR_TEXT = re.compile(r"FullyQualifiedErrorId|CategoryInfo\s*:|\bAt .+:\d+ char:\d+|\bAt line:\d+|Exception|\bERROR\b|Unhandled"
+                        r"|^\S+ : (The term|Cannot|You cannot|Unable|Method invocation|Property|A parameter|Access)|is not recognized as")
+
+
 def starts(lines, prefix):
     """True when one of the output lines starts with prefix."""
     return any(l.startswith(prefix) for l in lines)
 
 
-def checks(code, lines, record):
+def checks(code, lines, record, errors):
     """The checks, as (name, passed) pairs; each is a line that tests/engine_test.sh asserts for its first deploy run (298-345).
 
     Args:
         code: the exit code of the child.
         lines: the output lines of the child.
         record: what read_record gave.
+        errors: the lines of the child's error stream (a PowerShell error that does not stop the run goes there).
 
     Returns:
         A list of (name, passed) pairs.
     """
-    bad = [l for l in lines if re.match(r"(ERROR|Exception|Unhandled|At line:)|\bFullyQualifiedErrorId\b|\bCategoryInfo\b", l)]
+    bad = [l for l in lines if ERROR_TEXT.search(l)]
     return [
         ("exit code 0 (got %s)" % code, code == 0),
+        ("nothing on the error stream (%d lines%s)" % (len(errors), ": " + errors[0][:120] if errors else ""), not errors),
         ("the NIPR guard let the run start", not starts(lines, "This application cannot be installed in your environment")),
         ("skipped step: version not recorded as installed", starts(lines, "Note: some steps were off or skipped, so version 1.0.0 is not recorded as installed")),
         ("a file downloaded from the (local) release", starts(lines, "  Downloaded   T02\\SAMPLE-data-r1.txt")),
@@ -194,8 +205,8 @@ def main():
             print("PowerShell version of the child: " + v)
             results.append(("Windows PowerShell major version is 5 (got %s)" % v, v.split(".")[0] == "5"))
         script, users = prepare(t)
-        code, lines = run_text(script, users)
-        results += checks(code, lines, read_record(users))
+        code, lines, errors = run_text(script, users)
+        results += checks(code, lines, read_record(users), errors)
         if not all(ok for _, ok in results):
             print("--- last 30 lines of the run ---\n" + "\n".join(lines[-30:]) + "\n---")
     finally:
