@@ -25,6 +25,8 @@ body{margin:0;background:var(--bg);color:var(--text);font:1rem/1.5 var(--ui)}
 .row{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 /* The band has fixed colors (white text on navy to blue) in both themes. Grid: the logo spans two rows; row 1 = RADE and the channel, so their midpoints match. */
 .band{flex:none;background:linear-gradient(100deg,#0b2545,#00539f);color:#fff;border-bottom:3px solid var(--turn)}
+/* The band and the bottom line keep their content in a centered 860 px column, as the 90-161.Z page (the Administrator, 18 Nov 26). */
+.band-in,.bottom{width:100%;max-width:860px;margin-inline:auto}
 .band-in{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:1fr auto auto 1fr;column-gap:14px;align-items:center;padding-block:18px}
 .band img{grid-row:1/-1;width:64px;height:64px}
 .band .name{grid-area:2/2;margin:0;font-size:1.375rem;line-height:1.2;font-weight:650;color:#fff}
