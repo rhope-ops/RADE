@@ -78,12 +78,7 @@ function Get-NewerRound {
   # Reads go.md in the repository (the bookmark page's source; data, not code) and returns the highest round number listed in an open task
   # heading when it is newer than this one, else ''. Short timeout; any failure is silent, so it never blocks a run.
   try {
-    try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { $null = $_ }   # TLS 1.2 (R19)
-    $rq = [System.Net.WebRequest]::Create($goUrl)
-    $rq.Timeout = 4000
-    try { $rq.UserAgent = $webAgent } catch { $null = $_ }   # R21: as in Test-WebReach
-    try { $rq.UseDefaultCredentials = $true } catch { $null = $_ }   # https: Windows sign-in for the proxy (a file URL in tests has none)
-    if ($rq.Proxy) { $rq.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials }
+    $rq = Get-WebRequest $goUrl 4000   # engine/ps/07-checks.ps1: no Windows sign-in for the address, only for the proxy
     $rs = $rq.GetResponse()
     try { $text = (New-Object System.IO.StreamReader($rs.GetResponseStream())).ReadToEnd() } finally { $rs.Close() }
     $mine = [int]($round -replace '\D', '')

@@ -287,7 +287,7 @@
         },
         "urlConfig": {
           "type": "string",
-          "description": "Config file that holds the address, when it must not be in the public repo."
+          "description": "Config file that can hold the user's own address for this step. The step needs its own url too: a saved address is used only on the host and port of that url (the build stops without it)."
         },
         "url_source": {
           "type": "string",

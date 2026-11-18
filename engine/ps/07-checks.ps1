@@ -5,8 +5,8 @@
 #   SharePoint sign-in through PnP; only these fixed addresses (AGENTS.md "No reconnaissance").
 # Writes: one OneDrive test file and one temporary script (each deleted at once), the site address in Config, and the
 #   install record (one row of one list on the site, after a deploy step).
-# Credentials: the interactive CAC sign-in of PnP (-UseWebLogin); the proxy gets the Windows sign-in; the reach test
-#   sends no Windows sign-in to the addresses it tests (the Administrator, 2026-11-17).
+# Credentials: the interactive CAC sign-in of PnP (-UseWebLogin); the proxy gets the Windows sign-in; no web request
+#   of RADE sends the Windows sign-in to the address it asks (Get-WebRequest; the Administrator, 2026-11-17).
 
 # ---- Checks (PFM 14 Nov 26: RADE checks, from its window, that this computer can install the chosen app and
 # that the PFM has the rights to see it done end to end). Read-only except: one test file in the OneDrive folder and one
@@ -75,27 +75,55 @@ function Get-FlowPortal([string]$Base) {
   }
   return @{ Url = ''; Config = '' }
 }
-# True when both addresses are https and name the same host (any letter case). Takes the address to check and the
-# fixed address it must match; gives back $true or $false.
+<#
+.SYNOPSIS
+True when both addresses are https and name the same host (any letter case) and the same port.
+.DESCRIPTION
+The port is part of the rule (engine-v14): an address from a file a user can change must not make RADE touch another
+port of the host (AGENTS.md "No reconnaissance"). An empty or broken address gives $false.
+.PARAMETER Url
+The address to check.
+.PARAMETER Fixed
+The fixed address it must match.
+.OUTPUTS
+$true or $false.
+#>
 function Test-SameHost([string]$Url, [string]$Fixed) {
   try { $a = [uri]$Url; $b = [uri]$Fixed } catch { return $false }
-  return ($a.IsAbsoluteUri -and $b.IsAbsoluteUri -and $a.Scheme -eq 'https' -and $b.Scheme -eq 'https' -and $a.Host -ieq $b.Host)
+  if (-not $a -or -not $b) { return $false }
+  return ($a.IsAbsoluteUri -and $b.IsAbsoluteUri -and $a.Scheme -eq 'https' -and $b.Scheme -eq 'https' -and $a.Host -ieq $b.Host -and $a.Port -eq $b.Port)
+}
+<#
+.SYNOPSIS
+Makes the web request every RADE read uses: the address itself never gets the Windows sign-in.
+.DESCRIPTION
+One place for the request rules (engine-v14; the Administrator, 2026-11-17 and 2026-11-18): TLS 1.2 is added (Windows
+PowerShell 5.1 starts with TLS 1.0, which GitHub closes), the user agent of Edge's family is sent (a request with none
+can be closed by a filtering proxy), the Windows sign-in is off for the address, and only the work proxy gets it.
+The request is not sent here: the caller sends it and closes the answer.
+.PARAMETER Url
+The address to ask.
+.PARAMETER TimeoutMs
+How long to wait for the answer, in milliseconds.
+.OUTPUTS
+The request object (System.Net.WebRequest).
+#>
+function Get-WebRequest([string]$Url, [int]$TimeoutMs) {
+  try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { $null = $_ }   # 3072 = TLS 1.2
+  $rq = [System.Net.WebRequest]::Create($Url)
+  $rq.Timeout = $TimeoutMs
+  try { $rq.UserAgent = $webAgent } catch { $null = $_ }   # a file address (tests) has no user agent
+  try { $rq.UseDefaultCredentials = $false } catch { $null = $_ }   # a file address (tests) has no such setting; off is also the default
+  try { if ($rq.Proxy) { $rq.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials } } catch { $null = $_ }   # no proxy: nothing to sign in to
+  return $rq
 }
 function Test-WebReach([string]$Url) {
-  # TLS 1.2 first (found in R19, fixed for R20: Windows PowerShell 5.1 starts with TLS 1.0, which GitHub closes: [ReceiveFailure]; Edge uses 1.2).
-  try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { $null = $_ }
   # Does the host answer? Any HTTP answer counts (401 or 403 = it answers but wants a sign-in), so the address itself
   # never gets the Windows sign-in (the Administrator, 2026-11-17); only the proxy does.
   # Returns no address and no message text (they can hold the site or tenant name): only the code or the error kind.
   try {
-    $rq = [System.Net.WebRequest]::Create($Url)
-    $rq.Timeout = 6000
-    # R20: [ReceiveFailure] stayed with TLS 1.2 set. A request with no User-Agent can be closed by a filtering proxy (agent
-    # finding, Confidence low); send the one Edge's family sends.
-    try { $rq.UserAgent = $webAgent } catch { $null = $_ }
-    try { $rq.UseDefaultCredentials = $false } catch { $null = $_ }
-    try { $rq.AllowAutoRedirect = $false } catch { $null = $_ }
-    try { if ($rq.Proxy) { $rq.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials } } catch { $null = $_ }
+    $rq = Get-WebRequest $Url 6000   # TLS 1.2, user agent, no sign-in for the address (R19 to R21 findings live there)
+    try { $rq.AllowAutoRedirect = $false } catch { $null = $_ }   # the answer of this address counts, not of the next one
     $rs = $rq.GetResponse()
     $code = 0; try { $code = [int]$rs.StatusCode } catch { $null = $_ }
     $rs.Close()
