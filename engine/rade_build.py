@@ -497,7 +497,7 @@ ENGINE_SHA = hashlib.sha256(b''.join(rel.encode() + b'\0' + (ENGINE_ROOT / rel).
                                      + ['engine/rade_ui.ps1', 'assets/logo/logo-rho-128.png'])).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
-ENGINE_RELEASE = 14
+ENGINE_RELEASE = 15
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':
