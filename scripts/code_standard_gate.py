@@ -8,7 +8,7 @@ What it does:
   safety_ok       a safety label starts a header line and has a value on that line
   file_rules      the per-file rules (header, safety, file size, line length) of one source file
   owner_row       a NEW docs/DECISIONS.md table row that names .code-standard.json and has the owner in its By cell
-                  (an old row that was only moved, re-spaced or re-dated into the past does not count)
+                  (an old row again, moved, re-spaced or with a few characters changed, does not count)
   owner_role      the owner role, read from the "- Owner:" line of AGENTS.md
   exists_at       a file exists at a git ref (a debt key for a file new in this change is refused)
   level           how far an opt-in rule is adopted in a config (a higher level than on main may list new debt once)
@@ -20,6 +20,7 @@ Credentials: none.
 Run:     imported by scripts/code_standard.py; proved by `python3 scripts/code_standard.py --test`.
 """
 
+import difflib
 import re
 import subprocess
 from pathlib import Path
@@ -28,11 +29,22 @@ SAFETY_LABELS = ('Network:', 'Writes:', 'Credentials:')   # C1 safety: what a re
 MIN_HEADER_CHARS = 60      # a header shorter than this does not say what the file is for
 # A By cell with one of these marks a script or an agent, not the owner (the owner, 2026-11-17: only the owner decides).
 NOT_OWNER = ('scripts/', '.py', 'agent', 'delegation')
-MIN_ROW_CELLS = 4          # a DECISIONS row: date, decision, by, last
+ROW_CELLS = 4              # a DECISIONS row: date, decision, by, last (exactly: a spare cell would move the By cell)
+COPY_RATIO = 0.9           # a row this much like an old row is that row edited, not a new decision
 # The opt-in rules: the debt kind of each and its level in a config (0 = off). Level 2 of safety marks the strict form.
 OPT_IN = {'docs': lambda c: 1 if c.get('c2') == 'full' else 0,
-          'safety': lambda c: c.get('c1_safety') if type(c.get('c1_safety')) is int else int(bool(c.get('c1_safety'))),
+          'safety': lambda c: safety_level(c.get('c1_safety')),
           'line': lambda c: 1 if c.get('caps', {}).get('max_line_chars') else 0}
+
+
+def safety_level(value):
+    """Return the level of the "c1_safety" setting: 0 = off, 1 = on (true), 2 or more = a stricter form (a number, or
+    digits as text). Any other value that is set counts as 1; a negative number as 0."""
+    if isinstance(value, str) and value.strip().isdigit():
+        value = int(value.strip())
+    if type(value) is int:
+        return max(0, value)
+    return 1 if value else 0
 
 
 def safety_ok(head):
@@ -99,15 +111,30 @@ def squeeze(text):
     return re.sub(r'\s+', '', text)
 
 
-def row_refusal(text, name, owner, old_rows=(), floor=''):
+def is_copy(row, old_rows):
+    """True when `row` is an old row again: the same text but for spacing, or so close to one (COPY_RATIO alike or more)
+    that it is an old row with a word, a mark or a date changed.
+
+    Args:
+        row: the added row.
+        old_rows: the rows docs/DECISIONS.md had on the merge base (rows this change removed are among them).
+
+    Returns:
+        True or False.
+    """
+    mine = squeeze(row)
+    return any(mine == o or difflib.SequenceMatcher(None, mine, o, autojunk=False).ratio() >= COPY_RATIO
+               for o in (squeeze(x) for x in old_rows))
+
+
+def row_refusal(text, name, owner, old_rows=()):
     """Return why a DECISIONS line is not a new owner's row for file `name`, or None when it is one.
 
     Args:
         text: the added line, without its leading "+".
         name: the baseline file name the decision cell must name.
         owner: the owner role (owner_role), lower case.
-        old_rows: the lines of docs/DECISIONS.md at the merge base, each through squeeze().
-        floor: the earliest date (YYYY-MM-DD) a new row may carry, or '' for no limit.
+        old_rows: the table rows of docs/DECISIONS.md at the merge base.
 
     Returns:
         The refusal (which rule refused it) or None.
@@ -116,26 +143,24 @@ def row_refusal(text, name, owner, old_rows=(), floor=''):
     if not row.startswith('|'):
         return 'rule 1: not a table row (a line that starts with |)'
     cells = [c.replace('\0', '|').strip() for c in row.replace('\\|', '\0').strip('|').split('|')]
-    if len(cells) < MIN_ROW_CELLS:
-        return 'rule 1: a table row has at least %d cells' % MIN_ROW_CELLS
-    if name not in ' | '.join(cells[1:-2]):   # a "|" inside the decision text makes more cells: By is the one before last
+    if len(cells) != ROW_CELLS:
+        return 'rule 1: a decision row has %d cells: date, decision, by, last (write \\| for a | inside a cell)' % ROW_CELLS
+    if name not in cells[1]:
         return 'rule 2: the decision cell does not name ' + name
-    by = cells[-2].lower()
+    by = cells[2].lower()
     bad = [x for x in NOT_OWNER if x in by]
     if bad:
         return 'rule 3: the By cell names a script or an agent (%s)' % bad[0]
     if not owner:
         return 'rule 4: AGENTS.md has no "- Owner:" line to name the owner'
-    if not re.fullmatch(r'(the\s+)?' + re.escape(owner) + r'(\s*\(.*\))?', by):
-        return 'rule 4: the By cell is not the owner alone (%s)' % owner
-    if squeeze(row) in old_rows:
-        return 'rule 5: the row is not new (it is on main already; a moved or re-spaced row is no decision)'
-    if floor and not (re.fullmatch(r'\d{4}-\d{2}-\d{2}', cells[0]) and cells[0] >= floor):
-        return 'rule 6: the row is dated before this change started (%s); an old row that was edited is no decision' % floor
+    if not re.fullmatch(r'(the\s+)?' + re.escape(owner) + r'(\s*\([^()]*\))?', by):
+        return 'rule 4: the By cell is not the owner alone (%s; one note in brackets may follow)' % owner
+    if is_copy(row, old_rows):
+        return 'rule 5: the row is not new (it is an old row again: moved, re-spaced, or with a few characters changed)'
     return None
 
 
-def owner_row(diff, name, owner, old_text='', floor=''):
+def owner_row(diff, name, owner, old_text=''):
     """Check the added lines of a docs/DECISIONS.md diff for the owner's new row that opens the ratchet gate.
 
     Args:
@@ -143,18 +168,17 @@ def owner_row(diff, name, owner, old_text='', floor=''):
         name: the baseline file name.
         owner: the owner role (owner_role).
         old_text: docs/DECISIONS.md at the merge base ('' when there is none).
-        floor: the earliest date a new row may carry (the day before the merge base's commit), or ''.
 
     Returns:
         (True, []) when an added table row is new, names `name` and has the owner alone in its By cell; else (False,
         one refusal line for each added line that names `name`, with the rule that refused it).
     """
-    old_rows = {squeeze(x) for x in old_text.split('\n') if x.strip()}
+    old_rows = [x for x in old_text.split('\n') if x.strip().startswith('|')]
     refusals = []
     for line in diff.split('\n'):
         if not line.startswith('+') or line.startswith('+++') or name not in line:
             continue
-        why = row_refusal(line[1:], name, owner, old_rows, floor)
+        why = row_refusal(line[1:], name, owner, old_rows)
         if why is None:
             return True, []
         refusals.append('REFUSED  docs/DECISIONS.md line (%s): %s' % (why, line[1:61]))
