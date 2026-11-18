@@ -57,7 +57,7 @@ namespace System.Windows.Forms {
   [Flags] public enum TextFormatFlags { Left = 0, Top = 0, HorizontalCenter = 1, Right = 2, VerticalCenter = 4, SingleLine = 32, WordBreak = 16, NoPrefix = 2048, TextBoxControl = 8192, EndEllipsis = 32768, NoPadding = 268435456 }
   public enum MessageBoxButtons { OK, YesNo } public enum MessageBoxIcon { None, Warning } public enum MessageBoxDefaultButton { Button1, Button2 }
   public struct Padding { public int Left, Top, Right, Bottom; public Padding(int l, int t, int r, int b) { Left = l; Top = t; Right = r; Bottom = b; } public Padding(int a) { Left = Top = Right = Bottom = a; } }
-  public class ColumnStyle { public ColumnStyle(object a) { } public ColumnStyle(object a, object b) { } }
+  public class ColumnStyle { public object SizeType; public float Width; public ColumnStyle(object a) { SizeType = a; } public ColumnStyle(object a, object b) { SizeType = a; Width = Convert.ToSingle(b); } }
   public class RowStyle { public RowStyle(object a) { } public RowStyle(object a, object b) { } }
   public class ControlCollection : IEnumerable {
     public List<Control> Items = new List<Control>(); public Control Owner;

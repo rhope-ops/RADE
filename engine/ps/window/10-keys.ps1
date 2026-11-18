@@ -16,7 +16,8 @@ $ui.Form.Add_KeyDown({
     $n = [int]$Matches[2]; foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Key -eq $n) { $_.SuppressKeyPress = $true; $o.PerformClick(); break } } } })
 # Window size and place (R28, the Administrator, 2026-11-17): the window opens where the user last closed it (RADE\Config\rade-window.json;
 # bounds that are off every current screen are ignored); the first time it is maximized on the screen that shows the mouse. The
-# minimum size is 1280 x 720 at 100 % (cut to the work area of a small screen). The size and the state at Shown and at close are
+# minimum size is engine/window.json minSize (640 x 480 at 100 %, so Windows Snap can offer its zones; the Administrator, 2026-11-18;
+# 1280 x 720 before), cut to the work area of a small screen. The size and the state at Shown and at close are
 # recorded, and the layout self-check runs again after each resize (debounced: 400 ms after the last size change).
 $ui.Place = {
   $f = $ui.Form; $saved = Read-WindowState; $ui.Placed = 'first run'; $ui.LastClose = $(if ($saved) { [string]$saved.Closed } else { '' })
@@ -36,7 +37,7 @@ $ui.Place = {
       $f.Width = [int]($wa.Width * 0.95); $f.Height = [int]($wa.Height * 0.95); $f.Left = $wa.Left + [int](($wa.Width - $f.Width) / 2); $f.Top = $wa.Top + [int](($wa.Height - $f.Height) / 2)   # where Restore goes
       $f.WindowState = 'Maximized'
     }
-    $f.MinimumSize = New-Object System.Drawing.Size([math]::Min((& $ui.Sc 1280), $wa.Width), [math]::Min((& $ui.Sc 720), $wa.Height))
+    $f.MinimumSize = New-Object System.Drawing.Size([math]::Min((& $ui.Sc $ui.Layout.MinW), $wa.Width), [math]::Min((& $ui.Sc $ui.Layout.MinH), $wa.Height))
   } catch { $null = $_ } }
 # Gives the form's client size and window state as text like "1020x760/Normal". Takes nothing.
 $ui.WinNow = { $f = $ui.Form; $s = [string]$f.WindowState; if ($s -notin 'Normal', 'Maximized', 'Minimized') { $s = 'Normal' }; return ([string]$f.ClientSize.Width + 'x' + $f.ClientSize.Height + '/' + $s) }

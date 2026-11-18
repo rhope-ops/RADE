@@ -2,14 +2,17 @@
 # sentence, paragraphs, choices, box, hand-step text, step line, buttons) and the one-line text box helper.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
-# ---- The card: one block, left edge at 12 % of the width, 40 % of the spare height above it. Top to bottom: a small
+# ---- The card: one block, its text column centered (76.5 % of the width, at most 900 px: engine/window.json), 40 % of the spare height above it. Top to bottom: a small
 # line in capitals, the sentence, up to four paragraphs, the choices, a box with its label, the lines of a hand step (one
 # selectable text: the numbered lines, then the unnumbered ones), the file path of a hand step, the step line (name, bar,
 # time in the step, count), the last log line, the error box, two file links, a note, the help line, the closing line of
 # a hand step, the buttons, a last gray line, and the owner's test extras. A card shows only the parts it names ($ui.SetCard).
 $ui.Card = New-Object System.Windows.Forms.TableLayoutPanel
 $ui.Card.Dock = 'Fill'; $ui.Card.ColumnCount = 3; $ui.Card.RowCount = 3; $ui.Card.BackColor = $ui.C.White
-foreach ($w in @(11.75, 76.5, 11.75)) { [void]$ui.Card.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle('Percent', $w))) }
+# Three columns: a side, the text column, a side. The text column is $ui.Layout.Share % of the width and at most $ui.Layout.MaxW
+# (engine/window.json); the two sides share what is left, so the column is centered ($ui.Fit sets the sizes).
+$ui.CardCols = @(); $sd = (100 - $ui.Layout.Share) / 2
+foreach ($w in @($sd, $ui.Layout.Share, $sd)) { $cs = New-Object System.Windows.Forms.ColumnStyle('Percent', $w); $ui.CardCols += $cs; [void]$ui.Card.ColumnStyles.Add($cs) }
 [void]$ui.Card.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent', 40))); [void]$ui.Card.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('AutoSize'))); [void]$ui.Card.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent', 60)))
 # The card is a stack of two: the body (every part above the buttons) and the tail (the buttons, the last gray line
 # and the test extras). The body sits in a panel that scrolls only when the card is taller than the window, so the

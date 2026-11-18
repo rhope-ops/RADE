@@ -1,0 +1,5 @@
+{
+  "_doc": "The RADE window's layout values (the Administrator, 2026-11-18; docs/window-design.md). Sizes are pixels at 100 % Windows scaling. engine/rade_build.py puts them into every bundle; the window never reads this file at run time. The RADE page (index.html) has its own values.",
+  "textColumn": { "sharePercent": 76.5, "maxPx": 900 },
+  "minSize": { "width": 640, "height": 480 }
+}
