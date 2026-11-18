@@ -113,7 +113,6 @@ $ui.Fit = {
   & $ui.SetWrap $ui.StepName $cw; $ui.ErrBox.Width = [math]::Min((& $ui.Sc 600), ($cw - 2 * $mm))
   try { $ui.AppL.Width = [math]::Max((& $ui.Sc 60), ($ui.Top.ClientSize.Width - $ui.AppRow.Left - $ui.AppL.Left - (& $ui.Sc 32))) } catch { $null = $_ }
   try { $ui.AppL.Height = $ui.AppL.PreferredSize.Height } catch { $null = $_ }
-  try { $ui.AppRow.PerformLayout(); $ui.Top.PerformLayout() } catch { $null = $_ }   # the app row grows with its name (Windows job: a 1 px cut of 23 in 22)
   & $ui.FitRow; & $ui.Apart; & $ui.FitSent; & $ui.FitSteps; & $ui.FitEdges; & $ui.AlignRows
   foreach ($o in @($ui.Opts.Controls)) { $o.Width = $cw; try { $o.Height = (& $ui.OptPlan $o.Tag $cw).H } catch { $null = $_ } }
   & $ui.Squeeze }

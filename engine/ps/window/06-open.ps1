@@ -63,6 +63,9 @@ $ui.InitSel = { $ui.Sel = @{}; foreach ($k in $script:appSteps) { $ui.Sel[[int]$
 # Shows or hides the application row of the logo block (its logo, its name) and the link line above it (only when both
 # logos are there). Takes whether to show it.
 $ui.ShowAppRow = { param([bool]$On)
+  # The name is as tall as its text before the row shows: the row takes the name's height, and the first card after the
+  # choice is measured before the next fit (Windows job, 18 Nov 26: 23 needed in a 22 px row).
+  if ($On) { try { $ui.AppL.Height = $ui.AppL.PreferredSize.Height } catch { $null = $_ } }
   $ui.AppRow.Visible = $On; $ui.LinkLine.Visible = ($On -and $ui.Logo -and $ui.AppLogo)
   if ($ui.AppLogo) { $ui.AppLogo.AccessibleName = $(if ($On) { $script:app.Name + ' logo' } else { 'Application logo' }) } }
 # Takes the application the user chose: selects it, reuses base check results that can be reused, and shows Maintenance
