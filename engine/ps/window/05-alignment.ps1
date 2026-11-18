@@ -39,11 +39,12 @@ $ui.LeftIn = { param($C, $P) $x = 0; $c = $C; while ($c -and -not [object]::Refe
 # R29b N3: the time in this step and its count sit on the vertical midpoint of the step's bar (the same flow line: each
 # part's top is the line's top plus its top margin). Takes nothing; changes the top margins of $ui.StepTime and $ui.StepFrac.
 $ui.AlignTick = { try {
+    if ($null -eq $ui.BarTop0) { $ui.BarTop0 = [int]$ui.StepBar.Margin.Top }   # the bar's own top margin (scaled), kept: a lift is worked out from it each time, never added up
+    $h = [int]$ui.StepTime.PreferredSize.Height; $lift = [int][math]::Max(0, [math]::Ceiling($h / 2.0 - ($ui.BarTop0 + [double]$ui.StepBar.Height / 2.0)))   # a text taller than the bar's place: the bar moves down
+    $m = $ui.StepBar.Margin; if ($m.Top -ne $ui.BarTop0 + $lift) { $ui.StepBar.Margin = New-Object System.Windows.Forms.Padding($m.Left, ($ui.BarTop0 + $lift), $m.Right, $m.Bottom) }
     $bm = [double]$ui.StepBar.Margin.Top + [double]$ui.StepBar.Height / 2.0
-    foreach ($l in @($ui.StepTime, $ui.StepFrac)) { $h = [int]$l.PreferredSize.Height; $t = [int][math]::Max(0, [math]::Round($bm - $h / 2.0, [System.MidpointRounding]::AwayFromZero)); $m = $l.Margin
-      if ($m.Top -ne $t) { $l.Margin = New-Object System.Windows.Forms.Padding($m.Left, $t, $m.Right, $m.Bottom) } }
-    $h = [int]$ui.StepTime.PreferredSize.Height; $lift = [int][math]::Ceiling($h / 2.0 - $bm)   # a text taller than the bar's place: the bar moves down instead
-    if ($lift -gt 0) { $m = $ui.StepBar.Margin; $ui.StepBar.Margin = New-Object System.Windows.Forms.Padding($m.Left, ($m.Top + $lift), $m.Right, $m.Bottom); & $ui.AlignTick } } catch { $null = $_ } }   # no bar yet: the next fit aligns the row
+    foreach ($l in @($ui.StepTime, $ui.StepFrac)) { $hl = [int]$l.PreferredSize.Height; $t = [int][math]::Max(0, [math]::Round($bm - $hl / 2.0, [System.MidpointRounding]::AwayFromZero)); $m = $l.Margin
+      if ($m.Top -ne $t) { $l.Margin = New-Object System.Windows.Forms.Padding($m.Left, $t, $m.Right, $m.Bottom) } } } catch { $null = $_ } }   # no bar yet: the next fit aligns the row
 # Centers a row of controls up and down by changing their top and bottom margins. Takes the controls and the top margin
 # of the row; gives back nothing.
 $ui.AlignRow = { param($Parts, [int]$Base)
@@ -55,7 +56,8 @@ $ui.RowParts = { param([string]$Row) switch ($Row) { 'Top' { @(@($ui.Logo, $ui.T
 # Lines up every fixed row: box heights, the text box in its frame, then each row on one center line.
 $ui.AlignRows = { try { $bh = [int]$ui.FieldB.PreferredSize.Height; if ($bh -gt 0) { foreach ($p in $ui.Boxes) { if ($p.Height -ne $bh) { $p.Height = $bh } } } } catch { $null = $_ }   # a box is as tall as the compact button, measured
   foreach ($p in $ui.Boxes) { & $ui.BoxFit $p }   # the text box fills its frame (R24 job: a frame whose size never changed kept a 100 px text box at its top)
-  & $ui.AlignRow (& $ui.RowParts 'Top') 0; & $ui.AlignRow (& $ui.RowParts 'AppRow') 0; $mm = & $ui.Sc $ui.Z.M; & $ui.AlignRow (& $ui.RowParts 'FieldRow') $mm; & $ui.AlignRow (& $ui.RowParts 'TestRow') $mm; & $ui.AlignTick }
+  & $ui.AlignRow (& $ui.RowParts 'Top') 0; if (-not $ui.AppUnder) { & $ui.AlignRow (& $ui.RowParts 'AppRow') 0 };   # no application logo: the name is in the title column with its own 4 px gap (review of PR 106: a row of one part set it to 0)
+  $mm = & $ui.Sc $ui.Z.M; & $ui.AlignRow (& $ui.RowParts 'FieldRow') $mm; & $ui.AlignRow (& $ui.RowParts 'TestRow') $mm; & $ui.AlignTick }
 # The question headline (the prompt's first sentence, manifest "answers") shrinks to fit one line: from the headline size
 # in 0.5 pt steps to 60 % of it (never under the body size); only at that size does it wrap. Other cards keep the headline size.
 $ui.SentFonts = @{}
@@ -189,6 +191,7 @@ $ui.Measure = { param([string]$Card)
   # Returns where a control's ink starts (its left edge plus the measured ink offset: text, edge or drawing). Takes the control.
   $tx = { param($C) (& $sr $C).Left + (& $ui.Ink $C) }
   if ($ui.WordL.Visible -and (& $ui.HeadPair)) { $out += & $ui.HeadBad $Card @{ N = 'WordL'; X = (& $tx $ui.WordL) } @{ N = 'AppL'; X = (& $tx $ui.AppL) } }
+  if ($ui.AppUnder -and $ui.WordL.Visible -and (& $ui.HeadPair)) { $g = (& $sr $ui.AppL).Top - (& $sr $ui.WordL).Bottom; $gw = & $ui.Sc $ui.Z.G1; if ([math]::Abs($g - $gw) -gt 1) { $out += ('LAYOUT ' + $Card + ' header gap: ' + $g + ' between WordL and AppL, the gap is ' + $gw) } }   # R29b V1: a title and its subtitle, G1 apart
   if ($ui.StepRow.Visible -and -not $ui.RecOn) { $rb = & $sr $ui.StepBar
     foreach ($l in @($ui.StepTime, $ui.StepFrac)) { $rl = & $sr $l; if (($rl.Top - $l.Margin.Top) -eq ($rb.Top - $ui.StepBar.Margin.Top) -and $rl.Left -gt $rb.Left) { $out += & $ui.TickBad $Card @{ Top = $rb.Top; H = $rb.Height } @{ N = (& $ui.NameOf $l); Top = $rl.Top; H = $rl.Height } } } }
   if (-not $ui.RecOn) {
