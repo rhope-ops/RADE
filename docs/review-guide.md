@@ -35,7 +35,7 @@ Every source file starts with a header (code standard C1). Look for three lines 
 - `Writes:` the files, lists or sites it changes, or "none".
 - `Credentials:` what it asks for and how, or "none".
 
-A header is a claim, not proof: check it against the code. Files from before 2026-11-17 may not have these lines yet (they are listed as debt in `.code-standard.json` and are being fixed); for those, and to check any header, search the file for:
+A header is a claim, not proof: check it against the code. Files from before 2026-11-17 may not have these lines yet (they are listed as debt in `.check.state.json` and are being fixed); for those, and to check any header, search the file for:
 
 | Look for | PowerShell | Python | JavaScript |
 |---|---|---|---|
