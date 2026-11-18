@@ -1,4 +1,4 @@
-# The test "user" for the RADE window (tests/engine_test.sh, section "window"). It is put in front of a test copy of a
+# The test "user" for the RADE window (tests/engine_window.sh, sourced by tests/engine_test.sh). It is put in front of a test copy of a
 # bundle. It loads the stand-in types (tests/window_stub.cs), then answers each card the window shows: it prints one
 # "WIN" line per card, runs every Paint handler, checks that each control has a name and a focus ring, and selects a button.
 # Set by the test: RADE_T_STUB (path of the stub), RADE_T_APP (index of the application), RADE_T_HAND (done, fail or
