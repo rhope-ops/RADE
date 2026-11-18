@@ -353,12 +353,22 @@ def window_values():
 
 
 def engine_for_app(ui_text):
-    """Return the engine text for this application: the shared UI file in its slot and the app's facts (home page,
-    file prefix, folder) in their placeholders."""
+    """Put the shared UI file, the window layout values and the app's facts into the engine text. The build stops
+    when a window value's placeholder is not in the engine exactly once.
+
+    Args:
+        ui_text: the text of engine/rade_ui.ps1 (it must hold no placeholder).
+
+    Returns:
+        The engine text for this application: the shared UI file in its slot, the values of engine/window.json and the
+        app's facts (home page, file prefix, folder) in their placeholders.
+    """
     assert '@@' not in ui_text, 'engine/rade_ui.ps1 must not hold a placeholder'
     assert ENGINE.count('    # @@UI@@') == 1, 'the UI slot (# @@UI@@) must be in the engine once'
     engine = ENGINE.replace('    # @@UI@@', '\n'.join(('    ' + x) if x else x for x in ui_text.rstrip('\n').split('\n')))
     for k, v in window_values().items():
+        if engine.count(k) != 1:   # a value nobody uses, or used twice, would be dropped or doubled without a word
+            raise SystemExit('the engine must hold %s exactly once (engine/window.json)' % k)
         engine = engine.replace(k, v)
     return engine.replace('@@HOME@@', APP['home']).replace('@@PREFIX@@', APP['prefix']).replace('@@APP@@', APP['folder'])
 
