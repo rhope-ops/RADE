@@ -51,6 +51,7 @@ import base64, hashlib, json, re, sys, textwrap
 from pathlib import Path
 
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
+WINDOW_FILE = ENGINE_ROOT / 'engine/window.json'   # the window's layout values (the Administrator, 2026-11-18; docs/window-design.md)
 LOGO = ENGINE_ROOT / 'assets/logo/logo-rho-128.png'   # RADE's own logo (top left of the window)
 UI_FILE = ENGINE_ROOT / 'engine/rade_ui.ps1'   # the shared UI file: theme tokens, builders and the layout self-check (R28; docs/engine.md "How an app gets the engine")
 ROOT = None   # the application repo root (--app-root)
@@ -336,12 +337,29 @@ def fetch_lines(b):
     return ['$fetch += @{ Dir = %s; Name = %s; Url = %s; Sha = %s }' % tuple(q(x) for x in t) for t in fetch]
 
 
+def window_values():
+    """Read engine/window.json and check it. The build stops when a value is missing or out of range.
+
+    Returns:
+        A dict of placeholder -> text: the text column share (percent) and cap, and the minimum window size (pixels at 100 %).
+    """
+    w = json.loads(WINDOW_FILE.read_text(encoding='utf-8'))
+    share, cap = float(w['textColumn']['sharePercent']), int(w['textColumn']['maxPx'])
+    min_w, min_h = int(w['minSize']['width']), int(w['minSize']['height'])
+    assert 40 <= share <= 100, 'engine/window.json textColumn.sharePercent must be 40 to 100'
+    assert 240 <= cap <= 4000, 'engine/window.json textColumn.maxPx must be 240 to 4000'
+    assert 400 <= min_w <= 1920 and 300 <= min_h <= 1080, 'engine/window.json minSize must be 400 x 300 to 1920 x 1080'
+    return {'@@TEXT_SHARE@@': repr(share), '@@TEXT_MAX@@': str(cap), '@@MIN_W@@': str(min_w), '@@MIN_H@@': str(min_h)}
+
+
 def engine_for_app(ui_text):
     """Return the engine text for this application: the shared UI file in its slot and the app's facts (home page,
     file prefix, folder) in their placeholders."""
     assert '@@' not in ui_text, 'engine/rade_ui.ps1 must not hold a placeholder'
     assert ENGINE.count('    # @@UI@@') == 1, 'the UI slot (# @@UI@@) must be in the engine once'
     engine = ENGINE.replace('    # @@UI@@', '\n'.join(('    ' + x) if x else x for x in ui_text.rstrip('\n').split('\n')))
+    for k, v in window_values().items():
+        engine = engine.replace(k, v)
     return engine.replace('@@HOME@@', APP['home']).replace('@@PREFIX@@', APP['prefix']).replace('@@APP@@', APP['folder'])
 
 
@@ -514,14 +532,14 @@ def main():
 
 
 # The engine's hash: every file of the engine (docs/engine.md "How an app gets the engine"): this file, each engine/ps
-# part in build order, the shared UI file and the logo (path, then bytes). An app's lock still checks each file on its
+# part in build order, the shared UI file, the window layout values and the logo (path, then bytes). An app's lock still checks each file on its
 # own, and a bundle's header names each file with its own hash (part_lines); this one value is what --sha prints.
 ENGINE_SHA = hashlib.sha256(b''.join(rel.encode() + b'\0' + (ENGINE_ROOT / rel).read_bytes() + b'\0' for rel in
                                      ['engine/rade_build.py'] + ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS]
-                                     + ['engine/rade_ui.ps1', 'assets/logo/logo-rho-128.png'])).hexdigest()
+                                     + ['engine/rade_ui.ps1', 'engine/window.json', 'assets/logo/logo-rho-128.png'])).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
-ENGINE_RELEASE = 17
+ENGINE_RELEASE = 18
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':

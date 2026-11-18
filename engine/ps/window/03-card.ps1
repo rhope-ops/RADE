@@ -9,7 +9,10 @@
 # a hand step, the buttons, a last gray line, and the owner's test extras. A card shows only the parts it names ($ui.SetCard).
 $ui.Card = New-Object System.Windows.Forms.TableLayoutPanel
 $ui.Card.Dock = 'Fill'; $ui.Card.ColumnCount = 3; $ui.Card.RowCount = 3; $ui.Card.BackColor = $ui.C.White
-foreach ($w in @(11.75, 76.5, 11.75)) { [void]$ui.Card.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle('Percent', $w))) }
+# Three columns: a side, the text column, a side. The text column is $ui.Layout.Share % of the width and at most $ui.Layout.MaxW
+# (engine/window.json); the two sides share what is left, so the column is centered ($ui.Fit sets the sizes).
+$ui.CardCols = @(); $sd = (100 - $ui.Layout.Share) / 2
+foreach ($w in @($sd, $ui.Layout.Share, $sd)) { $cs = New-Object System.Windows.Forms.ColumnStyle('Percent', $w); $ui.CardCols += $cs; [void]$ui.Card.ColumnStyles.Add($cs) }
 [void]$ui.Card.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent', 40))); [void]$ui.Card.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('AutoSize'))); [void]$ui.Card.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent', 60)))
 # The card is a stack of two: the body (every part above the buttons) and the tail (the buttons, the last gray line
 # and the test extras). The body sits in a panel that scrolls only when the card is taller than the window, so the

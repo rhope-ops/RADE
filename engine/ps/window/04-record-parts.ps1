@@ -104,7 +104,13 @@ $ui.FitSteps = { & $ui.GuideFit }
 $ui.Fit = {
   if (-not $ui.Scaled) { return }   # R1 review: a size set while Windows Forms scales the form would be scaled again
   # Text wraps at the card's width; the choices are as wide as the card.
-  $cw = [math]::Max((& $ui.Sc 240), [int]($ui.Card.ClientSize.Width * 0.765) - (& $ui.Sc 4)); $ui.ContentW = $cw
+  # The text column: $ui.Layout.Share % of the card's width, at most $ui.Layout.MaxW (engine/window.json; the Administrator,
+  # 2026-11-18), centered between the two sides. Below the cap the sides are (100 - share) / 2 % each, as before.
+  $W = [int]$ui.Card.ClientSize.Width; $col = [math]::Min([int]($W * $ui.Layout.Share / 100), [int](& $ui.Sc $ui.Layout.MaxW)); $side = [math]::Max(0, [int](($W - $col) / 2))
+  try { if (@($ui.CardCols).Count -eq 3 -and ([int]$ui.CardCols[0].Width -ne $side -or [int]$ui.CardCols[1].Width -ne $col)) {
+      $ui.CardCols[0].SizeType = 'Absolute'; $ui.CardCols[0].Width = $side; $ui.CardCols[1].SizeType = 'Absolute'; $ui.CardCols[1].Width = $col
+      $ui.CardCols[2].SizeType = 'Percent'; $ui.CardCols[2].Width = 100 } } catch { $null = $_ }   # stand-in types or a form being closed: the card keeps its last columns
+  $cw = [math]::Max((& $ui.Sc 240), $col - (& $ui.Sc 4)); $ui.ContentW = $cw
   foreach ($l in @($ui.Kick, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathT, $ui.LastLog, $ui.Note, $ui.Help, $ui.Foot, $ui.Close)) { & $ui.SetWrap $l $cw }
   & $ui.SetWrap $ui.Sent ($cw - (& $ui.Sc 44))
   # Rows wrap at the card's width (a button or a box is never cut), and no box is wider than the card.
