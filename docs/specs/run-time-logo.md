@@ -1,6 +1,6 @@
 # Spec: run-time logo
 
-Status: Draft · Owner: the Administrator · Updated: 2026-11-17
+Status: Approved 2026-11-17 · Owner: the Administrator · Updated: 2026-11-17
 
 ## Goal
 RADE and every app draw their logo with code at run time on the work computer, so no PNG file is kept in a repo or sent in a bundle. A reviewer can read the logo as text, and bundles get smaller (90-161.Z R29a: about 72 KB of base64 PNG out of 585 KB).
@@ -40,12 +40,14 @@ Both logos (RADE Rho Bold, 90-161.Z W2) show in the window and as the SharePoint
 | D1 | Draw the logo at run time; no PNG in the repo or the bundle. | the Administrator | 2026-11-17 | SVG master with a PNG built and embedded (PNG bytes still travel); keep the PNG renderer |
 | D2 | The PNG renderer in 90-161.Z (logo_draw.py) stays until this ships; this reuses its SVG reader. | the Administrator | 2026-11-17 | Stop it at once (R29 would need a rebuild) |
 | D3 | Proof on the GitHub Windows runner and a work-computer look check. | the Administrator | 2026-11-17 | Work computer only (slow, by eye only) |
+| D5 | If the Windows runner cannot render the reference images, they live in `tests/` as test data only, never in a bundle or a release. | the Administrator | 2026-11-18 | The test draws its own reference only (blocks A2 if the runner cannot) |
+| D4 | A2 tolerance: at least 98 % of pixels within 8/255 per channel at 512 and 128 px. | the Administrator | 2026-11-17 | Equal pixels (GDI+ and Chromium anti-aliasing differ) |
 
 ## Acceptance checks
 | ID | Covers | Check | Pass when |
 |---|---|---|---|
 | A1 | R7 | `git ls-files '*.png'` in both repos, and `grep -c iVBORw0KGgo` on every tracked file and every bundle | no PNG file; count 0 |
-| A2 | R1, R2, R5, E4 | A new step in `.github/workflows/window.yml` (Windows PowerShell 5.1) draws each logo at 512, 128 and 16 px and compares each with a reference render of the SVG (Chromium, in the same job) | REC: at least 98 % of pixels within 8/255 per channel at 512 and 128 px; 16 px draws without error |
+| A2 | R1, R2, R5, E4 | A new step in `.github/workflows/window.yml` (Windows PowerShell 5.1) draws each logo at 512, 128 and 16 px and compares each with a reference render of the SVG (Chromium, in the same job) | at least 98 % of pixels within 8/255 per channel at 512 and 128 px (the Administrator, 2026-11-17); 16 px draws without error |
 | A3 | R3, R4, E3 | Build test: each logo SVG converts; a sample SVG with an `<ellipse>` and one with a `B` path command fail with the element named | both pass and fail as stated |
 | A4 | R6, E2 | Windows job: the site-logo step writes a 512 px PNG to a temp folder; with a read-only temp folder it stops with its message | file exists and opens as a 512 x 512 image; message shown, exit without upload |
 | A5 | E1 | Windows job: run the window with `System.Drawing` load forced to fail | the app name shows as text; no crash |
@@ -56,11 +58,7 @@ Both logos (RADE Rho Bold, 90-161.Z W2) show in the window and as the SharePoint
 ## Assumptions
 - `System.Drawing` (GDI+) is present on every NIPR computer with Windows PowerShell 5.1 · it ships with .NET Framework · high.
 - GDI+ anti-aliasing differs a little from Chromium, so A2 needs a tolerance, not equal pixels · medium.
-- The GitHub Windows runner can run Chromium (Playwright) for the reference render · medium; else commit reference PNGs as test data only, never shipped (a decision for the Administrator).
-
-## Open questions
-- A2 tolerance: is 98 % of pixels within 8/255 right? · the Administrator · blocks A2.
-- If the Windows runner cannot render the reference (Assumptions), may reference PNGs live in `tests/` only? · the Administrator · blocks A2.
+- The GitHub Windows runner can run Chromium (Playwright) for the reference render · medium; else reference PNGs live in `tests/` as test data only, never in a bundle (D5).
 
 ## Risks
 - The Rho Bold glyph path has about 200 curve commands; a converter bug shows as a wrong shape. REC: A2 at 512 px catches it; build the converter test-first from both SVGs.

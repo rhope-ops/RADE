@@ -324,7 +324,6 @@
    "engine/ps/04-steps.ps1": 1,
    "engine/ps/05-installed.ps1": 1,
    "engine/ps/06-round.ps1": 1,
-   "engine/ps/07-checks.ps1": 1,
    "engine/ps/08-saved-checks.ps1": 1,
    "engine/ps/09-start.ps1": 1,
    "engine/ps/10-window.ps1": 1,

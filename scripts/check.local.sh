@@ -22,6 +22,9 @@ python3 scripts/check_manifest.py
 # source file against the shrink-only baseline. Both lanes: it reads every file in about 1 s.
 python3 scripts/code_standard.py --test
 python3 scripts/code_standard.py
+# Network rules of the checks (the Administrator, 2026-11-17): no Windows sign-in to a tested address; a Config
+# address only on the app's own host. About 1 s.
+tests/net_rules_test.sh
 # Engine (moved from rhope-ops/90-161.Z, 2026-11-14): it compiles. Each app's own tests build and check its bundles.
 python3 -m py_compile engine/rade_build.py
 # Engine file list (apps lock these files; the release workflow signs the list): the trace runs and names the engine.
