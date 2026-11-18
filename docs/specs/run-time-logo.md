@@ -40,6 +40,7 @@ Both logos (RADE Rho Bold, 90-161.Z W2) show in the window and as the SharePoint
 | D1 | Draw the logo at run time; no PNG in the repo or the bundle. | the Administrator | 2026-11-17 | SVG master with a PNG built and embedded (PNG bytes still travel); keep the PNG renderer |
 | D2 | The PNG renderer in 90-161.Z (logo_draw.py) stays until this ships; this reuses its SVG reader. | the Administrator | 2026-11-17 | Stop it at once (R29 would need a rebuild) |
 | D3 | Proof on the GitHub Windows runner and a work-computer look check. | the Administrator | 2026-11-17 | Work computer only (slow, by eye only) |
+| D5 | If the Windows runner cannot render the reference images, they live in `tests/` as test data only, never in a bundle or a release. | the Administrator | 2026-11-18 | The test draws its own reference only (blocks A2 if the runner cannot) |
 | D4 | A2 tolerance: at least 98 % of pixels within 8/255 per channel at 512 and 128 px. | the Administrator | 2026-11-17 | Equal pixels (GDI+ and Chromium anti-aliasing differ) |
 
 ## Acceptance checks
@@ -57,10 +58,7 @@ Both logos (RADE Rho Bold, 90-161.Z W2) show in the window and as the SharePoint
 ## Assumptions
 - `System.Drawing` (GDI+) is present on every NIPR computer with Windows PowerShell 5.1 · it ships with .NET Framework · high.
 - GDI+ anti-aliasing differs a little from Chromium, so A2 needs a tolerance, not equal pixels · medium.
-- The GitHub Windows runner can run Chromium (Playwright) for the reference render · medium; else commit reference PNGs as test data only, never shipped (a decision for the Administrator).
-
-## Open questions
-- If the Windows runner cannot render the reference (Assumptions), may reference PNGs live in `tests/` only? · the Administrator · blocks A2.
+- The GitHub Windows runner can run Chromium (Playwright) for the reference render · medium; else reference PNGs live in `tests/` as test data only, never in a bundle (D5).
 
 ## Risks
 - The Rho Bold glyph path has about 200 curve commands; a converter bug shows as a wrong shape. REC: A2 at 512 px catches it; build the converter test-first from both SVGs.

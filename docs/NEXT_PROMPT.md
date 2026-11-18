@@ -14,7 +14,7 @@ Updated: 2026-11-17 by Claude (code standard and engine split; engine-v11 = 19ba
 0. Deploy v1: built, tested in text mode. Next: 90-161.Z lock bump and manifest fields, item 6 (app page), first tagged release.
 1. Reach test sends no Windows sign-in to the tested address; Config flow address only on the app's host (ENGINE_RELEASE 13, tests/net_rules_test.sh). Next: release engine-v13 after the Administrator's go, then each app moves its lock; a work-computer round proves the reach check.
 2. Next engine items: size in the summary, engine version + sha256 in the window, JSON results block.
-3. Run-time logo: spec docs/specs/run-time-logo.md approved 17 Nov 26 (A2 tolerance set; open: reference images in tests/ if the Windows runner cannot render them). Next: build in one engine release, then the 90-161.Z round that drops its PNGs.
+3. Run-time logo: spec docs/specs/run-time-logo.md approved 17 Nov 26 (A2 tolerance set; reference images in tests/ only if needed). Next: build in one engine release, then the 90-161.Z round that drops its PNGs.
 4. Build docs/engine.md (modes, check stages, fallback, fresh fast checks) and the drift check (docs/drift-check.md).
 5. Window "One thing": built, engine-v4; Windows job passes at 100 %. Next: each app moves its lock to engine-v4, then a work-computer round ("Layout self-check: PASS layout").
 6. After the first device round: fix what it reports, release, report the tag and commit.
