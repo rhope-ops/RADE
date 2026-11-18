@@ -192,12 +192,7 @@ function Get-NewerVersion {
   # R28: in a test round too (the Administrator, 2026-11-17): the notice shows for every application that names a version.
   if (-not [string]$script:app.Version) { return '' }   # no version: nothing to compare, no request
   try {
-    try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { $null = $_ }
-    $rq = [System.Net.WebRequest]::Create($releaseUrl)
-    $rq.Timeout = 4000
-    try { $rq.UserAgent = $webAgent } catch { $null = $_ }
-    try { $rq.UseDefaultCredentials = $true } catch { $null = $_ }
-    if ($rq.Proxy) { $rq.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials }
+    $rq = Get-WebRequest $releaseUrl 4000   # engine/ps/07-checks.ps1: no Windows sign-in for the address, only for the proxy
     $rs = $rq.GetResponse()
     try { $text = (New-Object System.IO.StreamReader($rs.GetResponseStream())).ReadToEnd() } finally { $rs.Close() }
     $v = [string](($text | ConvertFrom-Json).apps.PSObject.Properties | Where-Object { $_.Name -eq [string]$script:app.Name } | ForEach-Object { $_.Value } | Select-Object -First 1)

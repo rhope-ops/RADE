@@ -92,7 +92,8 @@ function Write-BundleFile([string]$Base, [scriptblock]$Say) {
   & $Say ('  ' + $files.Count + ' files saved.')
 }
 function Save-RoundDownload([string]$Base, [scriptblock]$Say) {
-  # Data files only (briefs, public color documents), never code (PFM 3A). WebClient uses the Windows proxy and sign-in.
+  # Data files only (briefs, public color documents), never code (PFM 3A). The address never gets the Windows sign-in
+  # (engine-v14, as in Get-WebRequest); only the work proxy does.
   # A repo file must match its SHA-256; a failed download leaves the link on the bookmark page as the fallback.
   $ok = 0; $bad = 0
   if (-not $fetch.Count) { return '' }
@@ -103,9 +104,9 @@ function Save-RoundDownload([string]$Base, [scriptblock]$Say) {
     $path = Join-Path $dir $f.Name
     $wc = New-Object System.Net.WebClient
     try {
-      $wc.UseDefaultCredentials = $true
-      try { $wc.Headers['User-Agent'] = $webAgent } catch { $null = $_ }   # R21: as in Test-WebReach
-      if ($wc.Proxy) { $wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials }
+      $wc.UseDefaultCredentials = $false
+      try { $wc.Headers['User-Agent'] = $webAgent } catch { $null = $_ }   # R21: as in Get-WebRequest
+      try { if ($wc.Proxy) { $wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials } } catch { $null = $_ }   # no proxy: nothing to sign in to
       $wc.DownloadFile($f.Url, $path)
       if ($f.Sha) {
         $sha = [System.Security.Cryptography.SHA256]::Create(); $fs = [System.IO.File]::OpenRead($path)

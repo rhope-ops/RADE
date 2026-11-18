@@ -129,7 +129,7 @@ function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
   if ($Step.UrlConfig) {
     $urlFile = Get-ConfigFile $Base $Step.UrlConfig
     # A saved address is used only on the host of the step's own address (the Administrator, 2026-11-17).
-    if (Test-Path -LiteralPath $urlFile -PathType Leaf) { try { $v = ([string](Get-Content -LiteralPath $urlFile -TotalCount 1)).Trim(); if (Test-SameHost $v $Step.Url) { $url = $v } elseif ($v) { & $Say ('    The saved address is not on ' + ([uri]$Step.Url).Host + '; the step uses its own address.') } } catch { $null = $_ } }
+    if (Test-Path -LiteralPath $urlFile -PathType Leaf) { try { $v = ([string](Get-Content -LiteralPath $urlFile -TotalCount 1)).Trim(); if (Test-SameHost $v $Step.Url) { $url = $v } elseif ($v -and $Step.Url) { & $Say ('    The saved address is not on ' + ([uri]$Step.Url).Host + '; the step uses its own address.') } elseif ($v) { & $Say '    The saved address is not used: this step gives no address of its own.' } } catch { $null = $_ } }
   }
   # An old marker from an earlier run would make site setup wait for a result that is not coming (review R13 #2).
   if ($Step.Marker) { $old = Join-Path $dir $Step.Marker; if (Test-Path -LiteralPath $old -PathType Leaf) { try { Remove-Item -LiteralPath $old -Force } catch { $null = $_ } } }

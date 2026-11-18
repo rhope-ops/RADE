@@ -45,7 +45,7 @@ it runs the same steps as text.
 Text files are embedded as readable single-quoted here-strings, so anyone can read the code.
 The build id (first 8 hex of the sha256 of the bundle body) shows in the window title and the summary.
 Usage: python3 engine/rade_build.py --app-root DIR [--manifest scripts/paste_bundles.json] [--check] [--sha]
-  --check: exit 1 if a bundle is out of date. --sha: print the engine's sha256 (this file and engine/ps, see ENGINE_SHA).
+  --check: exit 1 if a bundle is out of date. --sha: print the engine's sha256 (every engine file, see ENGINE_SHA).
 """
 import base64, hashlib, json, re, sys, textwrap
 from pathlib import Path
@@ -94,7 +94,7 @@ def q(s):
 
 
 # ---- The engine's PowerShell (the Administrator, 2026-11-17: docs/code-standard.md C10). It lives in engine/ps as
-# files that a person, the PowerShell parser and tests/check_code_standard.py can read one by one; this build joins them
+# files that a person, the PowerShell parser and scripts/code_standard.py can read one by one; this build joins them
 # in run order into the text every bundle carries. Each part is a whole file that parses alone. The window parts are
 # kept 4 spaces less indented than in the bundle and go where engine/ps/10-window.ps1 has its "# @@WINDOW@@" line.
 ENGINE_DIR = ENGINE_ROOT / 'engine/ps'
@@ -118,9 +118,18 @@ def file_sha(rel):
 
 
 def engine_text():
-    """Return the engine's PowerShell: the parts of ENGINE_PARTS in order, with the window parts (indented 4 spaces)
-    in the slot of 10-window.ps1. The text starts with a newline, as the bundle layout expects."""
+    """Join the engine's PowerShell parts. The build stops when engine/ps and the part lists differ, or when the
+    window slot is not there exactly once (a part or a slot would else be left out without a word).
+
+    Returns:
+        The parts of ENGINE_PARTS in order, with the window parts (indented 4 spaces) in the slot of 10-window.ps1.
+        The text starts with a newline, as the bundle layout expects.
+    """
     read = lambda rel: (ENGINE_DIR / rel).read_text(encoding='ascii')
+    on_disk = sorted(p.relative_to(ENGINE_DIR).as_posix() for p in ENGINE_DIR.rglob('*.ps1'))
+    assert on_disk == sorted(ENGINE_PARTS + WINDOW_PARTS), 'engine/ps and the part lists differ: %s' % sorted(
+        set(on_disk) ^ set(ENGINE_PARTS + WINDOW_PARTS))   # a part nobody listed would be left out without a word
+    assert sum(read(p).count(WINDOW_SLOT) for p in ENGINE_PARTS) == 1, 'the window slot (# @@WINDOW@@) must be there once'
     banner = lambda rel: '# ==== Engine part: engine/ps/%s (sha256 %s)\n' % (rel, file_sha('engine/ps/' + rel))   # in the Contents
     window = ''.join(indent(banner(w) + read(w), '    ') for w in WINDOW_PARTS)
     text = ''.join(banner(p) + read(p).replace(WINDOW_SLOT, window) for p in ENGINE_PARTS)
@@ -308,6 +317,7 @@ def step_lines(b):
                 'true' if s.get('default', True) is False else 'false', q(s.get('help', '')))   # optional = "default": false only; a files-changed default is still a needed step
              for s in b['steps']]
     for s in b['steps']:
+        assert s.get('url') or not s.get('urlConfig'), 'a step with "urlConfig" needs its own "url" (the host rule): %s' % s['name']
         assert (s.get('kind') == 'guide' and not s['file']) or any(f['dir'] == s['dir'] and Path(f['src']).name == s['file'] for f in b['files']), s
     return [line[:-2] + answers_part(s) + ' }' for line, s in zip(steps, b['steps'])]   # a step without "answers": the line as before
 
@@ -330,6 +340,7 @@ def engine_for_app(ui_text):
     """Return the engine text for this application: the shared UI file in its slot and the app's facts (home page,
     file prefix, folder) in their placeholders."""
     assert '@@' not in ui_text, 'engine/rade_ui.ps1 must not hold a placeholder'
+    assert ENGINE.count('    # @@UI@@') == 1, 'the UI slot (# @@UI@@) must be in the engine once'
     engine = ENGINE.replace('    # @@UI@@', '\n'.join(('    ' + x) if x else x for x in ui_text.rstrip('\n').split('\n')))
     return engine.replace('@@HOME@@', APP['home']).replace('@@PREFIX@@', APP['prefix']).replace('@@APP@@', APP['folder'])
 
@@ -451,7 +462,7 @@ def main():
     ap.add_argument('--app-root', help='the application repo root')
     ap.add_argument('--manifest', default='scripts/paste_bundles.json', help='manifest path inside the app repo')
     ap.add_argument('--check', action='store_true', help='exit 1 if a bundle is out of date')
-    ap.add_argument('--sha', action='store_true', help="print the engine's sha256 (this file and engine/ps) and exit")
+    ap.add_argument('--sha', action='store_true', help="print the engine's sha256 (every engine file) and exit")
     a = ap.parse_args()
     if a.sha:
         print(ENGINE_SHA); return
@@ -478,13 +489,15 @@ def main():
         sys.exit(1 if stale else 0)
 
 
-# The engine's hash: this file and each engine/ps part, in build order (path, then bytes). An app's lock still checks each
-# file on its own, and a bundle's header names each file with its own hash (part_lines); this one value is what --sha prints.
+# The engine's hash: every file of the engine (docs/engine.md "How an app gets the engine"): this file, each engine/ps
+# part in build order, the shared UI file and the logo (path, then bytes). An app's lock still checks each file on its
+# own, and a bundle's header names each file with its own hash (part_lines); this one value is what --sha prints.
 ENGINE_SHA = hashlib.sha256(b''.join(rel.encode() + b'\0' + (ENGINE_ROOT / rel).read_bytes() + b'\0' for rel in
-                                     ['engine/rade_build.py'] + ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS])).hexdigest()
+                                     ['engine/rade_build.py'] + ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS]
+                                     + ['engine/rade_ui.ps1', 'assets/logo/logo-rho-128.png'])).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
-ENGINE_RELEASE = 13
+ENGINE_RELEASE = 14
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':

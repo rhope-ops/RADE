@@ -5,7 +5,9 @@ Builds the sample app (schemas/examples/sample-manifest.json + tests/fixture-app
 same marked block to two of its scripts, then checks:
   1. the Contents list names every part, file and engine part, and each line number points at that banner line;
   2. the block is kept once ($shared) and each script holds one "# @@SHARED" line in its place;
-  3. the engine's own Expand-SharedBlock (engine/ps/03-files.ps1, run in pwsh) gives back each script's text exactly.
+  3. the engine's own Expand-SharedBlock (engine/ps/03-files.ps1, run in pwsh) gives back each script's text exactly;
+  4. a second build of the same app gives the same bytes (an app's lock and its stale check rest on this);
+  5. the build stops when an engine part is not in the part lists, and when a step has "urlConfig" and no "url".
 Output: one PASS or FAIL line per check, then "LAYOUT pass=N fail=M"; exit 1 on a failure. Needs Python 3 and pwsh 7.
 """
 import json
@@ -74,16 +76,55 @@ def check_shared(text, want):
         check(g == text_want, 'expand: %s comes back byte for byte' % name)
 
 
+def build(app, root=ROOT):
+    """Build the app in `app` with the engine under `root`; return the finished process."""
+    return subprocess.run([sys.executable, '-B', str(root / 'engine/rade_build.py'), '--app-root', str(app)], capture_output=True, text=True)
+
+
+def check_same_bytes(app, first):
+    """Check 4: build again and compare the bundle with the bytes of the first build."""
+    bundle = next((app / 'scripts/gov/paste').glob('*.ps1'))
+    bundle.unlink()
+    again = build(app)
+    check(again.returncode == 0 and bundle.read_bytes() == first, 'second build: the same bytes as the first (%d)' % len(first))
+
+
+def check_build_stops(tmp, app):
+    """Check 5: the build fails for an unlisted engine part and for a step with "urlConfig" and no "url".
+
+    Args:
+        tmp: a temporary folder; a copy of the engine with one extra part is made in it.
+        app: the test app's folder; its manifest is changed (run this check last).
+    """
+    engine = tmp / 'rade'
+    for rel in ('engine', 'assets/logo'):
+        shutil.copytree(ROOT / rel, engine / rel)
+    (engine / 'engine/ps/99-not-listed.ps1').write_text('# a part that no list names\n')
+    r = build(app, engine)
+    check(r.returncode != 0 and 'part lists differ' in r.stderr, 'build stops for an engine part that no list names')
+    manifest = app / 'scripts/paste_bundles.json'
+    m = json.loads(manifest.read_text())
+    step = m['bundles'][0]['steps'][0]
+    step.pop('url', None)
+    step['urlConfig'] = 'saved-address.txt'
+    manifest.write_text(json.dumps(m))
+    r = build(app)
+    check(r.returncode != 0 and 'urlConfig' in r.stderr, 'build stops for a step with "urlConfig" and no "url"')
+
+
 def main():
     """Build the test app and run the checks."""
     with tempfile.TemporaryDirectory() as d:
         app, want = make_app(Path(d))
-        b = subprocess.run([sys.executable, str(ROOT / 'engine/rade_build.py'), '--app-root', str(app)], capture_output=True, text=True)
+        b = build(app)
         check(b.returncode == 0, 'build of the test app' + ('' if b.returncode == 0 else ': ' + b.stdout[-300:] + b.stderr[-300:]))
         bundle = next((app / 'scripts/gov/paste').glob('*.ps1'), None)
         text = bundle.read_text(encoding='ascii') if bundle else ''
         check_contents(text)
         check_shared(text, want)
+        if bundle:
+            check_same_bytes(app, bundle.read_bytes())
+        check_build_stops(Path(d), app)
     print('LAYOUT pass=%d fail=%d' % (RESULTS.count(True), RESULTS.count(False)))
     return 0 if all(RESULTS) else 1
 
