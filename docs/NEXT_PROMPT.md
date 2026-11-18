@@ -1,6 +1,6 @@
 # Next prompt: RADE
 
-Updated: 2026-11-18 by Claude (logo 64 px baseline and app row, PRs 98 and 99, ENGINE_RELEASE 15, engine-v15 = 3d9ee5a released 18 Nov 26, palette stays USAF; standards plan done, close-out in docs/reviews; engine-v14 = 783dee4 released 17 Nov 26; test speed S1-S4 merged, PR 86; check baseline 66.4 s, PR 89). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
+Updated: 2026-11-18 by Claude (logo 64 px baseline and app row, PRs 98 and 99, ENGINE_RELEASE 15, engine-v15 = 3d9ee5a released 18 Nov 26, palette stays USAF; page header = the 90-161.Z band and tagline "Test, deploy, enjoy" on the page and in the window title, PR 101, ENGINE_RELEASE 16, release engine-v16 after PR 101 merges, then the 90-161.Z lock moves to engine-v16 in one step (its PR 147, the header with the name only, waits for that: the PFM, 1A); standards plan done, close-out in docs/reviews; engine-v14 = 783dee4 released 17 Nov 26; test speed S1-S4 merged, PR 86; check baseline 66.4 s, PR 89). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
 
 ## State
 

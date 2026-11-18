@@ -4,9 +4,10 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="icon" href="assets/logo/logo-rho-32.png">
 <style>
-/* Layout: the RADE window as a page ("One thing", docs/window-design.md): a 6 px light on the top edge, the logo line,
-   one card whose left edge is at 12 % of the width, a bottom line and a 4 px bar on the bottom edge.
-   Colors, one meaning each: navy = text and focus; blue = the action and progress; yellow = your turn;
+/* Layout: the RADE window as a page ("One thing", docs/window-design.md): the band
+   (the header of the 90-161.Z page: navy to blue, a yellow line under it; the logo, RADE with the tagline under it, and
+   TEAMS at the right on the row of RADE with the channel name under it; the Administrator, 18 Nov 26), one card and a bottom line in the same centered 860 px column, and a 4 px bar on the bottom edge.
+   Colors, one meaning each: navy = text and focus; blue = the action and progress; yellow = the line under the band;
    dark red = failed; green = done; gray = second lines. The light-theme values are the window's ($ui.C in
    engine/rade_build.py). Sizes: docs/window-design.md "Sizes" (a button is 132 x 40 at least; a link is underlined). */
 :root{--bg:#ffffff;--navy:#0b2545;--text:#1b2430;--gray:#5a6573;--action:#00539f;--action-fg:#ffffff;--link:#00539f;
@@ -21,19 +22,22 @@
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--text);font:1rem/1.5 var(--ui)}
 .win{min-height:100%;display:flex;flex-direction:column}
-.light{height:6px;flex:none;background:transparent}
-.win[data-light="turn"] .light{background:var(--turn)}
-.win[data-light="fail"] .light{background:var(--fail)}
 .row{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.logo{display:flex;align-items:center;gap:12px;padding-block:14px;flex-wrap:wrap}
-.logo img{width:64px;height:64px;flex:none}
-.logo b{font-size:1.25rem;color:var(--navy);letter-spacing:.02em}
-.logo span{color:var(--gray);font-size:.875rem;min-width:0}
+/* The band has fixed colors (white text on navy to blue) in both themes. Grid of 4 rows: the logo spans all of them; row 2 = RADE and TEAMS, row 3 = the tagline and the channel name, so the midpoints in each row match; rows 1 and 4 share the spare height. */
+.band{flex:none;background:linear-gradient(100deg,#0b2545,#00539f);color:#fff;border-bottom:3px solid var(--turn)}
+/* The band, the card and the bottom line share one centered 860 px column, as the 90-161.Z page (the Administrator, 18 Nov 26). */
+.band-in,.stage,.bottom{width:100%;max-width:860px;margin-inline:auto}
+.band-in{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:1fr auto auto 1fr;column-gap:14px;align-items:center;padding-block:18px}
+.band img{grid-row:1/-1;width:64px;height:64px}
+/* Right side: TEAMS in the style and on the row of RADE, the channel name in the style and on the row of the tagline (the Administrator, 18 Nov 26). */
+.band .name,.band .team{grid-row:2;margin:0;font-size:1.375rem;line-height:1.2;font-weight:650;color:#fff}
+.band .sub,.band .chan{grid-row:3;margin:2px 0 0;color:#dde8f3;font-size:.875rem}
+.band .name,.band .sub{grid-column:2}
+.band .team,.band .chan{grid-column:3;text-align:right}
 .stage{flex:1;display:flex;flex-direction:column}
 .stage::before{content:"";flex:2 1 0}
 .stage::after{content:"";flex:3 1 0}
-.card{margin-left:12%;max-width:42rem;min-width:0;padding-block:16px;display:flex;flex-direction:column;gap:14px}
-@media (max-width:720px){.card{margin-left:0}}
+.card{max-width:42rem;min-width:0;padding-block:16px;display:flex;flex-direction:column;gap:14px}
 .caps{margin:0;font-size:.8125rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gray)}
 .win[data-light="fail"] .caps{color:var(--fail)}
 h1{margin:0;font-size:1.8rem;line-height:1.2;font-weight:600;color:var(--navy);text-wrap:balance}
@@ -61,8 +65,7 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
 </style></head><body>
 <div class="win" id="win">
-<div class="light" aria-hidden="true"></div>
-<header class="row logo"><img src="assets/logo/logo-rho-64.png" srcset="assets/logo/logo-rho-64.png 1x, assets/logo/logo-rho-128.png 2x" alt=""><b>RADE</b><span>Test and deploy apps for your organization</span></header>
+<header class="band"><div class="row band-in"><img src="assets/logo/logo-rho-64.png" srcset="assets/logo/logo-rho-64.png 1x, assets/logo/logo-rho-128.png 2x" alt=""><p class="name">RADE</p><p class="sub">Test, deploy, enjoy</p><p class="team" id="team" hidden>TEAMS</p><p class="chan" id="chan"></p></div></header>
 <main class="row stage"><div class="card" id="card" aria-live="polite"><p class="caps">RADE</p><h1>Getting the newest script.</h1></div></main>
 <footer class="row bottom"><a href="https://github.com/rhope-ops/RADE">Repository</a><a id="back" href="#" hidden>Back</a><span class="state" id="state"></span></footer>
 <div class="bar" aria-hidden="true"><i id="bar"></i></div>
@@ -79,7 +82,7 @@ function recall(){try{return localStorage.getItem(KEY)}catch(e){return null}}
 function remember(v){try{localStorage.setItem(KEY,v)}catch(e){}}
 function web(u){return /^https:\/\//i.test(String(u||''))?String(u):''}   // links from a manifest: https only
 function get(url,asJson){return fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('code ['+r.status+']');return asJson?r.json():r.text()})}
-// light: '' (off), 'turn' (yellow: the page waits for you) or 'fail' (dark red). done = the bar turns green.
+// light: 'fail' turns the small caps line dark red; 'turn' (the page waits for you) and '' change nothing on the page, which has no light bar on its top edge (the Administrator, 18 Nov 26). done = the bar turns green.
 function show(o){
   win.setAttribute('data-light',o.light||'');
   if(o.done){win.setAttribute('data-done','')}else{win.removeAttribute('data-done')}
@@ -99,6 +102,7 @@ function start(){
   show({bar:10,state:'Loading',html:'<p class="caps">RADE</p><h1>Getting the list of applications.</h1>'});
   get('apps.json',true).then(function(c){
     HELP=c.help||'';
+    document.getElementById('team').hidden=!HELP;document.getElementById('chan').textContent=HELP;   // the band shows the channel name (one place: apps.json)
     APPS=(c.apps||[]).map(function(a){return {repo:a.repo,base:a.base||('https://raw.githubusercontent.com/'+a.repo+'/main/'),manifest:a.manifest}});
     if(!APPS.length){show({state:'No applications',html:'<p class="caps">RADE</p><h1>No application is available yet.</h1>'+helpLine()});return}
     var last=recall(),pick=APPS.length===1?APPS[0]:APPS.filter(function(a){return a.repo===last})[0];
