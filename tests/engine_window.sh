@@ -67,14 +67,14 @@ rn="$wd/u/test1234/OneDrive - United States Air Force/RADE/rade-runner.ps1"
 # 1c. A minimized window comes back when RADE needs the person; it has its own taskbar button (Application.Run: no owner).
 # The layout line and the SCALE line at 100 %; the sizes RADE sets after the form has scaled, at 100 % (the same numbers as
 # before the one scale source: tests/window_driver.ps1 "WIN measure").
-has "WIN restored=Normal taskbar=True minbox=True shown-by=Run" "WIN layline=Layout self-check: PASS layout, 0 cards (1216 x 684 at 100 %) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=96x96 font=17 fontPt=10 fontScale=1 ctlScale=1 realDpi=n/a aware=n/a screen=1280x800 work=1280x720 client=1216x684 state=Normal logo=40x40 btn=400x40" \
+has "WIN restored=Normal taskbar=True minbox=True shown-by=Run" "WIN layline=Layout self-check: PASS layout, 0 cards (1216 x 684 at 100 %) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=96x96 font=17 fontPt=10 fontScale=1 ctlScale=1 realDpi=n/a aware=n/a screen=1280x800 work=1280x720 client=1216x684 state=Normal logo=46x46 btn=400x40" \
   "WIN measure choice h=110 gap=8 plan-x=54" "WIN measure record box=5,4 label=5,6 rows=268" && ok || { bad "window 1c: restore, taskbar, the scale line"; grep "restored=\|layline=" "$wd/win.txt" | cut -c1-300; }
 # 1d. Polish after the R24 pictures (docs/window-design.md "Sizes"): the header and the label-box-button rows share one
 # midpoint within 1 px (from margins and sizes; an odd height gives a half pixel; the stand-ins have no layout), a box is as tall as a compact button, gaps of 8; the
 # question headline is the prompt's first sentence (one sentence: no body line; two: the rest is the body line, 1b) and a
 # first sentence too long for one line shrinks (22 pt, floor 13.2 pt = 60 %; the stand-ins' card is 258 px); the self-check's alignment rules pass an aligned fixture
 # and give one LAYOUT line for each fault of a misaligned one (a box 6.5 px off, a button 3 px off, box 23 vs button 30, a headline 3 px right).
-has "WIN mid hand label=18.5 box=19 button=19 box-h=30 button-h=30 gaps=8,8 inner=148/160 tick=0" "WIN mid header logo=20 word=20 app=19.5" "WIN mid answer label=18.5 box=19 h=30" \
+has "WIN mid hand label=18.5 box=19 button=19 box-h=30 button-h=30 gaps=8,8 inner=148/160 tick=0" "WIN mid header logo=23 word=23 app=22.5" "WIN mid answer label=18.5 box=19 h=30" \
   'WIN sent-pt=22 for "Did the flow run start?"' 'WIN sent-pt=22 for "Anything else to report?"' 'WIN sent-pt=13.2 for "How many flows does the import page show?"' \
   "WIN rule aligned=0 misaligned=4 ~ LAYOUT fixture FieldRow FieldBox midpoint: 15.5, the row midpoint is 22 ~ LAYOUT fixture FieldRow FieldB midpoint: 19, the row midpoint is 22 ~ LAYOUT fixture FieldRow heights: box FieldBox 23, button FieldB 30 ~ LAYOUT fixture Sent edge: starts at 126, the card edge is 123 (Kick)" && ok || { bad "window 1d: alignment, question headline, alignment rules"; grep "WIN mid\|sent-pt\|WIN rule" "$wd/win.txt" | cut -c1-300; }
 # 1f. Review of b093036: a click within 400 ms of a new card does nothing (a double-click on Done answers no question

@@ -11,7 +11,7 @@ $ui.Top.Dock = 'Top'; $ui.Top.AutoSize = $true; $ui.Top.AutoSizeMode = 'GrowAndS
 $ui.Top.Padding = (& $ui.Pad 32 12 32 0); $ui.Top.BackColor = $ui.C.White
 try {
   $ui.Logo = New-Object System.Windows.Forms.PictureBox
-  $ui.Logo.Size = New-Object System.Drawing.Size(40, 40); $ui.Logo.SizeMode = 'Zoom'; $ui.Logo.Margin = (& $ui.Pad 0 0 12 0); $ui.Logo.AccessibleName = 'RADE logo'
+  $ui.Logo.Size = New-Object System.Drawing.Size(46, 46); $ui.Logo.SizeMode = 'Zoom'; $ui.Logo.Margin = (& $ui.Pad 0 0 12 0); $ui.Logo.AccessibleName = 'RADE logo'
   $ui.Logo.Image = [System.Drawing.Image]::FromStream((New-Object System.IO.MemoryStream(, [System.Convert]::FromBase64String($logoPng))))
   [void]$ui.Top.Controls.Add($ui.Logo)
 } catch { $null = $_ }   # the window runs without the logo

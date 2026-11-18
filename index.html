@@ -26,7 +26,7 @@ body{margin:0;background:var(--bg);color:var(--text);font:1rem/1.5 var(--ui)}
 .win[data-light="fail"] .light{background:var(--fail)}
 .row{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .logo{display:flex;align-items:center;gap:12px;padding-block:14px;flex-wrap:wrap}
-.logo img{width:40px;height:40px;flex:none}
+.logo img{width:46px;height:46px;flex:none}
 .logo b{font-size:1.25rem;color:var(--navy);letter-spacing:.02em}
 .logo span{color:var(--gray);font-size:.875rem;min-width:0}
 .stage{flex:1;display:flex;flex-direction:column}
@@ -62,7 +62,7 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 </style></head><body>
 <div class="win" id="win">
 <div class="light" aria-hidden="true"></div>
-<header class="row logo"><img src="assets/logo/logo-rho-64.png" alt=""><b>RADE</b><span>Test and deploy apps for your organization</span></header>
+<header class="row logo"><img src="assets/logo/logo-rho-64.png" srcset="assets/logo/logo-rho-64.png 1x, assets/logo/logo-rho-128.png 2x" alt=""><b>RADE</b><span>Test and deploy apps for your organization</span></header>
 <main class="row stage"><div class="card" id="card" aria-live="polite"><p class="caps">RADE</p><h1>Getting the newest script.</h1></div></main>
 <footer class="row bottom"><a href="https://github.com/rhope-ops/RADE">Repository</a><a id="back" href="#" hidden>Back</a><span class="state" id="state"></span></footer>
 <div class="bar" aria-hidden="true"><i id="bar"></i></div>
