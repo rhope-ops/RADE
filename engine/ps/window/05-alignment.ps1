@@ -36,8 +36,8 @@ $ui.HeadPair = { [bool]([string]$ui.AppL.Text -and $(if ($ui.AppUnder) { $ui.App
 # The x of a control inside one of its parents (the sum of the lefts on the way up). Takes the control and the parent;
 # gives back the pixels.
 $ui.LeftIn = { param($C, $P) $x = 0; $c = $C; while ($c -and -not [object]::ReferenceEquals($c, $P)) { $x += [int]$c.Left; $c = $c.Parent }; $x }
-# The step bar's own top margin, scaled: 11 at 100 % (as made in 03-card.ps1). Takes nothing; gives back the pixels.
-$ui.BarTop = { & $ui.Sc 11 }
+# The step bar's own top margin, scaled ($ui.Z.BarTop at 100 %). Takes nothing; gives back the pixels.
+$ui.BarTop = { & $ui.Sc $ui.Z.BarTop }
 # R29b N3: the time in this step and its count sit on the vertical midpoint of the step's bar (the same flow line: each
 # part's top is the line's top plus its top margin). A text taller than the bar's place moves the bar down; that lift is
 # worked out from $ui.BarTop each time, so it never adds up. Takes nothing; changes the top margins of $ui.StepBar,

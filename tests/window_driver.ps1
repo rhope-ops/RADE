@@ -57,7 +57,7 @@ the points). Then a text taller than the bar's place, fitted twice. The bar, its
 Nothing; one WIN line.
 #>
 function global:Show-RadeTick {
-  $tk = @(); $keep = @{ Bar = $ui.StepBar.Margin; H = $ui.StepBar.Height; F = $ui.StepTime.Font; BT = $ui.BarTop }
+  $tk = @('base=' + (& $ui.BarTop)); $keep = @{ Bar = $ui.StepBar.Margin; H = $ui.StepBar.Height; F = $ui.StepTime.Font; BT = $ui.BarTop }
   foreach ($k in 1.0, 1.5, 2.0) { $ui.StepBar.Margin = (& $ui.Pad 14 ([int](11 * $k)) 14 0); $ui.BarTop = [scriptblock]::Create('' + [int](11 * $k)); $ui.StepBar.Height = [int](4 * $k); $f = New-Object RadeDraw.Font([string]$ui.F.Small.Name, [single](10 * $k))
     $ui.StepTime.Font = $f; $ui.StepFrac.Font = $f; & $ui.AlignTick; $mb = $ui.StepBar.Margin.Top + $ui.StepBar.Height / 2.0
     $tk += ([string]([int]($k * 100)) + '%:' + [math]::Abs(($ui.StepTime.Margin.Top + $ui.StepTime.PreferredSize.Height / 2.0) - $mb) + '/' + [math]::Abs(($ui.StepFrac.Margin.Top + $ui.StepFrac.PreferredSize.Height / 2.0) - $mb)) }
@@ -74,7 +74,7 @@ function global:Show-RadeR29bRules {
   $hd = @(& $ui.HeadBad 'fixture' @{ N = 'WordL'; X = 80 } @{ N = 'AppL'; X = 80 }) + @(& $ui.HeadBad 'fixture' @{ N = 'WordL'; X = 86 } @{ N = 'AppL'; X = 80 })
   $tg = @(& $ui.TickBad 'fixture' @{ Top = 11; H = 4 } @{ N = 'StepTime'; Top = 5; H = 17 }) + @(& $ui.TickBad 'fixture' @{ Top = 16; H = 6 } @{ N = 'StepTime'; Top = 7; H = 26 }) + @(& $ui.TickBad 'fixture' @{ Top = 22; H = 8 } @{ N = 'StepTime'; Top = 9; H = 34 })
   $tb = @(& $ui.TickBad 'fixture' @{ Top = 11; H = 4 } @{ N = 'StepTime'; Top = 6; H = 17 }) + @(& $ui.TickBad 'fixture' @{ Top = 16; H = 6 } @{ N = 'StepTime'; Top = 9; H = 26 }) + @(& $ui.TickBad 'fixture' @{ Top = 22; H = 8 } @{ N = 'StepTime'; Top = 7; H = 34 })
-  $hd += @(& $ui.GapBad 'fixture' 6 6) + @(& $ui.GapBad 'fixture' 7 6) + @(& $ui.GapBad 'fixture' 30 6)   # R29b V1 gap: 6 = G1 at 150 %; 1 px off passes, 45 at 150 % on the device (30 here) fails
+  $hd += @(& $ui.GapBad 'fixture' 6 6) + @(& $ui.GapBad 'fixture' 7 6) + @(& $ui.GapBad 'fixture' 8 6)   # R29b V1 gap: 6 = G1 at 150 %; 1 px off passes, 2 px off fails
   Write-Host ('WIN rule head=' + $hd.Count + ' tick-ok=' + $tg.Count + ' tick-off=' + $tb.Count + ' ~ ' + (@($hd) + @($tb) -join ' ~ '))
 }
 function global:Push-RadeButton([string]$Text) {

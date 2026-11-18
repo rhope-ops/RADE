@@ -43,7 +43,7 @@ $ui.F = @{ Small = $ui.Form.Font; SmallB = (& $ui.Font 'Segoe UI Semibold' 10 $n
 # parts of a card. Action = a card's buttons; compact = a button beside a box and the Record's "Back"; a link is 28 high.
 # Gaps are on the scale 4, 8, 12, 16, 24. A button or link has a 4 px margin (room for the 2 px focus ring), so two
 # of them are 8 px apart.
-$ui.Z = @{ ActionW = 132; ActionH = 40; CompactW = 110; CompactH = 30; LinkH = 28; M = 4; G1 = 4; G2 = 8; G3 = 12; G4 = 16; G6 = 24 }
+$ui.Z = @{ ActionW = 132; ActionH = 40; CompactW = 110; CompactH = 30; LinkH = 28; BarTop = 11; M = 4; G1 = 4; G2 = 8; G3 = 12; G4 = 16; G6 = 24 }
 $ui.Pad = { param([int]$L, [int]$T, [int]$R, [int]$B) New-Object System.Windows.Forms.Padding($L, $T, $R, $B) }
 $ui.Label = { param($Font, $Color, [int]$Top) $l = New-Object System.Windows.Forms.Label; $l.AutoSize = $true; $l.Font = $Font; $l.ForeColor = $Color; $l.BackColor = $ui.C.White; $l.UseMnemonic = $false; $l.Margin = (& $ui.Pad 0 $Top 0 0); $l.Visible = $false; $l }
 # ---- Card text that can be selected (R28, the Administrator, 2026-11-17)
