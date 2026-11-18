@@ -29,7 +29,7 @@ $ui.FitEdges = { try {
 $ui.FitHead = { try {
     if (-not (& $ui.HeadPair)) { & $ui.SetLeft $ui.WordL 0; & $ui.SetLeft $ui.AppL 0; return }
     $iw = & $ui.Ink $ui.WordL; $ia = & $ui.Ink $ui.AppL; $e = [math]::Max($iw, $ia)
-    & $ui.SetLeft $ui.WordL ($e - $iw); & $ui.SetLeft $ui.AppL ($e - $ia) } catch { $null = $_ } }
+    & $ui.SetLeft $ui.WordL ($e - $iw); & $ui.SetLeft $ui.AppL ($e - $ia) } catch { $null = $_ } }   # no measure (no window handle yet): the next fit sets the edges
 # Whether the header shows the application name on the edge of the word RADE: the name has text and shows, and both rows
 # start at the same x (both logos, or no application logo). Takes nothing; gives back $true or $false.
 $ui.HeadPair = { [bool]([string]$ui.AppL.Text -and $(if ($ui.AppUnder) { $ui.AppL.Visible } else { $ui.AppRow.Visible }) -and ($ui.AppUnder -or $ui.Logo)) }
@@ -43,7 +43,7 @@ $ui.AlignTick = { try {
     foreach ($l in @($ui.StepTime, $ui.StepFrac)) { $h = [int]$l.PreferredSize.Height; $t = [int][math]::Max(0, [math]::Round($bm - $h / 2.0, [System.MidpointRounding]::AwayFromZero)); $m = $l.Margin
       if ($m.Top -ne $t) { $l.Margin = New-Object System.Windows.Forms.Padding($m.Left, $t, $m.Right, $m.Bottom) } }
     $h = [int]$ui.StepTime.PreferredSize.Height; $lift = [int][math]::Ceiling($h / 2.0 - $bm)   # a text taller than the bar's place: the bar moves down instead
-    if ($lift -gt 0) { $m = $ui.StepBar.Margin; $ui.StepBar.Margin = New-Object System.Windows.Forms.Padding($m.Left, ($m.Top + $lift), $m.Right, $m.Bottom); & $ui.AlignTick } } catch { $null = $_ } }
+    if ($lift -gt 0) { $m = $ui.StepBar.Margin; $ui.StepBar.Margin = New-Object System.Windows.Forms.Padding($m.Left, ($m.Top + $lift), $m.Right, $m.Bottom); & $ui.AlignTick } } catch { $null = $_ } }   # no bar yet: the next fit aligns the row
 # Centers a row of controls up and down by changing their top and bottom margins. Takes the controls and the top margin
 # of the row; gives back nothing.
 $ui.AlignRow = { param($Parts, [int]$Base)
