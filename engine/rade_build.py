@@ -348,7 +348,11 @@ def engine_for_app(ui_text):
 def app_logo_bytes():
     """Return the bytes of the application's logo: the PNG file that the manifest's application.logo names (a path in
     the application repo), or no bytes when it names none. The window shows it under the RADE logo once the user
-    chooses the application (the Administrator, 2026-11-18). Stops the build when the file is missing or is not a PNG."""
+    chooses the application (the Administrator, 2026-11-18). Stops the build when the file is missing or is not a PNG.
+
+    Returns:
+        The PNG bytes, or b'' when application.logo is not set.
+    """
     rel = APP.get('logo')
     if not rel:
         return b''
