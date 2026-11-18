@@ -1,0 +1,18 @@
+# Text files keep LF in every checkout: the engine's hashes and an app's lock are over the file bytes,
+# so a Windows checkout must not turn LF into CRLF. No "* text=auto": it could change bytes.
+*.ps1 text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.html text eol=lf
+*.cs text eol=lf
+*.mjs text eol=lf
+*.js text eol=lf
+*.svg text eol=lf
+*.txt text eol=lf
+*.png binary
+*.zip binary
+*.docx binary
+*.pdf binary
