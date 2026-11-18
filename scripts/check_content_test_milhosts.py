@@ -1,6 +1,5 @@
-"""RADE's own cases of the self-test of scripts/check_content.py (check_content_test.py runs them; kept apart so that
-file stays under the 600-line cap of docs/code-standard.md C4): the linear military-host finder milhosts() of
-scripts/check_content_milhosts.py (RADE decision 2A, 2026-11-16; the kit keeps its own pattern and has no finder).
+"""RADE's own cases of the content check (the self-test of scripts/check_content_local.py runs them): the linear
+military-host finder milhosts() of scripts/check_content_milhosts.py (RADE decision 2A, 2026-11-16; the kit keeps its own pattern and has no finder).
 
 It proves that milhosts() gives the matches of MILHOST.finditer on the pattern's edge cases and on 2,000 random lines,
 that it falls back to the pattern when its model gives a wrong span, and that it runs in linear time on 200 KB runs.
@@ -9,7 +8,7 @@ Output: one "ok" or "FAIL" line per case through the check() and expect() functi
 Network: none.
 Writes: none.
 Credentials: none.
-Run:     python3 scripts/check_content.py --test (target: Python 3.8+ on Linux, the cloud workspace).
+Run:     python3 scripts/check_content_local.py --test (target: Python 3.8+ on Linux, the cloud workspace).
 """
 import random
 import time
@@ -20,7 +19,7 @@ at, dot = "@", "."  # addresses and hosts are joined at run time, so this file d
 
 
 def run(check, expect):
-    """Run RADE's milhosts() cases; `check` and `expect` are the result functions of check_content_test.py."""
+    """Run RADE's milhosts() cases; `check` and `expect` are the result functions of check_content_local.py."""
     case_milhosts_edges(check, expect)
     case_milhosts_fallback(check)
     case_milhosts_random_speed(check)

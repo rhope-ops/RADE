@@ -10,7 +10,7 @@ Status words: **Met** (a RADE rule or check does it), **Partial** (part of it, o
 
 ## 1. Each code-standard rule and what it supports
 
-Rules: [code-standard.md](code-standard.md).
+Rules: [code-standard.md](code-standard.md) and [code-standard-rade.md](code-standard-rade.md).
 
 | Rule | SSDF practice / task | STIG item |
 |---|---|---|
@@ -62,8 +62,8 @@ Only the items about development, code and delivery are listed. Items about web 
 | APSC-DV-001430 (V-222513) The application must have the capability to prevent the installation of patches, service packs, or application components without verification … | Partial | An app's build checks every engine file's SHA-256; no code is downloaded at run time. Gap: a person cannot yet check the pasted bundle's own hash on the work computer. REC: the review guide gives the steps (`certutil -hashfile`, review-guide.md part 2) and each release lists the bundle hash |
 | APSC-DV-000650 (V-222444) The application must not write sensitive data into the application logs. | Partial | Results e-mail holds masked counts only (AGENTS.md "Project rules", DoD365 boundary); by review |
 | APSC-DV-002530 (V-222606) The application must validate all input. | Partial | Site address prefix guardrail; manifest schema check (scripts/check_manifest.py). Other input by review |
-| APSC-DV-002570 (V-222610) The application must generate error messages that provide information necessary for corrective actions without revealing information … | Partial | By review only (review-guide.md checklist); rule X7 in [code-standard.md](code-standard.md) asks a reason for each discarded error |
-| APSC-DV-003235 (V-222656) The application must not be subject to error handling vulnerabilities. | Partial | Rule X7 (code-standard.md): a test counts the engine's `catch { $null = $_ }` with no reason (106 of 129 on 17 Nov 26; the count may only go down); the rest by review. Strict mode is not on in the shipped engine: [findings](reviews/2026-11-17-strict-mode-findings.md) |
+| APSC-DV-002570 (V-222610) The application must generate error messages that provide information necessary for corrective actions without revealing information … | Partial | By review only (review-guide.md checklist); rule X7 in [code-standard-rade.md](code-standard-rade.md) asks a reason for each discarded error |
+| APSC-DV-003235 (V-222656) The application must not be subject to error handling vulnerabilities. | Partial | Rule X7 (code-standard-rade.md): a test counts the engine's `catch { $null = $_ }` with no reason (106 of 129 on 17 Nov 26; the count may only go down); the rest by review. Strict mode is not on in the shipped engine: [findings](reviews/2026-11-17-strict-mode-findings.md) |
 | APSC-DV-003130 (V-222644) Prior to each release …, tests plans and procedures must be created and executed. | Met | release.yml runs the checks before each release; each app's work-computer round has a written test plan (for example rhope-ops/90-161.Z docs/gov-test-plan.md) |
 | APSC-DV-003150 (V-222646) At least one tester must be designated to test for security flaws in addition to functional testing. | Partial | The fresh reviewer checks rule conflicts and security; no named tester |
 | APSC-DV-003230 (V-222655) Threat models must be documented and reviewed for each application release … | Partial | [threat-model.md](threat-model.md) exists; it is not yet reviewed for each release. REC: as PW.1 |

@@ -48,7 +48,7 @@ A value that is set in another file (for example a `$...Url` variable) must be f
 
 Each function has a comment above it or in it that says what it does (rule C2). Rule C2 full asks more of a function longer than 10 lines: help that names what it takes and gives back (`.SYNOPSIS` and one `.PARAMETER` per parameter in PowerShell, in a `<# ... #>` block). That rule is new: most engine functions do not have that block yet (the open count is the "docs" debt in `.code-standard.json`), so for them read the `#` lines and the code. Read help in the file as text. Do not dot-source or run a file to read its help: that runs its code.
 
-Checklist for the rules a script cannot check ([code-standard.md](code-standard.md), marked **(review)**):
+Checklist for the rules a script cannot check ([code-standard.md](code-standard.md) and [code-standard-rade.md](code-standard-rade.md), marked **(review)**):
 
 - [ ] The header and help are true: the code does what they say and nothing more.
 - [ ] No host is contacted other than those in `Network:` (and never a scan, ping or port check).

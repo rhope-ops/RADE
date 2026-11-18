@@ -1,5 +1,5 @@
-"""RADE's military-host pattern and its linear-time finder for the content check (scripts/check_content_scan.py imports
-MILHOST and milhosts from here; RADE decision 2A, 2026-11-16). The kit keeps its own pattern in its scanner and has
+"""RADE's military-host pattern and its linear-time finder for the content check (scripts/check_content_local.py imports
+milhosts from here; RADE decision 2A, 2026-11-16). The kit keeps its own pattern in its scanner and has
 no finder (kit decision of 2026-11-17), so this part is RADE's own and lives in its own file.
 
 What it does: MILHOST is the pattern for a host name in the US military top-level domain and for the DoD cloud tenant
@@ -9,7 +9,7 @@ Inputs:  one line of text. Outputs: the match objects of MILHOST, leftmost first
 Network: none.
 Writes: none.
 Credentials: none.
-Run:     not run alone; proved by `python3 scripts/check_content.py --test` (scripts/check_content_test_milhosts.py).
+Run:     not run alone; proved by `python3 scripts/check_content_local.py --test` (scripts/check_content_test_milhosts.py).
          Target: Python 3.8+.
 """
 import bisect
