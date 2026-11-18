@@ -20,9 +20,10 @@ Read these first. Each is short.
 A bundle is one `.ps1` file that a person pastes. Each app keeps its bundles in its repo (90-161.Z: `scripts/gov/paste/`).
 
 1. On GitHub, open the bundle file in the app repo, select "History", and note the commit you review.
-2. On the work computer, before you paste, save the bundle text to a file and run:
-   `Get-FileHash -Algorithm SHA256 <file>`
-3. Download the same file from that commit on another computer (the "Raw" button) and run the same command (or `sha256sum`). The two values must be the same. If they differ, do not run it. A match proves only that the text did not change on the way; it does not prove that anyone reviewed it. That is what part 3 is for.
+2. On the work computer, before you paste, download the bundle file with the browser (the "Raw" button, then "Save as") and run:
+   `certutil -hashfile <file> SHA256`
+   (`Get-FileHash -Algorithm SHA256 <file>` gives the same value where that command exists; it was not found in one Windows PowerShell 5.1 test job: the comment in engine/ps/03-files.ps1, Save-RoundDownload.) Do not copy the text into an editor and save that: an editor can change the line ends or add a byte-order mark, and then the value differs although the code is the same.
+3. Download the same file from that commit on another computer and run the same command (or `sha256sum`). The two values must be the same. If they differ, do not run it. A match proves only that the text did not change on the way; it does not prove that anyone reviewed it. That is what part 3 is for.
 4. The bundle starts with a table of contents. Each part has a banner with its source file and that file's SHA-256 (code standard rule X3). The RADE engine parts must match the engine release the app's lock names (`scripts/rade.lock.json` in the app; the release lists every engine file's SHA-256 and is signed: engine.md "How an app gets the engine").
 
 ## 3. Read the code
@@ -44,7 +45,7 @@ A header is a claim, not proof: check it against the code. Files from before 202
 
 A value that is set in another file (for example a `$...Url` variable) must be followed to where it is set; in a bundle, search the whole bundle, not one part. `UseDefaultCredentials` sends the user's Windows sign-in to that address without a prompt: check that each such address is a fixed, expected host.
 
-Each function longer than 10 lines has help (`.SYNOPSIS` and one `.PARAMETER` per parameter in PowerShell) that says what it does, takes and gives back (rule C2 full). Read it in the file as text, in the `<# ... #>` block above or at the top of each function. Do not dot-source or run a file to read its help: that runs its code.
+Each function has a comment above it or in it that says what it does (rule C2). Rule C2 full asks more of a function longer than 10 lines: help that names what it takes and gives back (`.SYNOPSIS` and one `.PARAMETER` per parameter in PowerShell, in a `<# ... #>` block). That rule is new: most engine functions do not have that block yet (the open count is the "docs" debt in `.code-standard.json`), so for them read the `#` lines and the code. Read help in the file as text. Do not dot-source or run a file to read its help: that runs its code.
 
 Checklist for the rules a script cannot check ([code-standard.md](code-standard.md), marked **(review)**):
 
