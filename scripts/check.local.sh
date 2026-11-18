@@ -19,7 +19,9 @@ changed() {
 # Engine behavior (deploy v1) takes most of the time, so the engine tests start first, in the background, beside the
 # checks below, and their result is read at the end (speed audit S4; the Administrator, 2026-11-18).
 engine_files='^(engine/|tests/|schemas/|assets/|docs/window-design\.md$|scripts/check_manifest\.py$|scripts/check\.local\.sh$|scripts/lint\.sh$)'
-et=""; eo="$(mktemp)"; lt="$(mktemp -d)"; trap 'rm -rf "$lt" "$eo"' EXIT
+# kt PID: stops a process and its child processes (children first), so no engine test runs on after the lane ends.
+kt() { local c; for c in $(pgrep -P "$1" 2>/dev/null); do kt "$c"; done; kill "$1" 2>/dev/null || true; }
+et=""; eo="$(mktemp)"; lt="$(mktemp -d)"; trap '[ -z "$et" ] || kt "$et"; rm -rf "$lt" "$eo"' EXIT
 if changed "$engine_files"; then bash tests/engine_test.sh > "$eo" 2>&1 & et=$!; fi
 # Manifest contract: schemas/rade-manifest.schema.json plus cross-references (scripts/check_manifest.py).
 python3 scripts/check_manifest.py
@@ -47,7 +49,7 @@ python3 tests/check_apps_test.py
 if [ "$lane" = full ]; then python3 scripts/check_apps.py; else echo "SKIP app canary (fast lane: the full lane runs it)"; fi
 # Engine behavior (deploy v1): the sample bundle built and run in pwsh text mode (started at the top), its layout and its lint.
 if [ -n "$et" ]; then
-  if wait "$et"; then cat "$eo"; else cat "$eo"; echo "FAIL engine tests (tests/engine_test.sh)"; exit 1; fi
+  if wait "$et"; then et=""; cat "$eo"; else et=""; cat "$eo"; echo "FAIL engine tests (tests/engine_test.sh)"; exit 1; fi
   python3 tests/bundle_layout_test.py   # the Contents list and the shared blocks (docs/engine.md "Bundle layout")
   bash scripts/lint.sh   # PSScriptAnalyzer on the built sample bundle (apps lint their bundles with the same settings)
 else

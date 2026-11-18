@@ -100,7 +100,7 @@ The text-mode runs did not grow (42 `round`/`psrun`/`mkround`/`xrun` calls at bo
 
 | # | Proposal | Saving | Risk | Why not made |
 |---|---|---|---|---|
-| S4 | scripts/check.local.sh: start `tests/engine_test.sh` in the background before the other project checks (code-standard self-test 5.0 s, lint 4.4 s, app canary 1.8 s, code standard 1.3 s, bundle layout 0.5 s run serially after it now) and wait for it at its place | check.local.sh 65.5 s → 58.1 s (−7.4 s, measured with a scratch copy, 3 runs each) | low: the output order of check.local.sh changes; the fast lane keeps its `changed` condition | check.local.sh is run by the pre-push hook, so it is a guard file (AGENTS.md "Rules and decisions"): it changes only on the Administrator's request |
+| S4 (made later: the Administrator took it on 2026-11-18, commit 475ee83) | scripts/check.local.sh: start `tests/engine_test.sh` in the background before the other project checks (code-standard self-test 5.0 s, lint 4.4 s, app canary 1.8 s, code standard 1.3 s, bundle layout 0.5 s run serially after it now) and wait for it at its place | check.local.sh 65.5 s → 58.1 s (−7.4 s, measured with a scratch copy, 3 runs each) | low: the output order of check.local.sh changes; the fast lane keeps its `changed` condition | check.local.sh is run by the pre-push hook, so it is a guard file (AGENTS.md "Rules and decisions"): it changes only on the Administrator's request |
 | S5 | Run the window cases in one pwsh process (like tests/pwsh_batch.ps1 for text mode) | about 0.3–0.6 s CPU per run, about 2 s wall | medium: the stand-in types keep static state (pump count, timers, focus, screens) that would need a reset between runs | small gain now that the machine is busy on all 4 cores |
 | S6 | Make the window logic cheaper in the engine (for example fewer script-block calls for sizes: `$ui.Sc` 1,220 calls and `$ui.WordW` 4,245 calls in one run) | unknown; window runs are about half of the 203 s of CPU | engine change: it ships to work computers (Windows PowerShell 5.1) | outside a test audit: an engine change for the Administrator to decide |
 | — | Fewer engine child processes (81 per run) | large | it changes what is tested (steps run as their own process in the product) | not a test change |
@@ -110,7 +110,8 @@ The text-mode runs did not grow (42 `round`/`psrun`/`mkround`/`xrun` calls at bo
 
 - No test was removed, skipped or weakened; every `has`, `grep` and `ok`/`bad` line is the same text (S1 moved lines into
   tests/engine_window.sh and changed only `$t/win.txt` → `$wd/win.txt` and `$t/wu` → `$wd/u`).
-- No change to the engine, AGENTS.md, .claude/, scripts/git-hooks/, workflows or scripts/check.local.sh.
+- No change to the engine, AGENTS.md, .claude/, scripts/git-hooks/ or workflows. scripts/check.local.sh changed only
+  for S4, after the Administrator took it (2026-11-18).
 - `.bloat-audit.json` is not changed: the timing baseline is for the Administrator (below).
 
 ## For the Administrator

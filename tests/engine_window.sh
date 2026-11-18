@@ -11,7 +11,9 @@
 # runs are 3 groups (W, W2, W3) that run at once: one chain of 12 runs took about 75 s (speed audit, 2026-11-17). W2 and W3
 # start from a copy of the users root as window run 1 (the first deploy) left it ($t/wseed, made by W): an installed app.
 wgo() { wd="$t/$1"; mkdir -p "$wd/u/test1234/OneDrive - United States Air Force"; swap "$b" "$wd/wb.ps1" "$wd/u"
-  if [ -n "${2:-}" ]; then until [ -e "$t/wseed.done" ]; do sleep 0.2; done; cp -a "$t/wseed/." "$wd/u/"; fi; }
+  if [ -n "${2:-}" ]; then local n=0; until [ -e "$t/wseed.done" ] || [ $((n += 1)) -gt 1500 ]; do sleep 0.2; done
+    # at most 300 s: if group W ended early and left no seed, the group goes on without it and its checks fail
+    if [ -e "$t/wseed.done" ]; then cp -a "$t/wseed/." "$wd/u/"; else echo "  no seed from group W after 300 s ($t/wseed.done)"; fi; fi; }
 # stub: the stand-in types for win, as the DLL that group W compiles once before its first run ($t/window_stub.dll), or
 # the C# source when there is no DLL (each run then compiles it: about 0.8 s of CPU more for each of the 12 runs).
 stub() { if [ -s "$t/window_stub.dll" ]; then echo "$t/window_stub.dll"; else echo "$PWD/tests/window_stub.cs"; fi; }
