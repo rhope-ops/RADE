@@ -12,7 +12,7 @@ Updated: 2026-11-17 by Claude (code standard and engine split; engine-v11 = 19ba
 ## Open (in order)
 
 0. Deploy v1: built, tested in text mode. Next: 90-161.Z lock bump and manifest fields, item 6 (app page), first tagged release.
-1. Reach test sends no Windows sign-in to the tested address; Config flow address only on the app's host (ENGINE_RELEASE 13, tests/net_rules_test.sh). Next: release engine-v13 after the Administrator's go, then each app moves its lock; a work-computer round proves the reach check.
+1. Reach test sends no Windows sign-in to the tested address; Config flow address only on the app's host (ENGINE_RELEASE 13, tests/net_rules_test.sh). Next: release engine-v13 after the Administrator's go, then each app moves its lock; a work-computer round proves the reach check. MINOR leftovers (review of PR 85): a step with urlConfig and no url gets a blank-host message and no address (04-steps.ps1, window OpenUrl skips the check); the host rule allows any path or port on the host; net-flow FAILED does not say a saved address was ignored.
 2. Next engine items: size in the summary, engine version + sha256 in the window, JSON results block.
 3. Run-time logo: spec docs/specs/run-time-logo.md approved 17 Nov 26 (A2 tolerance set; reference images in tests/ only if needed). Next: build in one engine release, then the 90-161.Z round that drops its PNGs.
 4. Build docs/engine.md (modes, check stages, fallback, fresh fast checks) and the drift check (docs/drift-check.md).
