@@ -1,6 +1,6 @@
 # Next prompt: RADE
 
-Updated: 2026-11-18 by Claude (standards plan done, close-out in docs/reviews; engine-v14 = 783dee4 released 17 Nov 26; test speed S1-S4 merged, PR 86; check baseline 66.4 s, PR 89). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
+Updated: 2026-11-18 by Claude (logo 64 px baseline and app row, PRs 98 and 99, ENGINE_RELEASE 15, release engine-v15 after PR 99; standards plan done, close-out in docs/reviews; engine-v14 = 783dee4 released 17 Nov 26; test speed S1-S4 merged, PR 86; check baseline 66.4 s, PR 89). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
 
 ## State
 
@@ -14,7 +14,7 @@ Updated: 2026-11-18 by Claude (standards plan done, close-out in docs/reviews; e
 0. Deploy v1: built, tested in text mode. Next: 90-161.Z lock bump and manifest fields, item 6 (app page), first tagged release.
 1. The standards plan (the Administrator, 17 Nov 26; docs/DECISIONS.md): all stages merged (pull requests 87, 88, 94, 95; engine-v14 released; job text51 runs text mode on Windows PowerShell 5.1). What is merged, the proof, the Administrator's settings to do and every open point: [docs/reviews/2026-11-18-standards-plan-close.md](reviews/2026-11-18-standards-plan-close.md). Next engine release (15): the catch reasons and the strict-mode faults listed there. The kit must take the four checker files at its next port.
 2. Next engine items: size in the summary, engine version + sha256 in the window, JSON results block.
-3. Run-time logo: spec docs/specs/run-time-logo.md approved 17 Nov 26 (A2 tolerance set; reference images in tests/ only if needed). Next: build in one engine release, then the 90-161.Z round that drops its PNGs.
+3. Run-time logo: spec docs/specs/run-time-logo.md approved 17 Nov 26 (A2 tolerance set; reference images in tests/ only if needed). Next: build in one engine release, then the 90-161.Z round that drops its PNGs. When built, R7 also removes `application.logo`, `$appLogoPng` and `app_logo_bytes` (DECISIONS 2026-11-18). 90-161.Z: after its lock moves to engine-v15, it adds `application.logo` (docs/make-an-app.md).
 4. Build docs/engine.md (modes, check stages, fallback, fresh fast checks) and the drift check (docs/drift-check.md).
 5. Window "One thing": built, engine-v4; Windows job passes at 100 %. Next: each app moves its lock to engine-v4, then a work-computer round ("Layout self-check: PASS layout").
 6. After the first device round: fix what it reports, release, report the tag and commit.
@@ -32,6 +32,7 @@ Updated: 2026-11-18 by Claude (standards plan done, close-out in docs/reviews; e
 
 ## Needs the Administrator
 
+- Logo palette: the Administrator does not want the USAF blue/white/yellow look long term but kept it for engine-v15 (18 Nov 26); options A-D with contrast: https://claude.ai/artifact/VFGHZkutbbCDFE8uuoFtpr (REC A, Graphite & Teal).
 - The final Teams channel name (placeholder RHOPE-OPS in the engine and in apps.json `help`).
 
 ## Do not
