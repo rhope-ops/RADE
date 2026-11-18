@@ -1,5 +1,5 @@
 {
- "commit": "90cdebaa865dc2ebb4e85cc3b16dee14e1e2c2ac",
+ "commit": "356eed819b2cf3a765125dd88fe7678b3018350c",
  "files": {
   ".claude/agents/reviewer.md": "99714a5eda6b9910e3b7c632b1772ce77bf8ce7ab6e62ae05d6a34643300df9a",
   ".claude/agents/scout.md": "ca159180066f41d534b545518adbbdf357d198e8a680a3396413224b34e84511",
@@ -50,5 +50,5 @@
  },
  "kit": "archimedes_lever",
  "overrides": [],
- "version": "2026.11.20.1"
+ "version": "2026.11.20.2"
 }
