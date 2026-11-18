@@ -356,7 +356,9 @@ def app_logo_bytes():
     rel = APP.get('logo')
     if not rel:
         return b''
-    path = ROOT / rel
+    path = (ROOT / rel).resolve()
+    if rel.startswith('/') or '..' in Path(rel).parts or not path.is_relative_to(ROOT):
+        sys.exit('application.logo: the path must stay inside the application repo: ' + rel)
     if not path.is_file():
         sys.exit('application.logo: no file at ' + rel)
     data = path.read_bytes()
