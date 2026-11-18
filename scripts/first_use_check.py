@@ -20,6 +20,9 @@ It reports:
                     continues the approved plan, without a new plan review (the owner, 2026-11-18).
 The kit repo itself keeps its placeholders on purpose: it gets the KIT line, never FIRST USE.
 Exit 0 always: a session-start hook informs, it never blocks. Standard library only.
+Network: none (it runs local git read commands).
+Writes: none (the self-test: a temporary repo).
+Credentials: none; it reads whether a name denylist exists (an environment variable or a file), never its words.
 """
 import json
 import os
@@ -49,7 +52,14 @@ def has_denylist():
 
 
 def messages(root):
-    """The session-start lines this repo needs: KIT, FIRST USE and DENYLIST, plus a note for a check that failed."""
+    """The session-start lines this repo needs: KIT, FIRST USE and DENYLIST, plus a note for a check that failed.
+
+    Args:
+        root: the repo root (a path).
+
+    Returns:
+        A list of lines to print.
+    """
     root = pathlib.Path(root)
     out = []
     try:
@@ -154,7 +164,11 @@ def hook_cases(d, expect):
 
 
 def self_test():
-    """Check the messages on a temporary repo through each state (new, kit clone, guard with and without denylist)."""
+    """Check the messages on a temporary repo through each state (new, kit clone, guard with and without denylist).
+
+    Returns:
+        The exit code: 0 pass, 1 fail.
+    """
     ok = True
 
     def expect(name, got, want):

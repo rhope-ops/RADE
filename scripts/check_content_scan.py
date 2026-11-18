@@ -4,7 +4,20 @@ file (`.check`; the old name `.pii-guard` is still read), and the scans of a tex
 Inputs: text, repo-relative paths or git rev-list arguments; the word lists (environment or file) and the settings file.
 Outputs: findings as (where, line number, kind, masked value) tuples; nothing is printed here.
 Run: not run alone; check_content.py, check_content_hook.py and check_content_test.py import it (the checks, tiers and limits
-are described in the check_content.py header).
+are described in the check_content.py header). The patterns and finders of each finding kind: check_content_finders.py.
+
+A project's own finders (the extension point): when the file scripts/check_content_local.py stands next to this one,
+the scanner loads it. The kit has no such file, and the kit's own patterns stay the default. The module defines one
+or both of these names (a kind is one of email, secret, phone, id, milhost, dodid, marking):
+    REPLACE = {kind: [finder, ...]}   these finders take the place of the kit's finders for that kind (at least one)
+    ADD     = {kind: [finder, ...]}   these finders run after the finders of that kind
+    finder(line) -> an iterable of (start, end, value): the span of each match in the line of text, and the text
+                    that is the finding (it is masked in the output and compared with the allowed strings)
+The kinds milhost, dodid and marking run only in the DoD tier, whoever finds them. The module must not import this
+scanner when it is loaded (its own self-test may); `python3 scripts/check_content_local.py --test` is that self-test,
+and scripts/check.sh runs it when the file has one. A module that cannot be imported, or that has neither name in this
+shape, makes every scan fail (LOCAL_ERROR; scan_text raises LocalError) and the hook block: the scanner never falls
+back to the kit's patterns, and never to no check. The result line of a scan and --status say when a module is active.
 Network: none (it runs local git read commands).
 Writes: none.
 Credentials: none; it reads the name denylist and the terms list from an environment variable or a file.
@@ -18,72 +31,25 @@ import re
 import subprocess
 import unicodedata
 
-import check_content_milhosts   # scripts/check_content_milhosts.py: RADE's military-host pattern and linear finder
+import check_content_finders as finders_mod   # scripts/check_content_finders.py: the patterns, the kit's finders, the loader
+from check_content_finders import LocalError, emails   # noqa: F401 - LocalError is part of this module's interface
 
 ZERO = re.compile(r"^0+$")
-# EMAIL is the pattern; emails() finds its matches. A plain EMAIL.finditer tries every start of a long run of
-# local-part characters, so its time grows with the square of the run (200 KB took 26 s, longer than the hook timeout).
-EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
-_LOCAL = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._%+-")
+LOCAL_FILE = pathlib.Path(__file__).resolve().parent / finders_mod.LOCAL_NAME   # a project's own finders (see the header)
+FINDERS, LOCAL, LOCAL_ERROR = None, "", None   # the finders in use, the note for the result line, why they cannot be used
 
 
-def emails(line):
-    """The matches of EMAIL.finditer (leftmost, non-overlapping) in linear time. A local part cannot hold an "@", so
-    each match ends its local part at one "@": walk the "@" signs in order, start the local part at the start of its
-    run (not before the end of the last match), and match once from there.
-
-    Args:
-        line: one line of text.
-    """
-    pos, at = 0, line.find("@")
-    while at != -1:
-        start = at
-        while start > pos and line[start - 1] in _LOCAL:
-            start -= 1
-        m = EMAIL.match(line, start) if start < at else None
-        if m:
-            yield m
-            pos = m.end()
-            at = line.find("@", pos)
-        else:
-            at = line.find("@", at + 1)
+def use_local(path=None):
+    """Set the finders in use: the kit's, with the project's own module at `path` applied when that file exists
+    (None = LOCAL_FILE). A module that cannot be used sets LOCAL_ERROR, and then every scan_text call raises."""
+    global FINDERS, LOCAL, LOCAL_ERROR
+    try:
+        (FINDERS, LOCAL), LOCAL_ERROR = finders_mod.load_local(path or LOCAL_FILE), None
+    except LocalError as err:
+        FINDERS, LOCAL, LOCAL_ERROR = None, "", f"{err}. Correct or remove that file: no scan runs until then"
 
 
-PHONE = [
-    re.compile(r"(?<![\w./-])\(?\d{3}\)?[-. ]\d{3}[-.]\d{4}(?![\w-])"),
-    re.compile(r"(?<![\w./-])\(\d{3}\) ?\d{3}[-. ]\d{4}(?![\w-])"),
-    re.compile(r"(?<![\w+])\+\d{1,3}[ -]\(?\d{1,4}\)?[ -]\d{2,4}[ -]\d{3,4}(?![\w-])"),
-    re.compile(r"(?i)\b(?:phone|tel|cell|mobile|fax|call)\b\D{0,20}?(\+?1?[ .-]?\d{3}[ .-]?\d{3}[ .-]?\d{4})\b"),
-    re.compile(r"(?<![\w+])\+1\d{10}\b"),
-]
-SSN = re.compile(r"(?<![\w-])\d{3}-\d{2}-\d{4}(?![\w-])")
-SSN_KW = re.compile(r"(?i)\b(?:SSN|social security)\b\D{0,20}?(\d{3}[ -]?\d{2}[ -]?\d{4})\b")
-SECRET = [re.compile(r) for r in (
-    r"\bgh[pousr]_[A-Za-z0-9]{36,}\b",                 # GitHub tokens
-    r"\bgithub_pat_[A-Za-z0-9_]{60,}\b",               # GitHub fine-grained token
-    r"\bglpat-[A-Za-z0-9_-]{20,}",                      # GitLab
-    r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b",                  # AWS access key id
-    r"\bsk-ant-[A-Za-z0-9_-]{20,}",                     # Anthropic
-    r"\bsk-(?:proj-|svcacct-)?(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{32,}",  # OpenAI (mixed case + digit)
-    r"\bAIza[0-9A-Za-z_-]{35}(?![0-9A-Za-z_-])",        # Google API key
-    r"\bxox[abposr]-[A-Za-z0-9-]{10,}",                 # Slack
-    r"\b[rs]k_live_[0-9A-Za-z]{24,}",                   # Stripe live key
-    r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----",  # PEM, OpenSSH and PGP private keys
-)]
-# DoD tier (`profile: dod`). The marks are split in the source so this file does not flag itself.
-MILHOST, milhosts = check_content_milhosts.MILHOST, check_content_milhosts.milhosts   # RADE's own pattern and finder
-MARKING = [re.compile(r) for r in (
-    r"\bCUI/" r"/", r"^[^A-Za-z0-9]*CU" r"I[^A-Za-z0-9]*$", r"(?i)\bcontrolled\s+unclassified\s+" r"information\b",
-    r"^[^A-Za-z0-9]*(?:SEC" r"RET|CONFID" r"ENTIAL|UNCLASS" r"IFIED)[^A-Za-z0-9]*$",  # one word alone on its line, upper case
-    r"(?i)^[^A-Za-z0-9]*TOP\s+SEC" r"RET[^A-Za-z0-9]*$",                               # two words alone on a line, any case
-    r"\bFO" r"UO\b", r"(?i)\bfor\s+official\s+use\s+" r"only\b", r"\bNOF" r"ORN\b",
-    r"(?i)\b(?:SECRET|CONFIDENTIAL|UNCLASSIFIED)/" r"/",
-)]
-_DODID_KW = r"(?<![A-Za-z])(?:DOD[\s_-]*ID|EDIPI|CAC)(?![A-Za-z])"  # also dod_id, and DODID joined to the number
-DODID = [re.compile(r"(?i)" + _DODID_KW + r"\D{0,20}?(\d{10})(?!\d)"),          # keyword, then the number
-         re.compile(r"(?i)(?<!\d)(\d{10})(?!\d)\D{0,20}?" + _DODID_KW)]        # the number, then the keyword
-ALLOWED_EMAIL = re.compile(
-    r"(?i)(@users\.noreply\.github\.com$|^(no-?reply)@|@example\.(com|org|net)$|\.(example|invalid|test|localhost)$)")
+use_local()
 SKIP_SUFFIX = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf", ".zip", ".gz", ".woff", ".woff2", ".ttf")
 MAX_BYTES = 2_000_000
 
@@ -342,7 +308,10 @@ def scan_text(text, where, deny, allow, dod=False, terms=()):
     Returns:
         The findings, each (where, line number, kind, masked value).
     """
+    if LOCAL_ERROR:
+        raise LocalError(LOCAL_ERROR)
     found = []
+    kinds = [k for k in finders_mod.KINDS if dod or k not in finders_mod.DOD_KINDS]
     words = list(deny) + list(terms)
     names_low = {w.lower() for w in deny}
     name_re = re.compile(r"(?i)(?<![A-Za-z0-9])(" + "|".join(re.escape(w) for w in words) + r")(?![A-Za-z0-9])") if words else None
@@ -351,22 +320,10 @@ def scan_text(text, where, deny, allow, dod=False, terms=()):
     hosts_ok = {v.lower() for v in allow} if dod else set()  # a host name has no case
     for n, line in enumerate(text.splitlines(), 1):
         hits = []
-        for m in emails(line):
-            if not ALLOWED_EMAIL.search(m.group()):
-                hits.append(("email", m.group()))
-        for rx in SECRET:
-            hits += [("secret", m.group()) for m in rx.finditer(line)]
-        for rx in PHONE:
-            hits += [("phone", m.group(m.lastindex or 0).strip(" .-")) for m in rx.finditer(line)]  # allow lines are stripped
-        hits += [("id", m.group()) for m in SSN.finditer(line)]
-        hits += [("id", m.group(1)) for m in SSN_KW.finditer(line)]
-        if dod:
-            in_mail = _inside(m.span() for m in emails(line))  # the host of a mail address is part of that finding
-            hits += [("milhost", m.group()) for m in milhosts(line) if not in_mail(m.start(), m.end())]
-            for rx in DODID:
-                hits += [("dodid", m.group(1)) for m in rx.finditer(line)]
-            for rx in MARKING:
-                hits += [("marking", m.group().strip()) for m in rx.finditer(line)]
+        in_mail = _inside(m.span() for m in emails(line)) if dod else None  # the host of a mail address is part of that finding
+        for kind in kinds:
+            for find in FINDERS[kind]:
+                hits += [(kind, val) for s, e, val in find(line) if kind != "milhost" or not in_mail(s, e)]
         names = list(name_re.finditer(line)) if name_re else []
         if names:
             in_allowed = _inside((s.start(), s.end()) for rx in allow_res for s in rx.finditer(line))
@@ -450,7 +407,7 @@ def blocked_in_commit(sha, root, allow):
 def unscanned_in_commit(sha, root, allow, unscanned):
     """DoD tier: the files one commit adds or changes that cannot be scanned (too large, a file type that is not
     scanned, binary), unless a `skip:` line names them. numstat marks a binary file with "-"; the patch has no added
-    lines for it. (RADE: split from scan_commits, which was over the 60-line cap with its full docs.)
+    lines for it.
 
     Args:
         sha: the commit.

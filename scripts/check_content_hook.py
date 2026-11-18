@@ -10,7 +10,8 @@ What is scanned, by tool:
                                 CLIENTS, a URL, or a git verb in GIT_OUT). A local command passes
                                 unread. Limit: a payload that a script or an interpreter builds at run time.
     every other tool            every string of the input, and the files it names.
-Output: exit 0 lets the tool call run; exit 2 blocks it, and the masked findings go to stderr. Any error blocks.
+Output: exit 0 lets the tool call run; exit 2 blocks it, and the masked findings go to stderr. Any error blocks: also
+a project's own finders (scripts/check_content_local.py) that cannot be loaded block every call that is scanned.
 Run: check_content.py imports it for --hook; not run alone.
 Network: none.
 Writes: none.
@@ -23,7 +24,7 @@ import signal
 import subprocess
 import sys
 
-from check_content_scan import (BLOCKED, UNKNOWN_PROFILE, blocked, git, is_option_line, load_allow, load_denylist,
+from check_content_scan import (BLOCKED, UNKNOWN_PROFILE, LocalError, blocked, git, is_option_line, load_allow, load_denylist,
                                 load_terms, profile_of, scan_files, scan_text)
 
 
@@ -132,7 +133,8 @@ def hook(stdin_text):
     try:
         return _hook(sys.stdin.read() if stdin_text is None else stdin_text)
     except BaseException as e:  # noqa: B036 - fail closed, whatever went wrong
-        print(f"check hook: blocked: the scan failed ({e.__class__.__name__}); fail closed.", file=sys.stderr)
+        why = str(e) if isinstance(e, LocalError) else f"the scan failed ({e.__class__.__name__})"   # a broken local module is named
+        print(f"check hook: blocked: {why}; fail closed.", file=sys.stderr)
         return 2
     finally:
         if hasattr(signal, "SIGALRM"):

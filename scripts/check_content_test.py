@@ -17,12 +17,14 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
 
 import check_content_hook
+import check_content_scan
 from check_content_scan import (MAX_BYTES, OPTION_MAX, denylist_source, dod_mode, fingerprint, git, is_option_line,
                             load_allow, load_denylist, mask, parse_denylist, profile_of, push_revs, scan_commits,
                             scan_text, skipped, warn_mode)
@@ -538,25 +540,21 @@ def case_hook():
             os.environ.update(saved)
 
 
-def case_missing_parts():
-    """A copy of check_content.py without its parts blocks when run (exit 2, also in the hook) but only raises on import."""
-    with tempfile.TemporaryDirectory() as d:
-        alone = os.path.join(d, "check_content.py")
-        with open(ME[1]) as src, open(alone, "w") as dst:
-            dst.write(src.read())
-        env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}   # only the lone copy is importable
-        hook = subprocess.run([sys.executable, alone, "--hook"], input="{}", capture_output=True, text=True, cwd=d,
-                              env=env)
-        check("missing parts: the hook blocks (exit 2)", hook.returncode == 2)
-        with open(os.path.join(d, "check_content_scan.py"), "w") as part:   # the scan part alone: --hook still blocks
-            part.write(open(os.path.join(os.path.dirname(ME[1]), "check_content_scan.py")).read())
-        hook = subprocess.run([sys.executable, alone, "--hook"], input="{}", capture_output=True, text=True, cwd=d,
-                              env=env)
-        check("missing hook part: the hook blocks (exit 2)", hook.returncode == 2)
-        os.remove(os.path.join(d, "check_content_scan.py"))
-        imp = subprocess.run([sys.executable, "-c", "try:\n import check_content\nexcept ImportError:\n print('raised')"],
-                             capture_output=True, text=True, cwd=d, env=env)
-        check("missing parts: an importer gets ImportError, not an exit", imp.stdout.strip() == "raised")
+def without_local(kit, blocks):
+    """Make the cases prove the kit's own patterns, also in a project that has its own finders: copy the scripts of
+    the content check, without the project's module, into `kit`, point the command line of the cases at that copy, and
+    set the finders of this process to the kit's. (The project's module proves itself: its own --test.)
+
+    Args:
+        kit: an empty temporary folder.
+        blocks: the module check_content_test_blocks (it has its own command line for the cases).
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    for name in os.listdir(here):
+        if name.startswith("check_content") and name.endswith(".py") and name != check_content_scan.LOCAL_FILE.name:
+            shutil.copy(os.path.join(here, name), kit)
+    ME[1] = blocks.ME[1] = os.path.join(kit, "check_content.py")
+    check_content_scan.use_local(os.path.join(kit, check_content_scan.LOCAL_FILE.name))   # no such file: the kit's finders
 
 
 def run():
@@ -571,12 +569,14 @@ def run():
     os.environ.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
     os.environ.pop("CHECK_TERMS", None)  # the host's terms list must not change the cases
     os.environ["CHECK_TERMS_FILE"] = os.path.join(tempfile.gettempdir(), "no-such-terms-file.txt")
-    for case in (case_speed, case_minimum_patterns, case_secrets_and_masks, case_dod_patterns, case_profile_lines,
-                 case_denylist_and_fingerprint, case_cli, case_commits, case_hook, case_missing_parts):
-        case()
     import check_content_test_blocks  # the cases for terms, block lines, the .check name and the write and Bash tools
-    check_content_test_blocks.run(check)
-    import check_content_test_milhosts  # RADE's own cases: the linear military-host finder milhosts()
-    check_content_test_milhosts.run(check, expect)
+    import check_content_test_local   # the cases for a project's own finders (scripts/check_content_local.py)
+    with tempfile.TemporaryDirectory() as kit:
+        without_local(kit, check_content_test_blocks)
+        for case in (case_speed, case_minimum_patterns, case_secrets_and_masks, case_dod_patterns, case_profile_lines,
+                     case_denylist_and_fingerprint, case_cli, case_commits, case_hook):
+            case()
+        check_content_test_blocks.run(check)
+        check_content_test_local.run(check, kit)
     print("CONTENT CHECK TEST " + ("FAIL" if FAILED else "PASS"))
     return 1 if FAILED else 0
