@@ -124,3 +124,11 @@ The text-mode runs did not grow (42 `round`/`psrun`/`mkround`/`xrun` calls at bo
    window runs added on 2026-11-17 cost CPU, and the machine is now busy on all 4 cores. Recording a slower baseline
    with no further fix needs the Administrator's approval (`.claude/skills/efficiency/SKILL.md` "Record a baseline").
    REC: after the commits merge, record the median of 3 full-lane runs as the new baseline.
+
+## Baseline after the merge (2026-11-18)
+
+Full lane (`bash scripts/check.sh`), 3 runs on main 015f452 (PR 86 merged), 4 cores: 66.4 s, 66.7 s, 64.5 s; median 66.4 s
+(all CHECK PASS). One run on 783dee4 (main just before PR 86): 105.5 s. Gain of PR 86 on today's main: about 37 %.
+The old baseline (45.7 s) predates PR 84 (kit code-standard self-test, about 21 s in parallel) and PR 87 (network-rule
+tests). Recorded in .bloat-audit.json: check 66.4 s (the median); the step times are from one `scripts/check.sh --record`
+run (62.8 s), because a step's time is printed only by a recording run.
