@@ -604,6 +604,11 @@
           "pattern": "^https://",
           "description": "The app's bookmark page, named in the repository check."
         },
+        "logo": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_./-]+\\.png$",
+          "description": "Optional. Path in the application repo of the application's logo (a PNG; 128 px square is enough). The window shows it at 64 px under the RADE logo, with the application name beside it, once the user chooses the application (the Administrator, 2026-11-18)."
+        },
         "own": {
           "type": "array",
           "minItems": 1,
