@@ -377,8 +377,8 @@ def self_test_rows(cs):
         cs: the check module.
     """
     name, gate = cs.BASELINE_NAME, cs.gate
-    plus = lambda by: '+' + owner_row('cap', by).rstrip('\n')
-    ok, why = gate.owner_row('+The decision names %s in prose.' % name, name, 'administrator')
+    plus = lambda by: owner_row('cap', by).rstrip('\n')
+    ok, why = gate.owner_row('The decision names %s in prose.' % name, name, 'administrator')
     assert not ok and 'rule 1' in why[0], 'a plain non-table line is refused: %s' % why
     ok, why = gate.owner_row(plus('scripts/bump_lock.py'), name, 'administrator')
     assert not ok and 'rule 3' in why[0], 'a row by a script is refused: %s' % why
@@ -386,9 +386,9 @@ def self_test_rows(cs):
     assert not ok and 'rule 3' in why[0], 'a row by an agent is refused: %s' % why
     ok, why = gate.owner_row(plus('someone else'), name, 'administrator')
     assert not ok and 'rule 4' in why[0], 'a row by another person is refused: %s' % why
-    assert gate.owner_row('+| 2026-11-17 | other | the Administrator | - |', name, 'administrator') == (False, []), \
+    assert gate.owner_row('| 2026-11-17 | other | the Administrator | - |', name, 'administrator') == (False, []), \
         'a row that does not name the file is not a decision for it'
-    assert not gate.owner_row('+| 2026-11-17 | names %s | the Administrator |' % name, name, 'administrator')[0], \
+    assert not gate.owner_row('| 2026-11-17 | names %s | the Administrator |' % name, name, 'administrator')[0], \
         'a row with fewer than four cells is refused'
     assert gate.owner_row(plus('the Administrator'), name, 'administrator') == (True, []), 'the owner row passes'
     self_test_row_tricks(gate, name)
@@ -416,11 +416,11 @@ def self_test_row_tricks(gate, name):
     old = head + short + '\n' + row + '\n'
 
     def check(line, old_text='', gone=''):
-        """Return owner_row for a diff that adds `line` and, when `gone` is given, removes that old line."""
-        return gate.owner_row(('-' + gone + '\n' if gone else '') + '+' + line, name, 'administrator', old_text)
+        """Return owner_row for a file that is `old_text` with `line` added and, when `gone` is given, without that
+        old line."""
+        return gate.owner_row(line + '\n' + (old_text.replace(gone + '\n', '') if gone else old_text), name, 'administrator', old_text)
     for what, line in (('moved', row), ('re-spaced', row.replace('| the cap', '|   the cap'))):
-        ok, why = check(line, old, row)
-        assert not ok and 'rule 5' in why[0], 'an old row %s is refused: %s' % (what, why)
+        assert check(line, old, row) == (False, []), 'an old row %s is not a decision' % what
     edits = (('with a full stop added', row, row.replace(', see', '., see')), ('with a word changed', row, row.replace('sixty', 'fifty')),
              ('with its date changed', row, row.replace('2026-11-17', '2031-01-01')), ('in capital letters', row, row.upper().replace(name.upper(), name)),
              ('with only the file name added', short, short.replace('admin.', 'admin. ' + name)),
@@ -433,6 +433,10 @@ def self_test_row_tricks(gate, name):
     ok, why = check(owner_row('new opt-in rule for line length, cap 200, adopted in').rstrip('\n'), old, short)
     assert not ok and 'rule 5' in why[0], 'a new owner row beside a removed old row is refused: %s' % why
     assert check(owner_row('new opt-in rule for line length, cap 200, adopted in').rstrip('\n'), old)[0], 'a new row passes'
+    forged = row.replace('sixty', 'fifty') + '\n' + short + '\r' + row   # a lone CR hides the old row from a tool that splits on it
+    ok, why = gate.owner_row(head + forged + '\n', name, 'administrator', old)
+    assert not ok and 'rule 5' in why[0], 'an old row edited in place with a carriage-return trick is refused: %s' % why
+    assert gate.owner_role_in('- Owner: Claude\n') == 'claude' and gate.level('safety', {'c1_safety': '9' * 5000}) == 1, 'odd input'
     for line in ('| 2026-11-17 | raise the cap in %s (`a | b`) | agent, for the owner | - |' % name,
                  '| 2026-11-17 | raise the cap in %s | Agent | the Administrator | - |' % name,
                  '| 2026-11-17 | raise the cap in %s | the Administrator | - | x |' % name):
@@ -520,6 +524,9 @@ def self_test_strict_main(cs, root, g):
                      ('someone else', 'rule 4')):
         assert rule in problems(strict, both, owner_row(strict_text, by)), 'a row by %r is refused by %s' % (by, rule)
     assert 'rule 1' in problems(strict, both, 'Level changes .code-standard.json.\n'), 'a plain line is refused'
+    (root / 'AGENTS.md').write_text('- Owner: Claude\n')   # the owner line changed in the same change: main's owner still counts
+    assert 'rule 4' in problems(strict, both, owner_row(strict_text, 'Claude')), 'a new owner named in this change cannot decide'
+    (root / 'AGENTS.md').write_text('- Owner: the Administrator\n')
     assert 'config' in problems(strict, both, '| 2026-11-17 | other | the Administrator | - |\n'), 'a row for another thing'
     new_file = {'safety': {'a.py': 1, 'new.py': 1}}
     assert 'new files meet the rules' in problems(strict, new_file, owner_row(strict_text)), 'debt for a new file is refused'

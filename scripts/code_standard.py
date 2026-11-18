@@ -473,8 +473,11 @@ def against_main(base):
     if shown.returncode != 0:
         return [], 'NOTE  no baseline on main yet: this change starts it'
     old = json.loads(shown.stdout)
-    decided, refusals = gate.owner_row(git('diff', ref, '--', 'docs/DECISIONS.md').stdout, BASELINE_NAME,
-                                       gate.owner_role(ROOT), git('show', ref + ':docs/DECISIONS.md').stdout)
+    at_base = lambda path: subprocess.run(['git', '-C', str(ROOT), 'show', ref + ':' + path],
+                                          capture_output=True).stdout.decode('utf-8', 'replace')   # bytes: a lone CR stays in its line
+    here = ROOT / 'docs' / 'DECISIONS.md'
+    decided, refusals = gate.owner_row(here.read_bytes().decode('utf-8', 'replace') if here.is_file() else '', BASELINE_NAME,
+                                       gate.owner_role_in(at_base('AGENTS.md')), at_base('docs/DECISIONS.md'))   # main's owner
     problems = []
     for kind, items in base.get('debt', {}).items():
         adopting = gate.level(kind, base.get('config', {})) > gate.level(kind, old.get('config', {}))

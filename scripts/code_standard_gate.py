@@ -9,7 +9,7 @@ What it does:
   file_rules      the per-file rules (header, safety, file size, line length) of one source file
   owner_row       a NEW docs/DECISIONS.md table row that names .code-standard.json and has the owner in its By cell
                   (only in a change that leaves every older row as it was: an edited old row is no decision)
-  owner_role      the owner role, read from the "- Owner:" line of AGENTS.md
+  owner_role_in   the owner role, read from the "- Owner:" line of AGENTS.md (the check gives it main's AGENTS.md)
   exists_at       a file exists at a git ref (a debt key for a file new in this change is refused)
   level           how far an opt-in rule is adopted in a config (a higher level than on main may list new debt once)
 Inputs:  header text, file lines, git diff text, a repo root and a git ref.
@@ -38,7 +38,7 @@ OPT_IN = {'docs': lambda c: 1 if c.get('c2') == 'full' else 0,
 def safety_level(value):
     """Return the level of the "c1_safety" setting: 0 = off, 1 = on (true), 2 or more = a stricter form (a number, or
     digits as text). Any other value that is set counts as 1; a negative number as 0."""
-    if isinstance(value, str) and re.fullmatch(r'[0-9]+', value.strip()):
+    if isinstance(value, str) and re.fullmatch(r'[0-9]{1,6}', value.strip()):
         value = int(value.strip())
     if type(value) is int:
         return max(0, value)
@@ -94,29 +94,33 @@ def level(kind, config):
     return OPT_IN[kind](config) if kind in OPT_IN else 0
 
 
-def owner_role(root):
-    """Return the owner role from the "- Owner:" line of AGENTS.md, lower case, without a leading "the " ('' if none)."""
-    try:
-        text = (Path(root) / 'AGENTS.md').read_text(encoding='utf-8')
-    except OSError:
-        return ''
+def owner_role_in(text):
+    """Return the owner role from the "- Owner:" line of an AGENTS.md text, lower case, without a leading "the "
+    ('' if the text has no such line)."""
     m = re.search(r'^- Owner:\s*(.+?)\s*$', text, re.M)
     return re.sub(r'^the\s+', '', m.group(1).rstrip('.').lower()) if m else ''
 
 
+def owner_role(root):
+    """Return the owner role from the AGENTS.md file under `root` (owner_role_in; '' when there is no file)."""
+    try:
+        return owner_role_in((Path(root) / 'AGENTS.md').read_text(encoding='utf-8'))
+    except OSError:
+        return ''
+
+
 def squeeze(text):
-    """Return `text` with every run of spaces and tabs removed, so two rows that differ only in spacing are equal."""
+    """Return `text` with all white space removed, so two rows that differ only in spacing are equal."""
     return re.sub(r'\s+', '', text)
 
 
-def row_refusal(text, name, owner, old_rows=()):
+def row_refusal(text, name, owner):
     """Return why a DECISIONS line is not a new owner's row for file `name`, or None when it is one.
 
     Args:
-        text: the added line, without its leading "+".
+        text: a line of docs/DECISIONS.md that main does not have.
         name: the baseline file name the decision cell must name.
         owner: the owner role (owner_role), lower case.
-        old_rows: the table rows of docs/DECISIONS.md at the merge base, each through squeeze().
 
     Returns:
         The refusal (which rule refused it) or None.
@@ -137,37 +141,36 @@ def row_refusal(text, name, owner, old_rows=()):
         return 'rule 4: AGENTS.md has no "- Owner:" line to name the owner'
     if not re.fullmatch(r'(the\s+)?' + re.escape(owner) + r'(\s*\([^()]*\))?', by):
         return 'rule 4: the By cell is not the owner alone (%s; one note in brackets may follow)' % owner
-    if squeeze(row) in old_rows:
-        return 'rule 5: the row is not new (it is on main already; a moved or re-spaced row is no decision)'
     return None
 
 
-def owner_row(diff, name, owner, old_text=''):
-    """Check a docs/DECISIONS.md diff for the owner's new row that opens the ratchet gate. The gate opens only in a
-    change that adds rows and leaves every older row as it was: an older row that is edited or removed closes it, so
-    no old decision can be turned into a new one (no text is compared for likeness, no date is read).
+def owner_row(new_text, name, owner, old_text=''):
+    """Compare docs/DECISIONS.md with its text on the merge base and look for the owner's new row that opens the
+    ratchet gate. The gate opens only in a change that adds rows and leaves every older row as it was: an older row
+    that is edited or removed closes it, so no old decision can be turned into a new one. The two texts are compared
+    line by line (lines end at a line feed only); no diff output is read, no date, and no text for likeness.
 
     Args:
-        diff: the text of `git diff <merge base> -- docs/DECISIONS.md`.
+        new_text: docs/DECISIONS.md as it is in this change.
         name: the baseline file name.
-        owner: the owner role (owner_role).
+        owner: the owner role (owner_role_in).
         old_text: docs/DECISIONS.md at the merge base ('' when there is none).
 
     Returns:
-        (True, []) when an added table row is new, names `name` and has the owner alone in its By cell, and no older
-        row was edited or removed; else (False, the refusal lines, each with the rule that refused).
+        (True, []) when a new table row names `name` and has the owner alone in its By cell, and no older row was
+        edited or removed; else (False, the refusal lines, each with the rule that refused).
     """
-    rows = lambda sign: [x[1:] for x in diff.split('\n') if x.startswith(sign) and not x.startswith(sign * 3)]
-    table = lambda lines: {squeeze(x) for x in lines if x.strip().startswith('|')}
-    old_rows, refusals, found = table(old_text.split('\n')), [], False
-    for line in rows('+'):
-        if name not in line:
-            continue
-        why = row_refusal(line, name, owner, old_rows)
+    table = lambda text: {squeeze(x) for x in text.split('\n') if x.strip().startswith('|')}
+    old_lines = {squeeze(x) for x in old_text.split('\n')}
+    refusals, found = [], False
+    for line in new_text.split('\n'):
+        if name not in line or squeeze(line) in old_lines:
+            continue   # not about the baseline, or a line main has already (a moved or re-spaced row is no decision)
+        why = row_refusal(line, name, owner)
         found = found or why is None
         if why:
-            refusals.append('REFUSED  docs/DECISIONS.md line (%s): %s' % (why, line[:60]))
-    touched = sorted(table(rows('-')) - table(rows('+')))
+            refusals.append('REFUSED  docs/DECISIONS.md line (%s): %s' % (why, line.strip()[:60]))
+    touched = sorted(table(old_text) - table(new_text))
     if found and touched:
         return False, ['REFUSED  docs/DECISIONS.md (rule 5: this change also edits or removes %d older row(s), first: %s; '
                        'record the decision in a change that only adds its row)' % (len(touched), touched[0][:40])]
