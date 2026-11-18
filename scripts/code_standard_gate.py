@@ -7,15 +7,16 @@ accident, not by work. This module holds the strict forms so the check stays und
 What it does:
   safety_ok       a safety label starts a header line and has a value on that line
   file_rules      the per-file rules (header, safety, file size, line length) of one source file
-  owner_row       a NEW docs/DECISIONS.md table row that names .code-standard.json and has the owner in its By cell
+  owner_row       a NEW docs/DECISIONS.md table row that names the settings file `.check` and has the owner in its By cell
                   (only in a change that leaves every older row as it was: an edited old row is no decision)
   owner_role_in   the owner role, read from the "- Owner:" line of AGENTS.md (the check gives it main's AGENTS.md)
   exists_at       a file exists at a git ref (a debt key for a file new in this change is refused)
   level           how far an opt-in rule is adopted in a config (a higher level than on main may list new debt once)
+  main_config     the code standard settings on the merge base with origin/main
 Inputs:  header text, file lines, git diff text, a repo root and a git ref.
 Outputs: yes/no answers, refusal lines, and violations written into the caller's dict.
 Network: none.
-Writes: none (it runs git read-only commands; the check that imports it writes .code-standard.json).
+Writes: none (it runs git read-only commands; the check that imports it writes .check.state.json).
 Credentials: none.
 Run:     imported by scripts/code_standard.py; proved by `python3 scripts/code_standard.py --test`.
 """
@@ -114,13 +115,14 @@ def squeeze(text):
     return re.sub(r'\s+', '', text)
 
 
-def row_refusal(text, name, owner):
+def row_refusal(text, name, owner, names=None):
     """Return why a DECISIONS line is not a new owner's row for file `name`, or None when it is one.
 
     Args:
         text: a line of docs/DECISIONS.md that main does not have.
-        name: the baseline file name the decision cell must name.
+        name: the settings file name the decision cell must name.
         owner: the owner role (owner_role), lower case.
+        names: a test that says whether a text names the file (None: the text holds `name`).
 
     Returns:
         The refusal (which rule refused it) or None.
@@ -131,7 +133,7 @@ def row_refusal(text, name, owner):
     cells = [c.replace('\0', '|').strip() for c in row.replace('\\|', '\0').strip('|').split('|')]
     if len(cells) != ROW_CELLS:
         return 'rule 1: a decision row has %d cells: date, decision, by, last (write \\| for a | inside a cell)' % ROW_CELLS
-    if name not in cells[1]:
+    if not (names(cells[1]) if names else name in cells[1]):
         return 'rule 2: the decision cell does not name ' + name
     by = cells[2].lower()
     bad = [x for x in NOT_OWNER if x in by]
@@ -144,7 +146,7 @@ def row_refusal(text, name, owner):
     return None
 
 
-def owner_row(new_text, name, owner, old_text=''):
+def owner_row(new_text, name, owner, old_text='', names=None):
     """Compare docs/DECISIONS.md with its text on the merge base and look for the owner's new row that opens the
     ratchet gate. The gate opens only in a change that adds rows and leaves every older row as it was: an older row
     that is edited or removed closes it, so no old decision can be turned into a new one. The two texts are compared
@@ -152,9 +154,11 @@ def owner_row(new_text, name, owner, old_text=''):
 
     Args:
         new_text: docs/DECISIONS.md as it is in this change.
-        name: the baseline file name.
+        name: the settings file name.
         owner: the owner role (owner_role_in).
         old_text: docs/DECISIONS.md at the merge base ('' when there is none).
+        names: a test that says whether a text names the file (None: the text holds `name`); the check gives the
+            one that takes `.check` but not `.check.lock` or `.check.state.json`.
 
     Returns:
         (True, []) when a new table row names `name` and has the owner alone in its By cell, and no older row was
@@ -164,9 +168,9 @@ def owner_row(new_text, name, owner, old_text=''):
     old_lines = {squeeze(x) for x in old_text.split('\n')}
     refusals, found = [], False
     for line in new_text.split('\n'):
-        if name not in line or squeeze(line) in old_lines:
-            continue   # not about the baseline, or a line main has already (a moved or re-spaced row is no decision)
-        why = row_refusal(line, name, owner)
+        if not (names(line) if names else name in line) or squeeze(line) in old_lines:
+            continue   # not about the settings file, or a line main has already (a moved or re-spaced row is no decision)
+        why = row_refusal(line, name, owner, names)
         found = found or why is None
         if why:
             refusals.append('REFUSED  docs/DECISIONS.md line (%s): %s' % (why, line.strip()[:60]))
@@ -175,6 +179,24 @@ def owner_row(new_text, name, owner, old_text=''):
         return False, ['REFUSED  docs/DECISIONS.md (rule 5: this change also edits or removes %d older row(s), first: %s; '
                        'record the decision in a change that only adds its row)' % (len(touched), touched[0][:40])]
     return found, ([] if found else refusals)
+
+
+def main_config(root, code_base):
+    """Return the code standard settings on the merge base with origin/main, or None when there is none to read.
+
+    Args:
+        root: the repo root.
+        code_base: reads (settings, debt) at a git ref (scripts/check_settings.py code_base).
+
+    Returns:
+        The settings dict, or None (no merge base, no baseline there, or one that cannot be read).
+    """
+    mb = subprocess.run(['git', '-C', str(root), 'merge-base', 'HEAD', 'origin/main'], capture_output=True, text=True)
+    try:
+        old = code_base(root, mb.stdout.strip()) if mb.returncode == 0 else None
+    except ValueError:
+        return None
+    return old[0] if old else None
 
 
 def exists_at(root, ref, path):
