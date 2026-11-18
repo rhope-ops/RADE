@@ -4,6 +4,7 @@ Rows moved unchanged from [DECISIONS.md](DECISIONS.md) because later rows replac
 
 | Date | Decision | By | Replaces |
 |---|---|---|---|
+| 2026-11-14 | Tagline: "Test and deploy apps for your organization" (the word DoD is removed, so the app does not read as an official product). | the Administrator | Tagline with DoD (window row, 2026-11-14) |
 | 2026-11-17 | AGENTS.md "Engine source" line, exact text approved: the engine/ folder (entry engine/rade_build.py; file list in docs/engine.md), because the engine PowerShell now lives in engine/ps (engine-v11). Raised by the fresh rule-conflict check of the code-standard line. Scope: RADE. | the Administrator | "Engine source ... engine/rade_build.py here" (2026-11-14) |
 | 2026-11-14 | RADE installs apps only; it does not start them. | the Administrator | — |
 | 2026-11-14 | Window redesign: concept 1 "One thing" goes forward as the mockup, with Restore and Uninstall screens and a larger logo and word mark (40 px, 15 pt). Build not approved yet. Detail: docs/reviews/2026-11-14-window-redesign-proposals.md. | the Administrator | "concept not chosen" in the row below |
