@@ -1,24 +1,45 @@
-# RADE window part 02, the fixed parts: the status light, the logo line, the bottom line (Record and Back
+# RADE window part 02, the fixed parts: the status light, the logo block, the bottom line (Record and Back
 # links) and the progress bars with the timer that eases them. Builds on 01-setup.ps1.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
-# ---- The fixed parts: the light (6 px), the logo line, the card, the bottom line and the bar on the bottom edge.
+# ---- The fixed parts: the light (6 px), the logo block, the card, the bottom line and the bar on the bottom edge.
 $ui.Light = New-Object System.Windows.Forms.Panel
 $ui.Light.Dock = 'Top'; $ui.Light.Height = 6; $ui.Light.BackColor = $ui.C.White; $ui.Light.AccessibleRole = 'StaticText'; $ui.Light.AccessibleName = 'Status light: off'
 $ui.Light.Add_Paint({ try { $pn = New-Object System.Drawing.Pen($ui.C.Navy, [single]1); $_.Graphics.DrawLine($pn, 0, ($this.ClientSize.Height - 1), $this.ClientSize.Width, ($this.ClientSize.Height - 1)); $pn.Dispose() } catch { $null = $_ } })   # a 1 px navy line: the light is a part of the screen, 3 to 1 against white also when it is off
+# The logo block (the Administrator, 2026-11-18; docs/window-design.md "Fixed parts"): the RADE row (logo and the word
+# RADE), and once an application is chosen, a short link line and the application row (its logo and its name in gray).
+# Both logos are 64 px, the baseline size. The block is as tall as its rows (R28 N9: no fixed heights).
 $ui.Top = New-Object System.Windows.Forms.FlowLayoutPanel
-$ui.Top.Dock = 'Top'; $ui.Top.AutoSize = $true; $ui.Top.AutoSizeMode = 'GrowAndShrink'; $ui.Top.MinimumSize = New-Object System.Drawing.Size(0, 64); $ui.Top.WrapContents = $false;   # 64 at least; taller when its text needs it (R28 N9: no fixed heights)
+$ui.Top.Dock = 'Top'; $ui.Top.AutoSize = $true; $ui.Top.AutoSizeMode = 'GrowAndShrink'; $ui.Top.FlowDirection = 'TopDown'; $ui.Top.WrapContents = $false
 $ui.Top.Padding = (& $ui.Pad 32 12 32 0); $ui.Top.BackColor = $ui.C.White
-try {
-  $ui.Logo = New-Object System.Windows.Forms.PictureBox
-  $ui.Logo.Size = New-Object System.Drawing.Size(64, 64); $ui.Logo.SizeMode = 'Zoom'; $ui.Logo.Margin = (& $ui.Pad 0 0 12 0); $ui.Logo.AccessibleName = 'RADE logo'
-  $ui.Logo.Image = [System.Drawing.Image]::FromStream((New-Object System.IO.MemoryStream(, [System.Convert]::FromBase64String($logoPng))))
-  [void]$ui.Top.Controls.Add($ui.Logo)
-} catch { $null = $_ }   # the window runs without the logo
+# Makes one row of the logo block: a left-to-right flow panel as tall as its parts. Takes nothing; gives back the panel.
+$ui.LogoRow = { $r = New-Object System.Windows.Forms.FlowLayoutPanel; $r.AutoSize = $true; $r.AutoSizeMode = 'GrowAndShrink'; $r.WrapContents = $false
+  $r.Margin = (& $ui.Pad 0 0 0 0); $r.Padding = (& $ui.Pad 0 0 0 0); $r.BackColor = $ui.C.White; $r }
+# Makes one 64 px logo picture from base64 PNG text. Takes the text and the screen-reader name; gives back the picture,
+# or $null when there is no text or System.Drawing cannot read it (the window then runs without that logo).
+$ui.LogoPic = { param([string]$Png, [string]$Name)
+  if (-not $Png) { return $null }
+  try {
+    $p = New-Object System.Windows.Forms.PictureBox
+    $p.Size = New-Object System.Drawing.Size(64, 64); $p.SizeMode = 'Zoom'; $p.Margin = (& $ui.Pad 0 0 12 0); $p.AccessibleName = $Name
+    $p.Image = [System.Drawing.Image]::FromStream((New-Object System.IO.MemoryStream(, [System.Convert]::FromBase64String($Png)))); $p
+  } catch { $null } }   # no logo: the row shows its text only
+$ui.TopRow = & $ui.LogoRow
+$ui.Logo = & $ui.LogoPic $logoPng 'RADE logo'; if ($ui.Logo) { [void]$ui.TopRow.Controls.Add($ui.Logo) }
 $ui.WordL = & $ui.Label $ui.F.Word $ui.C.Navy 5; $ui.WordL.Text = 'RADE'; $ui.WordL.Visible = $true
-$ui.AppL = & $ui.Label $ui.F.Small $ui.C.Gray 14; $ui.AppL.Margin = (& $ui.Pad 10 14 0 0); $ui.AppL.Visible = $true
+[void]$ui.TopRow.Controls.Add($ui.WordL)
+# The link line: 1 px gray, 12 px long, on the middle of the logos ("something minimal"); shown with the application row
+# when both logos are there.
+$ui.LinkLine = New-Object System.Windows.Forms.Panel
+$ui.LinkLine.Size = New-Object System.Drawing.Size(1, 12); $ui.LinkLine.BackColor = $ui.C.Gray; $ui.LinkLine.Margin = (& $ui.Pad 32 4 0 4); $ui.LinkLine.Visible = $false
+$ui.AppRow = & $ui.LogoRow; $ui.AppRow.Visible = $false
+$ui.AppLogo = & $ui.LogoPic $appLogoPng 'Application logo'; if ($ui.AppLogo) { [void]$ui.AppRow.Controls.Add($ui.AppLogo) }
+# The application name and version, gray, no mark before it. Without an application logo it starts where the word RADE
+# starts (the logo, 64, and its gap, 12).
+$ui.AppL = & $ui.Label $ui.F.Small $ui.C.Gray 0; $ui.AppL.Margin = (& $ui.Pad $(if ($ui.AppLogo -or -not $ui.Logo) { 0 } else { 76 }) 0 0 0); $ui.AppL.Visible = $true
 $ui.AppL.AutoSize = $false; $ui.AppL.AutoEllipsis = $true; $ui.AppL.Size = New-Object System.Drawing.Size(600, 22)   # a long name and version: cut with "..."; its width follows the window ($ui.Fit)
-[void]$ui.Top.Controls.Add($ui.WordL); [void]$ui.Top.Controls.Add($ui.AppL)
+[void]$ui.AppRow.Controls.Add($ui.AppL)
+foreach ($c in @($ui.TopRow, $ui.LinkLine, $ui.AppRow)) { [void]$ui.Top.Controls.Add($c) }
 $ui.Bottom = New-Object System.Windows.Forms.TableLayoutPanel
 $ui.Bottom.Dock = 'Bottom'; $ui.Bottom.Height = 46; $ui.Bottom.AutoSize = $true; $ui.Bottom.AutoSizeMode = 'GrowAndShrink'; $ui.Bottom.MinimumSize = New-Object System.Drawing.Size(0, 46); $ui.Bottom.ColumnCount = 4; $ui.Bottom.RowCount = 1; $ui.Bottom.Padding = (& $ui.Pad 28 3 32 3); $ui.Bottom.BackColor = $ui.C.White
 foreach ($cs in @('AutoSize', 'AutoSize', 'Percent', 'AutoSize')) { [void]$ui.Bottom.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle($cs, 100))) }

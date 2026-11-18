@@ -35,6 +35,9 @@ json.dump(m, open(p, 'w'), indent=2)
 P
 }
 mkdir -p "$od" "$t/app/scripts"; cp -r tests/fixture-app/. "$t/app/"; cp schemas/examples/sample-manifest.json "$t/app/scripts/paste_bundles.json"; ans "$t/app/scripts/paste_bundles.json"
+# The sample's application logo (application.logo): RADE's own 64 px logo, copied into the temporary app so no PNG is kept in tests/.
+mkdir -p "$t/app/assets"; cp assets/logo/logo-rho-64.png "$t/app/assets/sample-logo.png"
+python3 -c "import json,sys; p=sys.argv[1]; m=json.load(open(p)); m['application']['logo']='assets/sample-logo.png'; json.dump(m,open(p,'w'),indent=2)" "$t/app/scripts/paste_bundles.json"
 : > "$t/go.md"; echo '{ "apps": { "Sample app (deploy)": "9.0.0", "Sample app": "9.0.0" } }' > "$t/rel.json"
 mkdir -p "$od/RADE/SampleApp/Config"; echo "https://usaf.dps.mil/sites/fake" > "$od/RADE/SampleApp/Config/SAMPLE-site.txt"
 # swap IN OUT USERS: the test copy of a bundle: users root, repository addresses and the check gate swapped for local ones,
@@ -68,6 +71,14 @@ psclose() { if [ "${ps_owner:-}" = "$BASHPID" ]; then exec {ps_rq}>&- {ps_rs}<&-
 js() { python3 -c "import json,sys; import glob,os; a=json.load(open(sys.argv[1])); assert a['key']=='SampleApp/Sample app (deploy)'; print(a['schema'], len(glob.glob(os.path.dirname(sys.argv[1])+'/*')), (a['installed'] or {}).get('version'), a['lastRun']['version'], a['lastRun']['state'])" "$inst" 2>&1; }
 
 build && ok || bad "build of the sample bundle"
+# application.logo: the bundle carries the logo as base64 text; a missing file or a file that is not a PNG stops the build.
+grep -q "^\$appLogoPng = 'iVBORw0KGgo" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" && ok || bad "application logo in the bundle"
+mv "$t/app/assets/sample-logo.png" "$t/sl.png"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: no file at assets/sample-logo.png" "$t/lg.txt" && ok || bad "build stops on a missing application logo"
+echo "not a png" > "$t/app/assets/sample-logo.png"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: not a PNG file" "$t/lg.txt" && ok || bad "build stops on an application logo that is not a PNG"
+sed -i 's#"logo": "assets/sample-logo.png"#"logo": "../sample-logo.png"#' "$t/app/scripts/paste_bundles.json"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: the path must stay inside the application repo" "$t/lg.txt" && ok || bad "build stops on an application logo outside the app repo"
+for bad in "/etc/sample-logo.png" "assets/../../sample-logo.png"; do sed -i "s#\"logo\": \"[^\"]*\"#\"logo\": \"$bad\"#" "$t/app/scripts/paste_bundles.json"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: the path must stay inside the application repo" "$t/lg.txt" && ok || bad "build stops on application logo $bad"; done
+sed -i 's#"logo": "[^"]*"#"logo": "assets/sample-logo.png"#' "$t/app/scripts/paste_bundles.json"
+mv "$t/sl.png" "$t/app/assets/sample-logo.png"; build || bad "rebuild after the application logo checks"
 b="$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1"
 grep -q "Name = 'Sample app (deploy)'.*Mode = 'deploy'; Version = '1.0.0'" "$b" && ! grep "Name = 'Sample app (deploy)'" "$b" | grep -q "'outlook'" && ok || bad "catalog: deploy app has Mode, Version and no outlook check"
 grep "Name = 'Sample app'" "$b" | grep -q "'outlook'.*Mode = 'test'; Version = ''" && ok || bad "catalog: test app keeps the outlook check and Mode test"
@@ -243,8 +254,8 @@ case('case', case_sp, "answers: the choices of 'flow-count' must differ (case an
 P
 # ---- sizes and text lengths (docs/window-design.md "Sizes", "Text lengths"; the Administrator, 2026-11-15)
 # Every button is made with a named kind (its size is in $ui.Z), and no other place sets a button's size.
-# (The bottom line's own minimum height, 46, and the logo line's, 64 (R28 N9: it grows with its text), are not button sizes: R24. Only those two expressions are left out of the count.)
-[ "$(cat $engine_src engine/rade_ui.ps1 | grep -o '& \$ui\.Btn [^;)]*' | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_ui.ps1 | wc -l)" = 2 ] && [ "$(cat $engine_src | grep -c 'MinimumSize = ')" = 3 ] && ok || bad "sizes: a button is made without a kind, or sets its own size"
+# (The bottom line's own minimum height, 46, is not a button size: R24. The logo block has no minimum: it is as tall as its rows, 2026-11-18.)
+[ "$(cat $engine_src engine/rade_ui.ps1 | grep -o '& \$ui\.Btn [^;)]*' | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_ui.ps1 | wc -l)" = 2 ] && [ "$(cat $engine_src | grep -c 'MinimumSize = ')" = 2 ] && ok || bad "sizes: a button is made without a kind, or sets its own size"
 # The limits in the document are the limits of the build.
 python3 - <<'P' && ok || bad "text lengths: docs/window-design.md and TEXT_LIMITS (engine/rade_build.py) differ"
 import importlib.util, re, pathlib

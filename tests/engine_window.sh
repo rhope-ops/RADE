@@ -74,7 +74,7 @@ has "WIN restored=Normal taskbar=True minbox=True shown-by=Run" "WIN layline=Lay
 # question headline is the prompt's first sentence (one sentence: no body line; two: the rest is the body line, 1b) and a
 # first sentence too long for one line shrinks (22 pt, floor 13.2 pt = 60 %; the stand-ins' card is 258 px); the self-check's alignment rules pass an aligned fixture
 # and give one LAYOUT line for each fault of a misaligned one (a box 6.5 px off, a button 3 px off, box 23 vs button 30, a headline 3 px right).
-has "WIN mid hand label=18.5 box=19 button=19 box-h=30 button-h=30 gaps=8,8 inner=148/160 tick=0" "WIN mid header logo=32 word=32 app=31.5" "WIN mid answer label=18.5 box=19 h=30" \
+has "WIN mid hand label=18.5 box=19 button=19 box-h=30 button-h=30 gaps=8,8 inner=148/160 tick=0" "WIN mid header logo=32 word=32" "WIN mid approw shown=True link=True applogo=32 app=31.5 name=Sample app (deploy) 1.0.0 logoname=Sample app (deploy) logo" "WIN mid answer label=18.5 box=19 h=30" \
   'WIN sent-pt=22 for "Did the flow run start?"' 'WIN sent-pt=22 for "Anything else to report?"' 'WIN sent-pt=13.2 for "How many flows does the import page show?"' \
   "WIN rule aligned=0 misaligned=4 ~ LAYOUT fixture FieldRow FieldBox midpoint: 15.5, the row midpoint is 22 ~ LAYOUT fixture FieldRow FieldB midpoint: 19, the row midpoint is 22 ~ LAYOUT fixture FieldRow heights: box FieldBox 23, button FieldB 30 ~ LAYOUT fixture Sent edge: starts at 126, the card edge is 123 (Kick)" && ok || { bad "window 1d: alignment, question headline, alignment rules"; grep "WIN mid\|sent-pt\|WIN rule" "$wd/win.txt" | cut -c1-300; }
 # 1f. Review of b093036: a click within 400 ms of a new card does nothing (a double-click on Done answers no question
