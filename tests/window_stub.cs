@@ -1,4 +1,4 @@
-// Stand-ins for the Windows Forms and System.Drawing types the RADE window uses, so tests/engine_test.sh (section "window") can run the
+// Stand-ins for the Windows Forms and System.Drawing types the RADE window uses, so tests/engine_window.sh (sourced by tests/engine_test.sh) can run the
 // window's logic on Linux (PowerShell 7 has no Windows Forms there). Nothing is drawn: a control keeps its values, an
 // event keeps its handlers, and the test "user" (tests/window_driver.ps1) fires them. A member that is not declared
 // here is taken as given (Dyn), so a layout, style or paint member with a wrong name is NOT found by the test; a wrong

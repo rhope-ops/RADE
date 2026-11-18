@@ -53,7 +53,6 @@
    "tests/engine_test.sh::mkround": 1,
    "tests/engine_test.sh::ok": 1,
    "tests/engine_test.sh::valid": 1,
-   "tests/engine_test.sh::win": 1,
    "tests/engine_test.sh::xrun": 1,
    "tests/fake-pnp/PnP.PowerShell/1.12.0/PnP.PowerShell.psm1::Add-PnPListItem": 1,
    "tests/fake-pnp/PnP.PowerShell/1.12.0/PnP.PowerShell.psm1::Connect-PnPOnline": 1,
@@ -306,9 +305,7 @@
    "tests/window_real_driver.ps1::global:Step-Rade": 1
   },
   "duplicate": {},
-  "file_size": {
-   "tests/engine_test.sh": 612
-  },
+  "file_size": {},
   "generated": {},
   "header": {},
   "length": {
