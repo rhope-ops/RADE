@@ -3,7 +3,9 @@
 # from Config is used only on the host and port of the step's own fixed address (the check, the step run and the hand
 # step), and no web request of the engine sends the Windows sign-in to the address it asks (only the proxy gets it).
 # The functions are cut out of the source and run in pwsh; the last check reads every engine file.
-# Network: none. Writes: temporary files, deleted on exit. Credentials: none.
+# Network: none.
+# Writes: temporary files, deleted on exit.
+# Credentials: none.
 # Run: tests/net_rules_test.sh (scripts/check.local.sh runs it in both lanes). Needs pwsh 7. Pass = "NETRULES pass".
 set -euo pipefail
 cd "$(dirname "$0")/.."
