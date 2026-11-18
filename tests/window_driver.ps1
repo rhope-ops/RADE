@@ -1,7 +1,7 @@
-# The test "user" for the RADE window (tests/engine_test.sh, section "window"). It is put in front of a test copy of a
+# The test "user" for the RADE window (tests/engine_window.sh, sourced by tests/engine_test.sh). It is put in front of a test copy of a
 # bundle. It loads the stand-in types (tests/window_stub.cs), then answers each card the window shows: it prints one
 # "WIN" line per card, runs every Paint handler, checks that each control has a name and a focus ring, and selects a button.
-# Set by the test: RADE_T_STUB (path of the stub), RADE_T_APP (index of the application), RADE_T_HAND (done, fail or
+# Set by the test: RADE_T_STUB (path of the stub: its C# source or a DLL made from it), RADE_T_APP (index of the application), RADE_T_HAND (done, fail or
 # skip), RADE_T_RECORD (1 = open "Record" and clear the Clean-up box before the run), RADE_T_TOUR (1 = the
 # application also gets the site, sign-in and Power Automate checks, and a base check of the test application is FAILED),
 # RADE_T_LOOP (1 = Application.Run fails as when a message loop already runs: the window must open with ShowDialog),
@@ -13,7 +13,12 @@
 # on a fixture that is aligned and one that is not.
 # On the hand step's questions (manifest "answers") it answers No, the second choice, and a text with a fake e-mail address.
 # A check that cannot pass on the test computer is set to PASSED after its card has shown (the test is of the window).
-Add-Type -TypeDefinition ([System.IO.File]::ReadAllText($env:RADE_T_STUB)) -ReferencedAssemblies @('System.Drawing.Primitives', 'System.Collections', 'System.Linq.Expressions', 'System.Management.Automation', 'System.Runtime', 'netstandard') -WarningAction SilentlyContinue
+# The stand-in types: RADE_T_STUB is the C# source (compiled here, about 0.8 s of CPU) or a DLL made from it once. With
+# RADE_T_STUB_OUT set, this script only compiles the source to that DLL and stops (tests/engine_window.sh; speed audit 2026-11-17).
+$stubRefs = @('System.Drawing.Primitives', 'System.Collections', 'System.Linq.Expressions', 'System.Management.Automation', 'System.Runtime', 'netstandard')
+if ($env:RADE_T_STUB -like '*.dll') { Add-Type -Path $env:RADE_T_STUB }
+elseif ($env:RADE_T_STUB_OUT) { Add-Type -TypeDefinition ([System.IO.File]::ReadAllText($env:RADE_T_STUB)) -ReferencedAssemblies $stubRefs -OutputAssembly $env:RADE_T_STUB_OUT -OutputType Library -WarningAction SilentlyContinue; return }
+else { Add-Type -TypeDefinition ([System.IO.File]::ReadAllText($env:RADE_T_STUB)) -ReferencedAssemblies $stubRefs -WarningAction SilentlyContinue }
 function Start-Process { param($FilePath, $ArgumentList, $WorkingDirectory) Write-Host ('WIN start-process ' + $(if ($FilePath -match '^https://') { 'browser' } else { [string]$FilePath })) }
 [RadeStub.Driver]::RunThrows = ($env:RADE_T_LOOP -eq '1'); if ($env:RADE_T_SCALE -eq '150') { [RadeStub.Driver]::FormDpi = 144 }
 $global:RadeT = @{ Long = @{}; Min = $false; Seen = ''; App = [int]$env:RADE_T_APP; Hand = [string]$env:RADE_T_HAND; Record = ($env:RADE_T_RECORD -eq '1'); Forced = $false; Opened = $false; Tour = ($env:RADE_T_TOUR -eq '1'); Esc = $false; Again = $false; SignIn = $false }
