@@ -29,7 +29,7 @@ checks 9 passed, layout self-check PASS). R29a, which uses the download and save
 Engine (for the next release, engine-v15):
 - 106 discarded-error catches give no reason (rule X7); 11 strict-mode faults are listed in docs/reviews/2026-11-17-strict-mode-findings.md.
 - The two blank-address refusals (hand step, step run) and the download's sign-in setting are proved by text search only.
-- A step with `urlConfig` now needs its own `url` (the build stops): an agent's decision under delegation, for the Administrator to confirm.
+- A step with `urlConfig` needs its own `url` (the build stops): confirmed by the Administrator on 18 Nov 26 (docs/DECISIONS.md).
 - The file read behind the newer-version line has a 4-second limit that fails without a word (05-installed.ps1).
 
 Checker gate (scripts/code_standard_gate.py):
