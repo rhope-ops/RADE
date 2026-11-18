@@ -45,6 +45,7 @@ Needs:   Python 3.8+, git, and pwsh 7 only when the repo has PowerShell files (t
 
 import argparse
 import ast
+import datetime
 import fnmatch
 import hashlib
 import json
@@ -473,8 +474,10 @@ def against_main(base):
     if shown.returncode != 0:
         return [], 'NOTE  no baseline on main yet: this change starts it'
     old = json.loads(shown.stdout)
+    day = git('show', '-s', '--format=%cs', ref).stdout.strip()   # a new row is dated no earlier than the day before
+    floor = (datetime.date.fromisoformat(day) - datetime.timedelta(days=1)).isoformat() if day else ''   # (time zones)
     decided, refusals = gate.owner_row(git('diff', ref, '--', 'docs/DECISIONS.md').stdout, BASELINE_NAME,
-                                       gate.owner_role(ROOT))
+                                       gate.owner_role(ROOT), git('show', ref + ':docs/DECISIONS.md').stdout, floor)
     problems = []
     for kind, items in base.get('debt', {}).items():
         adopting = gate.level(kind, base.get('config', {})) > gate.level(kind, old.get('config', {}))

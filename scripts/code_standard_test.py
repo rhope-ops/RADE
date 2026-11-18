@@ -389,10 +389,39 @@ def self_test_rows(cs):
     assert not gate.owner_row('+| 2026-11-17 | names %s | the Administrator |' % name, name, 'administrator')[0], \
         'a row with fewer than four cells is refused'
     assert gate.owner_row(plus('the Administrator'), name, 'administrator') == (True, []), 'the owner row passes'
+    self_test_row_tricks(gate, name)
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / 'AGENTS.md').write_text('# Rules\n- Owner: the PFM\n')
         assert gate.owner_role(d) == 'pfm', 'the owner role is read from AGENTS.md, without "the "'
         assert gate.owner_role(Path(d) / 'none') == '', 'no AGENTS.md: no owner'
+
+
+def self_test_row_tricks(gate, name):
+    """Self-test of the ways a row could open the gate with no new decision (review of 17 Nov 26): an old row that is
+    moved, re-spaced or edited; a "|" inside the decision text that shifts the cells; the owner's name beside another
+    writer. Honest forms pass: an indented row, a "\\|" in the text, a note in brackets after the owner.
+
+    Args:
+        gate: the gate module.
+        name: the baseline file name.
+    """
+    row = owner_row('cap').rstrip('\n')
+    check = lambda line, old='', floor='': gate.owner_row('+' + line, name, 'administrator', old, floor)
+    ok, why = check(row, 'head\n' + row + '\n')
+    assert not ok and 'rule 5' in why[0], 'an old row that was only moved is refused: %s' % why
+    ok, why = check(row.replace('| cap', '|  cap'), row)
+    assert not ok and 'rule 5' in why[0], 'an old row with changed spacing is refused: %s' % why
+    ok, why = check(row.replace('cap', 'cap 2'), row, '2026-11-20')
+    assert not ok and 'rule 6' in why[0], 'an old row with changed words keeps its old date and is refused: %s' % why
+    assert check(row, 'another row', '2026-11-16')[0], 'a new row dated on or after the floor passes'
+    ok, why = check('| 2026-11-17 | raise the cap in %s (`a | b`), as the Administrator said | agent, for the owner | - |' % name)
+    assert not ok and 'rule 3' in why[0], 'a | in the decision text does not move the By cell: %s' % why
+    for by in ('Claude, for the Administrator', 'not the Administrator'):
+        ok, why = check(owner_row('cap', by).rstrip('\n'))
+        assert not ok and 'rule 4' in why[0], 'the owner beside another writer is refused (%s): %s' % (by, why)
+    assert check('  ' + row)[0], 'an indented owner row passes'
+    assert check('| 2026-11-17 | a \\\\| b in %s | the Administrator (answer 2A) | - |' % name)[0], 'an escaped | and a note pass'
+    assert gate.level('safety', {'c1_safety': 'yes'}) == 1 and gate.level('safety', {'c1_safety': 2}) == 2, 'safety levels'
 
 
 def self_test_lines(cs, root, g):
