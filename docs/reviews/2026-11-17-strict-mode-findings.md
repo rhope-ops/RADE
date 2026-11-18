@@ -29,7 +29,7 @@ Part and line are in the engine file (the bundle line in brackets). "Caught" = a
 | 7 | same | engine/ps/06-round.ps1:112 [1123] | `.Answers` of a step result | stopped |
 | 8 | same | engine/ps/07-checks.ps1:490 [1724] | `.Advisory` of a check definition (hash table without that key), in `Invoke-Check` | stopped |
 | 9 | same | engine/ps/07-checks.ps1:501 [1735] | `.Saved` of a check result | stopped |
-| 10 | same | engine/ps/08-saved-checks.ps1:81 [1828] | `.Saved` of a check result | caught: the error is hidden by the catch of the caller |
+| 10 | same | engine/ps/08-saved-checks.ps1:81 [1828] | `.Saved` of a check result | caught: the error is hidden by the function's own catch (line 96), which ends the whole save |
 | 11 | same | engine/ps/07-checks.ps1:128 [1362] | `.StatusCode` of a web response | caught: the response of a file address has none; a web address has it |
 
 Not strict-mode errors (they also show with strict mode off, from the test's file addresses and from Linux): `UserAgent`, `UseDefaultCredentials` and `AllowAutoRedirect` on a file request (engine/ps/07-checks.ps1 :115, :116 and :126 [1349, 1350, 1360]) and `[System.Windows.Forms.Clipboard]` (engine/ps/04-steps.ps1:110 [572]).
@@ -38,7 +38,7 @@ Not strict-mode errors (they also show with strict mode off, from the test's fil
 
 - Real faults (strict mode only shows them; they are wrong today too):
   - 2 and 3: probably a `$null` piped into `Where-Object` (one row), so the code reads a property of `$null`. Today it is harmless because a missing property is `$null`. Fix: `@($Hist) | Where-Object { $_ -and ... }`, or test the list first.
-  - 10: the saved-result test `if ($r.Saved)` is hidden by a catch; with strict mode on, the error is swallowed and the loop goes on to the next line instead of skipping. Check what it did on 5.1 before you change it.
+  - 10: the saved-result test `if ($r.Saved)` is hidden by a catch; with strict mode on, the error leaves the loop and the function's own catch ends the whole save of the check results (a fresh-context reviewer proved this with a small pwsh case). Check what it did on 5.1 before you change it.
   - 11: the status code of a response is read in a try with its error discarded; fine, but it hides a real network answer without a code.
 - The engine's habit of reading a key that may not be there (4 to 9): result and definition tables are built with some keys left out, then read as `.Key`. Strict mode refuses it. Fix: build each table with every key (a default value), or read with `ContainsKey` / `.PSObject.Properties`. One place per table is better than each reader.
 - 1: a variable read before anything sets it (`$script:configOver`). Fix: set it to `$null` in the engine's first part. There are likely more of these in the parts the run did not reach (window, maintenance).
