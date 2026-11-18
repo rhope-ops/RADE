@@ -13,6 +13,7 @@ Read these first. Each is short.
 | RADE [AGENTS.md](../AGENTS.md) "Project rules" | The fixed limits: no network reconnaissance, no data across the DoD365 boundary, no code download at run time, Windows PowerShell 5.1 only |
 | [engine.md](engine.md) "Guardrails" | What RADE checks before it writes anything (NIPR computer name, the SharePoint address prefix, one install per site) and what each check reads |
 | The app's AGENTS.md "Project rules" | The app's own limits (for 90-161.Z: no government data in the repo; its "Commands" section: credentials only through Get-Credential at run time) |
+| [threat-model.md](threat-model.md) | What can go wrong with a pasted bundle, what limits it today and the open gaps (a self-assessment) |
 | [standards-mapping.md](standards-mapping.md) | Which NIST SSDF practices and DISA ASD STIG items the project meets, in part or not yet (a self-assessment, not an ATO artifact) |
 
 ## 2. Check that the bundle is the reviewed code

@@ -7,7 +7,8 @@ same marked block to two of its scripts, then checks:
   2. the block is kept once ($shared) and each script holds one "# @@SHARED" line in its place;
   3. the engine's own Expand-SharedBlock (engine/ps/03-files.ps1, run in pwsh) gives back each script's text exactly;
   4. a second build of the same app gives the same bytes (an app's lock and its stale check rest on this);
-  5. the build stops when an engine part is not in the part lists, and when a step has "urlConfig" and no "url".
+  5. the build stops when an engine part is not in the part lists, and when a step has "urlConfig" and no "url";
+  6. the count of `catch { $null = $_ }` with no reason comment on the same line is exactly SILENT_CATCHES (docs/code-standard.md X7).
 Output: one PASS or FAIL line per check, then "LAYOUT pass=N fail=M"; exit 1 on a failure. Needs Python 3 and pwsh 7.
 """
 import json
@@ -23,6 +24,12 @@ BLOCK = ('# >>> demo-common: generated from scripts/gov/src/demo-common.ps1 by a
          '# Returns the sum of two numbers.\nfunction Get-DemoSum([int]$A, [int]$B) { return $A + $B }\n'
          '# <<< demo-common\n')
 RESULTS = []
+DISCARD = 'catch { $null = $_ }'   # the discarded-error form that rule X7 counts
+# Engine PowerShell sources that rule X7 covers (the files the bundle is made of).
+ENGINE_PS = ('engine/ps/*.ps1', 'engine/ps/window/*.ps1', 'engine/rade_ui.ps1')
+# Standards plan Stage 5 (the Administrator approved the plan, 2026-11-17; this count is an agent's work under it). Discarded-error catches with no reason on their line (106 of 129
+# on 2026-11-17). This number may only go down: lower it when you add reasons; never raise it.
+SILENT_CATCHES = 106
 
 
 def check(ok, what):
@@ -112,6 +119,39 @@ def check_build_stops(tmp, app):
     check(r.returncode != 0 and 'urlConfig' in r.stderr, 'build stops for a step with "urlConfig" and no "url"')
 
 
+def count_discards():
+    """Count the discarded-error catches in the engine PowerShell, and those with no `#` comment after them on their line.
+
+    One line may hold several; each counts. An occurrence followed later on its line by a `#` comment has a reason.
+
+    Returns:
+        (all, silent): the number of catches, and the number of them with no reason.
+    """
+    total = silent = 0
+    for pattern in ENGINE_PS:
+        for path in sorted(ROOT.glob(pattern)):
+            for line in path.read_text(encoding='utf-8').split('\n'):
+                pos = line.find(DISCARD)
+                while pos >= 0:
+                    total += 1
+                    end = pos + len(DISCARD)
+                    silent += '#' not in line[end:]
+                    pos = line.find(DISCARD, end)
+    return total, silent
+
+
+def check_catch_reasons():
+    """Check 6: the count of silent catches equals SILENT_CATCHES, so the number can only go down."""
+    total, silent = count_discards()
+    if silent < SILENT_CATCHES:
+        note = ': fewer than the constant, so lower SILENT_CATCHES in tests/bundle_layout_test.py to %d' % silent
+    elif silent > SILENT_CATCHES:
+        note = ': more than the constant; give the new catch a reason comment on its line (never raise the constant)'
+    else:
+        note = ''
+    check(silent == SILENT_CATCHES, 'discarded-error catches with no reason: %d of %d (constant %d)%s' % (silent, total, SILENT_CATCHES, note))
+
+
 def main():
     """Build the test app and run the checks."""
     with tempfile.TemporaryDirectory() as d:
@@ -125,6 +165,7 @@ def main():
         if bundle:
             check_same_bytes(app, bundle.read_bytes())
         check_build_stops(Path(d), app)
+    check_catch_reasons()
     print('LAYOUT pass=%d fail=%d' % (RESULTS.count(True), RESULTS.count(False)))
     return 0 if all(RESULTS) else 1
 

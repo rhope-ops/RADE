@@ -56,6 +56,7 @@ Turned on in [.code-standard.json](../.code-standard.json) "config" (docs/DECISI
 | X4 | A decision in a comment names who decided and the date (for example "the Administrator, 2026-11-17"). | **(review)** |
 | X5 | A fixed number, path, address or limit is a named constant or a manifest value. | **(review)** |
 | X6 | When a change touches a function in the debt list, fix that function in the same change if it is small; otherwise leave it no worse. Kit files: fix them in the kit, then port. | **(review)** |
+| X7 | A discarded error says why: `catch { $null = $_ }` has a comment on the same line that gives the reason (for example `# history is a convenience: never stop a round for it`). A `try` around a cmdlet uses `-ErrorAction Stop`, or the catch never runs for that cmdlet's errors. New engine code is written to run under `Set-StrictMode -Version 2`; the shipped engine does not turn strict mode on until a work-computer round has passed with it ([strict-mode findings](reviews/2026-11-17-strict-mode-findings.md)). | **(check)** the first sentence: tests/bundle_layout_test.py counts the catches with no reason (106 of 129 on 2026-11-17); the constant `SILENT_CATCHES` may only go down; **(review)** the rest |
 
 - Each rule's link to NIST SP 800-218 (SSDF) and the DISA Application Security and Development STIG: [standards-mapping.md](standards-mapping.md).
 - How a reviewer in another unit inspects a RADE app before it runs: [review-guide.md](review-guide.md).

@@ -1,0 +1,54 @@
+# Spec: bundle hash display
+
+Status: proposed, not approved · Owner: the Administrator · Updated: 2026-11-17
+
+## Goal
+A person who pastes a bundle can check, in seconds and with no tool, that the text in front of them is the text that was built and reviewed: the same short hash shows on the bookmark page, in the stored release data, and on the bundle's first screen.
+
+## Done
+For one app, the build prints and stores the SHA-256 of each bundle; the page shows its short form beside the Copy button and compares it with the stored value; the first screen of the pasted bundle prints the same short form; a changed byte changes all three.
+
+## Requirements
+- R1. Each app build prints the SHA-256 of each built bundle, and stores it in a small JSON file beside the bundle (`<bundle>.sha256.json`: file name, SHA-256, build id, engine release) or in the app's release. Open: where (question Q1).
+- R2. The bookmark page ([index.html](../../index.html)) computes the SHA-256 of the text it fetched, in the page, with Web Crypto (`crypto.subtle.digest`, no library), and shows the first 12 and the last 4 hex characters beside the Copy button. It compares the full value with the stored value from R1 and says "matches the stored hash" or "does not match: do not run it".
+- R3. The bundle prints the same short hash on its first screen (text mode and window): "Script check: 3f9a1c07b2de...c41e".
+- R4. The hashed text is fixed: UTF-8 bytes of the bundle with line ends as LF, from the first byte after the marked header line (R5) to the end. The bundles are ASCII already (rade_build.py refuses other text), so no byte-order mark question arises. The page hashes the text it copies after the same normalization; Windows PowerShell ISE may turn LF into CRLF on paste, so the bundle normalizes before it hashes.
+- R5. The chicken-and-egg problem: a hash written inside the text it covers cannot be right. So the build writes the hash outside the hashed part: one marked header line (`# @@BUNDLE-HASH <64 hex> @@`) that holds the value, and the hash covers everything after that line. The bundle can then read the line, hash the rest and compare.
+- R6. When the page or the bundle finds a mismatch it says so in plain words and stops (the bundle: before it does anything else).
+
+## Out of scope
+- Code signing (no certificate; no agent handles one). See [threat-model.md](../threat-model.md).
+- Proof that anyone reviewed the code.
+- Hash display for the engine files (the lock does that: engine.md "How an app gets the engine").
+
+## How the bundle can know its hash
+| Way | Good | Bad |
+|---|---|---|
+| A. The build writes the value into the header line (R5) | Simple; no run-time work; the page and the stored JSON agree by construction | The line is not covered; a changed bundle can keep the old line and still print it. The bundle shows it, but cannot prove it |
+| B. The bundle hashes its own text at run time (everything after the header line) and prints the result | The printed value follows the text actually pasted, so a changed bundle prints a different value | Needs the bundle to find its own text (`$MyInvocation` is empty for pasted text in ISE: it may need `$psISE.CurrentFile.Editor.Text`, and nothing in the console host); a changed bundle can also change this code to print the old value |
+| C. Both: print B, compare with the A line, say "checked" or "does not match" | The person sees a mismatch between the line and the text | Same limit as B against a bundle that was changed with care |
+
+Proposal: C, with R5 (hash the text after the marked line). The first-screen line is a check for honest mistakes (a stale page, a half copy), like the guardrails: it is not a security control against a person who changes the code.
+
+## What this proves and what it does not
+- It catches a change on the way (the clipboard, a stale or cached page, a half copy, a different version of the file).
+- It does not prove that anyone reviewed the code. The hash says "the text is the one that was built"; the review ([review-guide.md](../review-guide.md)) says what the text does.
+- A changed page can lie: it can show a hash that fits a changed bundle. The person must compare the short value with one from a second place (the stored JSON in the release, read on another computer, or the line in the team's notes).
+- A changed bundle can print any value. Only the second place, outside the pasted text, is evidence.
+
+## Edge cases and errors
+- E1. The browser has no `crypto.subtle` (an http page, an old browser): the page shows no hash and says "hash not available"; the Copy button still works.
+- E2. The stored JSON is not there (older build): the page shows the computed value and says "no stored value to compare".
+- E3. Line ends: the page, the build and the bundle all normalize to LF before the hash.
+
+## Decisions
+| ID | Decision | By | Date | Alternatives rejected, and why |
+|---|---|---|---|---|
+| none | Nothing is decided; the questions are below | | | |
+
+## Open questions for the Administrator
+- Q1. Where is the stored value? REC: a JSON file beside each bundle in the app's repo, written by the build (the page already reads from the app repo), and also in the release notes once the page serves tagged releases. Alternative: release only (fewer files, but the page cannot compare for `main`).
+- Q2. Which short form? REC: first 12 and last 4 hex characters (a person reads 16 characters; a mismatch in any part of the text changes both ends). Alternative: first 8 only (shorter; weaker against a made-up near match).
+- Q3. Way A, B or C for the bundle? REC: C (print the run-time hash and compare with the header line).
+- Q4. Should the page serve a tagged release instead of `main`? REC: yes, as a separate step: the hash is only worth reading when the page has a release to compare with.
+- Q5. Does it go in the next engine release or wait for a work-computer round to prove that the ISE paste hashes the same text? REC: build it, but prove the paste in one round first (the console host and ISE differ on `$MyInvocation`).
