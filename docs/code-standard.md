@@ -1,42 +1,59 @@
-# Code standard: RADE
+# Code standard
 
-Decided by the Administrator, 2026-11-17 (docs/DECISIONS.md): all code in this repo is modular, clearly commented and human inspectable, and stays so as work continues. This file is the spec. [tests/check_code_standard.py](../tests/check_code_standard.py) enforces the rules marked **(check)**; the fresh reviewer of each pull request checks the rules marked **(review)**.
+Decided by the owner, 2026-11-17 (docs/DECISIONS.md): all code is lean, modular, commented and human-editable, and stays so as work continues. Why: a person must be able to read any script and know what it does before they run it. [scripts/code_standard.py](../scripts/code_standard.py) enforces the rules marked **(check)**; the fresh reviewer of each pull request checks the rules marked **(review)**.
 
-Why: a person must be able to read any script and know what it does before they run it on a work computer. A pasted bundle runs with that person's rights, so its code must be as easy to inspect as its text.
+The kit owns this file and the check. A project gets both by sync, or by a hand port where its rules forbid sync; it sets its own caps, scope and stricter rules (for example full docs per function) in its own `.code-standard.json` and a section below, never in a copy of the check.
 
 ## Scope
 
-- Every file git tracks with the extension `.py`, `.ps1`, `.psm1`, `.js`, `.mjs`, `.cjs` or `.sh`, and every file with no extension whose first line is a shell or Python shebang (for example scripts/git-hooks/pre-push): the engine, the scripts, the tests and the kit files.
-- Generated files get rule C6 only (their source gets the other rules). The list is `config.generated` in [tests/code-standard-baseline.json](../tests/code-standard-baseline.json).
-- Kit files (from archimedes_lever: scripts/pii_guard.py, bloat_check.py, timeline.py, log_check.py, stop_check.py, worker_guard.py, first_use_check.py, session_checkin.sh, check.sh, git-hooks/pre-push) are checked the same way. Their debt is fixed in the kit first, then ported (AGENTS.md "Project rules", no kit sync).
+- Every file git tracks with the extension `.py`, `.ps1`, `.psm1`, `.js`, `.mjs`, `.cjs` or `.sh`, and every file with no extension whose first line is a shell or Python shebang (for example scripts/git-hooks/pre-push).
+- Generated files get rule C6 only (their source gets the other rules). The list is `config.generated` in [.code-standard.json](../.code-standard.json).
 
 ## Rules
 
 | No. | Rule | How |
 |---|---|---|
-| C1 | Each source file starts with a header comment: what the file is for, its inputs, its outputs, how to run it, and its run target (for example Windows PowerShell 5.1). Python: the module docstring. PowerShell: comment-based help (`<# .SYNOPSIS ... #>`) or `#` lines. | **(check)** at least 60 characters; **(review)** the content |
-| C2 | Each function has a comment that says what it does, what it takes and what it gives back. Python: a docstring, or a `#` comment directly above the `def` or before its first statement. PowerShell: comment-based help, or a `#` line directly above `function` (the file header and a divider line such as `# ----` do not count; leave a blank line between the header and the first function's comment) (or above a script block kept in a variable, such as `$ui.Say = { ... }`). | **(check)** present; **(review)** true and useful |
-| C3 | A function is at most 60 lines long. A longer job is split into named steps, each its own function. A script block passed to a call (for example `$button.Add_Click({ ... })`) counts as a function for its length. | **(check)** |
-| C4 | A file is at most 600 lines long. A larger program is split into modules, one concern each (for example: checks, steps, window, results). | **(check)** |
-| C5 | One function lives in one file. Code that must also run alone (a task script, a bundle part) gets a generated copy between marker lines `# >>> <name>: generated from <source> ...` and `# <<< <name>`; the check skips that block and measures the source. | **(check)** same body twice fails |
-| C6 | A generated file says `GENERATED` in its first 15 lines and names its source and the command that builds it. A generated bundle starts with a table of contents, and each part has a banner with its source file and SHA-256. Hand edits: AGENTS.md "Checks". | **(check)** banner; **(review)** table of contents |
-| C7 | Names say what a thing is or does: PowerShell `Verb-Noun` with an approved verb; Python `snake_case`; no one-letter names except loop counters and short lambdas. | **(review)** |
-| C8 | A comment says why or what, in plain English, and is true. A decision in a comment names who decided and the date (for example "the Administrator, 2026-11-17"). Remove a comment the code makes obsolete in the same change. | **(review)** |
-| C9 | No magic values: a fixed number, path, address or limit is a named constant or a manifest value, with a comment that says where it comes from. | **(review)** |
-| C10 | Engine PowerShell runs on Windows PowerShell 5.1 (AGENTS.md "Project rules"). Embedded PowerShell lives in `.ps1` files, never in a Python string, so the PowerShell parser and this check can read it. | **(check)** each PowerShell and Python file parses; **(review)** the 5.1 target |
+| C1 | Each source file starts with a header comment: what the file is for, its inputs, its outputs and how to run it. Python: the module docstring. | **(check)** at least 60 characters; **(review)** the content |
+| C1 safety | Opt-in: a project sets `"c1_safety": true` in its `.code-standard.json` "config". Then each source file's header also has the three labels `Network:` (the hosts it reaches, or "none"), `Writes:` (the files, lists or sites it changes, or "none") and `Credentials:` (what it asks for and how, or "none"), so a reviewer finds them before a run. | **(check)** the three labels; **(review)** true |
+| C2 | Each function has a comment that says what it does. One line is enough; full parameter docs are not required. Python: a docstring, or a `#` line directly above the `def` or before its first statement. Shell and JS: a comment line directly above. The file header and a divider line (`# ----`) do not count. | **(check)** present; **(review)** true and useful |
+| C3 | A function is at most 60 lines long. A longer job is split into named steps, each its own function. | **(check)** |
+| C4 | A file is at most 600 lines long. A larger program is split into modules, one concern each. | **(check)** |
+| C5 | One function lives in one file. A copy that must also run alone is generated, between marker lines `# >>> <name>: generated from <source> ...` and `# <<< <name>`. | **(check)** same body twice fails |
+| C6 | A generated file says `GENERATED` in its first 15 lines and names its source and the command that builds it. | **(check)** |
+| C7 | Names say what a thing is or does: Python `snake_case`; PowerShell `Verb-Noun`; no one-letter names except loop counters and short lambdas. | **(review)** |
+| C8 | A comment says why or what, in plain English, and is true. Remove a comment the code makes obsolete in the same change. | **(review)** |
+| C9 | No magic values: a fixed number, path, address or limit is a named constant with a comment that says where it comes from. | **(review)** |
+| C10 | Each Python and PowerShell file parses. | **(check)** |
+| C2 full | Opt-in: a project sets `"c2": "full"` in its `.code-standard.json` "config". Then each function longer than 10 lines also documents each parameter and its return value, in the form its language's own help tools read. Python: a docstring with an `Args:` section that names each parameter (not `self` or `cls`) and a `Returns:` section when it returns a value (PEP 257). PowerShell: comment-based help (.SYNOPSIS or .DESCRIPTION) with one `.PARAMETER` per parameter, placed where `Get-Help` finds it (about_Comment_Based_Help). JavaScript: a `/** */` JSDoc block directly above, with one `@param` per parameter and `@returns` when it returns a value. Shell: the C2 comment only. | **(check)** [scripts/code_standard_docs.py](../scripts/code_standard_docs.py); **(review)** true and useful |
+| C11 | Lean: no dead code, no unused option, no second way to do the same job; prefer the standard library over a new dependency. A change does not make a check run slower than its baseline (.claude/skills/efficiency/SKILL.md). | **(review)**; time: `scripts/check.sh` TIME line |
 
 ## The ratchet
 
-- [tests/code-standard-baseline.json](../tests/code-standard-baseline.json) `debt` lists every violation that existed on 2026-11-17. A violation not in that list fails the check. A listed function or file that grows fails.
-- A listed item that is fixed also fails, until the same change lowers the baseline: `python3 tests/check_code_standard.py --update` (it refuses when there is new debt). So the list can only shrink.
-- Never add an item to the baseline by hand, never raise a cap, and never add a path to `exclude` to make the check pass (AGENTS.md "Checks"). The check enforces this: it compares the baseline with the one on the merge base with origin/main, and an added item, a raised value or a changed `config` fails. A change to the caps or the scope is the Administrator's decision: the same change adds a docs/DECISIONS.md row that names tests/code-standard-baseline.json.
-- New and changed code meets every rule. When a change touches a function that is in the debt list, fix that function in the same change if it is small (except kit files: see Scope); otherwise leave it no worse.
+- `.code-standard.json` `debt` lists the violations that existed when a repo adopted the standard (empty in the kit). A violation not in that list fails; a listed function or file that grows fails.
+- A listed item that is fixed also fails until the same change lowers the baseline (`--update`, which refuses new debt). So the list can only shrink.
+- A rule turned on later (for example `"c2": "full"`): `--adopt` lists its current debt once, in the same change as a docs/DECISIONS.md row that names `.code-standard.json`. The comparison with main accepts that list only when the option was off on main, so an option that is already on cannot be adopted again. It never touches the debt of a rule the ratchet already holds.
+- Never add an item to the baseline by hand, raise a cap or add an `exclude` to pass (AGENTS.md "Checks"). The check compares the baseline with the one on the merge base with origin/main; a cap or scope change needs a docs/DECISIONS.md row that names `.code-standard.json`.
 
 ## Commands
 
-- Check: `python3 tests/check_code_standard.py` (scripts/check.local.sh runs it in both lanes). Pass = last line `CODE-STANDARD pass`.
-- Every measurement: `python3 tests/check_code_standard.py --report`.
-- Lower the baseline after a fix: `python3 tests/check_code_standard.py --update`.
-- Prove the check itself: `python3 tests/check_code_standard.py --self-test`.
+- Check: `python3 scripts/code_standard.py` (scripts/check.sh runs it in both lanes). Pass = last line `CODE-STANDARD pass`.
+- Every measurement: `--report`. Lower the baseline after a fix: `--update`. A project's first baseline: `--init`. A rule just turned on: `--adopt`. Prove the check: `--test`.
 
-The same check file runs in rhope-ops/90-161.Z: a change to it is made here, and a session of 90-161.Z ports it there (AGENTS.md "Project rules", app repos).
+## RADE extras
+
+The Administrator, 2026-11-17. The text above is the kit's core, ported by hand from rhope-ops/archimedes_lever `docs/code-standard.md` (no kit sync, AGENTS.md "Project rules"); change it only by a port. This section adds RADE's stricter rules. Apps built on RADE use it too: rhope-ops/90-161.Z links here.
+
+Turned on in [.code-standard.json](../.code-standard.json) "config" (docs/DECISIONS.md 2026-11-17): `"c2": "full"` (rule C2 full: full docs for each function longer than 10 lines) and `"c1_safety": true` (rule C1 safety: `Network:`, `Writes:` and `Credentials:` lines in each header). Their starting debt is in the baseline and only shrinks.
+
+| No. | Extra rule | How |
+|---|---|---|
+| X1 | The C1 header also names the run target (for example Windows PowerShell 5.1). | **(review)** |
+| X2 | Engine PowerShell runs on Windows PowerShell 5.1 (AGENTS.md "Project rules"). Embedded PowerShell lives in `.ps1` files, never in a Python string, so the PowerShell parser and the check can read it. | **(check)** C10 parse; **(review)** the 5.1 target |
+| X3 | A generated bundle starts with a table of contents, and each part has a banner with its source file and SHA-256. | **(review)**; tests/engine_test.sh |
+| X4 | A decision in a comment names who decided and the date (for example "the Administrator, 2026-11-17"). | **(review)** |
+| X5 | A fixed number, path, address or limit is a named constant or a manifest value. | **(review)** |
+| X6 | When a change touches a function in the debt list, fix that function in the same change if it is small; otherwise leave it no worse. Kit files: fix them in the kit, then port. | **(review)** |
+
+- Each rule's link to NIST SP 800-218 (SSDF) and the DISA Application Security and Development STIG: [standards-mapping.md](standards-mapping.md).
+- How a reviewer in another unit inspects a RADE app before it runs: [review-guide.md](review-guide.md).
+- Check in this repo: `python3 scripts/code_standard.py` (scripts/check.local.sh runs it and its `--test` in both lanes).

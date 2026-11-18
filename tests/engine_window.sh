@@ -3,6 +3,7 @@
 # of engine_test.sh by the speed audit of 2026-11-17 (docs/code-standard.md C4: a file is at most 600 lines). Uses what
 # engine_test.sh defined before it: $t, $b, $engine_src, swap, go, ok and bad. Starts the background groups W, W2 and W3;
 # engine_test.sh "gather" waits for them and adds their counts.
+# Network: none. Writes: temporary files under the test folder $t, deleted on exit. Credentials: none.
 
 # ---- window: the "One thing" window (docs/window-design.md) with stand-in Windows Forms types (tests/window_stub.cs) and
 # a scripted user (tests/window_driver.ps1) that prints one WIN line per card, runs every Paint handler and checks names.
