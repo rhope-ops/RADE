@@ -8,7 +8,7 @@ same marked block to two of its scripts, then checks:
   3. the engine's own Expand-SharedBlock (engine/ps/03-files.ps1, run in pwsh) gives back each script's text exactly;
   4. a second build of the same app gives the same bytes (an app's lock and its stale check rest on this);
   5. the build stops when an engine part is not in the part lists, and when a step has "urlConfig" and no "url";
-  6. the count of `catch { $null = $_ }` with no reason comment on the same line is exactly SILENT_CATCHES (docs/code-standard.md X7).
+  6. the count of `catch { $null = $_ }` with no reason comment on the same line is exactly SILENT_CATCHES (docs/code-standard-rade.md X7).
 Output: one PASS or FAIL line per check, then "LAYOUT pass=N fail=M"; exit 1 on a failure. Needs Python 3 and pwsh 7.
 """
 import json

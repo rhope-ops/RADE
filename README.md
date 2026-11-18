@@ -15,6 +15,6 @@ New to working with AI agents? Read [docs/WORKING_WITH_AGENTS.md](docs/WORKING_W
 - Build, test and lint commands: [AGENTS.md](AGENTS.md) "Commands".
 - How the engine is built and released: [docs/engine.md](docs/engine.md).
 - Make an application for RADE: [docs/make-an-app.md](docs/make-an-app.md).
-- Code standard: [docs/code-standard.md](docs/code-standard.md). Review guide: [docs/review-guide.md](docs/review-guide.md).
+- Code standard: [docs/code-standard.md](docs/code-standard.md) and its RADE extras, [docs/code-standard-rade.md](docs/code-standard-rade.md). Review guide: [docs/review-guide.md](docs/review-guide.md).
 - Threat model: [docs/threat-model.md](docs/threat-model.md). Proposed bundle hash display: [docs/specs/bundle-hash.md](docs/specs/bundle-hash.md).
 - Report a vulnerability: [SECURITY.md](SECURITY.md).

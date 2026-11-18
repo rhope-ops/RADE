@@ -1,48 +1,43 @@
 #!/usr/bin/env python3
-"""The strict parts of the code-standard check (scripts/code_standard.py): the C1 safety labels, the per-file rules, the
-line-length rule, and the three gates that decide whether the ratchet baseline may take new debt.
+"""RADE's own gate of the code-standard check (the extension point of the kit's scripts/code_standard.py: its header
+gives the five entry points). It holds RADE's stricter rules; the kit check loads this file and calls it.
 
-Why: a rule that can be met with a word somewhere in a header, or with any line that names the baseline file, is met by
-accident, not by work. This module holds the strict forms so the check stays under its own file cap (docs/code-standard.md C4).
-What it does:
-  safety_ok       a safety label starts a header line and has a value on that line
-  file_rules      the per-file rules (header, safety, file size, line length) of one source file
-  owner_row       a NEW docs/DECISIONS.md table row that names .code-standard.json and has the owner in its By cell
-                  (only in a change that leaves every older row as it was: an edited old row is no decision)
-  owner_role_in   the owner role, read from the "- Owner:" line of AGENTS.md (the check gives it main's AGENTS.md)
-  exists_at       a file exists at a git ref (a debt key for a file new in this change is refused)
-  level           how far an opt-in rule is adopted in a config (a higher level than on main may list new debt once)
+Why: a rule that can be met with a word somewhere in a header, or with any line that names the settings file, is met by
+accident, not by work (the Administrator, 2026-11-17: docs/code-standard-rade.md). The rules:
+  RULES             'safety' relabelled (each label at a line start, with a value); 'line' (C4 line, cap
+                    `code-max-line-chars` in .check; its debt value is a length that may only go down)
+  OPT_IN            'line': on when .check sets `code-max-line-chars` (the kit holds the safety levels: off, on, strict)
+  file_rules        the strict C1 safety form (safety_ok; at `on` and at `strict`) and the longest line of a file
+  decided           the owner row: a NEW docs/DECISIONS.md table row that names the settings file `.check`, with
+                    main's owner alone in its By cell, in a change that leaves every older row as it was (owner_row)
+  new_debt_refusal  debt for a file that is new in this change is refused, with or without a decision (new files
+                    meet the rules)
 Inputs:  header text, file lines, git diff text, a repo root and a git ref.
-Outputs: yes/no answers, refusal lines, and violations written into the caller's dict.
+Outputs: yes/no answers, refusal lines, and violations written into the caller's dict; with --test, the self-test
+         result (scripts/code_standard_gate_test.py) and exit code 0 or 1.
 Network: none.
-Writes: none (it runs git read-only commands; the check that imports it writes .code-standard.json).
+Writes: none (it runs git read-only commands; the check that loads it writes .check.state.json; --test writes
+        temporary folders only).
 Credentials: none.
-Run:     imported by scripts/code_standard.py; proved by `python3 scripts/code_standard.py --test`.
+Run:     loaded by scripts/code_standard.py; `python3 scripts/code_standard_gate.py --test` is the self-test
+         (scripts/check.sh runs it).
 """
 
 import re
 import subprocess
+import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))   # the check loads this file by path, not by import
+import check_settings as settings   # noqa: E402 - scripts/check_settings.py: the settings file name and its name test
+
 SAFETY_LABELS = ('Network:', 'Writes:', 'Credentials:')   # C1 safety: what a reviewer must find before a run
-MIN_HEADER_CHARS = 60      # a header shorter than this does not say what the file is for
 # A By cell with one of these marks a script or an agent, not the owner (the owner, 2026-11-17: only the owner decides).
 NOT_OWNER = ('scripts/', '.py', 'agent', 'delegation')
 ROW_CELLS = 4              # a DECISIONS row: date, decision, by, last (exactly: a spare cell would move the By cell)
-# The opt-in rules: the debt kind of each and its level in a config (0 = off). Level 2 of safety marks the strict form.
-OPT_IN = {'docs': lambda c: 1 if c.get('c2') == 'full' else 0,
-          'safety': lambda c: safety_level(c.get('c1_safety')),
-          'line': lambda c: 1 if c.get('caps', {}).get('max_line_chars') else 0}
-
-
-def safety_level(value):
-    """Return the level of the "c1_safety" setting: 0 = off, 1 = on (true), 2 or more = a stricter form (a number, or
-    digits as text). Any other value that is set counts as 1; a negative number as 0."""
-    if isinstance(value, str) and re.fullmatch(r'[0-9]{1,6}', value.strip()):
-        value = int(value.strip())
-    if type(value) is int:
-        return max(0, value)
-    return 1 if value else 0
+RULES = {'safety': ('C1 safety: header without the Network:, Writes: and Credentials: lines, each with a value', None),
+         'line': ('C4 line longer than %d characters', 'max_line_chars')}
+OPT_IN = {'line': lambda c: 1 if c.get('caps', {}).get('max_line_chars') else 0}
 
 
 def safety_ok(head):
@@ -64,34 +59,26 @@ def longest_line(lines, skip):
 
 
 def file_rules(v, p, lines, head, config, skip):
-    """Write the per-file violations of one source file into `v`: C1 header, C1 safety, C4 file size, line length.
+    """Write RADE's per-file violations of one source file into `v`, after the kit's own per-file rules: the strict
+    C1 safety form (each label at the start of a header line, with a value) and the longest line (C4 line).
 
     Args:
         v: the violations dict {kind: {key: value}}, changed in place.
         p: the repo-relative path.
         lines: the file's lines.
-        head: the header text (header_block of scripts/code_standard.py).
-        config: the baseline "config".
+        head: the header text (one header line per text line).
+        config: the code standard settings.
         skip: the (first, last) line numbers of the generated blocks.
 
     Returns:
         None.
     """
-    caps = config['caps']
-    if len(head) < MIN_HEADER_CHARS:
-        v['header'][p] = 1
     if config.get('c1_safety') and not safety_ok(head):
         v['safety'][p] = 1
-    if len(lines) > caps['max_file_lines']:
-        v['file_size'][p] = len(lines)
-    longest = longest_line(lines, skip) if caps.get('max_line_chars') else 0
-    if longest > caps.get('max_line_chars', longest):
+    cap = config['caps'].get('max_line_chars')
+    longest = longest_line(lines, skip) if cap else 0
+    if cap and longest > cap:
         v['line'][p] = longest
-
-
-def level(kind, config):
-    """Return how far the opt-in rule of debt kind `kind` is adopted in `config` (0 = off or not an opt-in kind)."""
-    return OPT_IN[kind](config) if kind in OPT_IN else 0
 
 
 def owner_role_in(text):
@@ -114,13 +101,14 @@ def squeeze(text):
     return re.sub(r'\s+', '', text)
 
 
-def row_refusal(text, name, owner):
+def row_refusal(text, name, owner, names=None):
     """Return why a DECISIONS line is not a new owner's row for file `name`, or None when it is one.
 
     Args:
         text: a line of docs/DECISIONS.md that main does not have.
-        name: the baseline file name the decision cell must name.
+        name: the settings file name the decision cell must name.
         owner: the owner role (owner_role), lower case.
+        names: a test that says whether a text names the file (None: the text holds `name`).
 
     Returns:
         The refusal (which rule refused it) or None.
@@ -131,7 +119,7 @@ def row_refusal(text, name, owner):
     cells = [c.replace('\0', '|').strip() for c in row.replace('\\|', '\0').strip('|').split('|')]
     if len(cells) != ROW_CELLS:
         return 'rule 1: a decision row has %d cells: date, decision, by, last (write \\| for a | inside a cell)' % ROW_CELLS
-    if name not in cells[1]:
+    if not (names(cells[1]) if names else name in cells[1]):
         return 'rule 2: the decision cell does not name ' + name
     by = cells[2].lower()
     bad = [x for x in NOT_OWNER if x in by]
@@ -144,7 +132,7 @@ def row_refusal(text, name, owner):
     return None
 
 
-def owner_row(new_text, name, owner, old_text=''):
+def owner_row(new_text, name, owner, old_text='', names=None):
     """Compare docs/DECISIONS.md with its text on the merge base and look for the owner's new row that opens the
     ratchet gate. The gate opens only in a change that adds rows and leaves every older row as it was: an older row
     that is edited or removed closes it, so no old decision can be turned into a new one. The two texts are compared
@@ -152,9 +140,11 @@ def owner_row(new_text, name, owner, old_text=''):
 
     Args:
         new_text: docs/DECISIONS.md as it is in this change.
-        name: the baseline file name.
+        name: the settings file name.
         owner: the owner role (owner_role_in).
         old_text: docs/DECISIONS.md at the merge base ('' when there is none).
+        names: a test that says whether a text names the file (None: the text holds `name`); the check gives the
+            one that takes `.check` but not `.check.lock` or `.check.state.json`.
 
     Returns:
         (True, []) when a new table row names `name` and has the owner alone in its By cell, and no older row was
@@ -164,9 +154,9 @@ def owner_row(new_text, name, owner, old_text=''):
     old_lines = {squeeze(x) for x in old_text.split('\n')}
     refusals, found = [], False
     for line in new_text.split('\n'):
-        if name not in line or squeeze(line) in old_lines:
-            continue   # not about the baseline, or a line main has already (a moved or re-spaced row is no decision)
-        why = row_refusal(line, name, owner)
+        if not (names(line) if names else name in line) or squeeze(line) in old_lines:
+            continue   # not about the settings file, or a line main has already (a moved or re-spaced row is no decision)
+        why = row_refusal(line, name, owner, names)
         found = found or why is None
         if why:
             refusals.append('REFUSED  docs/DECISIONS.md line (%s): %s' % (why, line.strip()[:60]))
@@ -181,3 +171,49 @@ def exists_at(root, ref, path):
     """True when `path` exists in the commit `ref` (git cat-file -e); a file that does not is new in this change."""
     return subprocess.run(['git', '-C', str(root), 'cat-file', '-e', '%s:%s' % (ref, path)],
                           capture_output=True).returncode == 0
+
+
+def at_ref(root, ref, path):
+    """Return the text of `path` in the commit `ref` ('' when it has none); bytes are read, so a lone CR stays in its
+    line."""
+    out = subprocess.run(['git', '-C', str(root), 'show', '%s:%s' % (ref, path)], capture_output=True)
+    return out.stdout.decode('utf-8', 'replace') if out.returncode == 0 else ''
+
+
+def decided(root, ref):
+    """Return whether this change records the owner's decision on the settings file `.check` (owner_row).
+
+    Args:
+        root: the repo root.
+        ref: the merge base with origin/main.
+
+    Returns:
+        (True, []) for an owner row; else (False, the refusal lines). The owner is read from main's AGENTS.md, so an
+        owner line changed in this change does not count.
+    """
+    here = Path(root) / 'docs' / 'DECISIONS.md'
+    text = here.read_bytes().decode('utf-8', 'replace') if here.is_file() else ''
+    return owner_row(text, settings.CHECK, owner_role_in(at_ref(root, ref, 'AGENTS.md')),
+                     at_ref(root, ref, 'docs/DECISIONS.md'), settings.NAMES_CHECK.search)
+
+
+def new_debt_refusal(root, ref, kind, key):
+    """Refuse debt for a file that is new in this change: new files meet the rules, and no decision lifts that.
+
+    Args:
+        root: the repo root.
+        ref: the merge base with origin/main.
+        kind: the debt kind.
+        key: the debt key (a path, or path::function).
+
+    Returns:
+        A FAIL line, or None when the file exists at `ref`.
+    """
+    if exists_at(root, ref, key.split('::')[0]):
+        return None
+    return 'FAIL  baseline: debt for a file that is new in this change: %s (%s; new files meet the rules)' % (key, kind)
+
+
+if __name__ == '__main__' and '--test' in sys.argv[1:]:
+    import code_standard_gate_test   # scripts/code_standard_gate_test.py: RADE's cases
+    sys.exit(code_standard_gate_test.run())

@@ -35,7 +35,7 @@ Every source file starts with a header (code standard C1). Look for three lines 
 - `Writes:` the files, lists or sites it changes, or "none".
 - `Credentials:` what it asks for and how, or "none".
 
-A header is a claim, not proof: check it against the code. Files from before 2026-11-17 may not have these lines yet (they are listed as debt in `.code-standard.json` and are being fixed); for those, and to check any header, search the file for:
+A header is a claim, not proof: check it against the code. Files from before 2026-11-17 may not have these lines yet (they are listed as debt in `.check.state.json` and are being fixed); for those, and to check any header, search the file for:
 
 | Look for | PowerShell | Python | JavaScript |
 |---|---|---|---|
@@ -48,7 +48,7 @@ A value that is set in another file (for example a `$...Url` variable) must be f
 
 Each function has a comment above it or in it that says what it does (rule C2). Rule C2 full asks more of a function longer than 10 lines: help that names what it takes and gives back (`.SYNOPSIS` and one `.PARAMETER` per parameter in PowerShell, in a `<# ... #>` block). That rule is new: most engine functions do not have that block yet (the open count is the "docs" debt in `.code-standard.json`), so for them read the `#` lines and the code. Read help in the file as text. Do not dot-source or run a file to read its help: that runs its code.
 
-Checklist for the rules a script cannot check ([code-standard.md](code-standard.md), marked **(review)**):
+Checklist for the rules a script cannot check ([code-standard.md](code-standard.md) and [code-standard-rade.md](code-standard-rade.md), marked **(review)**):
 
 - [ ] The header and help are true: the code does what they say and nothing more.
 - [ ] No host is contacted other than those in `Network:` (and never a scan, ping or port check).
