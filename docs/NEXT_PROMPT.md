@@ -1,6 +1,6 @@
 # Next prompt: RADE
 
-Updated: 2026-11-17 by Claude (code standard and engine split; engine-v11 = 19ba54b released 17 Nov 26; ENGINE_RELEASE = 13 for the reach-test sign-in fix, release engine-v13 after the merge). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
+Updated: 2026-11-18 by Claude (test speed S1-S4 merged, PR 86; check baseline 66.4 s, PR 89; code standard and engine split; engine-v11 = 19ba54b released 17 Nov 26; ENGINE_RELEASE = 13 for the reach-test sign-in fix, release engine-v13 after the merge). Keep this file at 40 lines or fewer, one line per item. The current request overrides it. Detail of items 0-11 and the MINOR review leftovers: [docs/reviews/2026-11-16-handoff-detail.md](reviews/2026-11-16-handoff-detail.md).
 
 ## State
 
@@ -28,7 +28,7 @@ Updated: 2026-11-17 by Claude (code standard and engine split; engine-v11 = 19ba
 14. R28 leftovers (reviews of PR 72): no test for the kept runner copy; release.yml does not check ENGINE_RELEASE against the tag (guard file: the Administrator decides); Start waits 2.5 s; the shortcut's minimized console hides text-mode fallback; the no-app card cannot be reached in a real build. Device proof pending: 125/150 % text, .lnk, runner copy, ISE text capture (round R28 of 90-161.Z).
 
 15. Runner polish leftovers (reviews of pull request 71): `$ui.Say` sets the last log line without a new edge fit (stale edge possible, not seen in the job); `$ui.Fit` breaks long words before `FitSteps` sets the numbered widths (the 400 ms refit corrects it); no stand-in test covers `OnStatus`/`ShowRun`; option: only the numbered lines scroll on a hand card (today the whole text above the buttons scrolls).
-16. R28 fixes leftovers (pull request 78): N8 = the folder of the RADE shortcut (the Administrator confirmed, 17 Nov); no tests yet for: a path shown as <a path> in the layout line, a saved shortcut folder used on a later deploy, the Start-on-Maintenance note, GuideInkAt; right alignment of 1-9 beside 10 (figure spaces) is not measured; device proof in 90-161.Z R29; full lane 90 s vs baseline 45.7 s (efficiency skill); the 90-161.Z lock moves to engine-v10 only when the PFM asks.
+16. R28 fixes leftovers (pull request 78): N8 = the folder of the RADE shortcut (the Administrator confirmed, 17 Nov); no tests yet for: a path shown as <a path> in the layout line, a saved shortcut folder used on a later deploy, the Start-on-Maintenance note, GuideInkAt; right alignment of 1-9 beside 10 (figure spaces) is not measured; device proof in 90-161.Z R29; full lane: test speed S1-S4 merged (PR 86, 105.5 s -> 66.4 s), new baseline 66.4 s (PR 89; docs/reviews/2026-11-17-test-speed-audit.md); the required PR check is named `scan` (the job of pii-guard.yml), not `pii-guard`; the 90-161.Z lock moves to engine-v10 only when the PFM asks.
 
 ## Needs the Administrator
 
