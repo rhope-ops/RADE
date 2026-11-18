@@ -47,6 +47,25 @@ function global:Show-RadeCard {
     if ($t -in 'Button', 'TextBox', 'CheckBox' -and -not ($c.Parent -and $c.Parent.Events.ContainsKey('Paint')) -and -not ($c.Tag -is [hashtable]) -and -not ($c.Values.ContainsKey('TabStop') -and $c.Values['TabStop'] -eq $false)) { Write-Host ('WIN NOFOCUS ' + $t + ' "' + $c.Text + '" in view ' + $ui.View) }
   }
 }
+# R29b N3: prints "WIN mid tick": the step's time and count against the bar's midpoint, from margins and sizes (no layout
+# here), at 100, 150 and 200 %: the bar's coded margin and height scaled, the small font scaled (the stand-ins' text height is
+# 1.7 x the points). Takes nothing; restores the bar and the fonts after.
+function global:Show-RadeTick {
+  $tk = @(); $keep = @{ Bar = $ui.StepBar.Margin; H = $ui.StepBar.Height; F = $ui.StepTime.Font }
+  foreach ($k in 1.0, 1.5, 2.0) { $ui.StepBar.Margin = (& $ui.Pad 14 ([int](11 * $k)) 14 0); $ui.StepBar.Height = [int](4 * $k); $f = New-Object RadeDraw.Font([string]$ui.F.Small.Name, [single](10 * $k))
+    $ui.StepTime.Font = $f; $ui.StepFrac.Font = $f; & $ui.AlignTick; $mb = $ui.StepBar.Margin.Top + $ui.StepBar.Height / 2.0
+    $tk += ([string]([int]($k * 100)) + '%:' + [math]::Abs(($ui.StepTime.Margin.Top + $ui.StepTime.PreferredSize.Height / 2.0) - $mb) + '/' + [math]::Abs(($ui.StepFrac.Margin.Top + $ui.StepFrac.PreferredSize.Height / 2.0) - $mb)) }
+  $ui.StepBar.Margin = $keep.Bar; $ui.StepBar.Height = $keep.H; $ui.StepTime.Font = $keep.F; $ui.StepFrac.Font = $keep.F; & $ui.AlignTick
+  Write-Host ('WIN mid tick ' + ($tk -join ' '))
+}
+# R29b: prints "WIN rule head": the header rule fails on any edge difference; the ticker rule allows 1 px at 100, 150 and 200 %
+# (bar 4, 6, 8 high; text 17, 26, 34 high) and fails beyond it. Takes nothing.
+function global:Show-RadeR29bRules {
+  $hd = @(& $ui.HeadBad 'fixture' @{ N = 'WordL'; X = 80 } @{ N = 'AppL'; X = 80 }) + @(& $ui.HeadBad 'fixture' @{ N = 'WordL'; X = 86 } @{ N = 'AppL'; X = 80 })
+  $tg = @(& $ui.TickBad 'fixture' @{ Top = 11; H = 4 } @{ N = 'StepTime'; Top = 5; H = 17 }) + @(& $ui.TickBad 'fixture' @{ Top = 16; H = 6 } @{ N = 'StepTime'; Top = 7; H = 26 }) + @(& $ui.TickBad 'fixture' @{ Top = 22; H = 8 } @{ N = 'StepTime'; Top = 9; H = 34 })
+  $tb = @(& $ui.TickBad 'fixture' @{ Top = 11; H = 4 } @{ N = 'StepTime'; Top = 6; H = 17 }) + @(& $ui.TickBad 'fixture' @{ Top = 16; H = 6 } @{ N = 'StepTime'; Top = 9; H = 26 }) + @(& $ui.TickBad 'fixture' @{ Top = 22; H = 8 } @{ N = 'StepTime'; Top = 7; H = 34 })
+  Write-Host ('WIN rule head=' + $hd.Count + ' tick-ok=' + $tg.Count + ' tick-off=' + $tb.Count + ' ~ ' + (@($hd) + @($tb) -join ' ~ '))
+}
 function global:Push-RadeButton([string]$Text) {
   foreach ($b in $ui.B) { if ($b.Shown -and $b.Text -eq $Text) { $b.PerformClick(); return } }
   throw ('the test user found no button "' + $Text + '" in view ' + $ui.View)
@@ -132,7 +151,7 @@ function global:Push-RadeButton([string]$Text) {
   elseif ($v -eq 'hand') {
     $m = { param($C) $(if ($C.AutoSize) { $C.Margin.Top + $C.PreferredSize.Height / 2.0 } else { $C.Margin.Top + $C.Height / 2.0 }) }
     Write-Host ('WIN mid hand label=' + (& $m $ui.FieldL) + ' box=' + (& $m $ui.FieldBox) + ' button=' + (& $m $ui.FieldB) + ' box-h=' + $ui.FieldBox.Height + ' button-h=' + $ui.FieldB.PreferredSize.Height + ' gaps=' + ($ui.FieldL.Margin.Right + $ui.FieldBox.Margin.Left) + ',' + ($ui.FieldBox.Margin.Right + $ui.FieldB.Margin.Left) + ' inner=' + $ui.Field.Width + '/' + $ui.FieldBox.Width + ' tick=' + $ui.TickP.Margin.Left)
-    Write-Host ('WIN mid header logo=' + ($ui.Logo.Margin.Top + $ui.Logo.Height / 2.0) + ' word=' + (& $m $ui.WordL) + "`n" + 'WIN mid approw shown=' + $ui.AppRow.Shown + ' link=' + $ui.LinkLine.Shown + ' applogo=' + $(if ($ui.AppLogo) { $ui.AppLogo.Margin.Top + $ui.AppLogo.Height / 2.0 } else { 'none' }) + ' app=' + (& $m $ui.AppL) + ' name=' + $ui.AppL.Text + ' logoname=' + $(if ($ui.AppLogo) { $ui.AppLogo.AccessibleName } else { 'none' }))
+    Write-Host ('WIN mid header logo=' + ($ui.Logo.Margin.Top + $ui.Logo.Height / 2.0) + ' title=' + (& $m $ui.TitleCol) + ' word-in-title=' + [object]::ReferenceEquals($ui.WordL.Parent, $ui.TitleCol) + ' ink-left=' + ($ui.WordL.Margin.Left + (& $ui.Ink $ui.WordL)) + ',' + ($ui.AppL.Margin.Left + (& $ui.Ink $ui.AppL)) + "`n" + 'WIN mid approw shown=' + $ui.AppRow.Shown + ' link=' + $ui.LinkLine.Shown + ' applogo=' + $(if ($ui.AppLogo) { $ui.AppLogo.Margin.Top + $ui.AppLogo.Height / 2.0 } else { 'none' }) + ' app=' + (& $m $ui.AppL) + ' name=' + $ui.AppL.Text + ' logoname=' + $(if ($ui.AppLogo) { $ui.AppLogo.AccessibleName } else { 'none' })); Show-RadeTick
     $bc = @($ui.Body.Controls); $tc = @($ui.Tail.Controls)
     Write-Host ('WIN hand-order address-above-lines=' + ($bc.IndexOf($ui.FieldRow) -lt $bc.IndexOf($ui.Guide)) + ' lines-above-path=' + ($bc.IndexOf($ui.Guide) -lt $bc.IndexOf($ui.PathL) -and $bc.IndexOf($ui.PathL) + 1 -eq $bc.IndexOf($ui.PathT)) + ' path-above-links=' + ($bc.IndexOf($ui.PathT) -lt $bc.IndexOf($ui.LinkRow)) + ' closing-above-buttons=' + ($tc.IndexOf($ui.Close) + 1 -eq $tc.IndexOf($ui.BtnRow)) + ' closing-gap=' + $ui.BtnRow.Margin.Top)
     Write-Host ('WIN F tokens=' + ((@($ui.F.Keys) | Sort-Object) -join ',') + ' mono-only-in-record=' + [bool]([object]::ReferenceEquals($ui.RecText.Font, $ui.F.Mono) -and -not @($ui.F.Keys | Where-Object { $_ -ne 'Mono' -and $ui.F[$_].Name -eq 'Consolas' }).Count) + ' sent=' + $ui.F.Sent.Name + $ui.F.Sent.SizeInPoints + ' body=' + $ui.F.Body.Name + $ui.F.Body.SizeInPoints + ' small=' + $ui.F.Small.SizeInPoints + ' smallb=' + $ui.F.SmallB.Name + $ui.F.SmallB.SizeInPoints + ' help=' + $ui.Help.Font.SizeInPoints + ' kick=' + $ui.Kick.Font.Name + ' label=' + $ui.FieldL.Font.Name + ' plainbtn=' + $ui.B[1].Font.Name + ' link=' + $ui.CopyPathB.Font.Name + ' lastlog=' + $ui.LastLog.Font.Name)
@@ -181,7 +200,7 @@ function global:Push-RadeButton([string]$Text) {
     # A row that wraps: the check box alone on the second line is aligned on its own line; on the first line it is not.
     $wrap = @(& $ui.RowBad 'fixture' 'TestRow' @(@{ N = 'TestL'; Top = 10; H = 18; Line = 0; Kind = 'other' }, @{ N = 'ToBoxF'; Top = 4; H = 30; Line = 0; Kind = 'box' }, @{ N = 'OkBox'; Top = 48; H = 20; Line = 38; Kind = 'other' }))
     $wbad = @(& $ui.RowBad 'fixture' 'TestRow' @(@{ N = 'TestL'; Top = 10; H = 18; Line = 0; Kind = 'other' }, @{ N = 'ToBoxF'; Top = 4; H = 30; Line = 0; Kind = 'box' }, @{ N = 'OkBox'; Top = 48; H = 20; Line = 0; Kind = 'other' }))
-    Write-Host ('WIN rule wrapped=' + $wrap.Count + ' one-line=' + $wbad.Count + ' ~ ' + ($wbad -join ' ~ '))
+    Write-Host ('WIN rule wrapped=' + $wrap.Count + ' one-line=' + $wbad.Count + ' ~ ' + ($wbad -join ' ~ ')); Show-RadeR29bRules
     foreach ($b in $ui.B) { if ($b.Shown -and $b.Text -in 'Copy summary', 'Copy the log') { $b.PerformClick() } }
     Write-Host ('WIN copied=' + [bool]([RadeStub.Driver]::Clip -match 'Application: ') + ' note=' + $ui.Note.Text)
     if ($ui.TestRow.Shown) { $ui.DraftB.PerformClick(); Write-Host ('WIN draft-note=' + $ui.Note.Text) }
