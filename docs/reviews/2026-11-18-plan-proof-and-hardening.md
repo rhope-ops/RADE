@@ -36,8 +36,8 @@ R32 on engine-v20 (18 Nov 26; rhope-ops/90-161.Z docs/reviews/2026-11-18-r32-res
 | 2.2 Bundle hash | [docs/specs/bundle-hash.md](../specs/bundle-hash.md): one short hash on the page and on the bundle's first screen. | Agent | Built and released 2026-11-18 (engine-v21 = b005bad; the page is live; the Administrator took all five RECs). Open: the round of stage 1 proves the paste; then the bundle's stop on a mismatch (R6) goes on |
 | 2.3 Tagged releases on the page | The page serves an app's tagged release, not `main`, with a "previous version" choice: a merge is then not a release, and a rollback is one click. | Agent (page), app session (tags) | Decided 2026-11-18 (Q4: yes, as a separate step). Not built |
 | 2.4 Remove Bypass | If stage 1 shows `[ran]`: take `-ExecutionPolicy Bypass` out of the 4 places (04-steps.ps1, 07-checks.ps1, 05-installed.ps1, window/07-run.ps1), no fallback; the probe goes with it. One engine release, one round. | Agent | Waits for stage 1 |
-| 2.5 Release number guard | release.yml compares `ENGINE_RELEASE` with the tag. | Agent | **Decide** (guard file) |
-| 2.6 Code signing | Ask whether a DoD code-signing certificate can be had (the brief asks it). | The Administrator | Open |
+| 2.5 Release number guard | release.yml compares `ENGINE_RELEASE` with the tag. | Agent | Decided 19 Nov 26: build it (lane C) |
+| 2.6 Code signing | Ask whether a DoD code-signing certificate can be had (the brief asks it). | The Administrator | Decided 19 Nov 26: no certificate; the hash display stays |
 
 ## Stage 3: code (failures must not vanish)
 
@@ -66,9 +66,9 @@ One or two items for each engine release, in this order. Each has a test before 
 
 | Item | What | State |
 |---|---|---|
-| 5.1 Diagnose | First of the four missing maintenance run types: "is my install healthy" for files, the site record and, through the app's steps, its flows | **Decide**: the function list (handoff item 8) |
+| 5.1 Diagnose | First of the four missing maintenance run types: "is my install healthy" for files, the site record and, through the app's steps, its flows | Decided 19 Nov 26: 4 checks (files, lists and columns, flows, rights); fix step plus repair offer (DECISIONS) |
 | 5.2 Uninstall, Restore, Back up | The undo that makes a deploy safe at another unit | After 5.1 |
-| 5.3 Feedback inside the boundary | When the results e-mail ends, no failure at another unit reaches the owner. Design a results row on a list of the owner's own site, inside DoD365 (the boundary rule allows it) | **Decide**: design first |
+| 5.3 Feedback inside the boundary | When the results e-mail ends, no failure at another unit reaches the owner. Design a results row on a list of the owner's own site, inside DoD365 (the boundary rule allows it) | Decided 19 Nov 26: Teams team RHOPE-OPS; design next |
 | 5.4 Flow ownership | A flow belongs to the account that imported it, and only the installing account can update (docs/engine.md "Guardrails"). Add a hand step "add a second owner", and a way for a new person to take over an install | App session; RADE: the take-over path with 5.1 |
 | 5.5 Flow health after import | A check that the flow is on and its connections are valid | App session (step), RADE (shows it) |
 | 5.6 Drift check | docs/drift-check.md: also the place to see a data-policy change that turns a flow off. The ISSM sees the field list first | Handoff items 4 and 7 |
@@ -78,11 +78,11 @@ One or two items for each engine release, in this order. Each has a test before 
 | Item | What | State |
 |---|---|---|
 | 6.1 A second person | 2 or 3 people paste and run with no help from the owner; record where each one stops | The Administrator, after stage 1 |
-| 6.2 A second app | The smallest planned app, to test "RADE knows a platform, never an app's objects" | **Decide**: which app |
-| 6.3 A second maintainer | A second account with review rights, and a one-page take-over document | **Decide** |
+| 6.2 A second app | The smallest planned app, to test "RADE knows a platform, never an app's objects" | Decided 19 Nov 26: after the 90-161.Z pilot |
+| 6.3 A second maintainer | A second account with review rights, and a one-page take-over document | Decided 19 Nov 26: plan it |
 | 6.4 Repo access review | Each quarter, recorded in docs/DECISIONS.md (STIG APSC-DV-003000) | Agent, first on 2027-02-18 |
-| 6.5 A second channel | If the work proxy blocks the page's host, no install is possible. Decide whether a copy on a SharePoint page is wanted | **Decide** |
-| 6.6 Release rhythm | Agent REC: one engine release for each device round, so each release has a device result | **Decide** |
+| 6.5 A second channel | If the work proxy blocks the page's host, no install is possible. Decide whether a copy on a SharePoint page is wanted | Decided 19 Nov 26: a copy of the existing page, hosted by the Administrator |
+| 6.6 Release rhythm | Agent REC: one engine release for each device round, so each release has a device result | Decided 19 Nov 26: accepted |
 
 ## Not taken
 
