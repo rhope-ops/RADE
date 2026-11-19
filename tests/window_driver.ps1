@@ -22,6 +22,18 @@ else { Add-Type -TypeDefinition ([System.IO.File]::ReadAllText($env:RADE_T_STUB)
 function Start-Process { param($FilePath, $ArgumentList, $WorkingDirectory) Write-Host ('WIN start-process ' + $(if ($FilePath -match '^https://') { 'browser' } else { [string]$FilePath })) }
 [RadeStub.Driver]::RunThrows = ($env:RADE_T_LOOP -eq '1'); if ($env:RADE_T_SCALE -eq '150') { [RadeStub.Driver]::FormDpi = 144 }
 $global:RadeT = @{ Long = @{}; Min = $false; Seen = ''; App = [int]$env:RADE_T_APP; Hand = [string]$env:RADE_T_HAND; Record = ($env:RADE_T_RECORD -eq '1'); Forced = $false; Opened = $false; Tour = ($env:RADE_T_TOUR -eq '1'); Esc = $false; Again = $false; SignIn = $false }
+# R34: a pasted block goes into the one-line answer box as one line ($ui.PasteLine), cut to the room that is left
+# ($ui.OneLine). Takes nothing; prints the line "WIN paste".
+function global:Test-RadePaste {
+  $ui.Field.Multiline = $false; $ui.Field.ReadOnly = $false; [RadeStub.Driver]::Clip = "line one`r`n  line two`n"; $pl = & $ui.PasteLine $ui.Field
+  Write-Host ('WIN paste ok=' + $pl + ' text=' + $ui.Field.SelectedText + ' cut=' + (& $ui.OneLine ('x' * 20) 5) + ' joined=' + (& $ui.OneLine "a`tb`r`n`r`nc" 100)) }
+# R33: a check result that comes while the Record is open shows, with its detail also when it passed; Copy all gives the
+# whole Record. Takes nothing; prints the line "WIN record-copy" and puts the check's result back.
+function global:Test-RadeRecordCopy {
+  $cid = [string]@($script:appChecks)[0]; $was = $script:checkResults[$cid]; $script:checkResults[$cid] = @{ State = 'PASSED'; Detail = 'R33 detail probe'; Fix = '' }; & $ui.RecRefresh
+  $ui.RecCopy.PerformClick(); $cl = [string][RadeStub.Driver]::Clip; $nm = [string]$ui.RecChecks.Values['AccessibleName']
+  Write-Host ('WIN record-copy btn=' + $ui.RecCopy.Text + ' checks=' + ($cl -match '(?m)^CHECKS') + ' detail=' + ($cl -match '(?m)^      R33 detail probe') + ' steps=' + ($cl -match '(?m)^  \[[x ]\] ') + ' text=' + ($cl -match 'Files this round saves') + ' name=' + ($nm -match 'R33 detail probe'))
+  $script:checkResults[$cid] = $was; & $ui.RecRefresh }
 function global:Show-RadeCard {
   $ps = @($ui.P | Where-Object { $_.Shown } | ForEach-Object { $_.Text }) -join ' / '
   $bs = @($ui.B | Where-Object { $_.Shown } | ForEach-Object { $(if ($_.Enabled) { '[' } else { '(' }) + $_.Text + $(if ($_.Enabled) { ']' } else { ')' }) }) -join ' '
@@ -140,7 +152,7 @@ function global:Step-RadeR31([string]$V) {
   if ($V -eq 'answerfail') { $ui.ErrBox.Text = 'The page said: error 42 at https://usaf.dps.mil/sites/fake/x'; Push-RadeButton 'Continue'; return $true }
   if ($V -eq 'feedback') {   # L3: its label is above its box
     Write-Host ('WIN feedback max=' + $ui.Field.Values['MaxLength'] + ' enter=' + $ui.Form.Values['AcceptButton'].Text + ' focus=' + $ui.Field.Focused)
-    $ui.Field.Text = $(if ($env:RADE_T_FEEDBACK) { [string]$env:RADE_T_FEEDBACK } else { '' }); Push-RadeButton 'Continue'; return $true }
+    Test-RadePaste; $ui.Field.Text = $(if ($env:RADE_T_FEEDBACK) { [string]$env:RADE_T_FEEDBACK } else { '' }); Push-RadeButton 'Continue'; return $true }
   if ($V -eq 'ready' -and $env:RADE_T_WALK -eq '1') {
     # Help (F1) opens the tour from a card; its end shows that card again (the calls nest here, so the second visit of this card prints the result).
     if ($global:RadeT.Helped -and -not $global:RadeT.HelpBack) { $global:RadeT.HelpBack = $true; Write-Host ('WIN help link=' + $global:RadeT.HelpLink + ' name=' + $ui.TourB.Text + ' back-on=' + $ui.View + ' same=' + ($ui.Sent.Text -eq $global:RadeT.HelpSent) + ' seen=' + (Test-TourSeen)) }
@@ -216,7 +228,7 @@ function global:Push-RadeButton([string]$Text) {
       $lab = @($ui.RecSteps.Controls | Where-Object { $_ -is [System.Windows.Forms.Label] })[0]
       Write-Host ('WIN measure record box=' + $boxes[0].Margin.Left + ',' + $boxes[0].Margin.Top + ' label=' + $lab.Margin.Left + ',' + $lab.Margin.Bottom + ' rows=' + (& $ui.RecPlan 400).Tall + ' one-line=' + (-not $boxes[0].AutoSize -and -not $boxes[0].Values.ContainsKey('AutoEllipsis')))
       Write-Host ('WIN record on=' + $ui.RecOn + ' rows=' + @($ui.RecData).Count + ' boxes=' + $boxes.Count + ' enabled=' + $boxes[0].Enabled + ' text=' + [bool]($ui.RecText.Text -match 'Files this round saves') + ' name=' + [bool]($ui.RecChecks.Values['AccessibleName'] -match 'PASSED') + ' reused=' + (@($ui.RecData | Where-Object { $_.Name -match '^PowerShell is version' })[0].More -join ' / ') + ' tall=' + ($ui.RecChecks.Height -gt 100) + ' box-text=' + (($boxes | ForEach-Object { $ui.Full[$_] }) -join '|') + ' box-name=' + ($boxes[1].Values['AccessibleName'] -replace '\. .*$', ''))
-      $ui.Form.Key('Next'); Write-Host ('WIN paged=' + $ui.RecScroll.Values['AutoScrollPosition'].Y); $ui.Form.Key('Prior')   # the names Windows gives Page Down and Page Up
+      Test-RadeRecordCopy; $ui.Form.Key('Next'); Write-Host ('WIN paged=' + $ui.RecScroll.Values['AutoScrollPosition'].Y); $ui.Form.Key('Prior')   # the names Windows gives Page Down and Page Up
       foreach ($b in $boxes) { if ([int]$b.Tag -lt 0) { $b.Checked = $false } }
       $ui.Form.Key('Escape'); Write-Host ('WIN record on=' + $ui.RecOn + ' clean=' + $ui.Clean)
     }

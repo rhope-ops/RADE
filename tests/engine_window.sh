@@ -31,7 +31,7 @@ RADE_T_STUB="$PWD/tests/window_stub.cs" RADE_T_STUB_OUT="$t/window_stub.dll" pws
 # 1. A first deploy: boot, choose with the newer-version notice, ready, the Record (boxes can change, Clean-up off), the hand step, done.
 win 1 done 1 0; cp -a "$wd/u" "$t/wseed"; : > "$t/wseed.done"   # the seed of W2 and W3 (wgo)
 has "view=boot" "view=choose light=off kick= sent=Which application do you want to install?" "2 Sample app (deploy) 1.0.0 NOTE Version 9.0.0 is on the RADE page" "view=ready light=off kick=ALL 8 CHECKS PASSED sent=Ready to install Sample app (deploy) 1.0.0." \
-  "WIN record on=True rows=10 boxes=5 enabled=True text=True name=True reused=Last check: 14 Nov 26 / Version [5.1] tall=True" "WIN paged=" "WIN record on=False clean=False" "view=hand light=your turn kick=STEP 2 OF 3 · YOUR TURN sent=Import the sample flow" "btn=[Imported] [It failed] [Skip]" \
+  "WIN record on=True rows=10 boxes=5 enabled=True text=True name=True reused=Last check: 14 Nov 26 / Version [5.1] tall=True" "WIN record-copy btn=Copied checks=True detail=True steps=True text=True name=True" "WIN paged=" "WIN record on=False clean=False" "view=hand light=your turn kick=STEP 2 OF 3 · YOUR TURN sent=Import the sample flow" "btn=[Imported] [It failed] [Skip]" \
   "view=done light=off kick=ALL STEPS PASSED sent=Sample app (deploy) 1.0.0 is installed. p=Nothing was sent." "btn=[Start Sample app (deploy)] [Close] [Record] [Open results folder] [Copy summary]" "WIN made=True log=True locked=True" "WIN copied=True" && ! grep -q "foot=Site\|Change the site address" "$wd/win.txt" && ok || { bad "window 1: first deploy"; tail -5 "$wd/win.txt" | cut -c1-300; }
 # 1a. The polish pass of 17 Nov (docs/window-design.md "Type", "Cards"): the manifest title is what the window shows (the hand card's
 # headline, the step line of a run, the Record's step boxes and their accessible names, the foot of the Run card), a step with no title shows
@@ -68,7 +68,7 @@ rn="$wd/u/test1234/OneDrive - United States Air Force/RADE/rade-runner.ps1"
 # The layout line and the SCALE line at 100 %; the sizes RADE sets after the form has scaled, at 100 % (the same numbers as
 # before the one scale source: tests/window_driver.ps1 "WIN measure").
 has "WIN restored=Normal taskbar=True minbox=True shown-by=Run" "WIN layline=Layout self-check: PASS layout, 0 cards (1216 x 684 at 100 %) ~ SCALE dpiX=96 deviceDpi=n/a mode=Dpi asd=96x96 autoScale=96x96 font=17 fontPt=10 fontScale=1 ctlScale=1 realDpi=n/a aware=n/a screen=1280x800 work=1280x720 client=1216x684 state=Normal logo=64x64 btn=400x40" \
-  "WIN measure choice h=110 gap=8 plan-x=54" "WIN measure record box=5,4 label=5,6 rows=268" && ok || { bad "window 1c: restore, taskbar, the scale line"; grep "restored=\|layline=" "$wd/win.txt" | cut -c1-300; }
+  "WIN measure choice h=110 gap=8 plan-x=54" "WIN measure record box=5,4 label=5,6 rows=451" && ok || { bad "window 1c: restore, taskbar, the scale line"; grep "restored=\|layline=\|WIN measure record" "$wd/win.txt" | cut -c1-300; }
 # 1d. Polish after the R24 pictures (docs/window-design.md "Sizes"): the header and the label-box-button rows share one
 # midpoint within 1 px (from margins and sizes; an odd height gives a half pixel; the stand-ins have no layout), a box is as tall as a compact button, gaps of 8; the
 # question headline is the prompt's first sentence (one sentence: no body line; two: the rest is the body line, 1b) and a
@@ -90,7 +90,7 @@ has "WIN mid hand label=18.5 box=19 button=19 box-h=30 button-h=30 gaps=8,8 inne
 # "..." (R24 job: "(needs you)" was cut to "(ne"), shortened by RADE (no AutoEllipsis: no tooltip); the click guard runs on a
 # monotonic clock (a reference "in the future", as after the clock stepped back, never blocks; 401 ms after a card the click
 # is taken, 100 ms after it is not); long words break by text element (a surrogate pair stays whole) and in body lines too.
-has "WIN measure record box=5,4 label=5,6 rows=268 one-line=True" "WIN guard held=True then=Yes" "WIN break=abc|def|ghi|j word-bad=LAYOUT fixture P0 text: the word \"abcdefghij\" needs 70, the line is 50 word-ok=True" && ok || { bad "window 1f: click guard, long words"; grep "WIN guard\|WIN break" "$wd/win.txt" | cut -c1-300; }
+has "WIN measure record box=5,4 label=5,6 rows=451 one-line=True" "WIN guard held=True then=Yes" "WIN break=abc|def|ghi|j word-bad=LAYOUT fixture P0 text: the word \"abcdefghij\" needs 70, the line is 50 word-ok=True" && ok || { bad "window 1f: click guard, long words"; grep "WIN guard\|WIN break" "$wd/win.txt" | cut -c1-300; }
 # 1g. Second review of 9d71b28: the click guard on a monotonic clock, breaks by text element and in body lines, and a step
 # name shortened by RADE with "..." (no AutoEllipsis).
 has "WIN clock future=True after400=True within=False" && ok || { bad "window 1g: monotonic click guard"; grep "WIN clock" "$wd/win.txt"; }
@@ -190,7 +190,7 @@ has "view=answer light=your turn kick=STEP 4 OF 4 · QUESTION 1 OF 2 sent=What d
 # R32 (the Administrator, 2026-11-18): no middle dot after "RADE is working...": a space, then the number.
 grep -q "right=RADE is working\.\.\. [0-9]" "$wd/win.txt" && ! grep -q "is working\.\.\. ·" "$wd/win.txt" && ok || bad "r32: the state text has a mark after 'RADE is working...'"
 # L4: the last card of a test round (after the last step); its text is in the report under its own line, masked. L5: the 2 state texts.
-has "view=feedback light=your turn kick=LAST QUESTION sent=Anything else about this round or the app? p=This is optional. Do not type names or addresses. btn=[Continue]" "right=Your turn." "WIN feedback max=2000 enter=Continue focus=True" 'foot=RADE asks you one last question at the end. Until then, keep this window open.' &&
+has "view=feedback light=your turn kick=LAST QUESTION sent=Anything else about this round or the app? p=This is optional. Do not type names or addresses. btn=[Continue]" "right=Your turn." "WIN feedback max=10000 enter=Continue focus=True" "WIN paste ok=True text=line one line two cut=xxxxx joined=a b c" 'foot=RADE asks you one last question at the end. Until then, keep this window open.' &&
   grep -q "^Other feedback: The second card was slow. Mail <EMAIL>" "$wr" && ! grep -q "someone@\|RADE is waiting for you" "$wd/win.txt" "$wr" && [ "$(cat $engine_src engine/rade_ui.ps1 | grep -c "RADE is waiting for you")" = 0 ] && ok || { bad "r31 L4, L5: the last card, its report line, the state texts"; grep "view=feedback\|Other feedback\|foot=" "$wd/win.txt" "$wr" | cut -c1-260; }
 # L7: the now-doing line shows the step's "doing", then a plain sentence for each result line, and a NOW line; none of them is in the log.
 # The Administrator, 2026-11-19: each ends with "...", a long one is cut to 2 lines, and the line keeps one height (Cancel does not move).
