@@ -10,7 +10,7 @@ $ui.RunBase = {
   try {
     foreach ($id in $ui.BaseIds) {
       if ($ui.Form.IsDisposed -or $script:closing) { return }
-      $i++; $d = Get-CheckDef $id; $ui.RightL.Text = $ui.Words.Work + ' Check ' + $i + ' of ' + $ui.BaseIds.Count
+      $i++; $d = Get-CheckDef $id; $ui.RightL.Text = 'Check ' + $i + ' of ' + $ui.BaseIds.Count
       $r = Get-CheckToRun $d $cache $bp $site $false
       if (-not $r) { $r = Invoke-Check $d $bp $site { [System.Windows.Forms.Application]::DoEvents() } }
       $ui.BaseRes[$id] = $r; & $ui.RecRefresh   # an open Record shows the new result
@@ -38,7 +38,7 @@ $ui.VBootErr = { param([string]$Why)
 # first application and sets the card.
 $ui.VChoose = {
   if (@($apps).Count -eq 0) { & $ui.VNoApps; return }
-  Select-App 0; $ui.Picked = $false; $ui.Plan = $null; $ui.StartAfter = $false; $ui.AppL.Text = ''; & $ui.ShowAppRow $false; $list = @(); $dep = $false; $ui.Blocked = @{}; $ui.BlockedFix = @{}
+  Select-App 0; $ui.Picked = $false; $ui.Plan = $null; $ui.StartAfter = $false; $ui.AppL.Text = $ui.Tagline; & $ui.ShowAppRow $true; $list = @(); $dep = $false; $ui.Blocked = @{}; $ui.BlockedFix = @{}
   for ($j = 0; $j -lt $apps.Count; $j++) { foreach ($id in @($apps[$j].Checks)) { $r = $ui.BaseRes[$id]; if ($r -and $r.State -eq 'FAILED') { $ui.Blocked[$j] = ((Get-CheckDef $id).Name + ': ' + $r.Detail); $ui.BlockedFix[$j] = $(if ($r.Fix) { 'What to do: ' + $r.Fix } else { '' }); break } } }
   for ($j = 0; $j -lt $apps.Count; $j++) {
     $a = $apps[$j]; if ([string]$a.Mode -eq 'deploy') { $dep = $true }
@@ -55,7 +55,7 @@ $ui.VChoose = {
 # Shows "Checking this computer", runs the base checks and then shows Choose; shows the error card when they stop. Takes
 # nothing.
 $ui.Boot = {
-  & $ui.SetCard @{ View = 'boot'; Sentence = 'Checking this computer.'; P = @('This takes a few seconds. Nothing is changed.'); Right = $ui.Words.Work }
+  & $ui.SetCard @{ View = 'boot'; Sentence = 'Checking this computer.'; P = @('This takes a few seconds. Nothing is changed.') }
   try { & $ui.RunBase } catch { if (-not ($ui.Form.IsDisposed -or $script:closing)) { & $ui.VBootErr (ConvertTo-Masked ([string]$_.Exception.Message)) }; return }
   if ($ui.Form.IsDisposed -or $script:closing) { return }
   if (Test-TourSeen) { & $ui.VChoose } else { $ui.TourFrom = $null; & $ui.VTour 0 } }   # L6: the tour comes one time, before the first Choose
@@ -64,7 +64,7 @@ $ui.Boot = {
 # Choose (RADE\Config\rade-tour.txt), and again from "Help (F1)". S = the headline of a card, P = its paragraphs.
 $ui.TourCards = @(
   @{ S = 'RADE installs and tests applications on this computer.'; P = @('You choose an application. RADE checks this computer, then does the work as a list of steps.', 'A test of an application is called a round.') },
-  @{ S = 'RADE does most steps. Some steps are yours.'; P = @('"RADE is working..." at the bottom right: RADE does a step. Keep the window open.', '"Your turn." and a yellow line at the top: RADE waits for you. The card says what to do.') },
+  @{ S = 'RADE does most steps. Some steps are yours.'; P = @('A percent at the bottom right: RADE does a step. Keep the window open.', 'A yellow line at the top: RADE waits for you. The card says what to do.') },
   @{ S = 'A step that you do has up to three answers.'; P = @('"Done": you did the step and it worked.', '"It failed": the step did not work. RADE then asks what the error said.', '"Skip": you did not do the step. A card shows only the answers that fit its step.') },
   @{ S = 'The results stay on this computer.'; P = @('RADE writes a report into its results folder. RADE sends nothing.', 'After a test round RADE makes an e-mail draft with the results. You read it, and you send it.') },
   @{ S = 'The Record shows everything.'; P = @('Select "Record" or press F2 to see all checks, steps, files and the log.', 'Select "Help" or press F1 to see this tour again.') })
@@ -99,7 +99,7 @@ $ui.ShowAppRow = { param([bool]$On)
   $ui.LinkLine.Visible = ($On -and $ui.Logo -and $ui.AppLogo)
   & $ui.FitHead; & $ui.AlignRow (& $ui.RowParts 'Top') 0   # the title column is taller with its subtitle: the RADE row is centered again
   try { $ui.Form.PerformLayout() } catch { $null = $_ }   # no form yet (text mode): nothing to lay out
-  if ($ui.AppLogo) { $ui.AppLogo.AccessibleName = $(if ($On) { $script:app.Name + ' logo' } else { 'Application logo' }) } }
+  if ($ui.AppLogo) { $ui.AppLogo.AccessibleName = $(if ($On -and $ui.Picked) { $script:app.Name + ' logo' } else { 'Application logo' }) } }
 # Takes the application the user chose: selects it, reuses base check results that can be reused, and shows Maintenance
 # (already installed) or the checks. Takes the application number.
 $ui.Pick = { param([int]$J)
@@ -151,7 +151,7 @@ $ui.Checks = { param([bool]$Force)
   if ((& $ui.NeedSite) -and -not (Test-SiteUrl $site)) { & $ui.VSite; return }
   $ids = @($script:appChecks); $cache = Read-CheckCache; $script:savedWhy = @{}
   $ui.Cancel = $false
-  & $ui.SetCard @{ View = 'checking'; Sentence = 'Checking this computer and your access.'; P = @('Read-only. Nothing is changed.'); Right = $ui.Words.Work; Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { & $ui.CancelChecks } }) }
+  & $ui.SetCard @{ View = 'checking'; Sentence = 'Checking this computer and your access.'; P = @('Read-only. Nothing is changed.'); Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { & $ui.CancelChecks } }) }
   & $ui.SetBar 'all' 0 $true; $ui.Bars['all'].Fill = $ui.C.Blue; $ui.Busy = $true
   try {
     for ($i = 0; $i -lt $ids.Count; $i++) {
@@ -162,7 +162,7 @@ $ui.Checks = { param([bool]$Force)
       if ($have -and -not $Force) { continue }
       $sv = Get-CheckToRun $d $cache $bp $site $Force
       if ($sv) { $script:checkResults[$id] = $sv; & $ui.RecRefresh; continue }
-      $ui.P[0].Text = [string]$d.Name; $ui.RightL.Text = $ui.Words.Work + ' Check ' + ($i + 1) + ' of ' + $ids.Count; & $ui.SetBar 'all' ($i / [math]::Max(1, $ids.Count)) $true
+      $ui.P[0].Text = [string]$d.Name; $ui.RightL.Text = 'Check ' + ($i + 1) + ' of ' + $ids.Count; & $ui.SetBar 'all' ($i / [math]::Max(1, $ids.Count)) $true
       [System.Windows.Forms.Application]::DoEvents()
       $script:checkResults[$id] = Invoke-Check $d $bp $site { [System.Windows.Forms.Application]::DoEvents() }
       if ($ui.BaseRes.ContainsKey($id)) { $ui.BaseRes[$id] = $script:checkResults[$id] }   # Choose shows the newest result of a base check

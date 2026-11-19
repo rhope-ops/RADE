@@ -47,6 +47,9 @@ $ui.AppLogo = & $ui.LogoPic $appLogoPng 'Application logo'; if ($ui.AppLogo) { [
 $ui.AppUnder = -not $ui.AppLogo
 $ui.AppL = & $ui.InkText $ui.F.Small $ui.C.Gray 'Application' $true; $ui.AppL.Margin = (& $ui.Pad 0 $(if ($ui.AppUnder) { $ui.Z.G1 } else { 0 }) 0 0)   # a long name and version: cut with "..."; its widest size follows the window ($ui.Fit)
 if ($ui.AppUnder) { [void]$ui.TitleCol.Controls.Add($ui.AppL) } else { [void]$ui.AppRow.Controls.Add($ui.AppL) }
+# Boot looks like a chosen application (the Administrator, 2026-11-19): from the first frame the tagline stands where the
+# name will stand, in the same style, and the logo block has its full height; a chosen application's name replaces it.
+$ui.AppL.Text = $ui.Tagline; $ui.AppL.Visible = $true; if ($ui.AppUnder) { $ui.HeadRule.Visible = $true } else { $ui.AppRow.Visible = $true; $ui.LinkLine.Visible = [bool]$ui.Logo }
 foreach ($c in @($ui.TopRow, $ui.LinkLine, $ui.AppRow)) { [void]$ui.Top.Controls.Add($c) }
 $ui.Bottom = New-Object System.Windows.Forms.TableLayoutPanel
 $ui.Bottom.Dock = 'Bottom'; $ui.Bottom.Height = 46; $ui.Bottom.AutoSize = $true; $ui.Bottom.AutoSizeMode = 'GrowAndShrink'; $ui.Bottom.MinimumSize = New-Object System.Drawing.Size(0, 46); $ui.Bottom.ColumnCount = 5; $ui.Bottom.RowCount = 1; $ui.Bottom.Padding = (& $ui.Pad 28 3 32 3); $ui.Bottom.BackColor = $ui.C.White
