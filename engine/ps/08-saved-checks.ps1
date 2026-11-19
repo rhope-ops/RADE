@@ -9,7 +9,11 @@
 $checkMaxDays = 7
 # Checks whose answer can change between two runs on the same day always run (review R17 MAJOR 2: "Word is open" blocks a
 # deploy, PFM 14 Nov 26 1B; free space; a test file in OneDrive).
-$checkNoSave = @('nipr', 'ps', 'lang', 'child', 'word', 'disk', 'write')   # ps, lang and child from engine-v21: the rule above was not kept before (docs/engine.md "Results")
+$checkNoSave = @('nipr', 'word', 'disk', 'write')
+# Fast checks that are not saved in the file either, so each run of RADE makes them once (docs/engine.md "Results": fast
+# checks run fresh; from engine-v21, before it they were reused for 7 days). Their answer holds for one run of RADE, so the
+# window does not make them a second time after Choose, as it does for $checkNoSave (window/06-open.ps1).
+$checkEachRun = @('ps', 'lang', 'child')
 # Gives the first 6 bytes (12 hex characters) of the SHA-256 of the text, lower case and without a trailing "/". Takes
 # the text; gives back the hash, or an empty text for no text.
 function Get-ShortHash([string]$Text) {
@@ -56,7 +60,7 @@ function Get-CheckAge([string]$At) {
 }
 function Get-SavedCheck($Cache, [string]$Id, [string]$Scope) {
   # The saved result to use, or $null (with the reason in $script:savedWhy[$Id] when one was found but is too old).
-  if ($checkNoSave -contains $Id) { return $null }
+  if (($checkNoSave + $checkEachRun) -contains $Id) { return $null }
   $c = $Cache[$Id]
   if (-not $c -or $c.State -ne 'PASSED' -or $c.Scope -ne $Scope) { return $null }
   $age = Get-CheckAge $c.At
@@ -79,7 +83,7 @@ function Save-CheckCache($Results, [string]$Base, [string]$Site) {
     foreach ($id in @($Results.Keys)) {
       $r = $Results[$id]
       if ($r.Saved) { continue }   # a saved result keeps its first date
-      if ($checkNoSave -contains $id) { if ($keep.ContainsKey($id)) { $keep.Remove($id) }; continue }
+      if (($checkNoSave + $checkEachRun) -contains $id) { if ($keep.ContainsKey($id)) { $keep.Remove($id) }; continue }
       if ($r.State -eq 'PASSED') {
         $keep[$id] = [ordered]@{ state = 'PASSED'; detail = (ConvertTo-Masked ([string]$r.Detail)); at = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture); scope = (Get-CheckScope $id $Base $Site) }
       } elseif ($keep.ContainsKey($id) -and $r.State -ne 'RUNNING') { $keep.Remove($id) }

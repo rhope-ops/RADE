@@ -9,7 +9,7 @@ Why this plan: on 2026-11-18 the build was ahead of its proof (18 engine release
 | Item | What | Proof |
 |---|---|---|
 | 0.1 Probe without Bypass | The child check ("RADE can run its scripts") runs its test script a second time with no `-ExecutionPolicy` setting and adds `, without Bypass [ran]` or `[blocked, exit code N]` to its detail. The result of the check does not change. The probe takes out the setting that a RADE started from its shortcut hands down to child processes, so its answer is the computer's own. | tests/engine_test.sh (one new line, with that setting handed down to every run); a device round, stage 1 |
-| 0.2 No-reconnaissance check | [scripts/no_recon.py](../../scripts/no_recon.py): a word search of the engine sources and the sample app in both check lanes; the app canary prints a NOTE line for each such word in a real app's built bundle. A word search, not a proof. | `NORECON files=26 hits=0`; self-test 18 found, 6 allowed |
+| 0.2 No-reconnaissance check | [scripts/no_recon.py](../../scripts/no_recon.py): a word search of the engine sources and the sample app in both check lanes; the app canary prints a NOTE line for each such word in a real app's built bundle. A word search, not a proof. | `NORECON files=27 hits=0`; self-test 18 found, 6 allowed |
 | 0.3 Security brief | Draft for the ISSM and other reviewers, a private Claude doc (not in this public repo). | The Administrator reads and sends it |
 
 ## Stage 1: the next device round (the Administrator runs it; the first 90-161.Z round on engine-v21 or later)
