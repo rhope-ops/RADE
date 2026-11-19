@@ -472,6 +472,11 @@
         "answersOnly": {
           "const": true,
           "description": "Guide steps only, with \"answers\": the window shows the step's first question at once, with no card that has Done, It failed and Skip. The step is PASSED when every question that shows is answered, or FAILED (reported by you) when an answer in a question's \"failOn\" is given. Such a step has no file, guide lines, address, marker, doneText, doneLog or hide. Text mode cannot ask: the step is SKIPPED there. docs/engine.md \"Step contract\"."
+        },
+        "doing": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional. What the step does, in the present tense (\"Making the lists.\"): the RADE window shows it under the step's bar while the step runs, until the step's first item line. 1 to 80 characters; longer is a build WARNING. docs/engine.md \"Step contract\"."
         }
       },
       "allOf": [

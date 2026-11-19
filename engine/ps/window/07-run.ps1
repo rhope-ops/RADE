@@ -3,8 +3,17 @@
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
 # ---- The run. Invoke-Round calls back: a log line ($ui.Say), a tick ($ui.Tick), a step that starts ($ui.OnStatus) and
-# a step that ends ($ui.OnStep). A step you do by hand comes in through $script:guideUi.
-$ui.Say = { param($t) Add-RunLog $t; $ui.Log.Add([string]$t); $x = ([string]$t).Trim(); if ($x -and $ui.View -eq 'run') { & $ui.Show $ui.LastLog (& $ui.BreakLong $x $ui.LastLog.Font (& $ui.GetWrap $ui.LastLog)) }; if ($ui.RecOn) { try { $ui.RecText.AppendText([string]$t + "`r`n") } catch { $null = $_ } }; try { [System.Windows.Forms.Application]::DoEvents() } catch { $null = $_ } }
+# a step that ends ($ui.OnStep). A step you do by hand comes in through $script:guideUi, what a step does now through
+# $script:nowUi, and the last question of a test round through $script:feedbackUi.
+$ui.Say = { param($t) Add-RunLog $t; $ui.Log.Add([string]$t); if ($ui.RecOn) { try { $ui.RecText.AppendText([string]$t + "`r`n") } catch { $null = $_ } }; try { [System.Windows.Forms.Application]::DoEvents() } catch { $null = $_ } }
+# L7 (the Administrator, 2026-11-19): the now-doing line under the step's bar. The engine calls this ($script:nowUi) with a
+# plain sentence for each item a step script reports (Get-NowText) and for a NOW line. Takes the text; '' hides the line.
+$ui.ShowNow = { param([string]$Text) try { if ($ui.View -eq 'run') { $x = $Text.Trim(); & $ui.Show $ui.Now $(if ($x) { & $ui.BreakLong $x $ui.Now.Font (& $ui.GetWrap $ui.Now) } else { '' }) } } catch { $null = $_ } }
+$script:nowUi = { param($t) $null = & $ui.ShowNow ([string]$t) }
+# L8 (the Administrator, 2026-11-19): a step stays on the Run card for $ui.Layout.StepMs (engine/window.json) at least, so a
+# run of fast steps does not flicker. Waits out the rest of that time since the step showed. Takes nothing.
+$ui.HoldStep = {
+  while ($ui.View -eq 'run' -and $null -ne $ui.StepAt -and -not $script:closing -and -not $ui.Form.IsDisposed -and ($ui.Clock.Elapsed.TotalMilliseconds - [double]$ui.StepAt) -lt [double]$ui.Layout.StepMs) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 15 } }
 # Draws the progress: both bars, the time in the step, the step fraction and the overall percent with the time left
 # (only when earlier runs give one). Takes nothing; does nothing when no step runs.
 $ui.Paint = {
@@ -15,7 +24,7 @@ $ui.Paint = {
   & $ui.ShowTime
   $fr = $(if ($script:prog.Frac -ge 0) { [string]$script:prog.FracText } else { '' }); if ($ui.StepFrac.Text -ne $fr) { $ui.StepFrac.Text = $fr }
   # R21 W6: a time left only when earlier runs give one; never "a guess".
-  $rt = [string][int]($g.All * 100) + ' %' + $(if ($g.Known) { $dot + 'about ' + [math]::Max(1, [int][math]::Ceiling($g.Left / 60)) + $(if ([math]::Ceiling($g.Left / 60) -le 1) { ' minute' } else { ' minutes' }) + ' left' } else { '' }); if ($ui.RightL.Text -ne $rt) { $ui.RightL.Text = $rt } }
+  $rt = $ui.Words.Work + $dot + [string][int]($g.All * 100) + ' %' + $(if ($g.Known) { $dot + 'about ' + [math]::Max(1, [int][math]::Ceiling($g.Left / 60)) + $(if ([math]::Ceiling($g.Left / 60) -le 1) { ' minute' } else { ' minutes' }) + ' left' } else { '' }); if ($ui.RightL.Text -ne $rt) { $ui.RightL.Text = $rt } }
 # The time in this step (R28 N10): "4m 12s"; with hours "1h 04m 12s".
 $ui.Elapsed = { param([double]$Sec) $q = [int][math]::Floor([math]::Max(0, $Sec)); $h = [int][math]::Floor($q / 3600); $m = [int][math]::Floor(($q % 3600) / 60); $x = $q % 60
   if ($h) { return ('{0}h {1:00}m {2:00}s' -f $h, $m, $x) }; return ('{0}m {1:00}s' -f $m, $x) }
@@ -30,16 +39,19 @@ $ui.TitleOf = { param([string]$Name) foreach ($s in @($steps)) { if ([string]$s.
 $ui.ShowRun = {
   & $ui.SetCard @{ View = 'run'; Kicker = $(if ($ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN } else { 'Starting' }); Sentence = $(if (Test-Deploy) { 'Installing ' + $script:app.Name + '.' } else { 'Running round ' + $round + '.' })
     StepRow = $true; Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { $ui.Form.Close() } })   # asks first while a step runs (the window's X does the same)
-    Foot = $(if (@($ui.Guides).Count) { 'RADE needs you next at "' + (& $ui.TitleOf $ui.Guides[0]) + '". Until then, keep this window open.' } else { 'Nothing is needed from you. Keep this window open.' }) }
+    Right = $ui.Words.Work
+    Foot = $(if (@($ui.Guides).Count) { 'RADE needs you next at "' + (& $ui.TitleOf $ui.Guides[0]) + '". Until then, keep this window open.' } elseif (-not (Test-Deploy) -and -not $ui.Asked) { 'RADE asks you one last question at the end. Until then, keep this window open.' } else { 'Nothing is needed from you. Keep this window open.' }) }
   $ui.StepName.Text = (& $ui.TitleOf $ui.StepNow); $null = & $ui.FitEdges; $null = & $ui.ShowTime }   # the edge follows the ink of the new text's first letter (titles start with any letter)
 # Invoke-Round calls this when a step starts: keeps its name, start and estimate, and moves the run card on.
 # Takes the step index, the step count, the name and the estimate.
 $ui.OnStatus = { param($i, $count, $name, $estimate)
+  $null = & $ui.HoldStep
   $script:statusBase = $name; $script:stepStart = Get-Date; $script:stepEst = $estimate
   if ($i -le 1) { $null = & $ui.SetBar 'all' 0 $true }
   $ui.StepI = [int]$i; $ui.StepN = [int]$count; $ui.StepNow = [string]$name
   if ($ui.View -ne 'run') { $null = & $ui.ShowRun } else { $ui.Kick.Text = ('Step ' + $i + ' of ' + $count).ToUpperInvariant(); $ui.StepName.Text = (& $ui.TitleOf $name); $null = & $ui.FitEdges }
   $null = & $ui.SetBar 'step' 0 $true; $ui.StepFrac.Text = ''; $null = & $ui.ShowTime
+  $doing = ''; foreach ($s in @($steps)) { if ([string]$s.Name -ceq [string]$name) { $doing = [string]$s.Doing } }; $null = & $ui.ShowNow $doing; $ui.StepAt = $ui.Clock.Elapsed.TotalMilliseconds   # L7: the step's own present-tense sentence, until its first item
   $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }
 # Called when a step ends: keeps its state word (DONE, PASSED, SKIPPED, ...) from the result line and redraws. Takes the
 # step number and its result line.
@@ -66,7 +78,7 @@ $ui.Run = {
     $d = $ui.Field.Text.Trim().Trim('"')
     if ($d -and -not (Test-Path -LiteralPath $d -PathType Container)) { & $ui.Say1 'That folder was not found. Select "Browse" to choose a folder, or empty the box for no shortcut.'; return }
     $ui.LinkDir = $d; $ui.FieldAsked = $true; if ($d) { Save-ShortcutDir $d } }
-  $dep = Test-Deploy; $ui.Running = $true; $ui.Summary = @(); $ui.Log.Clear(); $ui.StepState = @{}; $ui.StepI = 0; $ui.StepNow = ''; $ui.Edit = $false
+  $dep = Test-Deploy; $ui.Running = $true; $ui.Asked = $false; $ui.StepAt = $null; $ui.Summary = @(); $ui.Log.Clear(); $ui.StepState = @{}; $ui.StepI = 0; $ui.StepNow = ''; $ui.Edit = $false
   $to = ''; if (-not $dep) { $to = [string](Get-MailTo (Get-BasePath)); $ui.ToBox.Text = $to }
   $sel = @(); $ui.Guides = @()
   for ($k = 0; $k -lt $steps.Count; $k++) { $on = [bool]($script:appSteps -contains $k -and $ui.Sel[[int]$k]); $sel += $on; if ($on -and $steps[$k].Kind -eq 'guide') { $ui.Guides += [string]$steps[$k].Name } }
@@ -88,7 +100,7 @@ $ui.Run = {
   $script:roundStart = Get-Date
   try {
     $ui.Summary = Invoke-Round ([bool]($cleanup.Count -and $ui.Clean)) $sel $to $ui.Say $ui.Tick $ui.OnStep $ui.OnStatus $ui.WindowLine $answers $checkLines
-    $script:stepStart = $null; $ui.Running = $false
+    & $ui.HoldStep; $script:stepStart = $null; $ui.Running = $false
     if (-not ($script:closing -or $ui.Form.IsDisposed)) { & $ui.VDone }   # closed in the last moments of the run: no clipboard, no folder
   } catch {
     $script:stepStart = $null; $ui.Running = $false

@@ -14,7 +14,7 @@
 # and for a button's 4 px margin, because a negative margin is taken as 0 in a table cell (R24 job).
 $ui.FitEdges = { try {
     $mm = & $ui.Sc $ui.Z.M; $x = & $ui.Sc 10; $ui.EdgeX = $x
-    foreach ($l in @($ui.Kick, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathL, $ui.PathT, $ui.Note, $ui.Help, $ui.Foot, $ui.Close, $ui.LastLog, $ui.FieldL, $ui.TestL)) { & $ui.SetLeft $l ($x - (& $ui.Ink $l)) }
+    foreach ($l in @($ui.Kick, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathL, $ui.PathT, $ui.Note, $ui.Help, $ui.Foot, $ui.Close, $ui.Now, $ui.FieldL, $ui.TestL)) { & $ui.SetLeft $l ($x - (& $ui.Ink $l)) }
     & $ui.SetLeft $ui.TickP 0; & $ui.SetLeft $ui.SentRow ($x - $(if ($ui.TickP.Visible) { & $ui.Ink $ui.TickP } else { & $ui.Ink $ui.Sent }))
     & $ui.SetLeft $ui.StepRow ($x - (& $ui.Ink $ui.StepName)); & $ui.SetLeft $ui.ErrRow ($x - $ui.ErrBox.Margin.Left)
     & $ui.SetLeft $ui.BtnRow ($x - $mm)   # a button's own 4 px margin (room for the ring)
@@ -70,7 +70,7 @@ $ui.SentFonts = @{}
 $ui.Raw = @{}
 # Re-breaks the long words of every card text so each line fits its width. Takes nothing; changes the label texts (the
 # raw text is kept in $ui.Raw).
-$ui.BreakAll = { foreach ($l in @($ui.Kick, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathT, $ui.LastLog, $ui.StepName, $ui.Note, $ui.Help, $ui.Foot, $ui.Close)) {
+$ui.BreakAll = { foreach ($l in @($ui.Kick, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathT, $ui.Now, $ui.StepName, $ui.Note, $ui.Help, $ui.Foot, $ui.Close)) {
     try { $w = [int](& $ui.GetWrap $l); if ($w -le 0 -or -not $l.Text) { continue }
       $e = $ui.Raw[$l]; $raw = $(if ($e -and [string]$l.Text -ceq [string]$e.Out) { [string]$e.Raw } else { [string]$l.Text })
       $b = & $ui.BreakLong $raw $l.Font $w; $ui.Raw[$l] = @{ Raw = $raw; Out = $b }; if ([string]$l.Text -cne $b) { $l.Text = $b } } catch { $null = $_ } } }
@@ -202,7 +202,7 @@ $ui.Measure = { param([string]$Card)
     $es = @()   # the card column: where each part's ink starts ($tx above)
     if ($ui.Kick.Visible) { $es += @{ N = 'Kick'; X = (& $tx $ui.Kick) } }
     if ($ui.TickP.Visible) { $es += @{ N = 'TickP'; X = (& $tx $ui.TickP) } } elseif ($ui.Sent.Visible -and $ui.Sent.Text) { $es += @{ N = 'Sent'; X = (& $tx $ui.Sent) } }
-    foreach ($l in @(@($ui.P) + @($ui.PathL, $ui.PathT, $ui.Close, $ui.StepName, $ui.LastLog, $ui.FieldL, $ui.Note, $ui.Help, $ui.Foot, $ui.TestL))) { if ($l.Visible -and $l.Text) { $es += @{ N = (& $ui.NameOf $l); X = (& $tx $l) } } }
+    foreach ($l in @(@($ui.P) + @($ui.PathL, $ui.PathT, $ui.Close, $ui.StepName, $ui.Now, $ui.FieldL, $ui.Note, $ui.Help, $ui.Foot, $ui.TestL))) { if ($l.Visible -and $l.Text) { $es += @{ N = (& $ui.NameOf $l); X = (& $tx $l) } } }
     if ($ui.Guide.Visible) { $es += @{ N = 'Guide'; X = (& $sr $ui.Guide).Left + (& $ui.GuideInk) } }   # the widest number of the numbered list
     if ($ui.ErrBox.Visible) { $es += @{ N = 'ErrBox'; X = (& $sr $ui.ErrBox).Left } }
     $k1 = @($ui.LinkRow.Controls | Where-Object { $_.Visible })[0]; if ($k1) { $es += @{ N = (& $ui.NameOf $k1); X = (& $tx $k1); D = ('link ink ' + (& $ui.Ink $k1) + ', width ' + $k1.Width + ', margin ' + $k1.Margin.Left + ', row margin ' + $ui.LinkRow.Margin.Left) } }
@@ -244,14 +244,14 @@ $ui.SetCard = { param($c)
   if ($ui.RecOn -and ($c.Light -or $c.View -eq 'done')) { $ui.RecOn = $false; $ui.Rec.Visible = $false; $ui.Card.Visible = $true; $ui.RecB.Visible = $true }   # a card that needs you closes the Record
   $ui.View = [string]$c.View; $ui.Card.SuspendLayout()
   $ui.Light.BackColor = $(if ($c.Light -eq 'you') { $ui.C.Yellow } elseif ($c.Light -eq 'bad') { $ui.C.Red } else { $ui.C.White })
-  $ui.Light.AccessibleName = 'Status light: ' + $(if ($c.Light -eq 'you') { 'RADE is waiting for you' } elseif ($c.Light -eq 'bad') { 'failed' } else { 'off' })
+  $ui.Light.AccessibleName = 'Status light: ' + $(if ($c.Light -eq 'you') { 'your turn' } elseif ($c.Light -eq 'bad') { 'failed' } else { 'off' })
   & $ui.Show $ui.Kick ([string]$c.Kicker).ToUpperInvariant()
   $ui.SentRaw = [string]$c.Sentence; $ui.Sent.Text = $ui.SentRaw; $ui.TickP.Visible = [bool]$c.Tick
   $ps = @($c.P | Where-Object { $_ }); for ($k = 0; $k -lt 4; $k++) { & $ui.Show $ui.P[$k] $(if ($k -lt $ps.Count) { [string]$ps[$k] } else { '' }) }
   $ui.OnOpt = $c.OnOption; & $ui.FillOpts $c.Options; $ui.Opts.Visible = [bool]$ui.Opts.Controls.Count
   & $ui.SetSteps $c.Lines
   $ui.PathL.Visible = [bool]$c.Path; & $ui.Show $ui.PathT ([string]$c.Path)
-  $ui.StepRow.Visible = [bool]$c.StepRow; & $ui.Show $ui.LastLog ''; if ($c.StepRow) { $ui.StepTime.Text = '' }   # the last log line shows when a line comes (no empty space)
+  $ui.StepRow.Visible = [bool]$c.StepRow; & $ui.Show $ui.Now ''; if ($c.StepRow) { $ui.StepTime.Text = '' }   # the last log line shows when a line comes (no empty space)
   $ui.FieldRow.Visible = [bool]$c.Field; $ui.FieldDo = $null
   if ($c.Field) { $ui.FieldL.Text = [string]$c.Field.Label; $ui.Field.Text = [string]$c.Field.Text; $ui.Field.AccessibleName = [string]$c.Field.Name; $ui.FieldB.Visible = [bool]$c.Field.Button; $ui.FieldBOn = [bool]$c.Field.Button; $ui.FieldB.Text = [string]$c.Field.Button; $ui.FieldDo = $c.Field.Act; $ui.Field.MaxLength = $(if ($c.Field.Max) { [int]$c.Field.Max } else { 32767 }); & $ui.FitRow }
   $ui.ErrRow.Visible = [bool]$c.Err; if ($c.Err) { $ui.ErrBox.Text = '' }
@@ -270,7 +270,7 @@ $ui.SetCard = { param($c)
   $ui.BtnRow.Visible = [bool]$bs.Count
   $ui.TestRow.Visible = [bool]$c.Test
   $ui.Form.AcceptButton = $(if ($c.NoAccept) { $null } else { $accept })   # Enter = the primary button, except on a hand step
-  $ui.Back = $c.Back; $ui.BackB.Visible = ([bool]$c.Back -and -not $ui.RecOn); $ui.RightL.Text = [string]$c.Right
+  $ui.Back = $c.Back; $ui.BackB.Visible = ([bool]$c.Back -and -not $ui.RecOn); $ui.RightL.Text = $(if ($c.Right) { [string]$c.Right } elseif ($c.Light -eq 'you') { $ui.Words.You } else { '' })   # L5: a card that waits for the person says "Your turn."
   & $ui.FitSent; & $ui.FitEdges; & $ui.AlignRows
   $ui.Card.ResumeLayout(); try { $ui.Card.PerformLayout() } catch { $null = $_ }
   if ($ui.Guide.Visible) { try { $ui.Guide.Refresh() } catch { $null = $_ }; & $ui.GuideFit; & $ui.FitEdges }   # the rich text box finishes its layout when it paints: paint it (no message pump), then measure its edge again (R28 job: 4 to 13 px off on the first hand card)

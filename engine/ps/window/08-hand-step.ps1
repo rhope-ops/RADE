@@ -18,12 +18,12 @@ $ui.VHand = {
   & $ui.SetCard @{ View = 'hand'; Light = 'you'; Kicker = $(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot + 'your turn' } else { 'Your turn' }); Sentence = (Get-StepTitle $st)
     P = @([string]$st.Note); Lines = @($st.Guide); Close = $close
     Field = $(if ($addr) { @{ Label = 'Address'; Text = $ui.GUrl; Name = 'Address to open'; Button = 'Open in browser'; Act = { & $ui.OpenUrl } } } else { $null }); Path = $file; Links = [bool]$file; Note = $clip
-    Buttons = $bs; Right = 'RADE is waiting for you'; NoAccept = $true; Focus = $(if ($addr) { 'fieldbutton' } else { 'text' }) } }
+    Buttons = $bs; NoAccept = $true; Focus = $(if ($addr) { 'fieldbutton' } else { 'text' }) } }
 # Shows the card where the user pastes the error of a hand step that failed; its button sets the answer to Abort. Takes
 # nothing.
 $ui.VHandFail = {
   & $ui.SetCard @{ View = 'handfail'; Light = 'you'; Kicker = 'It failed'; Sentence = 'What did the error say?'; P = @('Paste the error message here. Do not include names or a site address.'); Err = $true
-    Buttons = @(@{ Text = 'Report the failure'; Kind = 'primary'; Act = { $script:guideError = [string]$ui.ErrBox.Text; $ui.Answer = 'Abort' } }, @{ Text = 'Back'; Act = { & $ui.VHand } }); Right = 'RADE is waiting for you'; NoAccept = $true; Focus = 'err' } }
+    Buttons = @(@{ Text = 'Report the failure'; Kind = 'primary'; Act = { $script:guideError = [string]$ui.ErrBox.Text; $ui.Answer = 'Abort' } }, @{ Text = 'Back'; Act = { & $ui.VHand } }); NoAccept = $true; Focus = 'err' } }
 # A question of a hand step (manifest "answers"), after Done: the prompt is the sentence; yes/no and pick answer with
 # one button per word, a text with one line (2,000 characters at most; empty is allowed; R28: kept whole) and "Continue". No Back.
 $ui.ReplyActs = @({ $ui.Reply = [string]$ui.B[0].Text }, { $ui.Reply = [string]$ui.B[1].Text }, { $ui.Reply = [string]$ui.B[2].Text }, { $ui.Reply = [string]$ui.B[3].Text })
@@ -31,7 +31,7 @@ $ui.ReplyActs = @({ $ui.Reply = [string]$ui.B[0].Text }, { $ui.Reply = [string]$
 # Takes the question, its number and the count; the answer is set in $ui.Reply.
 $ui.VAnswer = { param($Q, [int]$I, [int]$N)
   $ui.Reply = $null
-  $c = @{ View = 'answer'; Light = 'you'; Kicker = ($(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot } else { '' }) + 'Question ' + $I + ' of ' + $N); Sentence = [string]$Q.Prompt; Right = 'RADE is waiting for you' }
+  $c = @{ View = 'answer'; Light = 'you'; Kicker = ($(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot } else { '' }) + 'Question ' + $I + ' of ' + $N); Sentence = [string]$Q.Prompt }
   # The prompt's first sentence (up to the first "?", "." or ":" followed by a space or the end) is the headline; the rest
   # is a body line under it (the Administrator, 2026-11-15, rework B). A first sentence too long for one line shrinks ($ui.FitSent).
   if ([string]$Q.Prompt -match '^(.+?[?.:])(?:\s+(\S.*))?$') { $c.Sentence = $Matches[1]; if ($Matches[2]) { $c.P = @($Matches[2].Trim()) } }
@@ -44,7 +44,7 @@ $ui.VAnswerFail = {
   $ui.Reply = $null
   & $ui.SetCard @{ View = 'answerfail'; Light = 'you'; Kicker = ($(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot } else { '' }) + 'It failed'); Sentence = 'What did the error say?'
     P = @('Paste the error message here. Do not include names or a site address. If there is no message, leave the box empty.'); Err = $true
-    Buttons = @(@{ Text = 'Continue'; Kind = 'primary'; Act = { $script:guideError = [string]$ui.ErrBox.Text; $ui.Reply = 'ok' } }); Right = 'RADE is waiting for you'; NoAccept = $true; Focus = 'err' } }
+    Buttons = @(@{ Text = 'Continue'; Kind = 'primary'; Act = { $script:guideError = [string]$ui.ErrBox.Text; $ui.Reply = 'ok' } }); NoAccept = $true; Focus = 'err' } }
 # Waits until the user answers the card that is shown ($ui.Reply is set) or the window closes. Takes nothing.
 $ui.WaitReply = { while ($null -eq $ui.Reply -and -not $script:closing -and -not $ui.Form.IsDisposed) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 25 } }
 # Asks the questions of a hand step, one card each, in order; a question with "showIf" shows only after one of its
@@ -87,4 +87,15 @@ $script:guideUi = { param($Step, [string]$File, [string]$Url, [string]$UrlFile)
   $ui.Guides = @($ui.Guides | Where-Object { $_ -ne [string]$Step.Name })
   if ($ui.Running -and -not $script:closing) { $null = & $ui.ShowRun }
   return $res }
-
+# L4 (the Administrator, 2026-11-19): the last card of a test round, "Anything else about this round or the app?". The
+# text is optional; the engine puts it into the report under the line "Other feedback:" (Get-RoundFeedback). Takes
+# nothing; waits for Continue; gives back the text ('' when the window closed).
+$script:feedbackUi = {
+  $was = $ui.Busy; $ui.Busy = $false; $ui.Reply = $null; $ui.Asked = $true
+  $null = & $ui.SetCard @{ View = 'feedback'; Light = 'you'; Kicker = 'Last question'; Sentence = 'Anything else about this round or the app?'
+    P = @('This is optional. Do not type names or addresses.'); Field = @{ Label = 'Your answer'; Text = ''; Name = 'Anything else about this round or the app?'; Max = 2000; Above = $true }; Focus = 'field'
+    Buttons = @(@{ Text = 'Continue'; Kind = 'primary'; Act = { $ui.Reply = [string]$ui.Field.Text } }) }
+  $null = & $ui.ToFront; $null = & $ui.WaitReply
+  $ui.Busy = $was; $text = [string]$ui.Reply
+  if ($ui.Running -and -not $script:closing) { $null = & $ui.ShowRun }
+  return $text }

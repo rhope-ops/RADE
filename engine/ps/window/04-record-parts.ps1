@@ -111,7 +111,7 @@ $ui.Fit = {
       $ui.CardCols[0].SizeType = 'Absolute'; $ui.CardCols[0].Width = $side; $ui.CardCols[1].SizeType = 'Absolute'; $ui.CardCols[1].Width = $col
       $ui.CardCols[2].SizeType = 'Percent'; $ui.CardCols[2].Width = 100 } } catch { $null = $_ }   # stand-in types or a form being closed: the card keeps its last columns
   $cw = [math]::Max((& $ui.Sc 240), $col - (& $ui.Sc 4)); $ui.ContentW = $cw
-  foreach ($l in @($ui.Kick, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathT, $ui.LastLog, $ui.Note, $ui.Help, $ui.Foot, $ui.Close)) { & $ui.SetWrap $l $cw }
+  foreach ($l in @($ui.Kick, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathT, $ui.Now, $ui.Note, $ui.Help, $ui.Foot, $ui.Close)) { & $ui.SetWrap $l $cw }
   & $ui.SetWrap $ui.Sent ($cw - (& $ui.Sc 44))
   # Rows wrap at the card's width (a button or a box is never cut), and no box is wider than the card.
   $mm = & $ui.Sc $ui.Z.M

@@ -391,7 +391,7 @@ def step_lines(b):
     for s in b['steps']:
         assert s.get('url') or not s.get('urlConfig'), 'a step with "urlConfig" needs its own "url" (the host rule): %s' % s['name']
         assert (s.get('kind') == 'guide' and not s['file']) or any(f['dir'] == s['dir'] and Path(f['src']).name == s['file'] for f in b['files']), s
-    return [line[:-2] + hand_part(s) + answers_part(s) + ' }' for line, s in zip(steps, b['steps'])]   # a step without these fields: the line as before
+    return [line[:-2] + (('; Doing = %s' % q(s['doing'].strip())) if s.get('doing') else '') + hand_part(s) + answers_part(s) + ' }' for line, s in zip(steps, b['steps'])]   # a step without these fields: the line as before
 
 
 def fetch_lines(b):
@@ -412,7 +412,8 @@ def window_values():
     """Read engine/window.json and check it. The build stops when a value is missing or out of range.
 
     Returns:
-        A dict of placeholder -> text: the text column share (percent) and cap, and the minimum window size (pixels at 100 %).
+        A dict of placeholder -> text: the text column share (percent) and cap, the minimum window size and the card
+        frame's minimum height (pixels at 100 %), and the minimum time a step stays on the Run card (ms).
     """
     w = json.loads(WINDOW_FILE.read_text(encoding='utf-8'))
     share, cap = float(w['textColumn']['sharePercent']), int(w['textColumn']['maxPx'])
@@ -420,7 +421,11 @@ def window_values():
     assert 40 <= share <= 100, 'engine/window.json textColumn.sharePercent must be 40 to 100'
     assert 240 <= cap <= 4000, 'engine/window.json textColumn.maxPx must be 240 to 4000'
     assert 400 <= min_w <= 1920 and 300 <= min_h <= 1080, 'engine/window.json minSize must be 400 x 300 to 1920 x 1080'
-    return {'@@TEXT_SHARE@@': repr(share), '@@TEXT_MAX@@': str(cap), '@@MIN_W@@': str(min_w), '@@MIN_H@@': str(min_h)}
+    frame, step_ms = int(w['cardFrame']['minHeight']), int(w['minStepMs'])
+    assert 120 <= frame <= 1080, 'engine/window.json cardFrame.minHeight must be 120 to 1080'
+    assert 0 <= step_ms <= 3000, 'engine/window.json minStepMs must be 0 to 3000'
+    return {'@@TEXT_SHARE@@': repr(share), '@@TEXT_MAX@@': str(cap), '@@MIN_W@@': str(min_w), '@@MIN_H@@': str(min_h),
+            '@@FRAME_MIN@@': str(frame), '@@MIN_STEP_MS@@': str(step_ms)}
 
 
 def engine_for_app(ui_text):
@@ -543,7 +548,7 @@ def build(b):
 # failure; a later release makes it a failure. This table is the one source: tests/engine_test.sh checks that the
 # document has the same numbers.
 TEXT_LIMITS = {'application name': 48, 'version': 14, 'summary': 150, 'step name': 56, 'step note': 200,
-               'step title': 56, 'guide line': 100, 'guide lines': 10, 'doneText': 24, 'step help': 160, 'answer prompt': 120, 'answer choice': 40}
+               'step title': 56, 'guide line': 100, 'guide lines': 10, 'doneText': 24, 'step doing': 80, 'step help': 160, 'answer prompt': 120, 'answer choice': 40}
 
 
 def text_lengths(b):
@@ -567,6 +572,7 @@ def text_lengths(b):
         over(what, 'step title', st.get('title'))
         over(what, 'step note', st.get('note'))
         over(what, 'doneText', st.get('doneText'))
+        over(what, 'step doing', st.get('doing'))
         over(what, 'step help', st.get('help'))
         for g in st.get('guide', []):
             over(what, 'guide line', g)

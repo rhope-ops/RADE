@@ -52,8 +52,9 @@ $ui.StepBar = & $ui.MkBar 'step' 'Progress of this step'; $ui.StepBar.Width = 20
 $ui.StepTime = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepTime.Visible = $true; $ui.StepTime.AccessibleName = 'Time in this step'
 $ui.StepFrac = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepFrac.Visible = $true; $ui.StepFrac.Margin = (& $ui.Pad $ui.Z.G3 2 0 0)
 foreach ($c in @($ui.StepName, $ui.StepBar, $ui.StepTime, $ui.StepFrac)) { [void]$ui.StepRow.Controls.Add($c) }
-# The last log line wraps to its full height (R28 N9: a label 20 px high cut it through its middle, and "..." cut its end).
-$ui.LastLog = & $ui.Text $ui.F.Small $ui.C.Gray $ui.Z.G2 'Last log line'
+# The now-doing line (L7, the Administrator, 2026-11-19; the last log line before): what the running step does now, as a plain
+# sentence ($ui.ShowNow). It wraps to its full height (R28 N9: a label 20 px high cut it through its middle, and "..." cut its end).
+$ui.Now = & $ui.Text $ui.F.Small $ui.C.Gray $ui.Z.G2 'Now doing'
 $ui.FieldRow = & $ui.Flow $ui.Z.G2; $ui.FieldRow.WrapContents = $true; & $ui.Ring $ui.FieldRow
 $ui.FieldL = & $ui.Label $ui.F.SmallB $ui.C.Gray 9; $ui.FieldL.Visible = $true
 # A one-line box: a frame as tall as a compact button with RADE's own 1 px edge, the text box inside it with no border,
@@ -101,7 +102,7 @@ foreach ($c in @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox)) { [void]$ui.Test
 # Puts controls into a table as one auto-sized row each, top to bottom. Takes the table and the list of controls; sets
 # the row count; gives back nothing.
 $ui.Fill = { param($T, $Parts) $row = 0; foreach ($c in @($Parts)) { [void]$T.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('AutoSize'))); $T.Controls.Add($c, 0, $row); $row++ }; $T.RowCount = $row }
-& $ui.Fill $ui.Body @($ui.Kick, $ui.SentRow, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.Opts, $ui.FieldRow, $ui.Guide, $ui.PathL, $ui.PathT, $ui.StepRow, $ui.LastLog, $ui.ErrRow, $ui.LinkRow, $ui.Note, $ui.Help)
+& $ui.Fill $ui.Body @($ui.Kick, $ui.SentRow, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.Opts, $ui.FieldRow, $ui.Guide, $ui.PathL, $ui.PathT, $ui.StepRow, $ui.Now, $ui.ErrRow, $ui.LinkRow, $ui.Note, $ui.Help)
 & $ui.Fill $ui.Tail @($ui.Close, $ui.BtnRow, $ui.Foot, $ui.TestRow)
 & $ui.Fill $ui.Stack @($ui.Scroll, $ui.Tail)
 $ui.Card.Controls.Add($ui.Stack, 1, 1); $ui.Card.SetColumnSpan($ui.Stack, 2)   # two columns: room for the scroll bar beside the text

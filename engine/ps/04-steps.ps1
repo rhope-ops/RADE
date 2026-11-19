@@ -28,7 +28,7 @@ function Get-StepStartInfo([string]$Base, $Step, [string]$Answer, [scriptblock]$
 }
 
 # Reads one output line of a running step (the step contract, docs/engine.md "Step contract"): masks it, then a
-# PROGRESS line moves the step bar, a MADE line goes to the undo list, a FALLBACK line names the fallback route, and any
+# PROGRESS line moves the step bar, a NOW line goes to the window's now-doing line, a MADE line goes to the undo list, a FALLBACK line names the fallback route, and any
 # other line is logged and counted as PASS, SKIP or FAIL. Takes the line, the step, the result record $R (changed in
 # place), the site address (for cleaned names) and the log callback; returns nothing.
 function Add-StepLine([string]$Line, $Step, $R, [string]$Site, [scriptblock]$Say) {
@@ -38,6 +38,9 @@ function Add-StepLine([string]$Line, $Step, $R, [string]$Site, [scriptblock]$Say
     if ($script:prog -and [int]$Matches[2] -gt 0) { $script:prog.Frac = [math]::Min(1.0, [double]$Matches[1] / [double]$Matches[2]); $script:prog.FracText = $Matches[1] + ' of ' + $Matches[2] }
     return
   }
+  # "NOW <text>" (L7): the step says in plain words what it does now. The window shows it under the step's bar; it stays
+  # out of the log and is not a result.
+  if ($line -cmatch '^\s*NOW\s+(\S.*)$') { if ($script:nowUi) { & $script:nowUi $Matches[1].Trim() }; return }
   # "MADE <kind>: <name>": something the step created (a list, a flow, a file); kept for the undo list (step contract).
   # A MADE line is never a result: it is logged with the cleaned name and not counted as PASS, FAIL or SKIP (review).
   if ($line -cmatch '^\s*MADE\s+([a-z][a-z-]{0,30}):\s+(\S.*)$') {
@@ -56,6 +59,15 @@ function Add-StepLine([string]$Line, $Step, $R, [string]$Site, [scriptblock]$Say
   if ($line -cmatch '(^|\s)SKIP(\s|$)') { $R.Skip++ }   # upper case only: prose such as "skip this" is not a result
   if ($line -match '(^|\s)(FAIL|FORMAT-FAIL|RENDER-ERROR|MEASURE-ERROR|STOPPED:)(\s|$)') { $R.Fail++ }
   if ($line.Trim()) { & $Say ('    ' + $line) }   # step output, indented under its step heading
+  if ($script:nowUi) { $now = Get-NowText $line; if ($now) { & $script:nowUi $now } }
+}
+# L7 (the Administrator, 2026-11-19): turns a result line of a step script into a plain sentence for the window's
+# now-doing line: the words after PASS, SKIP or FAIL (upper case), with what the result means in front. Takes the line
+# (masked already); gives back the sentence, or '' when the line is not a result or has no words after the result.
+function Get-NowText([string]$Line) {
+  if ($Line -cnotmatch '(?:^|\s)(PASS|SKIP|FAIL)(?:\s+|:\s*)(\S.*)$') { return '' }
+  $what = $Matches[2].Trim()
+  return ($(if ($Matches[1] -eq 'PASS') { 'Checked: ' } elseif ($Matches[1] -eq 'SKIP') { 'Skipped: ' } else { 'Needs review: ' }) + $what)
 }
 
 # Runs one step script as a child PowerShell and follows its output line by line until it ends or passes its time

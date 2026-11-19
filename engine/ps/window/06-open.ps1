@@ -10,7 +10,7 @@ $ui.RunBase = {
   try {
     foreach ($id in $ui.BaseIds) {
       if ($ui.Form.IsDisposed -or $script:closing) { return }
-      $i++; $d = Get-CheckDef $id; $ui.RightL.Text = 'Check ' + $i + ' of ' + $ui.BaseIds.Count
+      $i++; $d = Get-CheckDef $id; $ui.RightL.Text = $ui.Words.Work + $dot + 'Check ' + $i + ' of ' + $ui.BaseIds.Count
       $r = Get-CheckToRun $d $cache $bp $site $false
       if (-not $r) { $r = Invoke-Check $d $bp $site { [System.Windows.Forms.Application]::DoEvents() } }
       $ui.BaseRes[$id] = $r
@@ -55,7 +55,7 @@ $ui.VChoose = {
 # Shows "Checking this computer", runs the base checks and then shows Choose; shows the error card when they stop. Takes
 # nothing.
 $ui.Boot = {
-  & $ui.SetCard @{ View = 'boot'; Sentence = 'Checking this computer.'; P = @('This takes a few seconds. Nothing is changed.') }
+  & $ui.SetCard @{ View = 'boot'; Sentence = 'Checking this computer.'; P = @('This takes a few seconds. Nothing is changed.'); Right = $ui.Words.Work }
   try { & $ui.RunBase } catch { if (-not ($ui.Form.IsDisposed -or $script:closing)) { & $ui.VBootErr (ConvertTo-Masked ([string]$_.Exception.Message)) }; return }
   if (-not ($ui.Form.IsDisposed -or $script:closing)) { & $ui.VChoose } }
 # Resets what the user chose: each step to its default, clean-up on, no step states. Takes nothing.
@@ -123,7 +123,7 @@ $ui.Checks = { param([bool]$Force)
   if ((& $ui.NeedSite) -and -not (Test-SiteUrl $site)) { & $ui.VSite; return }
   $ids = @($script:appChecks); $cache = Read-CheckCache; $script:savedWhy = @{}
   $ui.Cancel = $false
-  & $ui.SetCard @{ View = 'checking'; Sentence = 'Checking this computer and your access.'; P = @('Read-only. Nothing is changed.'); Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { & $ui.CancelChecks } }) }
+  & $ui.SetCard @{ View = 'checking'; Sentence = 'Checking this computer and your access.'; P = @('Read-only. Nothing is changed.'); Right = $ui.Words.Work; Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { & $ui.CancelChecks } }) }
   & $ui.SetBar 'all' 0 $true; $ui.Bars['all'].Fill = $ui.C.Blue; $ui.Busy = $true
   try {
     for ($i = 0; $i -lt $ids.Count; $i++) {
@@ -134,7 +134,7 @@ $ui.Checks = { param([bool]$Force)
       if ($have -and -not $Force) { continue }
       $sv = Get-CheckToRun $d $cache $bp $site $Force
       if ($sv) { $script:checkResults[$id] = $sv; continue }
-      $ui.P[0].Text = [string]$d.Name; $ui.RightL.Text = 'Check ' + ($i + 1) + ' of ' + $ids.Count; & $ui.SetBar 'all' ($i / [math]::Max(1, $ids.Count)) $true
+      $ui.P[0].Text = [string]$d.Name; $ui.RightL.Text = $ui.Words.Work + $dot + 'Check ' + ($i + 1) + ' of ' + $ids.Count; & $ui.SetBar 'all' ($i / [math]::Max(1, $ids.Count)) $true
       [System.Windows.Forms.Application]::DoEvents()
       $script:checkResults[$id] = Invoke-Check $d $bp $site { [System.Windows.Forms.Application]::DoEvents() }
       if ($ui.BaseRes.ContainsKey($id)) { $ui.BaseRes[$id] = $script:checkResults[$id] }   # Choose shows the newest result of a base check

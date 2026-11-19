@@ -72,6 +72,7 @@ The most characters of each text an application gives the window. Source of the 
 | guide line | 100 | wraps it, in the text column of the numbered list |
 | guide lines | 10 | A count: the numbered lines of one guide (a line that starts with a number and a full stop, "Cards"). More is a WARNING of the build, not a failure; the card then scrolls above its buttons in a small window |
 | doneText | 24 | the button grows with the text and the row wraps |
+| step doing | 80 | The manifest field `doing`: what the step does, in the present tense, on the now-doing line of the Run card ("Cards"); wraps it |
 | step help | 160 | wraps it |
 | answer prompt | 120 | wraps it as the sentence of its question card. A hard limit: a longer prompt stops the build and the schema check |
 | answer choice | 40 | the button grows with the text and the row wraps. A hard limit, as the prompt |
