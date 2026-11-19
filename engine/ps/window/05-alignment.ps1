@@ -292,6 +292,7 @@ $ui.SetCard = { param($c)
   $ui.BtnRow.Visible = [bool]$bs.Count
   $ui.TestRow.Visible = [bool]$c.Test
   $ui.Form.AcceptButton = $(if ($c.NoAccept) { $null } else { $accept })   # Enter = the primary button, except on a hand step
+  $ui.CardNow = $c; $ui.TourB.Visible = ($ui.HelpViews -contains [string]$c.View -and -not $ui.RecOn)   # L6: Help on a card that can be shown again
   $ui.Back = $c.Back; $ui.BackB.Visible = ([bool]$c.Back -and -not $ui.RecOn); $ui.RightL.Text = $(if ($c.Right) { [string]$c.Right } elseif ($c.Light -eq 'you') { $ui.Words.You } else { '' })   # L5: a card that waits for the person says "Your turn."
   & $ui.FitSent; & $ui.FitEdges; & $ui.AlignRows
   $ui.Card.ResumeLayout(); try { $ui.Card.PerformLayout() } catch { $null = $_ }

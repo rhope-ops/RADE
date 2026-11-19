@@ -22,7 +22,7 @@ stub() { if [ -s "$t/window_stub.dll" ]; then echo "$t/window_stub.dll"; else ec
 # win APP HAND RECORD TOUR [BUNDLE]: runs the window for application APP (0 = test, 1 = deploy); output in $wd/win.txt.
 win() { sed -E -e 's#Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing#$null = 0#' -e "s#^\\\$sitePrefix = 'https://usaf.dps.mil/sites/'#\$sitePrefix = 'https://rade-test.invalid/sites/'#" -e 's#System\.Drawing\.(FontStyle|Font|Pen|SolidBrush|Image|Graphics)\b#RadeDraw.\1#g' "${5:-$wd/wb.ps1}" > "$wd/wb2.ps1"
   cat tests/window_driver.ps1 "$wd/wb2.ps1" > "$wd/w.ps1"
-  RADE_T_FAULT="${fault:-}" RADE_T_CANCEL="${cancel:-}" RADE_T_START="${start:-}" RADE_T_LINK="${link:-}" RADE_T_SCALE="${scale:-}" RADE_T_LOOP="${loop:-}" RADE_T_FEEDBACK="${feedback:-}" RADE_T_STUB="$(stub)" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$wd/u/test1234" timeout 180 pwsh -NoProfile -File "$wd/w.ps1" < /dev/null > "$wd/win.txt" 2>&1; }
+  RADE_T_FAULT="${fault:-}" RADE_T_CANCEL="${cancel:-}" RADE_T_START="${start:-}" RADE_T_LINK="${link:-}" RADE_T_SCALE="${scale:-}" RADE_T_LOOP="${loop:-}" RADE_T_FEEDBACK="${feedback:-}" RADE_T_WALK="${walk:-}" RADE_T_STUB="$(stub)" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$wd/u/test1234" timeout 180 pwsh -NoProfile -File "$wd/w.ps1" < /dev/null > "$wd/win.txt" 2>&1; }
 # has TEXT...: every text is in the window output, and the window did not fall back to text mode or miss a name.
 has() { local x; grep -q "No window could open\|WIN NONAME\|WIN NOFOCUS\|WIN BAD" "$wd/win.txt" && { grep -m3 "No window could open\|WIN NONAME\|WIN NOFOCUS\|WIN BAD" "$wd/win.txt" | cut -c1-300; return 1; }; for x in "$@"; do grep -qF -- "$x" "$wd/win.txt" || { echo "  missing: $x"; return 1; }; done; grep -q "^WIN closed=True" "$wd/win.txt"; }
 go W; {   # group W: runs in the background (see "go" in tests/engine_test.sh)
@@ -177,7 +177,7 @@ b['apps'][0]['steps'].append('T05 Sample questions r1')
 json.dump(m, open(p, 'w'), indent=2)
 P
 python3 scripts/check_manifest.py "$t/r31/app/scripts/paste_bundles.json" > "$t/r31/check.txt" 2>&1 && python3 engine/rade_build.py --app-root "$t/r31/app" > "$t/r31/build.txt" 2>&1 && swap "$t/r31/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$wd/r31.ps1" "$wd/u" && ok || { bad "r31: the bundle with hide, answersOnly, failOn, showIf and doing is valid and builds"; tail -3 "$t/r31/check.txt" "$t/r31/build.txt"; }
-feedback='The second card was slow. Mail someone@example.com' win 0 done 0 0 "$wd/r31.ps1"
+walk=1 feedback='The second card was slow. Mail someone@example.com' win 0 done 0 0 "$wd/r31.ps1"
 wr="$wd/u/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt"
 # E1: the hand card has Done and It failed, no Skip. E3: the text question is not asked after "No", and the report says so.
 has "view=hand light=your turn kick=STEP 3 OF 4 · YOUR TURN" 'btn=[Imported] [It failed] back=' && ! grep -q "^WIN view=hand .*\[Skip\]" "$wd/win.txt" && [ "$(grep -c "^WIN view=answer .*STEP 3 OF 4" "$wd/win.txt")" = 2 ] &&
@@ -193,6 +193,13 @@ has "view=feedback light=your turn kick=LAST QUESTION sent=Anything else about t
 # L7: the now-doing line shows the step's "doing", then a plain sentence for each result line, and a NOW line; none of them is in the log.
 # L8: a step stays on the Run card for the minimum time (engine/window.json minStepMs; the test user sets it to 0 after this one measure).
 has "WIN now=Checking the sample files." "WIN now=Checked: sample check: PowerShell" "WIN now-text pass=Checked: list there|skip=Skipped: no flow|fail=Needs review: list missing|plain=|none=" "WIN hold ms=120 held=True json=500" && ! grep -q "Checking the sample files" "$wr" && ok || { bad "r31 L7, L8: the now-doing line and the minimum step time"; grep "WIN now\|WIN hold" "$wd/win.txt" | cut -c1-200; }
+# L6: the tour comes before the first Choose, 5 cards (Back works), and its end is remembered in RADE\Config; "Help (F1)" is on the Ready
+# card, F1 opens the tour from it and its end shows that card again; a run and a hand card have no Help; a second window shows no tour.
+has "view=tour light=off kick=RADE TOUR · 1 OF 5 sent=RADE installs and tests applications on this computer." "btn=[Next] [Skip the tour]" "kick=RADE TOUR · 3 OF 5 sent=A step that you do has up to three answers." "btn=[Next] [Back] [Skip the tour]" "kick=RADE TOUR · 5 OF 5 sent=The Record shows everything." "btn=[Close the tour] [Back]" \
+  "WIN help link=True name=Help (F1) back-on=ready same=True seen=True" && [ "$(grep -c "^WIN view=tour .* 1 OF 5" "$wd/win.txt")" = 3 ] && [ -s "$wd/u/test1234/OneDrive - United States Air Force/RADE/Config/rade-tour.txt" ] &&
+  grep -n "^WIN view=" "$wd/win.txt" | grep -m1 "view=choose" | grep -qv "^[1-6]:" && ! grep "^WIN view=\(run\|hand\|answer\|feedback\|tour\|boot\|checking\) " "$wd/win.txt" | grep -q "help=True" && grep "^WIN view=ready " "$wd/win.txt" | grep -q "help=True" && ok || { bad "r31 L6: the tour and Help"; grep "view=tour\|WIN help" "$wd/win.txt" | cut -c1-200; }
+win 0 done 0 0 "$wd/r31.ps1"
+has "view=choose" && ! grep -q "view=tour" "$wd/win.txt" && ok || bad "r31 L6: the tour shows one time only"
 # A deploy asks no last question.
 ! grep -q "view=feedback" "$t/w1/win.txt" && ! grep -q "^Other feedback" "$t/w1/u/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && ok || bad "r31 L4: a deploy has no last question"
 echo "GROUP $pass $fail"; } > "$t/grp-W4.log" 2>&1 &

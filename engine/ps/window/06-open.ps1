@@ -57,7 +57,35 @@ $ui.VChoose = {
 $ui.Boot = {
   & $ui.SetCard @{ View = 'boot'; Sentence = 'Checking this computer.'; P = @('This takes a few seconds. Nothing is changed.'); Right = $ui.Words.Work }
   try { & $ui.RunBase } catch { if (-not ($ui.Form.IsDisposed -or $script:closing)) { & $ui.VBootErr (ConvertTo-Masked ([string]$_.Exception.Message)) }; return }
-  if (-not ($ui.Form.IsDisposed -or $script:closing)) { & $ui.VChoose } }
+  if ($ui.Form.IsDisposed -or $script:closing) { return }
+  if (Test-TourSeen) { & $ui.VChoose } else { $ui.TourTo = { & $ui.VChoose }; & $ui.VTour 0 } }   # L6: the tour comes one time, before the first Choose
+# L6 (the Administrator, 2026-11-19): the RADE tour, 5 cards: what RADE does, your turn and RADE's turn, what Done,
+# It failed and Skip mean, where the results go, and the Record. Shown one time for a Windows profile, before the first
+# Choose (RADE\Config\rade-tour.txt), and again from "Help (F1)". S = the headline of a card, P = its paragraphs.
+$ui.TourCards = @(
+  @{ S = 'RADE installs and tests applications on this computer.'; P = @('You choose an application. RADE checks this computer, then does the work as a list of steps.', 'A test of an application is called a round.') },
+  @{ S = 'RADE does most steps. Some steps are yours.'; P = @('"RADE is working..." at the bottom right: RADE does a step. Keep the window open.', '"Your turn." and a yellow line at the top: RADE waits for you. The card says what to do.') },
+  @{ S = 'A step that you do has up to three answers.'; P = @('"Done": you did the step and it worked.', '"It failed": the step did not work. RADE then asks what the error said.', '"Skip": you did not do the step. A card shows only the answers that fit its step.') },
+  @{ S = 'The results stay on this computer.'; P = @('RADE writes a report into its results folder. RADE sends nothing.', 'After a test round RADE makes an e-mail draft with the results. You read it, and you send it.') },
+  @{ S = 'The Record shows everything.'; P = @('Select "Record" or press F2 to see all checks, steps, files and the log.', 'Select "Help" or press F1 to see this tour again.') })
+# The cards that "Help (F1)" can leave and show again: no step or check runs on them, and none waits inside the engine.
+$ui.HelpViews = @('choose', 'maint', 'site', 'fail', 'need', 'ready', 'nodrive', 'done', 'review', 'stopped', 'noapps', 'booterr')
+# Shows card $I of the tour (0 = the first). "Next" and "Back" move; "Skip the tour" and the last card's button end it.
+# Takes the card number.
+$ui.VTour = { param([int]$I)
+  $n = $ui.TourCards.Count; $ui.TourI = [math]::Max(0, [math]::Min($n - 1, $I)); $tc = $ui.TourCards[$ui.TourI]; $last = ($ui.TourI -eq $n - 1)
+  & $ui.SetCard @{ View = 'tour'; Kicker = ('RADE tour' + $dot + ($ui.TourI + 1) + ' of ' + $n); Sentence = [string]$tc.S; P = @($tc.P)
+    Buttons = @(@{ Text = $(if ($last) { 'Close the tour' } else { 'Next' }); Kind = 'primary'; Act = { if ($ui.TourI -ge $ui.TourCards.Count - 1) { & $ui.EndTour } else { & $ui.VTour ($ui.TourI + 1) } } },
+      $(if ($ui.TourI) { @{ Text = 'Back'; Act = { & $ui.VTour ($ui.TourI - 1) } } } else { $null }), $(if ($last) { $null } else { @{ Text = 'Skip the tour'; Act = { & $ui.EndTour } } })) } }
+# Ends the tour: remembers that it was shown (Save-TourSeen) and shows the card it came from (Choose on the first run).
+# Takes nothing.
+$ui.EndTour = { Save-TourSeen; $to = $ui.TourTo; $ui.TourTo = $null; if ($to) { & $to } else { & $ui.VChoose } }
+# "Help (F1)": opens the tour from a card of $ui.HelpViews while nothing runs; the tour's end shows that card again
+# (a box on it has its first text again). Takes nothing.
+$ui.OpenTour = {
+  if ($ui.Busy -or $ui.Running -or $ui.RecOn -or $ui.HelpViews -notcontains [string]$ui.View) { return }
+  $ui.TourFrom = $ui.CardNow; $ui.TourTo = { & $ui.SetCard $ui.TourFrom }; & $ui.VTour 0 }
+$ui.TourB.Add_Click({ & $ui.OpenTour })
 # Resets what the user chose: each step to its default, clean-up on, no step states. Takes nothing.
 $ui.InitSel = { $ui.Sel = @{}; foreach ($k in $script:appSteps) { $ui.Sel[[int]$k] = [bool](Get-StepDefault $k) }; $ui.Clean = $true; $ui.StepState = @{} }
 # Shows or hides the application row of the logo block (its logo, its name) and the link line above it (only when both
