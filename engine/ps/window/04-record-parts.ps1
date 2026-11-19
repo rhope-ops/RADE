@@ -121,6 +121,6 @@ $ui.Fit = {
   try { $ui.AppL.Tag.MaxW = [math]::Max((& $ui.Sc 60), ($ui.Top.ClientSize.Width - (& $ui.LeftIn $ui.AppL $ui.Top) - (& $ui.Sc 32))) } catch { $null = $_ }   # in the application row or the title column
   & $ui.InkFit $ui.WordL; & $ui.InkFit $ui.AppL
   try { $lh = [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $ui.Kick.Font).Height + (& $ui.Sc 2); if ($ui.Head.MinimumSize.Height -ne $lh) { $ui.Head.MinimumSize = New-Object System.Drawing.Size(0, $lh) } } catch { $null = $_ }   # L1: the header row keeps its height on a card with no line
-  & $ui.FitRow; & $ui.Apart; & $ui.FitSent; & $ui.FitSteps; & $ui.FitEdges; & $ui.AlignRows
+  & $ui.FitRow; & $ui.Apart; & $ui.FitSent; & $ui.FitSteps; & $ui.FitEdges; & $ui.FitBar; & $ui.AlignRows
   foreach ($o in @($ui.Opts.Controls)) { $o.Width = $cw; try { $o.Height = (& $ui.OptPlan $o.Tag $cw).H } catch { $null = $_ } }
   & $ui.Squeeze }
