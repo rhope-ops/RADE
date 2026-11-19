@@ -37,10 +37,10 @@ REC = recommendation, not a decision. Cites are files in this repo.
 ## Open gaps, in priority order
 
 1. A person cannot check that the pasted bundle is the reviewed one (rows 1, 2 and 8). Design: [specs/bundle-hash.md](specs/bundle-hash.md), proposed, not approved.
-2. Code signing is an open gap. The owner has no code-signing certificate and is not sure one can be had. No agent handles a certificate or a key. Until there is a way to sign, `-ExecutionPolicy Bypass` and the unsigned bundle stay.
+2. Code signing is an open gap. The owner has no code-signing certificate and is not sure one can be had. No agent handles a certificate or a key. Until there is a way to sign, `-ExecutionPolicy Bypass` and the unsigned bundle stay. From engine-v19 the child check also runs its test script with no such setting and shows the answer, so a work-computer round proves whether the setting is needed (plan of 2026-11-19, stage 2.4).
 3. The page serves each app's `main`, not a tagged release.
 4. One maintainer account for the repo, the releases and the merges.
-5. No test per guardrail, and no test that reads a real results e-mail draft.
+5. No test per guardrail, and no test that reads a real results e-mail draft. The "No reconnaissance" rule has a word search in both check lanes (scripts/no_recon.py, 2026-11-19): not a proof.
 6. This model is not yet reviewed at each release. REC: read it at each engine release and say so in the release notes.
 
 This is a self-assessment, not an approval artifact.
