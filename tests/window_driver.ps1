@@ -105,9 +105,21 @@ function global:Start-RadeR31 {
   $ms0 = [int]$ui.Layout.StepMs; $ui.Layout.StepMs = 120; $v0 = $ui.View; $ui.View = 'run'; $ui.StepAt = $ui.Clock.Elapsed.TotalMilliseconds; $t0 = $ui.StepAt; & $ui.HoldStep
   Write-Host ('WIN hold ms=120 held=' + (($ui.Clock.Elapsed.TotalMilliseconds - $t0) -ge 115) + ' json=' + $ms0); $ui.View = $v0; $ui.StepAt = $null; $ui.Layout.StepMs = 0
   Write-Host ('WIN now-text pass=' + (Get-NowText 'ITEM m2-list PASS list there') + '|skip=' + (Get-NowText '  SKIP: no flow') + '|fail=' + (Get-NowText 'x FAIL list missing') + '|plain=' + (Get-NowText 'a line that passes nothing') + '|none=' + (Get-NowText 'PASS'))
+  # The Administrator, 2026-11-19: the line keeps one height (Cancel under it does not move), each text ends with "...", a long
+  # text is cut to $ui.NowLines lines. Measured once on a 300 px wrap, then the line is as it was.
+  $v0 = $ui.View; $ui.View = 'run'; $w0 = [int]$ui.Wrap[$ui.Now]; & $ui.SetWrap $ui.Now 300
+  & $ui.ShowNow 'Copying the list files.'; $s1 = $ui.Now.Text; $h1 = $ui.Now.Height
+  & $ui.ShowNow ('word ' * 200); $s2 = [string]$ui.Now.Text; $h2 = $ui.Now.Height
+  & $ui.ShowNow ('word ' * 200); & $ui.SetWrap $ui.Now 150; & $ui.BreakAll; $s4 = [string]$ui.Now.Text   # a narrower window: cut again
+  $fit4 = ((& $ui.Meas $s4 $ui.Now.Font 150).Height -le $ui.NowLines * (& $ui.Meas 'Ag' $ui.Now.Font 100000).Height) -and $s4.EndsWith('...')
+  & $ui.SetWrap $ui.Now 300; & $ui.ShowNow ('Done. ' + [string][char]0x2026); $s5 = [string]$ui.Now.Text
+  & $ui.ShowNow ''; $h3 = $ui.Now.Height; $e3 = $ui.Now.Visible
+  $fits = ((& $ui.Meas $s2 $ui.Now.Font 300).Height -le $ui.NowLines * (& $ui.Meas 'Ag' $ui.Now.Font 100000).Height)
+  Write-Host ('WIN now-fit short=' + $s1 + '|long-end=' + $s2.EndsWith('...') + '|long-fits=' + $fits + '|same-h=' + ($h1 -eq $h2 -and $h2 -eq $h3 -and $h1 -gt 0) + '|empty-shown=' + $e3 + '|narrower-fits=' + $fit4 + '|ellipsis=' + $s5)
+  & $ui.SetWrap $ui.Now $w0; $ui.Now.Text = ''; $ui.View = $v0
   $global:RadeT.ShowNow = $ui.ShowNow
-  # The window's now-doing line, with one WIN line for each text. Takes the text.
-  $ui.ShowNow = { param([string]$Text) if ($Text) { Write-Host ('WIN now=' + $Text) }; & $global:RadeT.ShowNow $Text }
+  # The window's now-doing line, with one WIN line for each text (the text given, then the text shown). Takes the text.
+  $ui.ShowNow = { param([string]$Text) & $global:RadeT.ShowNow $Text; if ($Text) { Write-Host ('WIN now=' + $Text + ' shown=' + $ui.Now.Text) } }
 }
 <#
 .SYNOPSIS

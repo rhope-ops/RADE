@@ -53,10 +53,18 @@ $ui.Label = { param($Font, $Color, [int]$Top) $l = New-Object System.Windows.For
 # WordBreak, TextBoxControl) whenever its text, its font or its wrap width changes. The wrap width is $ui.Wrap[box] (set with
 # $ui.SetWrap): a text box's own MaximumSize would cut the few extra pixels the edit control keeps at its edges.
 $ui.Wrap = @{}
+# A text box with a fixed number of lines ($ui.Hold[box] = n): $ui.Reflow makes it n lines tall whatever its text, also with no
+# text, so the parts under it never move when the text changes (the Run card's now-doing line: the Administrator, 2026-11-19,
+# "the cancel button jumps up and down"). Its text is cut to n lines with $ui.FitLines.
+$ui.Hold = @{}
 $ui.GetWrap = { param($C) if ($C -is [System.Windows.Forms.TextBox]) { return [int]$ui.Wrap[$C] }; return [int]$C.MaximumSize.Width }
 $ui.SetWrap = { param($C, [int]$W) if ($C -is [System.Windows.Forms.TextBox]) { $ui.Wrap[$C] = $W; & $ui.Reflow $C } else { $C.MaximumSize = New-Object System.Drawing.Size($W, 0) } }
 $ui.Reflow = { param($T)
-  try { $txt = [string]$T.Text; if (-not $txt) { return }
+  try { $txt = [string]$T.Text; $n = [int]$ui.Hold[$T]
+    if ($n -gt 0) {   # a fixed number of lines: as wide as its wrap width, n lines tall
+      $w = [int]$ui.Wrap[$T]; $one = & $ui.Meas 'Ag' $T.Font 100000
+      $ns = New-Object System.Drawing.Size($(if ($w -gt 0) { $w + (& $ui.Sc 4) } else { $one.Width }), ($n * $one.Height + (& $ui.Sc 2))); if ($T.Width -ne $ns.Width -or $T.Height -ne $ns.Height) { $T.Size = $ns }; return }
+    if (-not $txt) { return }
     $sl = & $ui.Sc 4; $w = [int]$ui.Wrap[$T]; $one = & $ui.Meas $txt $T.Font 100000; $sz = $one
     if ($w -gt 0 -and $one.Width -gt $w) { $sz = & $ui.Meas $txt $T.Font $w; $bw = $w + $sl } else { $bw = $one.Width + 2 * $sl }
     $ns = New-Object System.Drawing.Size($bw, ($sz.Height + (& $ui.Sc 2))); if ($T.Width -ne $ns.Width -or $T.Height -ne $ns.Height) { $T.Size = $ns } } catch { $null = $_ } }
@@ -240,6 +248,32 @@ $ui.Shorten = { param($C, [string]$Full, [int]$W)
   $si = New-Object System.Globalization.StringInfo($Full); $lo = 0; $hi = $si.LengthInTextElements
   while ($lo -lt $hi) { $mid = [int][math]::Ceiling(($lo + $hi) / 2.0); $C.Text = $si.SubstringByTextElements(0, $mid).TrimEnd() + '...'; if ($C.PreferredSize.Width -le $W) { $lo = $mid } else { $hi = $mid - 1 } }
   $C.Text = $(if ($lo -gt 0) { $si.SubstringByTextElements(0, $lo).TrimEnd() } else { '' }) + '...' }
+# Cuts a text to N lines with "..." (the help below).
+$ui.FitLines = {
+  <#
+  .SYNOPSIS
+  Cuts a text to at most N lines at a width, with "..." at its end when it is cut (the Administrator, 2026-11-19).
+  .DESCRIPTION
+  Measured as a card text box wraps ($ui.Meas). Binary search on the number of text elements, so a letter with its accents
+  is never split. The text is not changed when it fits.
+  .PARAMETER T
+  The text.
+  .PARAMETER F
+  The font it shows in.
+  .PARAMETER W
+  The wrap width, in pixels.
+  .PARAMETER N
+  The most lines it may take.
+  .OUTPUTS
+  The text that fits, as a string.
+  #>
+  param([string]$T, $F, [int]$W, [int]$N)
+  if (-not $T -or $W -le 0 -or $N -le 0) { return $T }
+  $most = $N * (& $ui.Meas 'Ag' $F 100000).Height
+  if ((& $ui.Meas $T $F $W).Height -le $most) { return $T }
+  $si = New-Object System.Globalization.StringInfo($T); $lo = 0; $hi = $si.LengthInTextElements
+  while ($lo -lt $hi) { $mid = [int][math]::Ceiling(($lo + $hi) / 2.0); $x = $si.SubstringByTextElements(0, $mid).TrimEnd() + '...'; if ((& $ui.Meas $x $F $W).Height -le $most) { $lo = $mid } else { $hi = $mid - 1 } }
+  return ($(if ($lo -gt 0) { $si.SubstringByTextElements(0, $lo).TrimEnd() } else { '' }) + '...') }
 # The self-check's rule for it: a word of a text that wraps is never wider than the line the text may take (a label's
 # MaximumSize, a card text box's $ui.GetWrap; else the word is cut). Not the label's own width: a wrapping label is as wide
 # as its widest line by its own measure, about 1 % narrower than the probe's, so a cut piece that is the widest line would
@@ -348,7 +382,7 @@ $ui.Check = {
         if (& $ui.IsCardText $c) {   # card text boxes are measured as labels are: a word wider than the line, and text that needs more room than the box has
           if ([int](& $ui.GetWrap $c) -gt 0 -and $c.Text) { $wb = & $ui.WordBad $card (& $ui.NameOf $c) ([string]$c.Text) $c.Font ([int](& $ui.GetWrap $c)); if ($wb) { $ui.LayBad.Add($wb) } }
           $nd = & $ui.TextNeed $c; if ($c.Text -and ($nd.Height -gt $c.ClientSize.Height + 1 -or $nd.Width -gt $c.ClientSize.Width + 1)) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' text: needs ' + $nd.Width + 'x' + $nd.Height + ' has ' + $c.ClientSize.Width + 'x' + $c.ClientSize.Height) }
-          $lh1 = [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $c.Font).Height; if ($c.Text -and $c.ClientSize.Height -gt $nd.Height + $lh1) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' dead space: has ' + $c.ClientSize.Height + ' high, the text needs ' + $nd.Height) } }   # more than one empty line under its text
+          $lh1 = [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $c.Font).Height; if ($c.Text -and -not $ui.Hold.ContainsKey($c) -and $c.ClientSize.Height -gt $nd.Height + $lh1) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' dead space: has ' + $c.ClientSize.Height + ' high, the text needs ' + $nd.Height) } }   # more than one empty line under its text (a box with fixed lines keeps its room)
         if ($c -is [System.Windows.Forms.CheckBox] -and $c.Text -and -not $c.AutoEllipsis) {   # a one-line check box whose text alone is wider than it is cut (the Record's step boxes before R24 fix round 3)
           $tw = [System.Windows.Forms.TextRenderer]::MeasureText([string]$c.Text, $c.Font).Width; if ($tw -gt $c.ClientSize.Width + 1) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' text cut: needs ' + $tw + ' has ' + $c.ClientSize.Width) } }
         # A cut line (R28 N9: the run card's status line was cut through its middle): a control with text is at least one line of its

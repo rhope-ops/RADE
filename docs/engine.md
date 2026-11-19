@@ -101,7 +101,7 @@ One engine, three modes per catalog app (`mode` in the manifest): **deploy** (in
 ## Results
 
 - PASSED, PASSED (fallback), WARNING, FAILED, NOT RUN. A fallback result names the documented fallback route used (for wings with less access) and counts as passed. FAILED or NOT RUN blocks a deploy (rhope-ops/90-161.Z docs/DECISIONS.md, 2026-11-14: "No deploy unless every check passes").
-- Saved checks (RADE\Config\rade-checks.json): fast checks (versions, language mode, disk, write, child) run fresh every time; only slow checks (site rights by CAC sign-in, the Power Automate look-and-answer) keep the 7-day reuse; "Run checks again" and the drift check run everything.
+- Saved checks (RADE\Config\rade-checks.json; code: `$checkNoSave`, `$checkEachRun` and `$checkMaxDays` in engine/ps/08-saved-checks.ps1): NIPR, Word, disk and write run fresh every time, also again after Choose; PowerShell version, language mode and child process run once for each run of RADE (from engine-v21); every other check that passed is saved and reused for 7 days when the computer, PowerShell, PnP and the scope are the same: OneDrive, Outlook, PnP, the three network checks, site rights (CAC sign-in) and the Power Automate look-and-answer (the Administrator, 2026-11-19: keep the code, correct this sentence). "Run checks again" and the drift check run everything.
 
 ## Step contract
 
