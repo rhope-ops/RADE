@@ -39,14 +39,28 @@ function global:Test-RadeRecordCopy {
   $ui.RecCopy.PerformClick(); $cl = [string][RadeStub.Driver]::Clip; $nm = [string]$ui.RecChecks.Values['AccessibleName']
   Write-Host ('WIN record-copy btn=' + $ui.RecCopy.Text + ' checks=' + ($cl -match '(?m)^CHECKS') + ' detail=' + ($cl -match '(?m)^      R33 detail probe') + ' steps=' + ($cl -match '(?m)^  \[[x ]\] ') + ' text=' + ($cl -match 'Files this round saves') + ' name=' + ($nm -match 'R33 detail probe'))
   $script:checkResults[$cid] = $was; & $ui.RecRefresh }
-# The red line of a script whose hash does not match (the Administrator, 2026-11-19): on the Choose card with a mismatch,
-# a match and a hash that is not available. Takes nothing; prints 3 "WIN script-warn" lines; shows the Choose card again.
+<#
+.SYNOPSIS
+The red line of a script whose hash does not match (the Administrator, 2026-11-19): prints the "WIN script-warn" lines.
+.DESCRIPTION
+On the real Choose card: a mismatch, a match and a hash that is not available. Then on cards that have a last line of
+their own (Choose of a test-only paste, Ready with a site, boot): the warning takes that line on a mismatch and the own
+text is back on a match. The real state is restored and Choose is shown again.
+.OUTPUTS
+Nothing; 9 WIN lines.
+#>
 function global:Test-RadeScriptWarn {
   if ($global:RadeT.WarnDone) { return }; $global:RadeT.WarnDone = $true
   $was = $script:scriptCheck
   foreach ($k in @(@('mismatch', 'abc...def', $false), @('match', 'abc...def', $true), @('unavailable', '', $false))) {
     $script:scriptCheck = @{ Line = 'x'; Short = $k[1]; Ok = $k[2] }; & $ui.VChoose
     Write-Host ('WIN script-warn ' + $k[0] + ' view=' + $ui.View + ' text=[' + $(if ($ui.Foot.Visible) { $ui.Foot.Text } else { '' }) + '] red=' + [object]::Equals($ui.Foot.ForeColor, $ui.C.Red)) }
+  # Cards that have a last line of their own (Choose of a test-only paste, Ready with a site, boot with none): the warning takes it on a mismatch; the own text is back on a match.
+  foreach ($k in @(@('mismatch', $false), @('match', $true))) {
+    $script:scriptCheck = @{ Line = 'x'; Short = 'abc...def'; Ok = $k[1] }
+    foreach ($v in @(@('choose', 'Last round on this computer: none recorded yet.'), @('ready', 'Site: example'), @('boot', ''))) {
+      & $ui.Show $ui.Foot ([string]$v[1]); & $ui.ScriptWarn @{ View = $v[0]; Foot = $v[1] }   # what SetCard does with the card's own last line
+      Write-Host ('WIN script-warn own ' + $k[0] + ' ' + $v[0] + ' text=[' + $(if ($ui.Foot.Visible) { $ui.Foot.Text } else { '' }) + '] red=' + [object]::Equals($ui.Foot.ForeColor, $ui.C.Red)) } }
   $script:scriptCheck = $was; & $ui.VChoose }
 function global:Show-RadeCard {
   # The top bar and the logo block at the first frame (the Administrator, 2026-11-19): one WIN line, once, with the window

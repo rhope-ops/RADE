@@ -292,11 +292,12 @@ $ui.LayLine = {
 # Sets a label's text and shows it only when the text is not empty. Takes the label and the text; gives back nothing.
 $ui.Show = { param($C, [string]$Text) $C.Text = $Text; $C.Visible = [bool]$Text }
 # A script whose hash does not match its own hash line (the Administrator, 2026-11-19; docs/specs/bundle-hash.md R3): on the
-# cards boot, choose and ready that have no last line of their own, the last line says so in dark red. A hash that cannot be
-# read ("not available") and a match show nothing. Takes the card; changes the color and text of $ui.Foot.
+# boot, choose and ready cards the last line says so in dark red, in place of the card's own last line (no exception: the
+# warning alone, so the layout holds at every size). A hash that cannot be read ("not available") and a match show nothing
+# here (the card's own last line stays). Takes the card; changes the color and text of $ui.Foot.
 $ui.ScriptWarn = { param($c)
   $bad = [bool]($script:scriptCheck.Short -and -not $script:scriptCheck.Ok)
-  if ($bad -and -not $c.Foot -and [string]$c.View -in 'boot', 'choose', 'ready') { & $ui.Show $ui.Foot 'This script does not match its hash. Do not run it.'; $ui.Foot.ForeColor = $ui.C.Red }
+  if ($bad -and [string]$c.View -in 'boot', 'choose', 'ready') { & $ui.Show $ui.Foot 'This script does not match its hash. Do not run it.'; $ui.Foot.ForeColor = $ui.C.Red }
   else { $ui.Foot.ForeColor = $ui.C.Gray } }
 $ui.SetCard = { param($c)
   # Shows one card. $c names the parts: View, Light ('you' = yellow, 'bad' = dark red), Kicker, Sentence, Tick, P (up to 4
