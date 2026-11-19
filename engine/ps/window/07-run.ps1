@@ -29,8 +29,9 @@ $ui.Paint = {
 # The time in this step (R28 N10): "4m 12s"; with hours "1h 04m 12s".
 $ui.Elapsed = { param([double]$Sec) $q = [int][math]::Floor([math]::Max(0, $Sec)); $h = [int][math]::Floor($q / 3600); $m = [int][math]::Floor(($q % 3600) / 60); $x = $q % 60
   if ($h) { return ('{0}h {1:00}m {2:00}s' -f $h, $m, $x) }; return ('{0}m {1:00}s' -f $m, $x) }
-# Shows the time in this step on the step line, once for each second. Takes nothing; a failure is ignored.
-$ui.ShowTime = { try { if ($ui.View -eq 'run' -and $script:stepStart) { $t = & $ui.Elapsed ((Get-Date) - $script:stepStart).TotalSeconds; if ($ui.StepTime.Text -ne $t) { $longer = ($t.Length -ne ([string]$ui.StepTime.Text).Length); $ui.StepTime.Text = $t; if ($longer) { & $ui.FitBar } } } } catch { $null = $_ } }   # a longer time (hours) takes room from the bar
+# Shows the time in this step on the step line, once for each second. A longer text (hours) takes room from the bar, so
+# the bar is fitted again then. Takes nothing; a failure is ignored.
+$ui.ShowTime = { try { if ($ui.View -eq 'run' -and $script:stepStart) { $t = & $ui.Elapsed ((Get-Date) - $script:stepStart).TotalSeconds; if ($ui.StepTime.Text -ne $t) { $longer = ($t.Length -ne ([string]$ui.StepTime.Text).Length); $ui.StepTime.Text = $t; if ($longer) { & $ui.FitBar } } } } catch { $null = $_ } }
 $ui.TimeT = New-Object System.Windows.Forms.Timer; $ui.TimeT.Interval = 1000; $ui.TimeT.Add_Tick({ & $ui.ShowTime })
 # The tick callback of a running step: repaints the bars and lets the window handle its events. Emits nothing.
 $ui.Tick = { $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }   # a callback must emit nothing: its output would join the engine function's return value
