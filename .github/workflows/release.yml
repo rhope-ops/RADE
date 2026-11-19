@@ -33,6 +33,12 @@ jobs:
         run: |
           [[ "$TAG" =~ ^engine-v[0-9]+$ ]] || { echo "FAIL the tag must be engine-v and a number"; exit 1; }
           if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then echo "FAIL the tag $TAG exists"; exit 1; fi
+      - name: Tag number equals ENGINE_RELEASE
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          built="$(sed -n 's/^ENGINE_RELEASE = \([0-9][0-9]*\)$/\1/p' engine/rade_build.py)"
+          [ "${TAG#engine-v}" = "$built" ] || { echo "FAIL the tag $TAG has number ${TAG#engine-v}, but ENGINE_RELEASE in engine/rade_build.py is $built"; exit 1; }
       - name: Repo checks (self-tests and engine tests)
         run: scripts/check.sh
       - name: Engine file list
