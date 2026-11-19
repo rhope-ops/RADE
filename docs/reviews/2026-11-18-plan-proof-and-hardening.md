@@ -12,9 +12,9 @@ Why this plan: on 2026-11-18 the build was ahead of its proof (18 engine release
 | 0.2 No-reconnaissance check | [scripts/no_recon.py](../../scripts/no_recon.py): a word search of the engine sources and the sample app in both check lanes; the app canary prints a NOTE line for each such word in a real app's built bundle. A word search, not a proof. | `NORECON files=26 hits=0`; self-test 18 found, 6 allowed |
 | 0.3 Security brief | Draft for the ISSM and other reviewers, a private Claude doc (not in this public repo). | The Administrator reads and sends it |
 
-## Stage 1: the next device round (the Administrator runs it; 90-161.Z R31 on engine-v21)
+## Stage 1: the next device round (the Administrator runs it; the first 90-161.Z round on engine-v21 or later)
 
-Read these lines in the round's results. Each one answers a question of this plan. The app's session moves the lock to engine-v21 first.
+Read these lines in the round's results. Each one answers a question of this plan. The app's session moves the lock to engine-v21 first. R31 ran on engine-v18 and R32 is planned on engine-v20 (18 Nov 26): those rounds have no `Script check` line, and before engine-v21 the checks `child`, `lang` and `ps` were reused from saved results for 7 days, against docs/engine.md "Results" (engine-v21 runs them fresh), so on an older engine delete RADE\Config\rade-checks.json before the paste to see the `without Bypass` part.
 
 | Line in the results | Question | If the answer is bad |
 |---|---|---|

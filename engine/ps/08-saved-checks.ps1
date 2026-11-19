@@ -9,7 +9,7 @@
 $checkMaxDays = 7
 # Checks whose answer can change between two runs on the same day always run (review R17 MAJOR 2: "Word is open" blocks a
 # deploy, PFM 14 Nov 26 1B; free space; a test file in OneDrive).
-$checkNoSave = @('nipr', 'word', 'disk', 'write')
+$checkNoSave = @('nipr', 'ps', 'lang', 'child', 'word', 'disk', 'write')   # ps, lang and child from engine-v21: the rule above was not kept before (docs/engine.md "Results")
 # Gives the first 6 bytes (12 hex characters) of the SHA-256 of the text, lower case and without a trailing "/". Takes
 # the text; gives back the hash, or an empty text for no text.
 function Get-ShortHash([string]$Text) {

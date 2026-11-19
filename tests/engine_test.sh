@@ -222,7 +222,11 @@ if git show "$v1:engine/rade_build.py" > "$t/v1/engine/rade_build.py" 2>/dev/nul
   xrun "$t/x-v1.ps1" "$t/x2.txt"; h1=$(sha "$xi"); n1=$(ls "$xo/RADE/Config/installed" | wc -l)
   xrun "$t/x-new.ps1" "$t/x3.txt"
   ! cmp -s "$t/x-new.ps1" "$t/x-v1.ps1" && grep -q "is recorded as installed" "$t/x1.txt" && grep -q "is recorded as installed" "$t/x2.txt" && [ -f "$xo/RADE/Config/rade-installed.json" ] && [ "$h0" = "$h1" ] && [ "$n0$n1" = 11 ] && ok || { bad "cross-version: engine-v1 changed this engine's record ($n0 $n1)"; tail -3 "$t/x2.txt"; }
-  grep -q "^Mode: deploy, version 1.0.0 is installed" "$t/x3.txt" && grep -q "PASSED: PowerShell is version 5.1 or newer. Last check: " "$t/x3.txt" && valid schemas/rade-installed.schema.json "$xi" && valid schemas/rade-checks.schema.json "$xo/RADE/Config/rade-checks.json" && ok || { bad "cross-version: this engine after engine-v1 (its record, the saved checks)"; grep "^Mode\|PowerShell is version" "$t/x3.txt"; }
+  grep -q "^Mode: deploy, version 1.0.0 is installed" "$t/x3.txt" && valid schemas/rade-installed.schema.json "$xi" && valid schemas/rade-checks.schema.json "$xo/RADE/Config/rade-checks.json" && ok || { bad "cross-version: this engine after engine-v1 (its record, the saved checks)"; grep "^Mode" "$t/x3.txt"; }
+  # Saved checks (docs/engine.md "Results"): a slow check is reused; the fast checks ps and child run fresh (from engine-v21).
+  grep -q "PASSED: Your OneDrive folder is set up. Last check: " "$t/x3.txt" && ok || bad "saved checks: the OneDrive check is not reused"
+  grep -q "PASSED: PowerShell is version 5.1 or newer. Version \[" "$t/x3.txt" && ok || bad "saved checks: the ps check did not run fresh"
+  grep -q "PASSED: RADE can run its scripts. Test script ran" "$t/x3.txt" && ok || bad "saved checks: the child check did not run fresh"
 else bad "cross-version: the engine-v1 commit $v1 is not in this clone and could not be fetched (git fetch origin $v1)"; fi
 echo "GROUP $pass $fail"; } > "$t/grp-X.log" 2>&1 &
 

@@ -237,7 +237,7 @@ if (-not $script:selfText) { try { $script:selfText = [string]$MyInvocation.MyCo
 The bundle's own hash check: the line to show, the short form and whether the text matches its first line.
 .DESCRIPTION
 Script check (docs/specs/bundle-hash.md; the Administrator, 2026-11-18): the first line of a bundle holds the SHA-256 of
-all the text after it (line ends as LF; engine/rade_build.py HASH_LINE). RADE hashes its own text ($script:selfText) the
+all the text after it (line ends as LF; engine/rade_hash.py HASH_LINE). RADE hashes its own text ($script:selfText) the
 same way and shows the short form (first 12 and last 4 hex), so a person can compare it with the RADE page. It catches a
 change on the way (a half copy, an old page); a changed script can print any value, so it is no security control. This
 release shows the answer and stops nothing: a work-computer round must first prove that a paste keeps the text (Q5).
