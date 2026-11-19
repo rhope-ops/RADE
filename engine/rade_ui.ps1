@@ -181,7 +181,7 @@ $ui.FontInk = { param($Font)
 # panel; $ui.InkFit sizes it when its text changes and when the window has its scale.
 $ui.InkText = { param($Font, $Color, [string]$Name, [bool]$Desc)
   $p = New-Object System.Windows.Forms.Panel; $p.Font = $Font; $p.ForeColor = $Color; $p.BackColor = $ui.C.White; $p.Margin = (& $ui.Pad 0 0 0 0); $p.Size = New-Object System.Drawing.Size(1, 1)
-  $p.AccessibleRole = 'StaticText'; $p.AccessibleName = $Name; $p.Tag = @{ Desc = $Desc; Left = 0; MaxW = 0 }; $p.Visible = $false
+  $p.AccessibleRole = 'StaticText'; $p.AccessibleName = $Name; $p.Tag = @{ Desc = $Desc; Left = 0; MaxW = 0; Cut = $false }; $p.Visible = $false
   $p.Add_Paint({ & $ui.InkPaint $this $_.Graphics }); $p.Add_TextChanged({ & $ui.InkFit $this }); $p }
 # Sizes an ink-tight panel to its text: as wide as the ink (at most Tag.MaxW when that is set: the text then ends with
 # "...") and as tall as the font's ink rows. Does nothing before the window has its scale. Takes the panel.
@@ -191,15 +191,21 @@ $ui.InkFit = { param($P)
     if ($P.Text) { $box = & $ui.InkOf ([string]$P.Text) $P.Font
       if ($box) { $P.Tag.Left = [int]$box.Left; $w = [int]$box.Right - [int]$box.Left }
       else { $w = [int][System.Windows.Forms.TextRenderer]::MeasureText([string]$P.Text, $P.Font).Width } }
-    if ([int]$P.Tag.MaxW -gt 0) { $w = [math]::Min($w, [int]$P.Tag.MaxW) }
+    $P.Tag.Cut = ([int]$P.Tag.MaxW -gt 0 -and $w -gt [int]$P.Tag.MaxW)   # cut = the text is wider than its widest size: only then it ends with "..."
+    if ($P.Tag.Cut) { $w = [int]$P.Tag.MaxW }
     $ns = New-Object System.Drawing.Size(([math]::Max(1, $w)), ([math]::Max(1, $h))); if ($P.Width -ne $ns.Width -or $P.Height -ne $ns.Height) { $P.Size = $ns }
     if ($P.Text) { $P.AccessibleName = [string]$P.Text }; $P.Invalidate() } catch { $null = $_ } }   # no size now: the next fit sizes it
 # Draws the text of an ink-tight panel: moved left and up by the empty room of its text cell, so the ink starts at the
-# panel's left and top edge; a text wider than the panel ends with "...". Takes the panel and its Graphics.
+# panel's left and top edge; a text cut to its widest size (Tag.Cut) ends with "...". Takes the panel and its Graphics.
 $ui.InkPaint = { param($P, $G)
   try { $G.Clear($P.BackColor); if (-not $P.Text) { return }
     $fi = & $ui.FontInk $P.Font; $l = [int]$P.Tag.Left
-    [System.Windows.Forms.TextRenderer]::DrawText($G, [string]$P.Text, $P.Font, (New-Object System.Drawing.Rectangle((-$l), (-[int]$fi.Top), ($P.ClientSize.Width + $l), ([int]$fi.Bottom + 4))), $P.ForeColor, $P.BackColor, [System.Windows.Forms.TextFormatFlags]'Left, Top, NoPadding, NoPrefix, SingleLine, EndEllipsis') } catch { $null = $_ } }   # drawing never stops the window
+    # R32 (the Administrator, 2026-11-18: "RA..." at 150 %): the panel is as wide as the ink, and Windows needs the text's whole
+    # cell (the ink and the last letter's side room, 1 or 2 px more at a large size) or it ends the text with "...". So a text
+    # that is not cut gets room past the panel's edge (nothing is drawn there) and no "..." rule; a cut text keeps both.
+    $room = $P.ClientSize.Width + $l; $fl = 'Left, Top, NoPadding, NoPrefix, SingleLine, EndEllipsis'
+    if (-not $P.Tag.Cut) { $room += [int][math]::Max(8, $fi.Bottom); $fl = 'Left, Top, NoPadding, NoPrefix, SingleLine' }
+    [System.Windows.Forms.TextRenderer]::DrawText($G, [string]$P.Text, $P.Font, (New-Object System.Drawing.Rectangle((-$l), (-[int]$fi.Top), $room, ([int]$fi.Bottom + 4))), $P.ForeColor, $P.BackColor, [System.Windows.Forms.TextFormatFlags]$fl) } catch { $null = $_ } }   # drawing never stops the window
 # Where the ink of a control is, measured on what Windows drew (DrawToBitmap; the first 240 px of its width): gives back
 # @{ Top; Bottom; Left; Right } in the control's own pixels, or its whole box when it cannot be measured. Takes the control.
 $ui.InkBox = { param($C)
