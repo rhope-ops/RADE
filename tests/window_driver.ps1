@@ -40,6 +40,10 @@ function global:Test-RadeRecordCopy {
   Write-Host ('WIN record-copy btn=' + $ui.RecCopy.Text + ' checks=' + ($cl -match '(?m)^CHECKS') + ' detail=' + ($cl -match '(?m)^      R33 detail probe') + ' steps=' + ($cl -match '(?m)^  \[[x ]\] ') + ' text=' + ($cl -match 'Files this round saves') + ' name=' + ($nm -match 'R33 detail probe'))
   $script:checkResults[$cid] = $was; & $ui.RecRefresh }
 function global:Show-RadeCard {
+  # The top bar and the logo block at the first frame (the Administrator, 2026-11-19): one WIN line, once, with the window
+  # title, the name spot (tagline until an application is chosen), whether it and the rule under RADE are shown, and the style.
+  if (-not $global:RadeT.TopBar) { $global:RadeT.TopBar = $true
+    Write-Host ('WIN topbar title=' + $ui.Form.Text + ' spot=' + $ui.AppL.Text + ' shown=' + ($ui.AppL.Visible -and ($ui.AppRow.Visible -or $ui.HeadRule.Visible)) + ' same-font=' + [object]::ReferenceEquals($ui.AppL.Font, $ui.F.Small) + ' right=[' + $ui.RightL.Text + ']') }
   $ps = @($ui.P | Where-Object { $_.Shown } | ForEach-Object { $_.Text }) -join ' / '
   $bs = @($ui.B | Where-Object { $_.Shown } | ForEach-Object { $(if ($_.Enabled) { '[' } else { '(' }) + $_.Text + $(if ($_.Enabled) { ']' } else { ')' }) }) -join ' '
   $os = @($ui.Opts.Controls | ForEach-Object { $(if ($_.Tag.Off) { 'OFF ' } else { [string]$_.Tag.Key + ' ' }) + $_.Tag.Name + $_.Tag.Ver + $(if ($_.Tag.Note) { ' NOTE ' + $_.Tag.Note } else { '' }) }) -join '; '

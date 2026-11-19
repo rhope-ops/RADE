@@ -40,15 +40,15 @@ if ($script:native) {
 $ui = @{ View = ''; Running = $false; Busy = $false; RecOn = $false; Edit = $false; Answer = ''; Acts = @(); Back = $null; OnOpt = $null; FieldDo = $null
   Log = (New-Object System.Collections.Generic.List[string]); Summary = @(); Sel = @{}; Clean = $true; StepState = @{}; Plan = $null; Picked = $false
   BaseIds = @(); BaseRes = @{}; Blocked = @{}; Newer = @{}; Bars = @{}; G = $null; GUrl = ''; CurId = ''; StepI = 0; StepN = 0; StepNow = ''; BusyShown = $false; Always = @($false, $false, $false, $false, $false, $false); NB = 6; StartAfter = $false; Cancel = $false; Dpi = 96.0; ScreenDpi = 96.0; FontK = 1.0; FontDpi = 96.0; Scaled = $false; Full = @{}; Clock = [System.Diagnostics.Stopwatch]::StartNew(); CardAt = -1000000.0; GuardMs = 400; Calm = $false; ContentW = 780 }
-# L5 (the Administrator, 2026-11-19): 2 fixed state texts, the same words every time. You = the person acts; Work = RADE acts.
-$ui.Words = @{ You = 'Your turn.'; Work = 'RADE is working...' }
+# The tagline (the Administrator, 2026-11-19): shown where the application's name shows, until an application is chosen.
+$ui.Tagline = 'Test, deploy, enjoy.'
 # Layout values from engine/window.json, put in by the build (text column share and cap, minimum window size, minimum height of the card frame; pixels at 100 %; the minimum time of a step on the Run card, ms).
 $ui.Layout = @{ Share = [double]'@@TEXT_SHARE@@'; MaxW = [int]'@@TEXT_MAX@@'; MinW = [int]'@@MIN_W@@'; MinH = [int]'@@MIN_H@@'; FrameMin = [int]'@@FRAME_MIN@@'; StepMs = [int]'@@MIN_STEP_MS@@' }
 $ui.Hist = Read-RoundHistory (Get-BasePath)
 $script:secret = Get-Secret (Get-ProfileLeaf) (Get-ProfileLeaf)   # saved checks are masked before they are written
 try { $ui.Calm = -not [System.Windows.Forms.SystemInformation]::UIEffectsEnabled } catch { $null = $_ }
 $ui.Form = New-Object System.Windows.Forms.Form
-$ui.Form.Text = 'RADE - ' + 'Test, deploy, enjoy' + ' - ' + $round + ' - build ' + $buildId + $(if ($script:scriptCheck.Short) { ' - script ' + $script:scriptCheck.Short + $(if (-not $script:scriptCheck.Ok) { ' DOES NOT MATCH' } else { '' }) } else { '' })   # the bundle hash (docs/specs/bundle-hash.md); the tagline (the Administrator, 18 Nov 26) is in the title bar; the window itself has none
+$ui.Form.Text = 'Redacted Application Deployment Engine' + $dot + 'build ' + $buildId   # the Administrator, 2026-11-19: the full name and the build, no round; the bundle hash stays in the log and the report (docs/specs/bundle-hash.md); the window itself has no title
 $ui.Form.SuspendLayout()
 $ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(96, 96); $ui.Form.AutoScaleMode = 'Dpi'   # sizes below are at 100 % scaling
 # @@UI@@

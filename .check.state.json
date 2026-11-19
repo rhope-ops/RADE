@@ -73,7 +73,6 @@
     "tests/window_driver.ps1::Start-Process": 1,
     "tests/window_driver.ps1::[RadeStub.Driver]::Pump": 1,
     "tests/window_driver.ps1::global:Push-RadeButton": 1,
-    "tests/window_driver.ps1::global:Show-RadeCard": 1,
     "tests/window_real.py::bundle": 1,
     "tests/window_real.py::file_url": 1,
     "tests/window_real.py::main": 1,
