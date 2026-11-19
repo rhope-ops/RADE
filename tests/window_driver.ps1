@@ -112,7 +112,7 @@ function global:Show-RadeCard {
   if (-not $global:RadeT.TopBar) { $global:RadeT.TopBar = $true
     Write-Host ('WIN topbar title=' + $ui.Form.Text + ' spot=' + $ui.AppL.Text + ' shown=' + ($ui.AppL.Visible -and ($ui.AppRow.Visible -or $ui.HeadRule.Visible)) + ' same-font=' + [object]::ReferenceEquals($ui.AppL.Font, $ui.F.Small) + ' right=[' + $ui.RightL.Text + ']')
     # "Your turn" (the Administrator, 2026-11-19): bold, blue, in the header row under the line in capitals; its line is as tall empty as shown.
-    $tw = $ui.Turn.Text; $ui.Turn.Text = 'Your turn'; $h1 = $ui.Turn.Height; $ui.Turn.Text = ''; $h2 = $ui.Turn.Height; $ui.Turn.Text = $tw
+    $tw = $ui.Turn.Text; $ui.Turn.Text = 'Your turn'; & $ui.Reflow $ui.Turn; $h1 = $ui.Turn.Height; $ui.Turn.Text = ''; & $ui.Reflow $ui.Turn; $h2 = $ui.Turn.Height; $ui.Turn.Text = $tw; & $ui.Reflow $ui.Turn
     Write-Host ('WIN turn font=' + $ui.Turn.Font.Name + ' ' + $ui.Turn.Font.SizeInPoints + ' ' + $ui.Turn.Font.Style + ' blue=' + [object]::Equals($ui.Turn.ForeColor, $ui.C.Blue) + ' head=' + ((@($ui.Head.Controls) | ForEach-Object { & $ui.NameOf $_ }) -join ',') + ' down=' + $ui.Head.Values['FlowDirection'] + ' same-h=' + ($h1 -eq $h2 -and $h1 -gt 0) + ' shown=' + $ui.Turn.Shown) }
   $ps = @($ui.P | Where-Object { $_.Shown } | ForEach-Object { $_.Text }) -join ' / '
   $bs = @($ui.B | Where-Object { $_.Shown } | ForEach-Object { $(if ($_.Enabled) { '[' } else { '(' }) + $_.Text + $(if ($_.Enabled) { ']' } else { ')' }) }) -join ' '

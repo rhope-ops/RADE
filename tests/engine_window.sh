@@ -37,7 +37,7 @@ has "view=boot" "view=choose light=off kick= sent=Which application do you want 
 # headline, the step line of a run, the Record's step boxes and their accessible names, the foot of the Run card), a step with no title shows
 # its name, and the report keeps the name; the hand card shows the step note under the headline, then the address row, then the numbered
 # lines (a line without a number goes after the list, small and gray), then the one closing line (with the step's doneText), above the
-# buttons; one typeface in 4 styles ($ui.F has only those tokens; every button has the strong font, also a plain one; Consolas is only the
+# buttons; one typeface in 5 styles ($ui.F has only those tokens; every button has the strong font, also a plain one; Consolas is only the
 # Record's text box); the last log line is small.
 has "view=hand light=your turn kick=STEP 2 OF 3 sent=Import the sample flow p=You do this step in the browser. RADE cannot do it for you. steps=1. Open the import page. ~ 2. Choose the file on the clipboard. ~ 3. Select Import. rest=RADE cannot see the import page, so it asks you to confirm. close=When you finish in the browser, come back to this window and select \"Imported\"." \
   "step=Check this computer now-font=Segoe UI10" "step=T03 Sample verify r1" 'foot=RADE needs you next at "Import the sample flow". Until then, keep this window open.' \
