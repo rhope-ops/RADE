@@ -28,7 +28,7 @@ function Get-StepStartInfo([string]$Base, $Step, [string]$Answer, [scriptblock]$
 }
 
 # Reads one output line of a running step (the step contract, docs/engine.md "Step contract"): masks it, then a
-# PROGRESS line moves the step bar, a MADE line goes to the undo list, a FALLBACK line names the fallback route, and any
+# PROGRESS line moves the step bar, a NOW line goes to the window's now-doing line, a MADE line goes to the undo list, a FALLBACK line names the fallback route, and any
 # other line is logged and counted as PASS, SKIP or FAIL. Takes the line, the step, the result record $R (changed in
 # place), the site address (for cleaned names) and the log callback; returns nothing.
 function Add-StepLine([string]$Line, $Step, $R, [string]$Site, [scriptblock]$Say) {
@@ -38,6 +38,9 @@ function Add-StepLine([string]$Line, $Step, $R, [string]$Site, [scriptblock]$Say
     if ($script:prog -and [int]$Matches[2] -gt 0) { $script:prog.Frac = [math]::Min(1.0, [double]$Matches[1] / [double]$Matches[2]); $script:prog.FracText = $Matches[1] + ' of ' + $Matches[2] }
     return
   }
+  # "NOW <text>" (L7): the step says in plain words what it does now. The window shows it under the step's bar; it stays
+  # out of the log and is not a result.
+  if ($line -cmatch '^\s*NOW\s+(\S.*)$') { if ($script:nowUi) { & $script:nowUi $Matches[1].Trim() }; return }
   # "MADE <kind>: <name>": something the step created (a list, a flow, a file); kept for the undo list (step contract).
   # A MADE line is never a result: it is logged with the cleaned name and not counted as PASS, FAIL or SKIP (review).
   if ($line -cmatch '^\s*MADE\s+([a-z][a-z-]{0,30}):\s+(\S.*)$') {
@@ -56,6 +59,15 @@ function Add-StepLine([string]$Line, $Step, $R, [string]$Site, [scriptblock]$Say
   if ($line -cmatch '(^|\s)SKIP(\s|$)') { $R.Skip++ }   # upper case only: prose such as "skip this" is not a result
   if ($line -match '(^|\s)(FAIL|FORMAT-FAIL|RENDER-ERROR|MEASURE-ERROR|STOPPED:)(\s|$)') { $R.Fail++ }
   if ($line.Trim()) { & $Say ('    ' + $line) }   # step output, indented under its step heading
+  if ($script:nowUi) { $now = Get-NowText $line; if ($now) { & $script:nowUi $now } }
+}
+# L7 (the Administrator, 2026-11-19): turns a result line of a step script into a plain sentence for the window's
+# now-doing line: the words after PASS, SKIP or FAIL (upper case), with what the result means in front. Takes the line
+# (masked already); gives back the sentence, or '' when the line is not a result or has no words after the result.
+function Get-NowText([string]$Line) {
+  if ($Line -cnotmatch '(?:^|\s)(PASS|SKIP|FAIL)(?:\s+|:\s*)(\S.*)$') { return '' }
+  $what = $Matches[2].Trim()
+  return ($(if ($Matches[1] -eq 'PASS') { 'Checked: ' } elseif ($Matches[1] -eq 'SKIP') { 'Skipped: ' } else { 'Needs review: ' }) + $what)
 }
 
 # Runs one step script as a child PowerShell and follows its output line by line until it ends or passes its time
@@ -100,7 +112,7 @@ function Get-StepLine($Step, $R, [double]$Seconds) {
   $state = Get-StepState $R
   if ($R.Skipped) { return ($Step.Name + ': SKIPPED' + $(if ($R.Why) { ' (' + $R.Why + ')' } else { ' by you' })) }
   if ($Step.Kind -eq 'guide' -and $R.FailText) { return ($Step.Name + ': FAILED (reported by you) in ' + (Format-Duration $Seconds) + ': ' + $R.FailText) }
-  if ($Step.Kind -eq 'guide') { return ($Step.Name + ': ' + $state + ' (confirmed by you) in ' + (Format-Duration $Seconds)) }
+  if ($Step.Kind -eq 'guide') { return ($Step.Name + ': ' + $state + $(if ($Step.AnswersOnly) { ' (answered by you) in ' } else { ' (confirmed by you) in ' }) + (Format-Duration $Seconds)) }
   if ($state -eq 'PASSED' -and $R.Fallback) { $state = 'PASSED (fallback: ' + $R.Fallback + ')' }
   return ($Step.Name + ': ' + $state + ' (' + $R.Pass + ' passed, ' + $R.Fail + ' failed' + $(if ($R.Skip) { ', ' + $R.Skip + ' skipped' } else { '' }) + ', exit code ' + $R.Exit + ') in ' + (Format-Duration $Seconds))
 }
@@ -118,10 +130,11 @@ function ConvertTo-UserText([string]$Text) {
   return ($t -replace 'https?://\S+', '<SITE>' -replace '[A-Za-z0-9.-]+\.(sharepoint|sharepoint-mil|onmicrosoft)\.[A-Za-z.]+\S*', '<SITE>')   # no address reaches the e-mail
 }
 # Runs a hand step: shows it (in the window or as console text), waits for Done, It failed or Skip, and asks the step's
-# questions. Takes the base folder, the step and a Say block; gives back the result table.
+# questions (a step with "answersOnly" shows only its questions). Takes the base folder, the step and a Say block; gives
+# back the result table.
 function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
   $r = @{ Pass = 0; Fail = 0; Exit = 0; Skipped = $false; FailText = ''; Answers = @() }
-  $script:guideAnswers = @{}
+  $script:guideAnswers = @{}; $script:guideFail = @(); $script:guideError = ''
   $dir = Join-Path $Base $Step.Dir
   $file = $(if ($Step.File) { Join-Path $dir $Step.File } else { '' })   # R18: a guide step may need no file
   $url = $Step.Url
@@ -134,38 +147,71 @@ function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
   # An old marker from an earlier run would make site setup wait for a result that is not coming (review R13 #2).
   if ($Step.Marker) { $old = Join-Path $dir $Step.Marker; if (Test-Path -LiteralPath $old -PathType Leaf) { try { Remove-Item -LiteralPath $old -Force } catch { $null = $_ } } }
   if ($Step.File) { & $Say ('    File ready: ' + $Step.Dir + '\' + $Step.File) }
+  if ($script:textMode -and $Step.AnswersOnly) { $r.Skipped = $true; $r.Why = 'its questions need the RADE window'; & $Say ('    Skipped: ' + $r.Why + '.'); return $r }
   if ($script:textMode) {
     foreach ($l in @($Step.Guide)) { & $Say ('    ' + $l) }
     if ($url) { & $Say ('    Address: ' + $url) }   # R28 N1: a step with no address shows none
     if ($file -and (Copy-TextToClipboard $file)) { & $Say '    The full file path is on the clipboard.' }
     if ($url -and $env:OS -eq 'Windows_NT') { try { Start-Process -FilePath $url } catch { $null = $_ } }
-    $a = [string](Read-Host 'Press Enter when the flow run has started, type F and Enter if it failed, or S and Enter to skip this step'); $a = $(if ($a) { $a.Trim() } else { '' })   # no input (closed stdin) gives no value, not ''
-    $res = $(if ($a -match '^[Ss]') { 'Cancel' } elseif ($a -match '^[Ff]') { 'Abort' } else { 'OK' })
+    $res = Read-GuideChoice $Step
     if ($res -eq 'Abort') { $script:guideError = [string](Read-Host 'Paste the error message (no names or site address), then press Enter') }
   } elseif ($script:guideUi) { $res = [string](@(& $script:guideUi $Step $file $url $urlFile))[-1] }   # the window shows the step as a card and waits for the answer
   else { $res = 'Cancel' }
-  $ok = ($res -eq 'OK')
-  if ($res -eq 'Abort') {
+  # E2 (the Administrator, 2026-11-19): an answer that the manifest marks as a failure ("failOn") makes the step FAILED.
+  $bad = @($script:guideFail | Where-Object { $_ })
+  if ($res -eq 'Abort' -or ($res -eq 'OK' -and $bad.Count)) {
     $t = ConvertTo-UserText ([string]$script:guideError)
     if ($t.Length -gt 600) { $t = $t.Substring(0, 600) + ' ...' }
     if (-not $t) { $t = 'no error text given' }
+    if ($bad.Count) { $t = 'answer ' + ($bad -join '; ') + '. Error text: ' + $t }
     $r.Fail = 1; $r.FailText = $t
     & $Say ('    Failed (reported by you): ' + $t)
-  } elseif ($ok) {
+  } elseif ($res -eq 'OK') {
     if ($Step.Marker) { try { Set-Content -LiteralPath (Join-Path $dir $Step.Marker) -Value (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') -Encoding UTF8 } catch { $null = $_ } }
     $r.Pass = 1
-    & $Say ('    ' + $(if ($Step.DoneLog) { $Step.DoneLog } else { 'Confirmed by you: the flow is imported and its run has started.' }))
-    # The step's questions (manifest "answers"), asked after Done: one line each for the summary, under the step's line.
-    foreach ($q in @($Step.Answers | Where-Object { $_ })) {
-      $k = [string]$q.Key
-      if ($script:textMode) { $v = 'not asked (text mode)' }
-      elseif (-not $script:guideAnswers.ContainsKey($k)) { $v = 'not answered (the window closed)' }
-      elseif ($q.Kind -eq 'text') { $v = ConvertTo-UserText ([string]$script:guideAnswers[$k]); if (-not $v) { $v = '(no text)' } }   # the full answer (R28: it was cut at 120 characters)
-      else { $v = [string]$script:guideAnswers[$k] }   # yes/no and pick: the fixed words of the buttons
-      $r.Answers += ('  Answer ' + $k + ': ' + $v)
-    }
-  } else { $r.Skipped = $true; & $Say '    Skipped by you.' }
+    & $Say ('    ' + $(if ($Step.DoneLog) { $Step.DoneLog } elseif ($Step.AnswersOnly) { 'Answered by you.' } else { 'Confirmed by you: the flow is imported and its run has started.' }))
+  } elseif ($res -eq 'None') { $r.Skipped = $true; $r.Why = 'no answer that this step offers was given'; & $Say ('    Skipped: ' + $r.Why + '.') }   # text mode: a hidden answer is never recorded as the person's
+  else { $r.Skipped = $true; & $Say '    Skipped by you.' }
+  # The step's questions (manifest "answers"), asked after Done: one line each for the summary, under the step's line.
+  if ($res -eq 'OK') { foreach ($q in @($Step.Answers | Where-Object { $_ })) { $r.Answers += ('  Answer ' + [string]$q.Key + ': ' + (Get-GuideAnswerText $q)) } }
   return $r
+}
+<#
+.SYNOPSIS
+Text mode: asks how a hand step ended and reads the answer.
+.DESCRIPTION
+Only the answers the step shows are offered (manifest "hide", E1); an answer that is not offered is asked again, 3 times
+at most; then the step is skipped with that reason, not as an answer of the person.
+.PARAMETER Step
+The step (its Hide list names the answers that are not offered: done, failed, skip).
+.OUTPUTS
+OK (Done), Abort (It failed), Cancel (Skip) or None (no answer that the step offers, 3 times).
+#>
+function Read-GuideChoice($Step) {
+  $hide = @($Step.Hide)
+  $ask = 'Press Enter when the flow run has started, type F and Enter if it failed, or S and Enter to skip this step'
+  if ($hide.Count) {
+    $ws = @(); if ($hide -notcontains 'done') { $ws += 'press Enter when you have done this step' }; if ($hide -notcontains 'failed') { $ws += 'type F and Enter if it failed' }; if ($hide -notcontains 'skip') { $ws += 'type S and Enter to skip this step' }
+    $ask = ($ws -join ', or '); $ask = $ask.Substring(0, 1).ToUpperInvariant() + $ask.Substring(1)
+  }
+  for ($n = 0; $n -lt 3; $n++) {
+    $a = [string](Read-Host $ask); $a = $(if ($a) { $a.Trim() } else { '' })   # no input (closed stdin) gives no value, not ''
+    $res = $(if ($a -match '^[Ss]') { 'Cancel' } elseif ($a -match '^[Ff]') { 'Abort' } else { 'OK' })
+    $name = $(if ($res -eq 'OK') { 'done' } elseif ($res -eq 'Abort') { 'failed' } else { 'skip' })
+    if ($hide -notcontains $name) { return $res }
+  }
+  return 'None'
+}
+# Gives the report text of one question of a hand step: the answer, or why there is none. A text answer is masked and
+# kept whole. Takes the question; reads $script:guideAnswers; gives back the text.
+function Get-GuideAnswerText($Q) {
+  $k = [string]$Q.Key
+  if ($script:textMode) { return 'not asked (text mode)' }
+  # E3: a question that depends on an earlier answer ("showIf") and did not show.
+  if ($Q.ShowKey -and @($Q.ShowIn) -cnotcontains [string]$script:guideAnswers[[string]$Q.ShowKey]) { return 'not asked' }
+  if (-not $script:guideAnswers.ContainsKey($k)) { return 'not answered (the window closed)' }
+  if ($Q.Kind -eq 'text') { $v = ConvertTo-UserText ([string]$script:guideAnswers[$k]); if (-not $v) { $v = '(no text)' }; return $v }   # the full answer (R28: it was cut at 120 characters)
+  return [string]$script:guideAnswers[$k]   # yes/no and pick: the fixed words of the buttons
 }
 # Adds one line to the run log, when a log exists. Takes the line; gives back nothing.
 function Add-RunLog([string]$T) { if ($null -ne $script:runLog) { $script:runLog.Add($T) } }

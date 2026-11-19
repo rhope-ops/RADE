@@ -8,7 +8,8 @@
 # A check that cannot pass on the test computer is set to PASSED after its card has shown (the test is of the window).
 # The hand step's questions (manifest "answers"): one picture per kind (NN-answer-yesno, NN-answer-pick, NN-answer-text),
 # for the owner's approval of the look (the long-text run draws a first sentence that shrinks in the smallest window);
-# the driver selects the first button (a text gets a short fake note).
+# the driver selects the first button (a text gets a short fake note). R31: the tour cards (each one), the step that shows only
+# questions (the driver selects its answer that means a failure, then gives a fake error text) and the last card of a test round.
 Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing
 $env:RADE_LAYOUT = '1'   # the layout self-check runs for a deploy too
 function Start-Process { param($FilePath, $ArgumentList, $WorkingDirectory) Write-Host ('WIN start-process ' + $(if ([string]$FilePath -match '^https://') { 'browser' } else { [string]$FilePath })) }
@@ -34,6 +35,14 @@ function global:Save-RadeCard([string]$Tag) {
   for ($i = $global:RadeT.Lay; $i -lt $ui.LayBad.Count; $i++) { Write-Host $ui.LayBad[$i] }
   $global:RadeT.Lay = $ui.LayBad.Count
   if ($ui.Scrolls -and -not $ui.RecOn) { Write-Host ('WIN scrolls ' + $card) }
+}
+# R31: answers the cards of the R31 brief. tour: each card (Next, then "Close the tour"); answer: the answer that means a
+# failure when the card has one (so its error card is drawn), else the first button; answerfail: a fake error text;
+# feedback: a fake note. Takes the view of the card.
+function global:Step-RadeR31([string]$V) {
+  if ($V -eq 'answerfail') { $ui.ErrBox.Text = 'The page said: error 42' } elseif ($V -eq 'feedback') { $ui.Field.Text = 'Sample feedback' }
+  $fb = @($ui.B | Where-Object { $_.Visible -and $_.Text -like 'An error*' })[0]
+  if ($V -eq 'answer' -and $fb) { $fb.PerformClick() } else { $ui.B[0].PerformClick() }
 }
 function global:Step-Rade {
   if (((Get-Date) - $global:RadeT.T0).TotalSeconds -gt 240) { Write-Host ('WIN TIMEOUT view=' + $ui.View + ' sent=' + $ui.Sent.Text); [Environment]::Exit(3) }
@@ -85,8 +94,8 @@ function global:Step-Rade {
     elseif ($global:RadeT.Hand -eq 'fail') { $ui.B[1].PerformClick() } else { $ui.B[0].PerformClick() }
   }
   elseif ($v -eq 'answer') {
-    if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }
-    $ui.B[0].PerformClick() }
+    if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }; Step-RadeR31 $v }
+  elseif ($v -in 'tour', 'answerfail', 'feedback') { Step-RadeR31 $v }
   elseif ($v -eq 'handfail') { $ui.ErrBox.Text = 'Import failed: flow https://usaf.dps.mil/sites/fake/x not found'; $ui.B[0].PerformClick() }
   elseif ($v -in 'done', 'review', 'stopped') {
     foreach ($l in @($ui.Log)) { if ([string]$l -match 'failed|FAILED|STOPPED|could not') { Write-Host ('WIN log ' + ([string]$l).Trim()) } }

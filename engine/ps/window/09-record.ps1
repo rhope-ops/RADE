@@ -91,12 +91,12 @@ $ui.VRecord = {
   $ui.RecText.Text = ($t -join "`r`n") + "`r`n"   # ends with a line break: a live log line is added below
   $ui.RecTitle.Text = 'Record' + $(if ($ui.Picked) { $dot + $script:app.Name } else { '' })
   & $ui.RecFit
-  $ui.Card.Visible = $false; $ui.Rec.Visible = $true; & $ui.RecTall; $ui.RecChecks.Invalidate(); $ui.RecB.Visible = $false; $ui.BackB.Visible = $false
+  $ui.Card.Visible = $false; $ui.Rec.Visible = $true; & $ui.RecTall; $ui.RecChecks.Invalidate(); $ui.RecB.Visible = $false; $ui.TourB.Visible = $false; $ui.BackB.Visible = $false
   try { [void]$ui.RecClose.Focus() } catch { $null = $_ } }
 # Closes the Record and shows the card again; redraws the ready card when a step box was changed. Takes nothing.
 $ui.CloseRecord = {
   & $ui.Check
-  $ui.RecOn = $false; $ui.Rec.Visible = $false; $ui.Card.Visible = $true; $ui.RecB.Visible = $true; $ui.BackB.Visible = [bool]$ui.Back
+  $ui.RecOn = $false; $ui.Rec.Visible = $false; $ui.Card.Visible = $true; $ui.RecB.Visible = $true; $ui.TourB.Visible = ($ui.HelpViews -contains [string]$ui.View); $ui.BackB.Visible = [bool]$ui.Back
   if ($ui.Edit) { $ui.Edit = $false; if ($ui.View -eq 'ready') { & $ui.VReady } }   # the plan line follows the boxes
   try { [void]$ui.RecB.Focus() } catch { $null = $_ } }
 $ui.RecB.Add_Click({ & $ui.VRecord })

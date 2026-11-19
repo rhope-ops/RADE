@@ -3,7 +3,7 @@
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
 # ---- The card: one block, its text column centered (76.5 % of the width, at most 900 px: engine/window.json), 40 % of the spare height above it. Top to bottom: a small
-# line in capitals, the sentence, up to four paragraphs, the choices, a box with its label, the lines of a hand step (one
+# line in capitals (the header row), the sentence, up to four paragraphs, the choices, a box with its label, the lines of a hand step (one
 # selectable text: the numbered lines, then the unnumbered ones), the file path of a hand step, the step line (name, bar,
 # time in the step, count), the last log line, the error box, two file links, a note, the help line, the closing line of
 # a hand step, the buttons, a last gray line, and the owner's test extras. A card shows only the parts it names ($ui.SetCard).
@@ -13,8 +13,13 @@ $ui.Card.Dock = 'Fill'; $ui.Card.ColumnCount = 3; $ui.Card.RowCount = 3; $ui.Car
 # (engine/window.json); the two sides share what is left, so the column is centered ($ui.Fit sets the sizes).
 $ui.CardCols = @(); $sd = (100 - $ui.Layout.Share) / 2
 foreach ($w in @($sd, $ui.Layout.Share, $sd)) { $cs = New-Object System.Windows.Forms.ColumnStyle('Percent', $w); $ui.CardCols += $cs; [void]$ui.Card.ColumnStyles.Add($cs) }
-[void]$ui.Card.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent', 40))); [void]$ui.Card.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('AutoSize'))); [void]$ui.Card.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent', 60)))
-# The card is a stack of two: the body (every part above the buttons) and the tail (the buttons, the last gray line
+# Three rows: the room above the frame (a fixed height, set by $ui.Squeeze), the frame, the rest (L1, the Administrator, 2026-11-19).
+$ui.CardRows = @((New-Object System.Windows.Forms.RowStyle('Absolute', 0)), (New-Object System.Windows.Forms.RowStyle('AutoSize')), (New-Object System.Windows.Forms.RowStyle('Percent', 100))); foreach ($rs in $ui.CardRows) { [void]$ui.Card.RowStyles.Add($rs) }
+# The card frame (L1, the Administrator, 2026-11-19): its top is fixed (40 % of the spare height above a frame of
+# $ui.Layout.FrameMin, engine/window.json), it is that tall at least and grows down to the bottom line at most. It is a
+# stack of four: the header row (the line in capitals, "Step x of n": it never scrolls and never moves), the body, a gap
+# that fills a short card up to the minimum height, and the tail, so the buttons sit at the bottom of the frame.
+# The card is a stack: the body (every part above the buttons) and the tail (the buttons, the last gray line
 # and the test extras). The body sits in a panel that scrolls only when the card is taller than the window, so the
 # buttons are always in view (the Administrator, 2026-11-15; $ui.Squeeze). No scroll at 1020 x 616 and larger.
 $ui.MkStack = { $t = New-Object System.Windows.Forms.TableLayoutPanel; $t.AutoSize = $true; $t.AutoSizeMode = 'GrowAndShrink'; $t.ColumnCount = 1; $t.Margin = (& $ui.Pad 0 0 0 0); $t.BackColor = $ui.C.White
@@ -24,6 +29,8 @@ $ui.Scroll = New-Object System.Windows.Forms.Panel
 $ui.Scroll.AutoScroll = $true; $ui.Scroll.Margin = (& $ui.Pad 0 0 0 0); $ui.Scroll.BackColor = $ui.C.White; $ui.Scroll.AccessibleName = 'Card text'
 $ui.Body.Location = New-Object System.Drawing.Point(0, 0); [void]$ui.Scroll.Controls.Add($ui.Body)
 $ui.Kick = & $ui.Text $ui.F.SmallB $ui.C.Gray 0 'Card line'
+$ui.Head = & $ui.Flow 0; $ui.Head.Visible = $true; $ui.Head.AccessibleName = 'Card header'; [void]$ui.Head.Controls.Add($ui.Kick)   # as tall as one line also when the card has no line ($ui.Fit)
+$ui.Gap = New-Object System.Windows.Forms.Panel; $ui.Gap.Size = New-Object System.Drawing.Size(1, 0); $ui.Gap.Margin = (& $ui.Pad 0 0 0 0); $ui.Gap.BackColor = $ui.C.White; $ui.Gap.Visible = $false
 $ui.SentRow = & $ui.Flow $ui.Z.G1; $ui.SentRow.Visible = $true
 $ui.TickP = New-Object System.Windows.Forms.Panel
 $ui.TickP.Size = New-Object System.Drawing.Size(30, 30); $ui.TickP.Margin = (& $ui.Pad 0 9 12 0); $ui.TickP.Visible = $false; $ui.TickP.AccessibleRole = 'StaticText'; $ui.TickP.AccessibleName = 'Passed'
@@ -52,8 +59,9 @@ $ui.StepBar = & $ui.MkBar 'step' 'Progress of this step'; $ui.StepBar.Width = 20
 $ui.StepTime = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepTime.Visible = $true; $ui.StepTime.AccessibleName = 'Time in this step'
 $ui.StepFrac = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepFrac.Visible = $true; $ui.StepFrac.Margin = (& $ui.Pad $ui.Z.G3 2 0 0)
 foreach ($c in @($ui.StepName, $ui.StepBar, $ui.StepTime, $ui.StepFrac)) { [void]$ui.StepRow.Controls.Add($c) }
-# The last log line wraps to its full height (R28 N9: a label 20 px high cut it through its middle, and "..." cut its end).
-$ui.LastLog = & $ui.Text $ui.F.Small $ui.C.Gray $ui.Z.G2 'Last log line'
+# The now-doing line (L7, the Administrator, 2026-11-19; the last log line before): what the running step does now, as a plain
+# sentence ($ui.ShowNow). It wraps to its full height (R28 N9: a label 20 px high cut it through its middle, and "..." cut its end).
+$ui.Now = & $ui.Text $ui.F.Small $ui.C.Gray $ui.Z.G2 'Now doing'
 $ui.FieldRow = & $ui.Flow $ui.Z.G2; $ui.FieldRow.WrapContents = $true; & $ui.Ring $ui.FieldRow
 $ui.FieldL = & $ui.Label $ui.F.SmallB $ui.C.Gray 9; $ui.FieldL.Visible = $true
 # A one-line box: a frame as tall as a compact button with RADE's own 1 px edge, the text box inside it with no border,
@@ -101,8 +109,8 @@ foreach ($c in @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox)) { [void]$ui.Test
 # Puts controls into a table as one auto-sized row each, top to bottom. Takes the table and the list of controls; sets
 # the row count; gives back nothing.
 $ui.Fill = { param($T, $Parts) $row = 0; foreach ($c in @($Parts)) { [void]$T.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('AutoSize'))); $T.Controls.Add($c, 0, $row); $row++ }; $T.RowCount = $row }
-& $ui.Fill $ui.Body @($ui.Kick, $ui.SentRow, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.Opts, $ui.FieldRow, $ui.Guide, $ui.PathL, $ui.PathT, $ui.StepRow, $ui.LastLog, $ui.ErrRow, $ui.LinkRow, $ui.Note, $ui.Help)
+& $ui.Fill $ui.Body @($ui.SentRow, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.Opts, $ui.FieldRow, $ui.Guide, $ui.PathL, $ui.PathT, $ui.StepRow, $ui.Now, $ui.ErrRow, $ui.LinkRow, $ui.Note, $ui.Help)
 & $ui.Fill $ui.Tail @($ui.Close, $ui.BtnRow, $ui.Foot, $ui.TestRow)
-& $ui.Fill $ui.Stack @($ui.Scroll, $ui.Tail)
+& $ui.Fill $ui.Stack @($ui.Head, $ui.Scroll, $ui.Gap, $ui.Tail)
 $ui.Card.Controls.Add($ui.Stack, 1, 1); $ui.Card.SetColumnSpan($ui.Stack, 2)   # two columns: room for the scroll bar beside the text
 

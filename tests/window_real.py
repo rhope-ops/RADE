@@ -10,7 +10,8 @@ Usage: python tests/window_real.py OUT_DIR
 Pass = every run ends with "WIN closed=True", prints no "LAYOUT " line (the engine's layout self-check), a SCALE line,
 and no card scrolls at a size larger than the smallest, except a hand card ("Your turn"), whose text may scroll at
 any size (the Administrator, 2026-11-17); the first run draws the 3 question cards of the hand step
-and each run in the smallest window draws the text question (exit 0). Output: OUT_DIR/<run>/*.png
+and each run in the smallest window draws the text question; a first window of a Windows profile draws the 5 tour cards,
+and a test round draws the cards answerfail and feedback (R31) (exit 0). Output: OUT_DIR/<run>/*.png
 (NN-answer-yesno, NN-answer-pick, NN-answer-text), out.txt.
 """
 import importlib.util
@@ -104,6 +105,14 @@ def bundle(t, long, keep=None):
         sp.loader.exec_module(eng)
         m = stretch(m, eng.TEXT_LIMITS)
         names = [a["name"] for a in m["bundles"][0]["apps"]]
+    # R31 (docs/reviews/2026-11-19-r31-plan.md): a step of the test application that shows only questions (E2), with an answer
+    # that means a failure and a question that depends on the other answer (E3); the first step says what it is doing (L7).
+    b0 = m["bundles"][0]
+    b0["steps"][0]["doing"] = "Checking the sample files."
+    b0["steps"].append({"name": "T05 Sample questions r1", "dir": "T05", "file": "", "kind": "guide", "guide": [], "answersOnly": True, "answers": [
+        {"key": "page", "prompt": "What does the page show?", "kind": "pick", "choices": ["The list", "An error"], "failOn": ["An error"]},
+        {"key": "more", "prompt": "Does the list show two rows?", "kind": "yesno", "showIf": {"key": "page", "in": ["The list"]}}]})
+    b0["apps"][0]["steps"].append("T05 Sample questions r1")
     (app / "scripts" / "paste_bundles.json").write_text(json.dumps(m), encoding="utf-8")
     r = subprocess.run([sys.executable, str(ROOT / "engine" / "rade_build.py"), "--app-root", str(app)], capture_output=True, text=True)
     if r.returncode:
@@ -131,6 +140,27 @@ def bundle(t, long, keep=None):
     driver = (ROOT / "tests" / "window_real_driver.ps1").read_text(encoding="utf-8")
     (t / "w.ps1").write_text(driver + "\n" + s, encoding="utf-8-sig")   # a byte order mark: Windows PowerShell 5.1 reads the file as UTF-8
     return users
+
+
+def r31_why(lines, app, fresh):
+    """Say what a run misses of the cards of the R31 brief (docs/reviews/2026-11-19-r31-plan.md).
+
+    Args:
+        lines: the output lines of the run.
+        app: the application of the run (0 = the test application).
+        fresh: True when the run starts on a new Windows profile, so the tour shows.
+
+    Returns:
+        A list of reasons (empty when nothing is missing): a first window draws the 5 tour cards; a test round draws
+        the error card of an answer that means a failure and its last card.
+    """
+    views = [re.sub(r"^WIN card=\d+-(\S+) .*$", r"\1", l) for l in lines if l.startswith("WIN card=")]
+    why = []
+    if fresh and views.count("tour") != 5:
+        why.append("the tour drew %d cards, not 5" % views.count("tour"))
+    if app == 0 and not {"answerfail", "feedback"} <= set(views):
+        why.append("a test round did not draw the cards answerfail and feedback")
+    return why
 
 
 def main():
@@ -165,7 +195,7 @@ def main():
                 print("   " + l[:300])
         # a hand card ("Your turn") may scroll at any size (the Administrator, 2026-11-17); every other card only at the smallest
         scrolls = [l for l in lines if l.startswith("WIN scrolls ") and not l.rstrip().endswith("-hand")]
-        why = []
+        why = r31_why(lines, app, name == RUNS[0][0] or not name.startswith("deploy-"))   # R31: the tour, and the cards of a test round
         if not closed:
             why.append("the window did not reach its end")
         if layout:

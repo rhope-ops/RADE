@@ -40,6 +40,17 @@ function Save-WindowState([int]$X, [int]$Y, [int]$W, [int]$H, [string]$State, [i
   try { $o = [ordered]@{ about = 'RADE window place (a cache; delete it to open maximized again)'; x = $X; y = $Y; w = $W; h = $H; state = $State; dpi = $Dpi; closed = [ordered]@{ w = $ClientW; h = $ClientH; state = $CloseState } }
     Write-FileWhole (Get-RadeConfigFile 'rade-window.json') (($o | ConvertTo-Json -Depth 4) + "`r`n") } catch { $null = $_ }
 }
+# L6 (the Administrator, 2026-11-19): says whether the RADE tour was shown for this Windows profile before
+# (RADE\Config\rade-tour.txt is there). Takes nothing; gives back $true or $false ($true when the file cannot be looked
+# for, so a problem never shows the tour each time).
+function Test-TourSeen { try { return [bool](Test-Path -LiteralPath (Get-RadeConfigFile 'rade-tour.txt') -PathType Leaf) } catch { return $true } }
+# Remembers that the RADE tour was shown: writes the date to RADE\Config\rade-tour.txt; a failure is ignored. Takes
+# nothing; gives back nothing.
+function Save-TourSeen {
+  try { $p = Get-RadeConfigFile 'rade-tour.txt'; $d = Split-Path -Parent $p
+    if (-not (Test-Path -LiteralPath $d -PathType Container)) { [void](New-Item -ItemType Directory -Path $d -Force) }
+    Write-FileWhole $p ((Get-Date -Format 'yyyy-MM-dd') + "`r`n") } catch { $null = $_ }   # not saved: the tour shows one more time
+}
 function Get-MailTo([string]$Base) {
   # RADE\Config\rade-mail-to.txt: the address the results e-mail goes to (PFM 13 Nov; RADE R17). The window box saves it.
   # Until it exists, the app's old Config\@@PREFIX@@-mail-to.txt is read.
