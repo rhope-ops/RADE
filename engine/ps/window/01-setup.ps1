@@ -23,10 +23,10 @@ if ($env:OS -eq 'Windows_NT') {
 # R34 (the Administrator, 2026-11-19, "a"): in PowerShell ISE the window read 96 dpi on a 150 % screen while the console drew it
 # smaller and sharper; SetProcessDPIAware above cannot change a process whose awareness is already set. So RADE also reads the
 # awareness of its own thread (Windows 10 1607 or later) and, only when it is "unaware" (Windows then stretches the window),
-# makes the thread "system aware" before the form exists; 10-keys.ps1 sets the old value back when the window has closed.
+# makes the thread "system aware" before the form exists; engine/ps/10-window.ps1 sets the old value back when the window has closed or failed.
 # A separate type (Rade.Dpi): a bundle pasted again in the same session must not fail on a changed Rade.Native.
 # $script:dpiThread is the SCALE line's "thread=" (the awareness, and "unaware>system" when RADE changed it).
-$script:dpiThread = 'n/a'; $script:dpiOld = [IntPtr]::Zero
+$script:dpiThread = 'n/a'
 if ($script:native) {
   try { Add-Type -Namespace Rade -Name Dpi -MemberDefinition ('[DllImport("user32.dll")] public static extern IntPtr GetThreadDpiAwarenessContext(); ' +
       '[DllImport("user32.dll")] public static extern int GetAwarenessFromDpiAwarenessContext(IntPtr c); [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr c); ' +
