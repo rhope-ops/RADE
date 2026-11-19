@@ -31,7 +31,15 @@ $ui.FitHead = { try {
     $iw = & $ui.Ink $ui.WordL; $ia = & $ui.Ink $ui.AppL; $e = [math]::Max($iw, $ia)
     & $ui.SetLeft $ui.WordL ($e - $iw); & $ui.SetLeft $ui.AppL ($e - $ia)
     # L2: the line under the word is as wide as the word's ink and starts where it starts.
-    if ($ui.AppUnder) { & $ui.SetLeft $ui.HeadRule $e; $rw = [math]::Max(1, [int]$ui.WordL.Width - $iw); if ($ui.HeadRule.Width -ne $rw) { $ui.HeadRule.Width = $rw } } } catch { $null = $_ } }   # no measure (no window handle yet): the next fit sets the edges
+    # R34: the width comes from the ink Windows drew in the panel ($ui.InkBox, the measure of the self-check), not from the
+    # panel's width: at 150 % in ISE the panel was 114 wide and the drawn word 93 (each card had the defect).
+    if ($ui.AppUnder) { & $ui.SetLeft $ui.HeadRule $e; $rw = & $ui.RuleW; if ($ui.HeadRule.Width -ne $rw) { $ui.HeadRule.Width = $rw } } } catch { $null = $_ } }
+# The width of the line under the word RADE: the width of the word's drawn ink, measured once for each text, font and
+# panel size. Takes nothing; gives back the width in pixels (at least 1).
+$ui.RuleW = { $w = $ui.WordL; $f = $w.Font; $k = 'rule|' + [string]$w.Text + '|' + $f.Name + '|' + $f.SizeInPoints + '|' + $w.Width + 'x' + $w.Height
+  if ($ui.Inks.ContainsKey($k)) { return [int]$ui.Inks[$k] }
+  $b = & $ui.InkBox $w; $v = [math]::Max(1, [int]$b.Right - [int]$b.Left); if ($v -lt [int]$w.Width) { $ui.Inks[$k] = $v }   # only a measure is kept: the whole box is the fallback
+  return $v }   # no measure (no window handle yet): the next fit sets the edges
 # Whether the header shows the application name on the edge of the word RADE: the name has text and shows, and both rows
 # start at the same x (both logos, or no application logo). Takes nothing; gives back $true or $false.
 $ui.HeadPair = { [bool]([string]$ui.AppL.Text -and $(if ($ui.AppUnder) { $ui.AppL.Visible } else { $ui.AppRow.Visible }) -and ($ui.AppUnder -or $ui.Logo)) }

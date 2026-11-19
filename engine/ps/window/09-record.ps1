@@ -12,7 +12,7 @@ $ui.RecRows = {
     $d = Get-CheckDef $id; $r = $(if ($ui.Picked) { $script:checkResults[$id] } else { $ui.BaseRes[$id] }); if (-not $r) { $r = @{ State = 'NOT RUN'; Detail = ''; Fix = '' } }
     if ([string]$d.Group -ne $g0) { $g0 = [string]$d.Group; $rows += @{ Head = $g0.ToUpperInvariant() } }
     $nm = [string]$d.Short; if (-not $nm) { $nm = [string]$d.Name }
-    $rows += @{ Name = $nm; State = [string]$r.State; More = $(if ($r.State -ne 'PASSED' -or $r.Saved) { @(@($r.Detail, $r.Fix) | Where-Object { $_ }) } else { @() }) }   # not passed: what was found, then what to do; reused (Get-SavedCheck): "Last check: 17 Nov 26", then what it found
+    $rows += @{ Name = $nm; State = [string]$r.State; More = $(if ($r.State -ne 'PASSED' -or $r.Saved) { @(@($r.Detail, $r.Fix) | Where-Object { $_ }) } else { @(@($r.Detail) | Where-Object { $_ }) }) }   # not passed: what was found, then what to do; reused (Get-SavedCheck): "Last check: 17 Nov 26", then what it found; passed (R33): what it found
   }
   return $rows }
 $ui.RecPlan = { param([int]$w)
@@ -44,6 +44,25 @@ $ui.RecChecks.Add_Paint({
       foreach ($m in @($q.More)) { & $ui.Word $g $m.T $ui.F.Small $ui.C.Gray $pl.In ($m.Y + (& $ui.Sc 1)) ($lw - $pl.In) ($m.H - (& $ui.Sc 1)) $wrap }   # what was found, then what to do
     }
   } catch { $null = $_ } })
+# Reads the check results again while the Record is open (R33: a check that ended after F2 still showed NOT RUN). Takes
+# nothing; does nothing when the Record is closed. Called after each check result of the window's check runs.
+$ui.RecRefresh = { if (-not $ui.RecOn) { return }
+  try { $ui.RecData = @(& $ui.RecRows); & $ui.RecTall; & $ui.RecName; $ui.RecChecks.Invalidate() } catch { $null = $_ } }
+# Sets the screen-reader text of the check list from $ui.RecData. Takes nothing.
+$ui.RecName = { $ui.RecChecks.AccessibleName = 'Checks. ' + ((@($ui.RecData) | ForEach-Object { if ($_.Head) { $_.Head + ':' } else { $_.Name + ' ' + $_.State + $(if (@($_.More).Count) { ', ' + (@($_.More) -join ', ') } else { '' }) } }) -join '. ') }
+# The whole Record as plain text, for Copy all (R33): the title, each check with its result and its detail lines, each step
+# box with its state, then the text box (files, made list, log). Takes nothing; gives back the text with Windows line ends.
+$ui.RecAll = {
+  $t = @([string]$ui.RecTitle.Text, '', 'CHECKS')
+  foreach ($r in @($ui.RecData)) { if ($r.Head) { $t += ('  ' + $r.Head) } else { $t += ('    ' + $r.State + ': ' + $r.Name); foreach ($m in @($r.More)) { $t += ('      ' + [string]$m) } } }
+  $t += @('', 'STEPS')
+  foreach ($c in @($ui.RecSteps.Controls)) {
+    if ($c -is [System.Windows.Forms.CheckBox]) { $fu = $ui.Full[$c]; $t += ('  [' + $(if ($c.Checked) { 'x' } else { ' ' }) + '] ' + $(if ($null -ne $fu) { [string]$fu } else { [string]$c.Text })) }
+    elseif ([string]$c.Text -and [string]$c.Text -ne 'STEPS') { $t += ('      ' + [string]$c.Text) } }
+  $t += ''; $t += @(([string]$ui.RecText.Text) -split "`r?`n")
+  return ((@($t) -join "`r`n").TrimEnd() + "`r`n") }
+# Copy all: puts $ui.RecAll on the clipboard and says so on the button until the Record opens again. Takes nothing.
+$ui.RecCopyAll = { try { [System.Windows.Forms.Clipboard]::SetText((& $ui.RecAll)); $ui.RecCopy.Text = 'Copied' } catch { $ui.RecCopy.Text = 'Not copied' } }
 # Sets the height of the check list to the height of its rows. Takes nothing; does nothing before the window has its
 # scale.
 $ui.RecTall = { if (-not $ui.Scaled) { return }; try { $t = (& $ui.RecPlan $ui.RecChecks.ClientSize.Width).Tall + (& $ui.Sc 4); if ($ui.RecChecks.Height -ne $t) { $ui.RecChecks.Height = $t } } catch { $null = $_ } }
@@ -57,7 +76,7 @@ $ui.VRecord = {
   & $ui.Check
   $ui.RecOn = $true; $ui.RecData = @(& $ui.RecRows)
   $ui.RecW = 0; & $ui.RecTall   # as tall as its rows (the same plan as the Paint handler)
-  $ui.RecChecks.AccessibleName = 'Checks. ' + ((@($ui.RecData) | ForEach-Object { if ($_.Head) { $_.Head + ':' } else { $_.Name + ' ' + $_.State + $(if (@($_.More).Count) { ', ' + (@($_.More) -join ', ') } else { '' }) } }) -join '. ')
+  & $ui.RecName; $ui.RecCopy.Text = 'Copy all'
   $old = @($ui.RecSteps.Controls); $ui.RecSteps.Controls.Clear(); foreach ($o in $old) { $o.Dispose() }; $ui.Full = @{}
   # Adds one label to the Steps part of the Record. Takes the text, the font and the color; gives back nothing.
   $mk = { param([string]$Text, $Font, $Color) $l = New-Object System.Windows.Forms.Label; $l.AutoSize = $true; $l.UseMnemonic = $false; $l.MaximumSize = New-Object System.Drawing.Size(([math]::Max((& $ui.Sc 120), $ui.RecSteps.ClientSize.Width - (& $ui.Sc 24))), 0); $l.Text = $Text; $l.Font = $Font; $l.ForeColor = $Color; $l.Margin = (& $ui.Pad (& $ui.Sc 5) 0 0 (& $ui.Sc 6)); [void]$ui.RecSteps.Controls.Add($l) }
@@ -101,5 +120,6 @@ $ui.CloseRecord = {
   try { [void]$ui.RecB.Focus() } catch { $null = $_ } }
 $ui.RecB.Add_Click({ & $ui.VRecord })
 $ui.RecClose.Add_Click({ & $ui.CloseRecord })
+$ui.RecCopy.Add_Click({ & $ui.RecCopyAll })
 $ui.BackB.Add_Click({ if ($ui.Back -and -not $ui.RecOn -and -not $ui.Busy -and -not $ui.Running) { & $ui.Back } })
 

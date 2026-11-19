@@ -137,7 +137,8 @@ namespace System.Windows.Forms {
     public static Size MeasureText(string t, object f, Size s, TextFormatFlags fl) { int w = (t ?? "").Length * 7; int lines = Math.Max(1, (w + Math.Max(1, s.Width) - 1) / Math.Max(1, s.Width)); return new Size(Math.Min(w, Math.Max(1, s.Width)), 18 * lines); }   // a text that wraps at a width
     public static void DrawText(object g, string t, object f, Rectangle r, Color c, TextFormatFlags fl) { if (t == null) throw new ArgumentNullException("text"); }
   }
-  public static class Clipboard { public static void SetText(string t) { if (string.IsNullOrEmpty(t)) throw new ArgumentNullException("text"); RadeStub.Driver.Clip = t; } }
+  public static class Clipboard { public static void SetText(string t) { if (string.IsNullOrEmpty(t)) throw new ArgumentNullException("text"); RadeStub.Driver.Clip = t; }
+    public static bool ContainsText() { return !string.IsNullOrEmpty(RadeStub.Driver.Clip); } public static string GetText() { return RadeStub.Driver.Clip ?? ""; } }
   public class Screen { public Rectangle Bounds = new Rectangle(0, 0, 1280, 800); public Rectangle WorkingArea = new Rectangle(0, 0, 1280, 720); public static Screen FromControl(Control c) { return new Screen(); }
     public static Screen FromPoint(Point p) { return new Screen(); }
     public static Screen[] AllScreens { get { return RadeStub.Driver.Screens(); } } }

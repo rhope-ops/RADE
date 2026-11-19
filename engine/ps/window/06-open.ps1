@@ -13,7 +13,7 @@ $ui.RunBase = {
       $i++; $d = Get-CheckDef $id; $ui.RightL.Text = $ui.Words.Work + ' Check ' + $i + ' of ' + $ui.BaseIds.Count
       $r = Get-CheckToRun $d $cache $bp $site $false
       if (-not $r) { $r = Invoke-Check $d $bp $site { [System.Windows.Forms.Application]::DoEvents() } }
-      $ui.BaseRes[$id] = $r
+      $ui.BaseRes[$id] = $r; & $ui.RecRefresh   # an open Record shows the new result
     }
     # One read per application (4 s at most each); after one slow read the others are not tried.
     $slow = $false
@@ -161,11 +161,12 @@ $ui.Checks = { param([bool]$Force)
       if ($d.Kind -ne 'auto') { if (-not $have) { $sv = Get-CheckToRun $d $cache $bp $site $false; if ($sv) { $script:checkResults[$id] = $sv } }; continue }   # a sign-in or look check: its saved result, else it asks later
       if ($have -and -not $Force) { continue }
       $sv = Get-CheckToRun $d $cache $bp $site $Force
-      if ($sv) { $script:checkResults[$id] = $sv; continue }
+      if ($sv) { $script:checkResults[$id] = $sv; & $ui.RecRefresh; continue }
       $ui.P[0].Text = [string]$d.Name; $ui.RightL.Text = $ui.Words.Work + ' Check ' + ($i + 1) + ' of ' + $ids.Count; & $ui.SetBar 'all' ($i / [math]::Max(1, $ids.Count)) $true
       [System.Windows.Forms.Application]::DoEvents()
       $script:checkResults[$id] = Invoke-Check $d $bp $site { [System.Windows.Forms.Application]::DoEvents() }
       if ($ui.BaseRes.ContainsKey($id)) { $ui.BaseRes[$id] = $script:checkResults[$id] }   # Choose shows the newest result of a base check
+      & $ui.RecRefresh   # an open Record shows the new result
     }
   } finally { $null = Save-CheckCache $script:checkResults $bp $site; $ui.Busy = $false; & $ui.SetBar 'all' 0 $false }
   if ($ui.Cancel) { $ui.Cancel = $false; & $ui.VChoose; return }   # Cancel: back to Choose, nothing changed (a check that ran is kept)
@@ -208,7 +209,7 @@ $ui.One = {
   & $ui.SetCard @{ View = 'checking'; Light = 'you'; Sentence = $(if ($d.Kind -eq 'signin') { 'Waiting for your sign-in.' } else { 'Checking.' }); P = @([string]$d.Name); Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { & $ui.CancelChecks } }) }
   $ui.Busy = $true
   try { $script:checkResults[$ui.CurId] = Invoke-Check $d $bp $site { [System.Windows.Forms.Application]::DoEvents() } }
-  finally { $null = Save-CheckCache $script:checkResults $bp $site; $ui.Busy = $false }
+  finally { $null = Save-CheckCache $script:checkResults $bp $site; $ui.Busy = $false; & $ui.RecRefresh }
   & $ui.ToFront; if ($ui.Cancel) { $ui.Cancel = $false; & $ui.VChoose; return }; & $ui.Next }
 $ui.VReady = {
   # The plan in three lines; the detail (each file, each step's box) is in the Record.

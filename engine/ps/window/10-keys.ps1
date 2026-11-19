@@ -1,4 +1,4 @@
-# RADE window part 10, keys and form events: the key handlers (F2, Esc, Enter, Ctrl+C), the window place
+# RADE window part 10, keys and form events: the key handlers (F2, Esc, Enter, Ctrl+C, Ctrl+V in the answer box), the window place
 # saved and restored, and the call that shows the form. It is the last window part.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
@@ -6,6 +6,7 @@
 $ui.Form.Add_KeyDown({
   $k = [string]$_.KeyCode
   if ($_.Control -and $k -eq 'C' -and (& $ui.CopyText $ui.Form.ActiveControl)) { $_.SuppressKeyPress = $true }   # Ctrl+C copies the selected card text
+  elseif ((($_.Control -and $k -eq 'V') -or ($_.Shift -and $k -eq 'Insert')) -and [object]::ReferenceEquals($ui.Form.ActiveControl, $ui.Field) -and (& $ui.PasteLine $ui.Field)) { $_.SuppressKeyPress = $true }   # R34: a pasted block goes into the one-line answer box whole
   elseif ($k -eq 'F1') { $_.SuppressKeyPress = $true; & $ui.OpenTour }   # L6: Help = the RADE tour
   elseif ($k -eq 'F2') { $_.SuppressKeyPress = $true; if ($ui.RecOn) { & $ui.CloseRecord } else { & $ui.VRecord } }
   elseif ($ui.RecOn -and $k -in 'PageDown', 'Next', 'PageUp', 'Prior' -and -not (& $ui.InField)) {   # the check list by keyboard when it is taller than the window; Windows names these keys Next and Prior; in the log box they page the log
