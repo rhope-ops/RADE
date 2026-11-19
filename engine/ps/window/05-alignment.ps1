@@ -291,6 +291,13 @@ $ui.LayLine = {
   return ('Layout self-check: PASS layout, ' + $ui.LayCards.Count + ' cards (' + $size + ')' + $sc + "`r`n" + (& $ui.Scale)) }
 # Sets a label's text and shows it only when the text is not empty. Takes the label and the text; gives back nothing.
 $ui.Show = { param($C, [string]$Text) $C.Text = $Text; $C.Visible = [bool]$Text }
+# A script whose hash does not match its own hash line (the Administrator, 2026-11-19; docs/specs/bundle-hash.md R3): on the
+# cards boot, choose and ready that have no last line of their own, the last line says so in dark red. A hash that cannot be
+# read ("not available") and a match show nothing. Takes the card; changes the color and text of $ui.Foot.
+$ui.ScriptWarn = { param($c)
+  $bad = [bool]($script:scriptCheck.Short -and -not $script:scriptCheck.Ok)
+  if ($bad -and -not $c.Foot -and [string]$c.View -in 'boot', 'choose', 'ready') { & $ui.Show $ui.Foot 'This script does not match its hash. Do not run it.'; $ui.Foot.ForeColor = $ui.C.Red }
+  else { $ui.Foot.ForeColor = $ui.C.Gray } }
 $ui.SetCard = { param($c)
   # Shows one card. $c names the parts: View, Light ('you' = yellow, 'bad' = dark red), Kicker, Sentence, Tick, P (up to 4
   # paragraphs), Options + OnOption, Lines (guide lines, in order: numbered ones first, others after them; one selectable text), Path (a file path), StepRow, Field (Label, Text, Name, Button, Do, Max, Above), Err, Links, Note, Help, Close (the hand card's closing line),
@@ -314,6 +321,7 @@ $ui.SetCard = { param($c)
   $ui.ErrRow.Visible = [bool]$c.Err; if ($c.Err) { $ui.ErrBox.Text = '' }
   $ui.LinkRow.Visible = [bool]($c.Links -or $c.PageLink); $ui.CopyPathB.Visible = [bool]$c.Links; $ui.ShowFileB.Visible = [bool]$c.Links; $ui.PageB.Visible = [bool]$c.PageLink
   & $ui.Show $ui.Note ([string]$c.Note); & $ui.Show $ui.Help ([string]$c.Help); & $ui.Show $ui.Foot ([string]$c.Foot); & $ui.Show $ui.Close ([string]$c.Close)
+  & $ui.ScriptWarn $c   # the script's hash does not match: a red last line on the boot, Choose and Ready cards
   $bm = & $ui.Sc $(if ($c.Close) { $ui.Z.G2 - $ui.Z.M } else { $ui.Z.G4 - $ui.Z.M }); $bn = $ui.BtnRow.Margin; if ($bn.Top -ne $bm) { $ui.BtnRow.Margin = New-Object System.Windows.Forms.Padding($bn.Left, $bm, $bn.Right, $bn.Bottom) }   # 8 under the closing line, else 16
   $bs = @($c.Buttons | Where-Object { $_ }); $ui.Acts = @(); $first = $null; $accept = $null; $ui.BOn = @($false) * $ui.NB; $ui.BApart = @($false) * $ui.NB; $ui.Always = @($false) * $ui.NB
   for ($k = 0; $k -lt $ui.NB; $k++) {

@@ -39,6 +39,15 @@ function global:Test-RadeRecordCopy {
   $ui.RecCopy.PerformClick(); $cl = [string][RadeStub.Driver]::Clip; $nm = [string]$ui.RecChecks.Values['AccessibleName']
   Write-Host ('WIN record-copy btn=' + $ui.RecCopy.Text + ' checks=' + ($cl -match '(?m)^CHECKS') + ' detail=' + ($cl -match '(?m)^      R33 detail probe') + ' steps=' + ($cl -match '(?m)^  \[[x ]\] ') + ' text=' + ($cl -match 'Files this round saves') + ' name=' + ($nm -match 'R33 detail probe'))
   $script:checkResults[$cid] = $was; & $ui.RecRefresh }
+# The red line of a script whose hash does not match (the Administrator, 2026-11-19): on the Choose card with a mismatch,
+# a match and a hash that is not available. Takes nothing; prints 3 "WIN script-warn" lines; shows the Choose card again.
+function global:Test-RadeScriptWarn {
+  if ($global:RadeT.WarnDone) { return }; $global:RadeT.WarnDone = $true
+  $was = $script:scriptCheck
+  foreach ($k in @(@('mismatch', 'abc...def', $false), @('match', 'abc...def', $true), @('unavailable', '', $false))) {
+    $script:scriptCheck = @{ Line = 'x'; Short = $k[1]; Ok = $k[2] }; & $ui.VChoose
+    Write-Host ('WIN script-warn ' + $k[0] + ' view=' + $ui.View + ' text=[' + $(if ($ui.Foot.Visible) { $ui.Foot.Text } else { '' }) + '] red=' + [object]::Equals($ui.Foot.ForeColor, $ui.C.Red)) }
+  $script:scriptCheck = $was; & $ui.VChoose }
 function global:Show-RadeCard {
   # The top bar and the logo block at the first frame (the Administrator, 2026-11-19): one WIN line, once, with the window
   # title, the name spot (tagline until an application is chosen), whether it and the rule under RADE are shown, and the style.
@@ -152,6 +161,7 @@ The view of the card that shows.
 $true when the card was answered here; $false when the caller must answer it.
 #>
 function global:Step-RadeR31([string]$V) {
+  if ($V -eq 'choose') { Test-RadeScriptWarn }
   if ($V -eq 'tour') {   # RADE_T_WALK=1: every card, with Back one time; else the test user skips it. From Help: skipped.
     if ($env:RADE_T_WALK -eq '1' -and -not $global:RadeT.Helped) {
       if ($ui.Kick.Text -match ' 2 OF 5$' -and -not $global:RadeT.TourBack) { $global:RadeT.TourBack = $true; Push-RadeButton 'Back'; return $true }
