@@ -54,6 +54,7 @@ As built (agent choices inside the decisions; say so if one is wrong):
 - Until the round of D5, a mismatch in the bundle is shown and stops nothing (R6 for the bundle is not on yet): a false alarm from a paste would block every round. The page does stop (no Copy button).
 - The bundle shows the line in text mode (second line), in the round's log and report, and the short form in the window's title bar. A place inside the window is a window-design decision that is not made.
 - The bundle reads its own text from its file (the saved runner, a `-File` run) or from the ISE script pane. Pasted into a plain console it cannot, and says "not available".
+- The page: a script with no hash line is offered as "an older build" only when no stored file is there; a stored file that cannot be read, or that differs, is a mismatch. The script and its stored file are two downloads, and the host can hand out an old copy of one for some minutes after a push, so that card says to wait 5 minutes and try again before it says "do not run" (not measured: a risk to watch at the first app release).
 - Blank lines above the first line are allowed (R4 says "from the first byte after the header line"); a script of an older build has no hash line, and the page says so.
 
 ## Questions (answered 2026-11-18: each REC is taken; see Decisions)

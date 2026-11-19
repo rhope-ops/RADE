@@ -558,12 +558,12 @@ def main():
         text = build(b)
         rec_file, rec = out.with_name(out.name + '.sha256.json'), hash_record(b, text)   # the stored hash, beside the bundle
         if a.check:
-            if not out.exists() or out.read_bytes() != text.encode('ascii') or not rec_file.exists() or rec_file.read_text() != rec:
+            if not out.exists() or out.read_bytes() != text.encode('ascii') or not rec_file.exists() or rec_file.read_bytes() != rec.encode('ascii'):
                 print('STALE ' + b['out']); stale += 1
             continue
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(text.encode('ascii'))
-        rec_file.write_text(rec)
+        rec_file.write_bytes(rec.encode('ascii'))   # bytes: the same file on every platform
         print('BUILT %s bytes=%d files=%d steps=%d' % (b['out'], len(text), len(b['files']), len(b['steps'])))
         print('HASH %s %s (%s)' % (b['out'], bundle_hash(text)[0], short_hash(bundle_hash(text)[0])))
         for line in text_lengths(b):

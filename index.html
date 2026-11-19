@@ -90,16 +90,21 @@ function get(url,asJson){return fetch(url,{cache:'no-store'}).then(function(r){i
 // 'none' (a script of an older build: it has no hash line). Gives a promise of {state, short, why}.
 function short(h){return h.slice(0,12)+'...'+h.slice(-4)}
 function scriptCheck(text,url){
-  var t=text.replace(/\r\n/g,'\n'),m=/^# @@BUNDLE-HASH ([0-9a-f]{64}) @@\n/.exec(t);
-  if(!m){return Promise.resolve({state:'none'})}
+  var t=text.replace(/\r\n/g,'\n'),m=/^\s*# @@BUNDLE-HASH ([0-9a-f]{64}) @@\n/.exec(t);   // blank lines above the line are allowed, as in the bundle's own check
+  // The stored file: its SHA-256, '' when there is none (code 404 or no answer), or null when it is there and cannot be read.
+  var stored=function(){return get(url+'.sha256.json',true).then(function(j){var v=String(j&&j.sha256||'');return /^[0-9a-f]{64}$/.test(v)?v:null},function(e){return /^code \[/.test(String(e&&e.message))||!(e instanceof SyntaxError)?'':null})};
+  var later='A new version can be on its way: the script and its stored hash are two downloads. Wait 5 minutes, then select "Try again". If it fails again, do not run the script: ask in the Teams channel.';
+  if(!m){   // no hash line: right for a script of an older build, wrong when a stored hash says the script must have one
+    return stored().then(function(st){return st===''?{state:'none'}:{state:'bad',why:'the script has no hash line, and a stored hash is there',todo:later}});
+  }
   if(!(window.crypto&&crypto.subtle&&window.TextEncoder)){return Promise.resolve({state:'nocrypto'})}
   return crypto.subtle.digest('SHA-256',new TextEncoder().encode(t.slice(m[0].length))).then(function(buf){
     var hex=Array.prototype.map.call(new Uint8Array(buf),function(x){return ('0'+x.toString(16)).slice(-2)}).join('');
     if(hex!==m[1]){return {state:'bad',short:short(hex),why:'the text gives '+short(hex)+', its own first line says '+short(m[1])}}
-    return get(url+'.sha256.json',true).then(function(j){
-      var st=String(j&&j.sha256||'');
-      return st===hex?{state:'match',short:short(hex)}:{state:'bad',short:short(hex),why:'the text gives '+short(hex)+', the stored hash is '+(st?short(st):'not readable')};
-    },function(){return {state:'nostored',short:short(hex)}});
+    return stored().then(function(st){
+      if(st===''){return {state:'nostored',short:short(hex)}}
+      return st===hex?{state:'match',short:short(hex)}:{state:'bad',short:short(hex),why:'the text gives '+short(hex)+', the stored hash '+(st?'is '+short(st):'cannot be read'),todo:later};
+    });
   });
 }
 function checkLine(a){
@@ -163,7 +168,7 @@ function open(a){
       if(my!==load){return}
       a.check=h;a.loaded=new Date();
       if(h.state==='bad'){   // R6: say so in plain words and stop; no Copy button
-        failCard('The script does not match its hash. Do not run it.',h.why,'Select "Try again". If it fails again, do not run the script: ask in the Teams channel.','<button type="button" class="btn primary" data-act="open" data-focus>Try again</button>');
+        failCard('The script does not match its hash. Do not run it.',h.why,h.todo||'Select "Try again". If it fails again, do not run the script: ask in the Teams channel.','<button type="button" class="btn primary" data-act="open" data-focus>Try again</button>');
         return;
       }
       ready(a,false);
