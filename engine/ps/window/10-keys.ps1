@@ -92,4 +92,5 @@ catch {
   [void]$ui.Form.ShowDialog()
 }
 foreach ($o in @($ui.Trash)) { try { $o.Dispose() } catch { $null = $_ } }   # after the window has closed: no handler is running
+if ($script:dpiOld -ne [IntPtr]::Zero) { try { $null = [Rade.Dpi]::SetThreadDpiAwarenessContext($script:dpiOld) } catch { $null = $_ } }   # the thread's own dpi awareness again (01-setup.ps1); a failure leaves the closed window's setting
 return

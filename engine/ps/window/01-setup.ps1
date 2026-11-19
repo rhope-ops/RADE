@@ -20,6 +20,22 @@ if ($env:OS -eq 'Windows_NT') {
       '[DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hWnd); [DllImport("user32.dll")] public static extern bool HideCaret(IntPtr hWnd);') -ErrorAction Stop
     $script:native = $true; try { $null = [Rade.Native]::SetProcessDPIAware() } catch { $null = $_ } } catch { $script:native = $false }
 }
+# R34 (the Administrator, 2026-11-19, "a"): in PowerShell ISE the window read 96 dpi on a 150 % screen while the console drew it
+# smaller and sharper; SetProcessDPIAware above cannot change a process whose awareness is already set. So RADE also reads the
+# awareness of its own thread (Windows 10 1607 or later) and, only when it is "unaware" (Windows then stretches the window),
+# makes the thread "system aware" before the form exists; 10-keys.ps1 sets the old value back when the window has closed.
+# A separate type (Rade.Dpi): a bundle pasted again in the same session must not fail on a changed Rade.Native.
+# $script:dpiThread is the SCALE line's "thread=" (the awareness, and "unaware>system" when RADE changed it).
+$script:dpiThread = 'n/a'; $script:dpiOld = [IntPtr]::Zero
+if ($script:native) {
+  try { Add-Type -Namespace Rade -Name Dpi -MemberDefinition ('[DllImport("user32.dll")] public static extern IntPtr GetThreadDpiAwarenessContext(); ' +
+      '[DllImport("user32.dll")] public static extern int GetAwarenessFromDpiAwarenessContext(IntPtr c); [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr c); ' +
+      '[DllImport("user32.dll")] public static extern uint GetDpiForSystem();') -ErrorAction Stop
+    $aw = [Rade.Dpi]::GetAwarenessFromDpiAwarenessContext([Rade.Dpi]::GetThreadDpiAwarenessContext())
+    $script:dpiThread = $(if ($aw -ge 0 -and $aw -le 2) { @('unaware', 'system', 'permonitor')[$aw] } else { 'invalid' })
+    if ($aw -eq 0) { $script:dpiOld = [Rade.Dpi]::SetThreadDpiAwarenessContext([IntPtr](-2)); if ($script:dpiOld -ne [IntPtr]::Zero) { $script:dpiThread = 'unaware>system' } }   # -2 = DPI_AWARENESS_CONTEXT_SYSTEM_AWARE
+  } catch { $script:dpiThread = 'n/a' }   # before Windows 10 1607 (no such function) or no compiler: the window runs as before
+}
 [System.Windows.Forms.Application]::EnableVisualStyles()
 $ui = @{ View = ''; Running = $false; Busy = $false; RecOn = $false; Edit = $false; Answer = ''; Acts = @(); Back = $null; OnOpt = $null; FieldDo = $null
   Log = (New-Object System.Collections.Generic.List[string]); Summary = @(); Sel = @{}; Clean = $true; StepState = @{}; Plan = $null; Picked = $false
