@@ -10,7 +10,8 @@ Usage: python tests/window_real.py OUT_DIR
 Pass = every run ends with "WIN closed=True", prints no "LAYOUT " line (the engine's layout self-check), a SCALE line,
 and no card scrolls at a size larger than the smallest, except a hand card ("Your turn"), whose text may scroll at
 any size (the Administrator, 2026-11-17); the first run draws the 3 question cards of the hand step
-and each run in the smallest window draws the text question (exit 0). Output: OUT_DIR/<run>/*.png
+and each run in the smallest window draws the text question; a first window of a Windows profile draws the 5 tour cards,
+and a test round draws the cards answerfail and feedback (R31) (exit 0). Output: OUT_DIR/<run>/*.png
 (NN-answer-yesno, NN-answer-pick, NN-answer-text), out.txt.
 """
 import importlib.util
@@ -104,6 +105,14 @@ def bundle(t, long, keep=None):
         sp.loader.exec_module(eng)
         m = stretch(m, eng.TEXT_LIMITS)
         names = [a["name"] for a in m["bundles"][0]["apps"]]
+    # R31 (docs/reviews/2026-11-19-r31-plan.md): a step of the test application that shows only questions (E2), with an answer
+    # that means a failure and a question that depends on the other answer (E3); the first step says what it is doing (L7).
+    b0 = m["bundles"][0]
+    b0["steps"][0]["doing"] = "Checking the sample files."
+    b0["steps"].append({"name": "T05 Sample questions r1", "dir": "T05", "file": "", "kind": "guide", "guide": [], "answersOnly": True, "answers": [
+        {"key": "page", "prompt": "What does the page show?", "kind": "pick", "choices": ["The list", "An error"], "failOn": ["An error"]},
+        {"key": "more", "prompt": "Does the list show two rows?", "kind": "yesno", "showIf": {"key": "page", "in": ["The list"]}}]})
+    b0["apps"][0]["steps"].append("T05 Sample questions r1")
     (app / "scripts" / "paste_bundles.json").write_text(json.dumps(m), encoding="utf-8")
     r = subprocess.run([sys.executable, str(ROOT / "engine" / "rade_build.py"), "--app-root", str(app)], capture_output=True, text=True)
     if r.returncode:
@@ -181,6 +190,14 @@ def main():
             why.append("the question cards (answer-yesno, answer-pick, answer-text) were not all drawn: %s" % sorted(got))
         if size == SMALLEST and hand == "done" and "answer-text" not in got:
             why.append("the text question (answer-text) was not drawn in the smallest window")
+        # R31: a first window of a Windows profile draws the 5 tour cards; a test round draws the error card of an answer that
+        # means a failure and its last card
+        views = [re.sub(r"^WIN card=\d+-(\S+) .*$", r"\1", l) for l in lines if l.startswith("WIN card=")]
+        if not name.startswith("deploy-") or first:
+            if views.count("tour") != 5:
+                why.append("the tour drew %d cards, not 5" % views.count("tour"))
+        if app == 0 and not {"answerfail", "feedback"} <= set(views):
+            why.append("a test round did not draw the cards answerfail and feedback")
         broken = [l for l in lines if l.startswith(("WIN PNG-FAILED", "WIN DRIVER-ERROR", "WIN TIMEOUT", "WIN BAD"))]
         if broken:
             why.append(broken[0][:120])

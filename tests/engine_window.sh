@@ -200,6 +200,34 @@ has "view=tour light=off kick=RADE TOUR · 1 OF 5 sent=RADE installs and tests a
   grep -n "^WIN view=" "$wd/win.txt" | grep -m1 "view=choose" | grep -qv "^[1-6]:" && ! grep "^WIN view=\(run\|hand\|answer\|feedback\|tour\|boot\|checking\) " "$wd/win.txt" | grep -q "help=True" && grep "^WIN view=ready " "$wd/win.txt" | grep -q "help=True" && ok || { bad "r31 L6: the tour and Help"; grep "view=tour\|WIN help" "$wd/win.txt" | cut -c1-200; }
 win 0 done 0 0 "$wd/r31.ps1"
 has "view=choose" && ! grep -q "view=tour" "$wd/win.txt" && ok || bad "r31 L6: the tour shows one time only"
+# Text mode (no window): a hidden answer is not offered and not taken (S is asked again; Enter is Done), the step with only questions
+# is SKIPPED, and the last question is not asked.
+printf '1\n\nS\n\n\n' | USERPROFILE="$wd/u/test1234" timeout 120 pwsh -NoProfile -File "$wd/r31.ps1" > "$wd/text.txt" 2>&1
+[ "$(grep -c "Press Enter when you have done this step, or type F and Enter if it failed" "$wd/text.txt")" -ge 1 ] && ! grep -q "S and Enter to skip" "$wd/text.txt" && grep -q "^T02 Sample import r1: PASSED (confirmed by you)" "$wr" && grep -q "^T05 Sample questions r1: SKIPPED (its questions need the RADE window)" "$wr" &&
+  grep -q "^Other feedback: not asked (text mode)" "$wr" && ok || { bad "r31 text mode: hidden answers, the step with only questions, no last question"; grep "Press Enter\|T02\|T05\|Other feedback" "$wd/text.txt" | cut -c1-200; }
+# A bad field stops the build, and the manifest check finds it too (one manifest for each fault).
+python3 - "$t" <<'P' && ok || bad "r31: the build and the manifest check reject a bad hide, answersOnly, failOn or showIf"
+import copy, json, pathlib, shutil, subprocess, sys
+t = pathlib.Path(sys.argv[1]); a = t / 'r31x' / 'app'; shutil.copytree(t / 'r31' / 'app', a)
+base = json.load(open(a / 'scripts' / 'paste_bundles.json'))
+def step(m, n): return [s for s in m['bundles'][0]['steps'] if s['name'].startswith(n)][0]
+def c1(m): step(m, 'T02')['hide'] = ['done', 'failed', 'skip']
+def c2(m): step(m, 'T01')['hide'] = ['skip']
+def c3(m): step(m, 'T05')['guide'] = ['1. Look.']
+def c4(m): step(m, 'T02')['answers'][0]['failOn'] = ['No']
+def c5(m): step(m, 'T05')['answers'][0]['failOn'] = ['A word that is no answer']
+def c6(m): step(m, 'T05')['answers'][0]['showIf'] = {'key': 'more', 'in': ['Yes']}
+def c7(m): step(m, 'T05')['answers'][1]['showIf'] = {'key': 'page', 'in': ['Maybe']}
+def c8(m): del step(m, 'T05')['answers']
+cases = [(c1, 'hide: 1 or 2 of'), (c2, 'hide: only a guide step'), (c3, 'answersOnly: the step has no Done card'), (c4, 'failOn is only for a step with "answersOnly"'), (c5, 'failOn names 1 or more of the answers'),
+         (c6, 'showIf needs "key" (an earlier'), (c7, 'showIf "in" names 1 or more of the answers'), (c8, 'answersOnly: only a guide step (kind "guide") with "answers"')]
+for change, want in cases:
+    m = copy.deepcopy(base); change(m); json.dump(m, open(a / 'scripts' / 'paste_bundles.json', 'w'))
+    b = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(a)], capture_output=True, text=True)
+    c = subprocess.run([sys.executable, 'scripts/check_manifest.py', str(a / 'scripts' / 'paste_bundles.json')], capture_output=True, text=True)
+    assert b.returncode != 0 and want in (b.stdout + b.stderr), (want, (b.stdout + b.stderr)[-300:])
+    assert c.returncode != 0, (want, c.stdout[-300:])
+P
 # A deploy asks no last question.
 ! grep -q "view=feedback" "$t/w1/win.txt" && ! grep -q "^Other feedback" "$t/w1/u/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && ok || bad "r31 L4: a deploy has no last question"
 echo "GROUP $pass $fail"; } > "$t/grp-W4.log" 2>&1 &

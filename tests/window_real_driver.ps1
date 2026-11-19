@@ -8,7 +8,8 @@
 # A check that cannot pass on the test computer is set to PASSED after its card has shown (the test is of the window).
 # The hand step's questions (manifest "answers"): one picture per kind (NN-answer-yesno, NN-answer-pick, NN-answer-text),
 # for the owner's approval of the look (the long-text run draws a first sentence that shrinks in the smallest window);
-# the driver selects the first button (a text gets a short fake note).
+# the driver selects the first button (a text gets a short fake note). R31: the tour cards (each one), the step that shows only
+# questions (the driver selects its answer that means a failure, then gives a fake error text) and the last card of a test round.
 Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing
 $env:RADE_LAYOUT = '1'   # the layout self-check runs for a deploy too
 function Start-Process { param($FilePath, $ArgumentList, $WorkingDirectory) Write-Host ('WIN start-process ' + $(if ([string]$FilePath -match '^https://') { 'browser' } else { [string]$FilePath })) }
@@ -86,7 +87,11 @@ function global:Step-Rade {
   }
   elseif ($v -eq 'answer') {
     if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }
-    $ui.B[0].PerformClick() }
+    $fb = @($ui.B | Where-Object { $_.Visible -and $_.Text -like 'An error*' })[0]   # R31 E2: the answer that means a failure, so its card is drawn
+    if ($fb) { $fb.PerformClick() } else { $ui.B[0].PerformClick() } }
+  elseif ($v -eq 'tour') { $ui.B[0].PerformClick() }   # R31 L6: the first-run tour, each card (Next, then "Close the tour")
+  elseif ($v -eq 'answerfail') { $ui.ErrBox.Text = 'The page said: error 42'; $ui.B[0].PerformClick() }   # R31 E2: the error text after an answer that means a failure
+  elseif ($v -eq 'feedback') { $ui.Field.Text = 'Sample feedback'; $ui.B[0].PerformClick() }   # R31 L4: the last card of a test round
   elseif ($v -eq 'handfail') { $ui.ErrBox.Text = 'Import failed: flow https://usaf.dps.mil/sites/fake/x not found'; $ui.B[0].PerformClick() }
   elseif ($v -in 'done', 'review', 'stopped') {
     foreach ($l in @($ui.Log)) { if ([string]$l -match 'failed|FAILED|STOPPED|could not') { Write-Host ('WIN log ' + ([string]$l).Trim()) } }
