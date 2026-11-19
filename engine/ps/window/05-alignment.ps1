@@ -89,10 +89,11 @@ $ui.SentFonts = @{}
 $ui.Raw = @{}
 # Re-breaks the long words of every card text so each line fits its width. Takes nothing; changes the label texts (the
 # raw text is kept in $ui.Raw).
-$ui.BreakAll = { foreach ($l in @($ui.Kick, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathT, $ui.Now, $ui.StepName, $ui.Note, $ui.Help, $ui.Foot, $ui.Close)) {
+$ui.BreakAll = { foreach ($l in @($ui.Kick, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathT, $ui.StepName, $ui.Note, $ui.Help, $ui.Foot, $ui.Close)) {
     try { $w = [int](& $ui.GetWrap $l); if ($w -le 0 -or -not $l.Text) { continue }
       $e = $ui.Raw[$l]; $raw = $(if ($e -and [string]$l.Text -ceq [string]$e.Out) { [string]$e.Raw } else { [string]$l.Text })
-      $b = & $ui.BreakLong $raw $l.Font $w; $ui.Raw[$l] = @{ Raw = $raw; Out = $b }; if ([string]$l.Text -cne $b) { $l.Text = $b } } catch { $null = $_ } } }
+      $b = & $ui.BreakLong $raw $l.Font $w; $ui.Raw[$l] = @{ Raw = $raw; Out = $b }; if ([string]$l.Text -cne $b) { $l.Text = $b } } catch { $null = $_ } }
+  & $ui.CutNow }   # the now-doing line is cut again from its whole text at the new width (review of PR 121)
 # Fits the headline: on an answer card the font shrinks, not below the body size, until the text fits one line; then it
 # breaks long words and calls $ui.BreakAll. Takes nothing; changes $ui.Sent.
 $ui.FitSent = { try {
@@ -294,7 +295,7 @@ $ui.SetCard = { param($c)
   $ui.OnOpt = $c.OnOption; & $ui.FillOpts $c.Options; $ui.Opts.Visible = [bool]$ui.Opts.Controls.Count
   & $ui.SetSteps $c.Lines
   $ui.PathL.Visible = [bool]$c.Path; & $ui.Show $ui.PathT ([string]$c.Path)
-  $ui.StepRow.Visible = [bool]$c.StepRow; & $ui.Show $ui.Now ''; if ($c.StepRow) { $ui.StepTime.Text = ''; $ui.Now.Visible = $true }   # the run card keeps the now-doing room, empty until a text comes
+  $ui.StepRow.Visible = [bool]$c.StepRow; $ui.NowRaw = ''; $ui.Now.Text = ''; $ui.Now.Visible = [bool]$c.StepRow; if ($c.StepRow) { $ui.StepTime.Text = '' }   # the run card keeps the now-doing room, empty until a text comes
   $ui.FieldRow.Visible = [bool]$c.Field; $ui.FieldDo = $null
   $ui.FieldAbove = [bool]($c.Field -and $c.Field.Above); try { $ui.FieldRow.SetFlowBreak($ui.FieldL, $ui.FieldAbove) } catch { $null = $_ }   # L3: the box goes under its label
   if ($c.Field) { $ui.FieldL.Text = [string]$c.Field.Label; $ui.Field.Text = [string]$c.Field.Text; $ui.Field.AccessibleName = [string]$c.Field.Name; $ui.FieldB.Visible = [bool]$c.Field.Button; $ui.FieldBOn = [bool]$c.Field.Button; $ui.FieldB.Text = [string]$c.Field.Button; $ui.FieldDo = $c.Field.Act; $ui.Field.MaxLength = $(if ($c.Field.Max) { [int]$c.Field.Max } else { 32767 }); & $ui.FitRow }
