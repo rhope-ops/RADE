@@ -248,16 +248,26 @@ $ui.Shorten = { param($C, [string]$Full, [int]$W)
   $si = New-Object System.Globalization.StringInfo($Full); $lo = 0; $hi = $si.LengthInTextElements
   while ($lo -lt $hi) { $mid = [int][math]::Ceiling(($lo + $hi) / 2.0); $C.Text = $si.SubstringByTextElements(0, $mid).TrimEnd() + '...'; if ($C.PreferredSize.Width -le $W) { $lo = $mid } else { $hi = $mid - 1 } }
   $C.Text = $(if ($lo -gt 0) { $si.SubstringByTextElements(0, $lo).TrimEnd() } else { '' }) + '...' }
-$ui.FitLines = { param([string]$T, $F, [int]$W, [int]$N)
+# Cuts a text to N lines with "..." (the help below).
+$ui.FitLines = {
   <#
   .SYNOPSIS
   Cuts a text to at most N lines at a width, with "..." at its end when it is cut (the Administrator, 2026-11-19).
   .DESCRIPTION
   Measured as a card text box wraps ($ui.Meas). Binary search on the number of text elements, so a letter with its accents
   is never split. The text is not changed when it fits.
+  .PARAMETER T
+  The text.
+  .PARAMETER F
+  The font it shows in.
+  .PARAMETER W
+  The wrap width, in pixels.
+  .PARAMETER N
+  The most lines it may take.
   .OUTPUTS
   The text that fits, as a string.
   #>
+  param([string]$T, $F, [int]$W, [int]$N)
   if (-not $T -or $W -le 0 -or $N -le 0) { return $T }
   $most = $N * (& $ui.Meas 'Ag' $F 100000).Height
   if ((& $ui.Meas $T $F $W).Height -le $most) { return $T }
