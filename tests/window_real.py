@@ -154,6 +154,32 @@ def bundle(t, long, keep=None, swaps=()):
     return users
 
 
+def r32_why(lines, name):
+    """Say what a run misses of the R32 window fixes (docs/DECISIONS.md 2026-11-18): the mouse wheel and the step row.
+
+    Args:
+        lines: the output lines of the run.
+        name: the name of the run ("device150-" runs also check the step row of the Run card).
+
+    Returns:
+        A list of texts, one for each fault (empty = nothing is missing).
+    """
+    why = []
+    wheel = [l for l in lines if l.startswith("WIN wheel ")]
+    scrolls = [l for l in lines if l.startswith("WIN scrolls ")]
+    if any(not l.rstrip().endswith("moved=True") for l in wheel) or len(wheel) != len(scrolls):
+        why.append("the mouse wheel did not move the text of each card that scrolls (%d of %d)" % (len(wheel), len(scrolls)))
+    if any(l.startswith("WIN r32 ") and " error=" in l for l in lines):
+        why.append("an r32 measure line has an error")
+    if name.startswith("device150-"):
+        rows = [re.search(r" name=(\d+)/(\d+) bar=(\d+)/.* frac=(\d+)/", l) for l in lines if l.startswith("WIN r32 ") and "-run " in l]
+        rows = [tuple(int(x) for x in m.groups()) for m in rows if m]
+        # the bar and the count start inside the title's rows: they are on its line, not on a line of their own under it
+        if len(rows) < 3 or any(not (top <= bar < top + high and top <= frac < top + high) for top, high, bar, frac in rows):
+            why.append("the step's bar or count is not on the title's line: %s" % rows[:4])
+    return why
+
+
 def r31_why(lines, app, fresh):
     """Say what a run misses of the cards of the R31 brief (docs/reviews/2026-11-19-r31-plan.md).
 
@@ -215,7 +241,7 @@ def main():
                 print("   " + l[:300])
         # a hand card ("Your turn") may scroll at any size (the Administrator, 2026-11-17); every other card only at the smallest
         scrolls = [l for l in lines if l.startswith("WIN scrolls ") and not l.rstrip().endswith("-hand")]
-        why = r31_why(lines, app, name == RUNS[0][0] or not name.startswith("deploy-"))   # R31: the tour, and the cards of a test round
+        why = r31_why(lines, app, name == RUNS[0][0] or not name.startswith("deploy-")) + r32_why(lines, name)   # R31: tour and test-round cards; R32: wheel, step row
         if not closed:
             why.append("the window did not reach its end")
         if layout:

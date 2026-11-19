@@ -30,7 +30,7 @@ $ui.Paint = {
 $ui.Elapsed = { param([double]$Sec) $q = [int][math]::Floor([math]::Max(0, $Sec)); $h = [int][math]::Floor($q / 3600); $m = [int][math]::Floor(($q % 3600) / 60); $x = $q % 60
   if ($h) { return ('{0}h {1:00}m {2:00}s' -f $h, $m, $x) }; return ('{0}m {1:00}s' -f $m, $x) }
 # Shows the time in this step on the step line, once for each second. Takes nothing; a failure is ignored.
-$ui.ShowTime = { try { if ($ui.View -eq 'run' -and $script:stepStart) { $t = & $ui.Elapsed ((Get-Date) - $script:stepStart).TotalSeconds; if ($ui.StepTime.Text -ne $t) { $ui.StepTime.Text = $t } } } catch { $null = $_ } }
+$ui.ShowTime = { try { if ($ui.View -eq 'run' -and $script:stepStart) { $t = & $ui.Elapsed ((Get-Date) - $script:stepStart).TotalSeconds; if ($ui.StepTime.Text -ne $t) { $longer = ($t.Length -ne ([string]$ui.StepTime.Text).Length); $ui.StepTime.Text = $t; if ($longer) { & $ui.FitBar } } } } catch { $null = $_ } }   # a longer time (hours) takes room from the bar
 $ui.TimeT = New-Object System.Windows.Forms.Timer; $ui.TimeT.Interval = 1000; $ui.TimeT.Add_Tick({ & $ui.ShowTime })
 # The tick callback of a running step: repaints the bars and lets the window handle its events. Emits nothing.
 $ui.Tick = { $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }   # a callback must emit nothing: its output would join the engine function's return value
@@ -51,7 +51,7 @@ $ui.OnStatus = { param($i, $count, $name, $estimate)
   if ($i -le 1) { $null = & $ui.SetBar 'all' 0 $true }
   $ui.StepI = [int]$i; $ui.StepN = [int]$count; $ui.StepNow = [string]$name
   if ($ui.View -ne 'run') { $null = & $ui.ShowRun } else { $ui.Kick.Text = ('Step ' + $i + ' of ' + $count).ToUpperInvariant(); $ui.StepName.Text = (& $ui.TitleOf $name); $null = & $ui.FitEdges; $null = & $ui.FitBar }
-  $null = & $ui.SetBar 'step' 0 $true; $ui.StepFrac.Text = ''; $null = & $ui.ShowTime
+  $null = & $ui.SetBar 'step' 0 $true; $ui.StepFrac.Text = ''; $null = & $ui.FitBar; $null = & $ui.ShowTime
   $doing = ''; foreach ($s in @($steps)) { if ([string]$s.Name -ceq [string]$name) { $doing = [string]$s.Doing } }; $null = & $ui.ShowNow $doing; $ui.StepAt = $ui.Clock.Elapsed.TotalMilliseconds   # L7: the step's own present-tense sentence, until its first item
   $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }
 # Called when a step ends: keeps its state word (DONE, PASSED, SKIPPED, ...) from the result line and redraws. Takes the

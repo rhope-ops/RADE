@@ -359,7 +359,7 @@ grep -q "^Version 1.0.0 of Sample app (deploy) is recorded as installed" "$t/out
 grep -rq "Test script ran.*, without Bypass \[ran\]" "$t/out.txt" "$od/RADE/SampleApp/Rounds/R01" && ok || { bad "child check: the detail has no 'without Bypass [ran]'"; grep -rh "Test script" "$t/out.txt" "$od/RADE/SampleApp/Rounds/R01" | head -3; }
 # Every check's detail is in a local file that is not in the results folder, so no e-mail draft attaches it (2026-11-18).
 grep -q "^PASSED: RADE can run its scripts. Test script ran.*without Bypass \[ran\]" "$cfg/rade-checks-last.txt" && ok || bad "checks: no child detail in Config/rade-checks-last.txt"
-grep -q "does not attach it to an e-mail" "$cfg/rade-checks-last.txt" && ! grep -rq "without Bypass" "$od/RADE/SampleApp/Rounds" && ok || bad "checks: the detail file's note, or a detail in the results folder"
+grep -q "no e-mail draft attaches it" "$cfg/rade-checks-last.txt" && ! grep -rq "without Bypass" "$od/RADE/SampleApp/Rounds" && ok || bad "checks: the detail file's note, or a detail in the results folder"
 ! grep -qi "outlook\|e-mail\|draft\|Summary copied" "$t/out.txt" && ok || { bad "deploy 1: output names Outlook, an e-mail, a draft or a copied summary"; grep -i "outlook\|e-mail\|draft\|Summary copied" "$t/out.txt"; }
 [ ! -e "$cfg/rade-mail-to.txt" ] && ok || bad "deploy 1: an e-mail address file was written"
 [ "$(js)" = "rade-installed/2 1 1.0.0 1.0.0 PASSED" ] && ! grep -q "test1234\|$t" "$inst" && ok || { bad "deploy 1: rade-installed.json ($(js))"; cat "$inst"; }

@@ -36,7 +36,8 @@ function global:Save-RadeCard([string]$Tag) {
   $global:RadeT.Lay = $ui.LayBad.Count
   if ($ui.Scrolls -and -not $ui.RecOn) { Write-Host ('WIN scrolls ' + $card) }
   # R32: the wheel moves the text of a card that scrolls, from a control that has no scroll bar of its own (the headline).
-  if ($ui.Scrolls -and -not $ui.RecOn) { try { $y0 = $ui.Scroll.AutoScrollPosition.Y; & $ui.Wheel $ui.Sent (New-Object System.Windows.Forms.HandledMouseEventArgs('None', 0, 0, 0, -120))
+  if ($ui.Scrolls -and -not $ui.RecOn) { try { $y0 = $ui.Scroll.AutoScrollPosition.Y; $ev = New-Object System.Windows.Forms.HandledMouseEventArgs('None', 0, 0, 0, -120)
+      [System.Windows.Forms.Control].GetMethod('OnMouseWheel', [System.Reflection.BindingFlags]'NonPublic, Instance').Invoke($ui.Sent, @($ev))   # as Windows raises it on the headline: only the hook of $ui.WheelOn hands it on
       Write-Host ('WIN wheel ' + $card + ' moved=' + ($ui.Scroll.AutoScrollPosition.Y -ne $y0)); $ui.Scroll.AutoScrollPosition = New-Object System.Drawing.Point(0, 0) } catch { Write-Host ('WIN wheel ' + $card + ' error=' + $_.Exception.Message) } }
   # R32 measures (screen pixels, top/height): the bottom line's two texts, the header's widths, and on the Run card the step row.
   try { $sr = { param($C) $q = $C.RectangleToScreen($C.ClientRectangle); [string]$q.Top + '/' + $q.Height }
