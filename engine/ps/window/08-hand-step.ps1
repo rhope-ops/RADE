@@ -92,6 +92,7 @@ $script:guideUi = { param($Step, [string]$File, [string]$Url, [string]$UrlFile)
 # text is optional; the engine puts it into the report under the line "Other feedback:" (Get-RoundFeedback). Takes
 # nothing; waits for Continue; gives back the text ('' when the window closed).
 $script:feedbackUi = {
+  $null = & $ui.HoldStep   # L8: the last step stays on the Run card for its minimum time first
   $was = $ui.Busy; $ui.Busy = $false; $ui.Reply = $null; $ui.Asked = $true
   $null = & $ui.SetCard @{ View = 'feedback'; Light = 'you'; Kicker = 'Last question'; Sentence = 'Anything else about this round or the app?'
     P = @('This is optional. Do not type names or addresses.'); Field = @{ Label = 'Your answer'; Text = ''; Name = 'Anything else about this round or the app?'; Max = 2000; Above = $true }; Focus = 'field'

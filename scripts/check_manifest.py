@@ -37,6 +37,8 @@ def refs(m):
             keys = [a['key'] for a in qs if isinstance(a, dict) and isinstance(a.get('key'), str)]
             for k in sorted({k for k in keys if keys.count(k) > 1}):
                 out.append('%s: step %r: answers: the key %r is used twice' % (r, s['name'], k))
+            if 'done' in (s.get('hide') or []) and s.get('answers'):
+                out.append('%s: step %r: hide: a step with answers cannot hide done (its questions come after Done)' % (r, s['name']))
             words = {}   # key -> the button words of each earlier yes/no or pick question (for failOn and showIf)
             for a in qs:
                 cs = a.get('choices') if isinstance(a, dict) and isinstance(a.get('choices'), list) else []

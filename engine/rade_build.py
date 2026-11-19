@@ -214,8 +214,8 @@ def hand_part(s):
         raise SystemExit('step %r: %s' % (s['name'], why))
     out, guide, hide = '', s.get('kind', 'script') == 'guide', s.get('hide')
     if 'hide' in s:
-        if not guide or not isinstance(hide, list) or not 1 <= len(hide) <= 2 or len(set(hide)) != len(hide) or set(hide) - {'done', 'failed', 'skip'}:
-            no('hide: only for a guide step (kind "guide"): 1 or 2 of done, failed and skip, each one time (one button stays)')
+        if not guide or not isinstance(hide, list) or not 1 <= len(hide) <= 2 or len(set(hide)) != len(hide) or set(hide) - {'done', 'failed', 'skip'} or ('done' in hide and s.get('answers')):
+            no('hide: only for a guide step (kind "guide"): 1 or 2 of done, failed and skip, each one time (one button stays); not done when the step has answers')
         out += '; Hide = @(%s)' % ', '.join(q(h) for h in hide)
     if 'answersOnly' in s:
         used = [f for f in ('hide', 'doneText', 'doneLog', 'marker', 'url', 'urlConfig', 'file', 'guide') if s.get(f)]

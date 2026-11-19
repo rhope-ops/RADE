@@ -170,7 +170,8 @@ function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
     if ($Step.Marker) { try { Set-Content -LiteralPath (Join-Path $dir $Step.Marker) -Value (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') -Encoding UTF8 } catch { $null = $_ } }
     $r.Pass = 1
     & $Say ('    ' + $(if ($Step.DoneLog) { $Step.DoneLog } elseif ($Step.AnswersOnly) { 'Answered by you.' } else { 'Confirmed by you: the flow is imported and its run has started.' }))
-  } else { $r.Skipped = $true; & $Say '    Skipped by you.' }
+  } elseif ($res -eq 'None') { $r.Skipped = $true; $r.Why = 'no answer that this step offers was given'; & $Say ('    Skipped: ' + $r.Why + '.') }   # text mode: a hidden answer is never recorded as the person's
+  else { $r.Skipped = $true; & $Say '    Skipped by you.' }
   # The step's questions (manifest "answers"), asked after Done: one line each for the summary, under the step's line.
   if ($res -eq 'OK') { foreach ($q in @($Step.Answers | Where-Object { $_ })) { $r.Answers += ('  Answer ' + [string]$q.Key + ': ' + (Get-GuideAnswerText $q)) } }
   return $r
@@ -180,11 +181,11 @@ function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
 Text mode: asks how a hand step ended and reads the answer.
 .DESCRIPTION
 Only the answers the step shows are offered (manifest "hide", E1); an answer that is not offered is asked again, 3 times
-at most.
+at most; then the step is skipped with that reason, not as an answer of the person.
 .PARAMETER Step
 The step (its Hide list names the answers that are not offered: done, failed, skip).
 .OUTPUTS
-OK (Done), Abort (It failed) or Cancel (Skip, or no valid answer).
+OK (Done), Abort (It failed), Cancel (Skip) or None (no answer that the step offers, 3 times).
 #>
 function Read-GuideChoice($Step) {
   $hide = @($Step.Hide)
@@ -199,7 +200,7 @@ function Read-GuideChoice($Step) {
     $name = $(if ($res -eq 'OK') { 'done' } elseif ($res -eq 'Abort') { 'failed' } else { 'skip' })
     if ($hide -notcontains $name) { return $res }
   }
-  return 'Cancel'
+  return 'None'
 }
 # Gives the report text of one question of a hand step: the answer, or why there is none. A text answer is masked and
 # kept whole. Takes the question; reads $script:guideAnswers; gives back the text.

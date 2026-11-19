@@ -205,6 +205,9 @@ has "view=choose" && ! grep -q "view=tour" "$wd/win.txt" && ok || bad "r31 L6: t
 printf '1\n\nS\n\n\n' | USERPROFILE="$wd/u/test1234" timeout 120 pwsh -NoProfile -File "$wd/r31.ps1" > "$wd/text.txt" 2>&1
 [ "$(grep -c "Press Enter when you have done this step, or type F and Enter if it failed" "$wd/text.txt")" -ge 1 ] && ! grep -q "S and Enter to skip" "$wd/text.txt" && grep -q "^T02 Sample import r1: PASSED (confirmed by you)" "$wr" && grep -q "^T05 Sample questions r1: SKIPPED (its questions need the RADE window)" "$wr" &&
   grep -q "^Other feedback: not asked (text mode)" "$wr" && ok || { bad "r31 text mode: hidden answers, the step with only questions, no last question"; grep "Press Enter\|T02\|T05\|Other feedback" "$wd/text.txt" | cut -c1-200; }
+# Text mode: an answer that the step hides, 3 times: the step is skipped with that reason, never as "by you".
+printf '1\n\nS\nS\nS\n\n' | USERPROFILE="$wd/u/test1234" timeout 120 pwsh -NoProfile -File "$wd/r31.ps1" > "$wd/text2.txt" 2>&1
+grep -q "^T02 Sample import r1: SKIPPED (no answer that this step offers was given)" "$wr" && ! grep -q "^T02 .*by you" "$wr" && ok || { bad "r31 text mode: a hidden answer is never recorded"; grep "^T02" "$wr"; }
 # A bad field stops the build, and the manifest check finds it too (one manifest for each fault).
 python3 - "$t" <<'P' && ok || bad "r31: the build and the manifest check reject a bad hide, answersOnly, failOn or showIf"
 import copy, json, pathlib, shutil, subprocess, sys
@@ -219,8 +222,9 @@ def c5(m): step(m, 'T05')['answers'][0]['failOn'] = ['A word that is no answer']
 def c6(m): step(m, 'T05')['answers'][0]['showIf'] = {'key': 'more', 'in': ['Yes']}
 def c7(m): step(m, 'T05')['answers'][1]['showIf'] = {'key': 'page', 'in': ['Maybe']}
 def c8(m): del step(m, 'T05')['answers']
+def c9(m): step(m, 'T02')['hide'] = ['done']
 cases = [(c1, 'hide: only for a guide step'), (c2, 'hide: only for a guide step'), (c3, 'no Done card (so without: guide)'), (c4, 'failOn (only in a step with "answersOnly"'), (c5, 'failOn (only in a step with'),
-         (c6, 'showIf needs "key" (an earlier'), (c7, 'showIf needs "key" (an earlier'), (c8, 'answersOnly: true, only for a guide step')]
+         (c6, 'showIf needs "key" (an earlier'), (c7, 'showIf needs "key" (an earlier'), (c8, 'answersOnly: true, only for a guide step'), (c9, 'not done when the step has answers')]
 for change, want in cases:
     m = copy.deepcopy(base); change(m); json.dump(m, open(a / 'scripts' / 'paste_bundles.json', 'w'))
     b = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(a)], capture_output=True, text=True)
