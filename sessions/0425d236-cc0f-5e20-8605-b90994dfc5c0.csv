@@ -1,0 +1,5 @@
+message_id,timestamp,turn,session_id,repo,model,source,input_tokens,cache_creation_input_tokens,cache_read_input_tokens,output_tokens
+msg_011ChBRUxCm1jijCQ7fQh3zf,2026-11-19T01:31:21.584Z,1,0425d236-cc0f-5e20-8605-b90994dfc5c0,RADE,claude-fable-5-2,main,2,31151,63580,373
+msg_011ChBRVLBLT7gcjV4U1s2rP,2026-11-19T01:31:27.474Z,1,0425d236-cc0f-5e20-8605-b90994dfc5c0,RADE,claude-fable-5-2,main,2,4603,94731,408
+msg_011ChBRVbsuMZuW1onVx9akX,2026-11-19T01:31:52.890Z,1,0425d236-cc0f-5e20-8605-b90994dfc5c0,RADE,claude-fable-5-2,main,2,13997,99334,2201
+msg_011ChBRXc7MJpKcHZe86gjaP,2026-11-19T01:32:05.501Z,1,0425d236-cc0f-5e20-8605-b90994dfc5c0,RADE,claude-fable-5-2,main,2,2555,113331,1949
