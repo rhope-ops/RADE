@@ -2,6 +2,8 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>RADE</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<link rel="icon" href="assets/logo/rho-usaf-32.png" media="(prefers-color-scheme:light)">
+<link rel="icon" href="assets/logo/rho-fulcrum-32.png" media="(prefers-color-scheme:dark)">
 <link rel="icon" href="assets/logo/rho-usaf-32.png">
 <style>
 /* Layout: the RADE window as a page ("One thing", docs/window-design.md): the band
@@ -28,7 +30,11 @@ body{margin:0;background:var(--bg);color:var(--text);font:1rem/1.5 var(--ui)}
 /* The band, the card and the bottom line share one centered 860 px column, as the 90-161.Z page (the Administrator, 18 Nov 26). */
 .band-in,.stage,.bottom{width:100%;max-width:860px;margin-inline:auto}
 .band-in{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:1fr auto auto 1fr;column-gap:14px;align-items:center;padding-block:18px}
-.band img{grid-row:1/-1;width:64px;height:64px}
+.band img{grid-row:1/-1;grid-column:1;width:64px;height:64px}
+/* Logo (the Administrator, 19 Nov 26): Rho USAF in the light theme, Rho Fulcrum in the dark theme. The same selectors as the theme tokens, so data-theme wins over the system setting. */
+.logo.fulcrum{display:none}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .logo.usaf{display:none}:root:not([data-theme="light"]) .logo.fulcrum{display:block}}
+:root[data-theme="dark"] .logo.usaf{display:none}:root[data-theme="dark"] .logo.fulcrum{display:block}
 /* Right side: TEAMS in the style and on the row of RADE, the channel name in the style and on the row of the tagline (the Administrator, 18 Nov 26). */
 .band .name,.band .team{grid-row:2;margin:0;font-size:1.375rem;line-height:1.2;font-weight:650;color:#fff}
 .band .sub,.band .chan{grid-row:3;margin:2px 0 0;color:#dde8f3;font-size:.875rem}
@@ -63,9 +69,29 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 .bar i{display:block;height:100%;width:0;background:var(--action);transition:width .25s linear}
 .win[data-done] .bar i{background:var(--pass)}
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+/* Contrast modes (the Administrator, 19 Nov 26: "ensure the html site supports contrast modes").
+   1. More contrast (prefers-contrast:more): second lines, edges and the bar track move toward the text color; the band is one
+      solid navy with white text; the focus ring is 3 px. Light and dark each have their own values (same selectors as the themes).
+   2. Forced colors (Windows contrast themes): the browser takes the system colors. Parts that only a background color shows
+      (the band, the bar and its fill, the main button) get a system-color border or fill, so they stay visible. The logo is an
+      image and keeps its own colors (its disc carries it on any background). */
+@media (prefers-contrast:more){
+:root{--gray:#333d48;--edge:#1b2430;--link:#003f7a;--track:#8a96a3}
+.band{background:#0b2545}.band .sub,.band .chan{color:#fff}
+:focus-visible{outline-width:3px}}
+@media (prefers-contrast:more) and (prefers-color-scheme:dark){:root:not([data-theme="light"]){--gray:#d5dde6;--edge:#c3ccd8;--link:#b3cff5;--track:#5a6573}}
+@media (prefers-contrast:more){:root[data-theme="dark"]{--gray:#d5dde6;--edge:#c3ccd8;--link:#b3cff5;--track:#5a6573}}
+@media (forced-colors:active){
+.band{background:Canvas;color:CanvasText;border-bottom-color:CanvasText}
+.band .name,.band .team,.band .sub,.band .chan{color:CanvasText}
+.btn,.btn.primary{border:1px solid ButtonText}
+.btn.primary{border-width:2px}
+.bar{background:Canvas;border-top:1px solid CanvasText}
+.bar i{forced-color-adjust:none;background:Highlight}
+:focus-visible{outline:3px solid Highlight}}
 </style></head><body>
 <div class="win" id="win">
-<header class="band"><div class="row band-in"><img src="assets/logo/rho-usaf-64.png" srcset="assets/logo/rho-usaf-64.png 1x, assets/logo/rho-usaf-128.png 2x" alt=""><p class="name">RADE</p><p class="sub">Test, deploy, enjoy</p><p class="team" id="team" hidden>TEAMS</p><p class="chan" id="chan"></p></div></header>
+<header class="band"><div class="row band-in"><img class="logo usaf" src="assets/logo/rho-usaf-64.png" srcset="assets/logo/rho-usaf-64.png 1x, assets/logo/rho-usaf-128.png 2x" alt=""><img class="logo fulcrum" src="assets/logo/rho-fulcrum-64.png" srcset="assets/logo/rho-fulcrum-64.png 1x, assets/logo/rho-fulcrum-128.png 2x" alt=""><p class="name">RADE</p><p class="sub">Test, deploy, enjoy</p><p class="team" id="team" hidden>TEAMS</p><p class="chan" id="chan"></p></div></header>
 <main class="row stage"><div class="card" id="card" aria-live="polite"><p class="caps">RADE</p><h1>Getting the newest script.</h1></div></main>
 <footer class="row bottom"><a href="https://github.com/rhope-ops/RADE">Repository</a><a id="back" href="#" hidden>Back</a><span class="state" id="state"></span></footer>
 <div class="bar" aria-hidden="true"><i id="bar"></i></div>
