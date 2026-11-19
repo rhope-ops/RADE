@@ -48,6 +48,8 @@ RUNS = [
 DEVICE_150 = [
     (r"\$ui\.Form\.AutoScaleDimensions = New-Object System\.Drawing\.SizeF\(96, 96\)", "$ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(64, 64)"),
     (r"if \(\$d -gt 0\) \{ \$ui\.Dpi = \$d \}", "if ($d -gt 0) { $ui.Dpi = $d * 1.5 }"),
+    # the step title of R32 that left no room for the bar beside it: the bar must stay on the title's line ($ui.FitBar)
+    (r"'Check this computer'", "'Make the test list and library'"),
 ]
 WORDS = "readiness tracker for each unit member with a reminder before an item is due and one page for the commander "
 
