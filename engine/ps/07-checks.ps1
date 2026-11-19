@@ -153,7 +153,7 @@ function Test-WebReach([string]$Url) {
 function Invoke-ChildScript([string]$Text, [string]$ArgText, [int]$Seconds, [scriptblock]$Tick, [bool]$Bypass = $true) {
   # Runs a short embedded check script as a child powershell.exe, the way steps run. The script is written to the Windows
   # temp folder and deleted at once. Returns the exit code and the output lines. $Bypass = $false starts it with no
-  # -ExecutionPolicy setting: only the child check's probe does that (plan of 2026-11-19, stage 0).
+  # -ExecutionPolicy setting: only the child check's probe does that (plan of 2026-11-18, stage 0).
   $exe = 'powershell.exe'
   if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) { $exe = 'pwsh' }
   $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('@@PREFIX@@-check-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.ps1')
@@ -353,7 +353,7 @@ function Get-ComputerCheck([string]$Id, [scriptblock]$Tick) {
     $r = Invoke-ChildScript "'child ok'`r`nexit 7`r`n" '' 60 $Tick
     $pol = ''
     try { $pol = (@(Get-ExecutionPolicy -List | Where-Object { $_.Scope -match 'Policy$' -and [string]$_.ExecutionPolicy -ne 'Undefined' } | ForEach-Object { [string]$_.Scope + '=' + [string]$_.ExecutionPolicy }) -join ', ') } catch { $null = $_ }
-    # Probe (the Administrator, 2026-11-19): a second small script, started with no -ExecutionPolicy setting of its own
+    # Probe (the Administrator, 2026-11-18): a second small script, started with no -ExecutionPolicy setting of its own
     # and none handed down (it ends with code 8 if one was). Its answer shows in the detail only and never changes the
     # result: a round then proves whether this computer needs the setting at all.
     $probe = ''

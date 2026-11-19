@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""No-reconnaissance check (AGENTS.md "Project rules", "No reconnaissance"; the Administrator, 2026-11-19).
+"""No-reconnaissance check (AGENTS.md "Project rules", "No reconnaissance"; the Administrator, 2026-11-18).
 
 Reads PowerShell text and reports each word that finds hosts, pings, tests a port, looks up a name, maps a network,
 searches a directory or opens a session on another computer. It is a word search, not a proof: it reads comments and

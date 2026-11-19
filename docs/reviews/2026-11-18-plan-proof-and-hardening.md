@@ -1,8 +1,8 @@
 # Plan: proof and hardening (RADE)
 
-Approved by the Administrator on 2026-11-19 ("implement everything we've discussed into the plan for the project at an appropriate stage and do as much as possible to test these issues in the next rounds"). Scope: RADE; items that belong to an app are marked "app session". This file is the one home of the plan: [docs/NEXT_PROMPT.md](../NEXT_PROMPT.md) and the handoff detail link here. A row marked **Decide** needs the Administrator before it is built. After a restart, continue from the first row that is not done.
+Approved by the Administrator on 2026-11-18 ("implement everything we've discussed into the plan for the project at an appropriate stage and do as much as possible to test these issues in the next rounds"). Scope: RADE; items that belong to an app are marked "app session". This file is the one home of the plan: [docs/NEXT_PROMPT.md](../NEXT_PROMPT.md) and the handoff detail link here. A row marked **Decide** needs the Administrator before it is built. After a restart, continue from the first row that is not done.
 
-Why this plan: on 2026-11-19 the build was ahead of its proof (18 engine releases in 5 days; one app; one person who has run it; no device result after R29b r5 on engine-v14). The stages below put proof and integrity before new features. Engine and app work go on beside it (the Administrator, 2026-11-19).
+Why this plan: on 2026-11-18 the build was ahead of its proof (18 engine releases in 5 days; one app; one person who has run it; no device result after R29b r5 on engine-v14). The stages below put proof and integrity before new features. Engine and app work go on beside it (the Administrator, 2026-11-18).
 
 ## Stage 0: built with this plan (engine-v19)
 
@@ -55,9 +55,9 @@ One or two items for each engine release, in this order. Each has a test before 
 
 | Item | What | Who |
 |---|---|---|
-| 4.1 Send the brief | The Administrator has discussed paste-and-run with the ISSM and other professionals (DECISIONS 2026-11-19); the brief asks for the position in writing | The Administrator |
+| 4.1 Send the brief | The Administrator has discussed paste-and-run with the ISSM and other professionals (DECISIONS 2026-11-18); the brief asks for the position in writing | The Administrator |
 | 4.2 A person reviews the code | A named reviewer of the receiving unit, with [docs/review-guide.md](../review-guide.md); findings become issues (STIG APSC-DV-003170, -001460) | The Administrator asks; agent fixes |
-| 4.3 Official endorsement | The long-term goal (the Administrator, 2026-11-19): an approved way to distribute, so RADE does not depend on the paste path staying open | The Administrator |
+| 4.3 Official endorsement | The long-term goal (the Administrator, 2026-11-18): an approved way to distribute, so RADE does not depend on the paste path staying open | The Administrator |
 | 4.4 Threat model at each release | Read [docs/threat-model.md](../threat-model.md) at each engine release and say so in the release notes | Agent |
 
 ## Stage 5: operations (run it for other people)
@@ -78,11 +78,11 @@ One or two items for each engine release, in this order. Each has a test before 
 | 6.1 A second person | 2 or 3 people paste and run with no help from the owner; record where each one stops | The Administrator, after stage 1 |
 | 6.2 A second app | The smallest planned app, to test "RADE knows a platform, never an app's objects" | **Decide**: which app |
 | 6.3 A second maintainer | A second account with review rights, and a one-page take-over document | **Decide** |
-| 6.4 Repo access review | Each quarter, recorded in docs/DECISIONS.md (STIG APSC-DV-003000) | Agent, first on 2027-02-19 |
+| 6.4 Repo access review | Each quarter, recorded in docs/DECISIONS.md (STIG APSC-DV-003000) | Agent, first on 2027-02-18 |
 | 6.5 A second channel | If the work proxy blocks the page's host, no install is possible. Decide whether a copy on a SharePoint page is wanted | **Decide** |
 | 6.6 Release rhythm | Agent REC: one engine release for each device round, so each release has a device result | **Decide** |
 
 ## Not taken
 
-- A pause of engine work until the device rounds are done (agent REC, 2026-11-19): the Administrator works on the engine and the app together.
-- A two-week freeze of the kit (agent REC, 2026-11-19): no answer; not in this plan.
+- A pause of engine work until the device rounds are done (agent REC, 2026-11-18): the Administrator works on the engine and the app together.
+- A two-week freeze of the kit (agent REC, 2026-11-18): no answer; not in this plan.

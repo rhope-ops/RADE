@@ -32,7 +32,7 @@ python3 scripts/code_standard.py
 # Network rules of the checks (the Administrator, 2026-11-17): no Windows sign-in to a tested address; a Config
 # address only on the app's own host. About 1 s.
 tests/net_rules_test.sh
-# No reconnaissance (AGENTS.md "Project rules"; the Administrator, 2026-11-19): no word that finds hosts, pings, tests a
+# No reconnaissance (AGENTS.md "Project rules"; the Administrator, 2026-11-18): no word that finds hosts, pings, tests a
 # port or looks up a name in the engine sources or the sample app. A word search that proves itself first. Under 1 s.
 python3 scripts/no_recon.py --test
 python3 scripts/no_recon.py
