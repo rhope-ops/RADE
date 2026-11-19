@@ -7,6 +7,7 @@ try {
   # Writes a line to the run log and the console. Takes the line; gives back nothing.
   $say = { param($t) Add-RunLog $t; Write-Host $t }
   Write-Host ('RADE - ' + $round + ' - build ' + $buildId)
+  Write-Host $script:scriptCheck.Line   # the bundle hash, to compare with the RADE page (docs/specs/bundle-hash.md)
   Write-Host (Get-LastRoundText (Read-RoundHistory (Get-BasePath)))
   $newer = Get-NewerRound
   if ($newer) { Write-Host ('A newer round, ' + $newer + ', is in the repository. Type N and press Enter to stop, then run ' + $newer + '.') }

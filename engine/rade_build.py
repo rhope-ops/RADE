@@ -44,6 +44,8 @@ It runs only the steps embedded in it and never fetches code (PFM 3A). If no win
 it runs the same steps as text.
 Text files are embedded as readable single-quoted here-strings, so anyone can read the code.
 The build id (first 8 hex of the sha256 of the bundle body) shows in the window title and the summary.
+The first line of a bundle is its hash (HASH_LINE: the SHA-256 of all the text after it); the build writes the same value
+to <bundle>.sha256.json beside the bundle, for the RADE page to compare (docs/specs/bundle-hash.md).
 Usage: python3 engine/rade_build.py --app-root DIR [--manifest scripts/paste_bundles.json] [--check] [--sha]
   --check: exit 1 if a bundle is out of date. --sha: print the engine's sha256 (every engine file, see ENGINE_SHA).
 """
@@ -432,7 +434,7 @@ def contents(head, body):
             marks.append((n, line.strip()[7:]))
         elif line.endswith("@'"):
             inside = True
-    first = head.count('\n') + len(marks) + 2   # the bundle line of body line 1: after the header and this list
+    first = head.count('\n') + len(marks) + 3   # the bundle line of body line 1: after the hash line, the header and this list
     rows = ['#   line %5d  %s' % (first + n - 1, (('  ' if line.startswith('File') else '') + line)[:150]) for n, line in marks]
     return '# ==== Contents (GENERATED; the line numbers are lines of this bundle)\n' + '\n'.join(rows) + '\n'
 
@@ -445,9 +447,35 @@ def part_lines():
     return '  Engine parts, in run order:\n' + ''.join('    %s\n' % r for r in rows)
 
 
+# Bundle hash (docs/specs/bundle-hash.md; the Administrator, 2026-11-18). The first line of a bundle holds the SHA-256 of
+# all the text after it (line ends as LF), so the value is not inside the text it covers. The page (index.html) and the
+# bundle itself (Get-ScriptCheck, engine/ps/05-installed.ps1) hash the same text and show the same short form.
+HASH_LINE = '# @@BUNDLE-HASH %s @@\n'
+
+
+def bundle_hash(text):
+    """Return (the SHA-256 on the first line of a bundle or '', the SHA-256 of the text after that line with LF line ends)."""
+    first, _, rest = text.replace('\r\n', '\n').partition('\n')
+    m = re.fullmatch(r'# @@BUNDLE-HASH ([0-9a-f]{64}) @@', first)
+    return (m.group(1) if m else ''), hashlib.sha256(rest.encode('ascii')).hexdigest()
+
+
+def short_hash(sha):
+    """The form a person compares: the first 12 and the last 4 hex characters."""
+    return sha[:12] + '...' + sha[-4:]
+
+
+def hash_record(b, text):
+    """The text of the stored hash file beside a bundle (<bundle>.sha256.json): what the page compares its own hash with."""
+    sha = bundle_hash(text)[0]
+    build_id = re.search(r"(?m)^\$buildId = '([0-9a-f]{8})'$", text).group(1)
+    rec = {'file': Path(b['out']).name, 'sha256': sha, 'short': short_hash(sha), 'buildId': build_id, 'engineRelease': ENGINE_RELEASE}
+    return json.dumps(rec, indent=2) + '\n'
+
+
 def build(b):
-    """Return the whole bundle text for one manifest bundle: the header (what it is, how to run it, its sources), the
-    contents list and the body. The build id is the first 8 hex of the body's SHA-256."""
+    """Return the whole bundle text for one manifest bundle: the hash line (HASH_LINE), the header (what it is, how to
+    run it, its sources), the contents list and the body. The build id is the first 8 hex of the body's SHA-256."""
     ui_text = UI_FILE.read_text(encoding='ascii')
     body = bundle_body(b, ui_text)
     build_id = hashlib.sha256(body.encode('ascii')).hexdigest()[:8]
@@ -462,7 +490,8 @@ def build(b):
             '  and saves its results in Rounds\\%s%s No download, no admin rights.\n'
             '  To read it: the Contents list below gives the line of each part and file; each part starts with a "# ====" line.\n'
             '#>\n$buildId = \'%s\'\n$engineRelease = %d\n' % (b['title'], file_sha('engine/rade_build.py'), hashlib.sha256(ui_text.encode('ascii')).hexdigest()[:12], MANIFEST, part_lines(), APP['folder'], b['round'], sends, build_id, ENGINE_RELEASE))
-    return head + contents(head, body) + body
+    rest = head + contents(head, body) + body
+    return HASH_LINE % hashlib.sha256(rest.encode('ascii')).hexdigest() + rest
 
 
 # Text lengths (the Administrator, 2026-11-15; docs/window-design.md "Text lengths"). The most characters of each text an
@@ -527,13 +556,16 @@ def main():
     for b in m['bundles']:
         out = ROOT / b['out']
         text = build(b)
+        rec_file, rec = out.with_name(out.name + '.sha256.json'), hash_record(b, text)   # the stored hash, beside the bundle
         if a.check:
-            if not out.exists() or out.read_bytes() != text.encode('ascii'):
+            if not out.exists() or out.read_bytes() != text.encode('ascii') or not rec_file.exists() or rec_file.read_text() != rec:
                 print('STALE ' + b['out']); stale += 1
             continue
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(text.encode('ascii'))
+        rec_file.write_text(rec)
         print('BUILT %s bytes=%d files=%d steps=%d' % (b['out'], len(text), len(b['files']), len(b['steps'])))
+        print('HASH %s %s (%s)' % (b['out'], bundle_hash(text)[0], short_hash(bundle_hash(text)[0])))
         for line in text_lengths(b):
             print(line)
     if a.check:
@@ -549,7 +581,7 @@ ENGINE_SHA = hashlib.sha256(b''.join(rel.encode() + b'\0' + (ENGINE_ROOT / rel).
                                      + ['engine/rade_ui.ps1', 'engine/window.json', 'assets/logo/logo-rho-128.png'])).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
-ENGINE_RELEASE = 19
+ENGINE_RELEASE = 20
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':

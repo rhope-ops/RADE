@@ -12,9 +12,9 @@ Why this plan: on 2026-11-18 the build was ahead of its proof (18 engine release
 | 0.2 No-reconnaissance check | [scripts/no_recon.py](../../scripts/no_recon.py): a word search of the engine sources and the sample app in both check lanes; the app canary prints a NOTE line for each such word in a real app's built bundle. A word search, not a proof. | `NORECON files=26 hits=0`; self-test 18 found, 6 allowed |
 | 0.3 Security brief | Draft for the ISSM and other reviewers, a private Claude doc (not in this public repo). | The Administrator reads and sends it |
 
-## Stage 1: the next device round (the Administrator runs it; 90-161.Z R31 on engine-v19)
+## Stage 1: the next device round (the Administrator runs it; 90-161.Z R31 on engine-v20)
 
-Read these lines in the round's results. Each one answers a question of this plan. The app's session moves the lock to engine-v19 first.
+Read these lines in the round's results. Each one answers a question of this plan. The app's session moves the lock to engine-v20 first.
 
 | Line in the results | Question | If the answer is bad |
 |---|---|---|
@@ -24,15 +24,15 @@ Read these lines in the round's results. Each one answers a question of this pla
 | 4 lines `PASS shared files` | Do the install records work on Windows PowerShell 5.1? | Fix, release, next round |
 | R29a (download and saved-address steps) | No result yet since engine-v14 | Run it in the same sitting |
 
-Also in this round, by hand (2 minutes): paste the bundle once in the console and once in ISE, and note whether both start. Stage 2.2 needs to know that ISE and the console behave the same before the hash check is built.
+From engine-v20 also read the second line of the results, `Script check: <first 12>...<last 4> (checked)`, and compare the value with the RADE page and the window's title bar: all three must be the same. `DOES NOT MATCH` after an honest paste in ISE means the paste changed the text: send the line as it is (stage 2.2 then changes how the text is hashed). Before this round the app's session moves the lock to engine-v20 and commits the new `*.ps1.sha256.json` files.
 
 ## Stage 2: integrity (what a user copies is what was reviewed)
 
 | Item | What | Who | State |
 |---|---|---|---|
-| 2.1 Ruleset on main | Require a pull request and the status check `checks` (the name GitHub shows for the job of check.yml). Also from the standards close-out: the Dependabot secret for the name denylist, private vulnerability reporting. | The Administrator (GitHub settings) | Open |
-| 2.2 Bundle hash | [docs/specs/bundle-hash.md](../specs/bundle-hash.md): one short hash on the page and on the bundle's first screen. | Agent, after the answers | **Decide**: the five questions (agent REC: take all five RECs) |
-| 2.3 Tagged releases on the page | The page serves an app's tagged release, not `main`, with a "previous version" choice: a merge is then not a release, and a rollback is one click. | Agent (page), app session (tags) | **Decide** with 2.2 (its Q4) |
+| 2.1 Ruleset on main | Require a pull request and the status check `checks` (the name GitHub shows for the job of check.yml). Also from the standards close-out: the Dependabot secret for the name denylist, private vulnerability reporting. | The Administrator (GitHub settings) | Ruleset live with `checks` (the Administrator, 2026-11-18; an agent cannot read the setting). Open: the Dependabot secret, private vulnerability reporting |
+| 2.2 Bundle hash | [docs/specs/bundle-hash.md](../specs/bundle-hash.md): one short hash on the page and on the bundle's first screen. | Agent | Built 2026-11-18 (engine-v20 and the page; the Administrator took all five RECs). Open: the round of stage 1 proves the paste; then the bundle's stop on a mismatch (R6) goes on |
+| 2.3 Tagged releases on the page | The page serves an app's tagged release, not `main`, with a "previous version" choice: a merge is then not a release, and a rollback is one click. | Agent (page), app session (tags) | Decided 2026-11-18 (Q4: yes, as a separate step). Not built |
 | 2.4 Remove Bypass | If stage 1 shows `[ran]`: take `-ExecutionPolicy Bypass` out of the 4 places (04-steps.ps1, 07-checks.ps1, 05-installed.ps1, window/07-run.ps1), no fallback; the probe goes with it. One engine release, one round. | Agent | Waits for stage 1 |
 | 2.5 Release number guard | release.yml compares `ENGINE_RELEASE` with the tag. | Agent | **Decide** (guard file) |
 | 2.6 Code signing | Ask whether a DoD code-signing certificate can be had (the brief asks it). | The Administrator | Open |

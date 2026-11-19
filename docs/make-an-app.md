@@ -10,7 +10,7 @@ What an application repository must hold so that RADE can test and deploy it. RA
 | 2 | Step scripts | PowerShell files (Windows PowerShell 5.1) that a bundle writes to the computer and runs. They follow the step contract ([engine.md](engine.md) "Step contract"). | `scripts/gov/*.ps1` |
 | 3 | Lock | The RADE commit and every engine file with its SHA-256 ([engine.md](engine.md) "How an app gets the engine"). Copy it from a RADE release (`rade-engine.lock.json`). | `scripts/rade.lock.json` |
 | 4 | Build script | Downloads the locked engine files, checks each SHA-256 and runs `engine/rade_build.py --app-root <repo>`. Copy the example; it uses the Python standard library only. | `scripts/build_paste_bundles.py` |
-| 5 | Built bundle | The engine's output: one `.ps1` text for each bundle, committed to the repo. Never edit it by hand. | `scripts/gov/paste/*.ps1` |
+| 5 | Built bundle | The engine's output: one `.ps1` text for each bundle and, from engine-v20, its stored hash `<bundle>.ps1.sha256.json` (the RADE page compares with it), both committed to the repo. Never edit them by hand. | `scripts/gov/paste/*.ps1`, `*.ps1.sha256.json` |
 | 6 | `go.md` on main | The task page. The window reads it to tell the user that a newer round exists. | `go.md` |
 | 7 | `rade-release.json` on main | The current version of each app in the manifest, for the newer-version notice in a deploy. | `rade-release.json` |
 
