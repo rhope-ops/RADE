@@ -150,9 +150,10 @@ function Test-WebReach([string]$Url) {
     return @{ Ok = $false; Why = 'network error [' + $e.GetType().Name + ']' }
   }
 }
-function Invoke-ChildScript([string]$Text, [string]$ArgText, [int]$Seconds, [scriptblock]$Tick) {
+function Invoke-ChildScript([string]$Text, [string]$ArgText, [int]$Seconds, [scriptblock]$Tick, [bool]$Bypass = $true) {
   # Runs a short embedded check script as a child powershell.exe, the way steps run. The script is written to the Windows
-  # temp folder and deleted at once. Returns the exit code and the output lines.
+  # temp folder and deleted at once. Returns the exit code and the output lines. $Bypass = $false starts it with no
+  # -ExecutionPolicy setting: only the child check's probe does that (plan of 2026-11-18, stage 0).
   $exe = 'powershell.exe'
   if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) { $exe = 'pwsh' }
   $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('@@PREFIX@@-check-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.ps1')
@@ -161,9 +162,12 @@ function Invoke-ChildScript([string]$Text, [string]$ArgText, [int]$Seconds, [scr
     [System.IO.File]::WriteAllText($tmp, $Text, (New-Object System.Text.UTF8Encoding $true))
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $exe
-    $psi.Arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $tmp + '"' + $(if ($ArgText) { ' ' + $ArgText } else { '' })
+    $psi.Arguments = '-NoProfile ' + $(if ($Bypass) { '-ExecutionPolicy Bypass ' } else { '' }) + '-File "' + $tmp + '"' + $(if ($ArgText) { ' ' + $ArgText } else { '' })
     $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true
     $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
+    # A PowerShell started with -ExecutionPolicy hands that setting to its child processes in this variable (the RADE
+    # shortcut starts that way), so the probe takes it out: else it would say "ran" on a computer that needs the setting.
+    if (-not $Bypass) { $psi.EnvironmentVariables.Remove('PSExecutionPolicyPreference') }
     $p = [System.Diagnostics.Process]::Start($psi)
     $script:child = $p   # Exit stops a check too (review R17)
     $outTask = $p.StandardOutput.ReadToEndAsync(); $errTask = $p.StandardError.ReadToEndAsync()
@@ -349,7 +353,12 @@ function Get-ComputerCheck([string]$Id, [scriptblock]$Tick) {
     $r = Invoke-ChildScript "'child ok'`r`nexit 7`r`n" '' 60 $Tick
     $pol = ''
     try { $pol = (@(Get-ExecutionPolicy -List | Where-Object { $_.Scope -match 'Policy$' -and [string]$_.ExecutionPolicy -ne 'Undefined' } | ForEach-Object { [string]$_.Scope + '=' + [string]$_.ExecutionPolicy }) -join ', ') } catch { $null = $_ }
-    if ($r.Exit -eq 7) { $one = Format-CheckResult 'PASSED' ('Test script ran' + $(if ($pol) { ', policy [' + $pol + ']' } else { '' })) '' }
+    # Probe (the Administrator, 2026-11-18): a second small script, started with no -ExecutionPolicy setting of its own
+    # and none handed down (it ends with code 8 if one was). Its answer shows in the detail only and never changes the
+    # result: a round then proves whether this computer needs the setting at all.
+    $probe = ''
+    if ($r.Exit -eq 7) { $n = Invoke-ChildScript "if (`$env:PSExecutionPolicyPreference) { exit 8 }`r`nexit 7`r`n" '' 60 $Tick $false; $probe = ', without Bypass [' + $(if ($n.Exit -eq 7) { 'ran' } else { 'blocked, exit code ' + $n.Exit }) + ']' }
+    if ($r.Exit -eq 7) { $one = Format-CheckResult 'PASSED' ('Test script ran' + $(if ($pol) { ', policy [' + $pol + ']' } else { '' }) + $probe) '' }
     else { $one = Format-CheckResult 'FAILED' ('Test script did not run, exit code [' + $r.Exit + ']' + $(if ($r.Why) { ', ' + $r.Why } else { '' }) + $(if ($pol) { ', policy [' + $pol + ']' } else { '' })) 'This computer blocks RADE scripts. Contact your ISSM and send the results e-mail as is' }
   }
   }
