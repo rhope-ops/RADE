@@ -60,8 +60,10 @@ $ui.StepTime = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepTime.Visible = $tru
 $ui.StepFrac = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepFrac.Visible = $true; $ui.StepFrac.Margin = (& $ui.Pad $ui.Z.G3 2 0 0)
 foreach ($c in @($ui.StepName, $ui.StepBar, $ui.StepTime, $ui.StepFrac)) { [void]$ui.StepRow.Controls.Add($c) }
 # The now-doing line (L7, the Administrator, 2026-11-19; the last log line before): what the running step does now, as a plain
-# sentence ($ui.ShowNow). It wraps to its full height (R28 N9: a label 20 px high cut it through its middle, and "..." cut its end).
+# sentence ($ui.ShowNow). It has a fixed room of $ui.NowLines lines, shown also with no text, and a longer text ends with "..."
+# (the Administrator, 2026-11-19: Cancel under it jumped as the text changed; before, it wrapped to its full height, R28 N9).
 $ui.Now = & $ui.Text $ui.F.Small $ui.C.Gray $ui.Z.G2 'Now doing'
+$ui.NowLines = 2; $ui.Hold[$ui.Now] = $ui.NowLines
 $ui.FieldRow = & $ui.Flow $ui.Z.G2; $ui.FieldRow.WrapContents = $true; & $ui.Ring $ui.FieldRow
 $ui.FieldL = & $ui.Label $ui.F.SmallB $ui.C.Gray 9; $ui.FieldL.Visible = $true
 # A one-line box: a frame as tall as a compact button with RADE's own 1 px edge, the text box inside it with no border,

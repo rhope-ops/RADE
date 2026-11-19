@@ -294,7 +294,7 @@ $ui.SetCard = { param($c)
   $ui.OnOpt = $c.OnOption; & $ui.FillOpts $c.Options; $ui.Opts.Visible = [bool]$ui.Opts.Controls.Count
   & $ui.SetSteps $c.Lines
   $ui.PathL.Visible = [bool]$c.Path; & $ui.Show $ui.PathT ([string]$c.Path)
-  $ui.StepRow.Visible = [bool]$c.StepRow; & $ui.Show $ui.Now ''; if ($c.StepRow) { $ui.StepTime.Text = '' }   # the last log line shows when a line comes (no empty space)
+  $ui.StepRow.Visible = [bool]$c.StepRow; & $ui.Show $ui.Now ''; if ($c.StepRow) { $ui.StepTime.Text = ''; $ui.Now.Visible = $true }   # the run card keeps the now-doing room, empty until a text comes
   $ui.FieldRow.Visible = [bool]$c.Field; $ui.FieldDo = $null
   $ui.FieldAbove = [bool]($c.Field -and $c.Field.Above); try { $ui.FieldRow.SetFlowBreak($ui.FieldL, $ui.FieldAbove) } catch { $null = $_ }   # L3: the box goes under its label
   if ($c.Field) { $ui.FieldL.Text = [string]$c.Field.Label; $ui.Field.Text = [string]$c.Field.Text; $ui.Field.AccessibleName = [string]$c.Field.Name; $ui.FieldB.Visible = [bool]$c.Field.Button; $ui.FieldBOn = [bool]$c.Field.Button; $ui.FieldB.Text = [string]$c.Field.Button; $ui.FieldDo = $c.Field.Act; $ui.Field.MaxLength = $(if ($c.Field.Max) { [int]$c.Field.Max } else { 32767 }); & $ui.FitRow }
