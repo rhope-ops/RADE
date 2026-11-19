@@ -26,7 +26,7 @@ $ui.VHandFail = {
   & $ui.SetCard @{ View = 'handfail'; Light = 'you'; Kicker = 'It failed'; Sentence = 'What did the error say?'; P = @('Paste the error message here. Do not include names or a site address.'); Err = $true
     Buttons = @(@{ Text = 'Report the failure'; Kind = 'primary'; Act = { $script:guideError = [string]$ui.ErrBox.Text; $ui.Answer = 'Abort' } }, @{ Text = 'Back'; Act = { & $ui.VHand } }); NoAccept = $true; Focus = 'err' } }
 # A question of a hand step (manifest "answers"), after Done: the prompt is the sentence; yes/no and pick answer with
-# one button per word, a text with one line (2,000 characters at most; empty is allowed; R28: kept whole) and "Continue". No Back.
+# one button per word, a text with one line (10,000 characters at most; empty is allowed; R28: kept whole) and "Continue". No Back.
 $ui.ReplyActs = @({ $ui.Reply = [string]$ui.B[0].Text }, { $ui.Reply = [string]$ui.B[1].Text }, { $ui.Reply = [string]$ui.B[2].Text }, { $ui.Reply = [string]$ui.B[3].Text })
 # Shows one question of a hand step (text, yes or no, or a pick). The first sentence of the prompt is the headline.
 # Takes the question, its number and the count; the answer is set in $ui.Reply.
@@ -36,7 +36,8 @@ $ui.VAnswer = { param($Q, [int]$I, [int]$N)
   # The prompt's first sentence (up to the first "?", "." or ":" followed by a space or the end) is the headline; the rest
   # is a body line under it (the Administrator, 2026-11-15, rework B). A first sentence too long for one line shrinks ($ui.FitSent).
   if ([string]$Q.Prompt -match '^(.+?[?.:])(?:\s+(\S.*))?$') { $c.Sentence = $Matches[1]; if ($Matches[2]) { $c.P = @($Matches[2].Trim()) } }
-  if ($Q.Kind -eq 'text') { $c.Field = @{ Label = 'Your answer'; Text = ''; Name = [string]$Q.Prompt; Max = 2000; Above = $true }; $c.Focus = 'field'; $c.Buttons = @(@{ Text = 'Continue'; Kind = 'primary'; Act = { $ui.Reply = [string]$ui.Field.Text } }) }
+  if ($Q.Kind -eq 'text') { $c.Field = @{ Label = 'Your answer'; Text = ''; Name = [string]$Q.Prompt; Max = 10000; Above = $true }
+    $c.Focus = 'field'; $c.Buttons = @(@{ Text = 'Continue'; Kind = 'primary'; Act = { $ui.Reply = [string]$ui.Field.Text } }) }
   else { $ws = @($(if ($Q.Kind -eq 'yesno') { 'Yes', 'No' } else { $Q.Choices })); $c.Buttons = @(for ($k = 0; $k -lt $ws.Count; $k++) { @{ Text = [string]$ws[$k]; Act = $ui.ReplyActs[$k] } }) }
   & $ui.SetCard $c }
 # E2 (the Administrator, 2026-11-19): after an answer that the manifest marks as a failure ("failOn"), the card where the
@@ -89,7 +90,7 @@ $script:guideUi = { param($Step, [string]$File, [string]$Url, [string]$UrlFile)
   if ($ui.Running -and -not $script:closing) { $null = & $ui.ShowRun }
   return $res }
 # L4 (the Administrator, 2026-11-19): the last card of a test round, "Anything else about this round or the app?". The
-# text is optional and takes up to 10,000 characters (R34: 2,000 cut a pasted block); a pasted block becomes one line ($ui.PasteLine); the engine puts it into the report under the line "Other feedback:" (Get-RoundFeedback). Takes
+# text is optional and takes up to 10,000 characters, like every text answer (R34, R7); a pasted block becomes one line ($ui.PasteLine); the engine puts it into the report under the line "Other feedback:" (Get-RoundFeedback). Takes
 # nothing; waits for Continue; gives back the text ('' when the window closed).
 $script:feedbackUi = {
   $null = & $ui.HoldStep   # L8: the last step stays on the Run card for its minimum time first

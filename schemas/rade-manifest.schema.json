@@ -374,7 +374,7 @@
                   "pick",
                   "text"
                 ],
-                "description": "yesno: buttons Yes and No. pick: one button per choice. text: one line of at most 2,000 characters, kept whole in the report (empty is recorded as \"(no text)\"; e-mail and site addresses are masked)."
+                "description": "yesno: buttons Yes and No. pick: one button per choice. text: one line of at most 10,000 characters (a longer paste is cut and the window says how many characters did not fit), kept whole in the report (empty is recorded as \"(no text)\"; e-mail and site addresses are masked)."
               },
               "choices": {
                 "type": "array",

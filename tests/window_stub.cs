@@ -92,7 +92,7 @@ namespace System.Windows.Forms {
   public class TableLayoutPanel : Control { public Bag ColumnStyles = new Bag(); public Bag RowStyles = new Bag(); public void SetColumnSpan(Control c, int n) { } }
   public class ButtonBase : Control { }   // R29b: $ui.Ink asks for it (a button with an edge starts at its edge)
   public class Button : ButtonBase { public override Size PreferredSize { get { object m; Size min = new Size(0, 0); if (Values.TryGetValue("MinimumSize", out m) && m is PSObject) m = ((PSObject)m).BaseObject; if (m is Size) min = (Size)m; return new Size(Math.Max((Text ?? "").Length * 7 + 24, min.Width), Math.Max(23, min.Height)); } } }
-  public class TextBoxBase : Control { public bool ReadOnly; public int SelectionLength; public string SelectedText = ""; public void Copy() { RadeStub.Driver.Clip = "selected"; } public void SelectAll() { SelectionLength = (Text ?? "").Length; } }
+  public class TextBoxBase : Control { public bool ReadOnly; public int SelectionLength; string sel = ""; public string Inserted = ""; public string SelectedText { get { return sel; } set { sel = value; Inserted = value; } } public void Copy() { RadeStub.Driver.Clip = "selected"; } public void SelectAll() { SelectionLength = (Text ?? "").Length; } }
   public class TextBox : TextBoxBase { public int GetLineFromCharIndex(int i) { return 0; } }
   public class RichTextBox : TextBoxBase { }   // the lines of a hand step: its Rtf is kept as given (Dyn); the window keeps the plain lines too
   public class MenuItemStub : RadeStub.Dyn { public bool Enabled = true; }

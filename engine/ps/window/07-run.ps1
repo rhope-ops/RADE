@@ -19,8 +19,8 @@ $script:nowUi = { param($t) $null = & $ui.ShowNow ([string]$t) }
 # run of fast steps does not flicker. Waits out the rest of that time since the step showed. Takes nothing.
 $ui.HoldStep = {
   while ($ui.View -eq 'run' -and $null -ne $ui.StepAt -and -not $script:closing -and -not $ui.Form.IsDisposed -and ($ui.Clock.Elapsed.TotalMilliseconds - [double]$ui.StepAt) -lt [double]$ui.Layout.StepMs) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 15 } }
-# Draws the progress: both bars, the time in the step, the step fraction and the overall percent with the time left
-# (only when earlier runs give one). Takes nothing; does nothing when no step runs.
+# Draws the progress: both bars, the time in the step, the step fraction and the overall percent (the Administrator, 2026-11-19:
+# the percent only). Takes nothing; does nothing when no step runs.
 $ui.Paint = {
   if (-not $script:prog -or -not $script:stepStart) { return }
   $g = Get-Progress
@@ -29,7 +29,7 @@ $ui.Paint = {
   & $ui.ShowTime
   $fr = $(if ($script:prog.Frac -ge 0) { [string]$script:prog.FracText } else { '' }); if ($ui.StepFrac.Text -ne $fr) { $ui.StepFrac.Text = $fr; & $ui.FitBar }
   # R21 W6: a time left only when earlier runs give one; never "a guess".
-  $rt = $ui.Words.Work + ' ' + [string][int]($g.All * 100) + ' %' + $(if ($g.Known) { $dot + 'about ' + [math]::Max(1, [int][math]::Ceiling($g.Left / 60)) + $(if ([math]::Ceiling($g.Left / 60) -le 1) { ' minute' } else { ' minutes' }) + ' left' } else { '' }); if ($ui.RightL.Text -ne $rt) { $ui.RightL.Text = $rt } }
+  $rt = [string][int]($g.All * 100) + ' %'; if ($ui.RightL.Text -ne $rt) { $ui.RightL.Text = $rt } }
 # The time in this step (R28 N10): "4m 12s"; with hours "1h 04m 12s".
 $ui.Elapsed = { param([double]$Sec) $q = [int][math]::Floor([math]::Max(0, $Sec)); $h = [int][math]::Floor($q / 3600); $m = [int][math]::Floor(($q % 3600) / 60); $x = $q % 60
   if ($h) { return ('{0}h {1:00}m {2:00}s' -f $h, $m, $x) }; return ('{0}m {1:00}s' -f $m, $x) }
@@ -45,7 +45,7 @@ $ui.TitleOf = { param([string]$Name) foreach ($s in @($steps)) { if ([string]$s.
 $ui.ShowRun = {
   & $ui.SetCard @{ View = 'run'; Kicker = $(if ($ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN } else { 'Starting' }); Sentence = $(if (Test-Deploy) { 'Installing ' + $script:app.Name + '.' } else { 'Running round ' + $round + '.' })
     StepRow = $true; Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { $ui.Form.Close() } })   # asks first while a step runs (the window's X does the same)
-    Right = $ui.Words.Work
+    Right = '0 %'
     Foot = $(if (@($ui.Guides).Count) { 'RADE needs you next at "' + (& $ui.TitleOf $ui.Guides[0]) + '". Until then, keep this window open.' } elseif (-not (Test-Deploy) -and -not $ui.Asked) { 'RADE asks you one last question at the end. Until then, keep this window open.' } else { 'Nothing is needed from you. Keep this window open.' }) }
   $ui.StepName.Text = (& $ui.TitleOf $ui.StepNow); $null = & $ui.FitEdges; $null = & $ui.FitBar; $null = & $ui.ShowTime }   # the edge follows the ink of the new text's first letter (titles start with any letter)
 # Invoke-Round calls this when a step starts: keeps its name, start and estimate, and moves the run card on.

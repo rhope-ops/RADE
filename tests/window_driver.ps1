@@ -23,10 +23,15 @@ function Start-Process { param($FilePath, $ArgumentList, $WorkingDirectory) Writ
 [RadeStub.Driver]::RunThrows = ($env:RADE_T_LOOP -eq '1'); if ($env:RADE_T_SCALE -eq '150') { [RadeStub.Driver]::FormDpi = 144 }
 $global:RadeT = @{ Long = @{}; Min = $false; Seen = ''; App = [int]$env:RADE_T_APP; Hand = [string]$env:RADE_T_HAND; Record = ($env:RADE_T_RECORD -eq '1'); Forced = $false; Opened = $false; Tour = ($env:RADE_T_TOUR -eq '1'); Esc = $false; Again = $false; SignIn = $false }
 # R34: a pasted block goes into the one-line answer box as one line ($ui.PasteLine), cut to the room that is left
-# ($ui.OneLine). Takes nothing; prints the line "WIN paste".
+# ($ui.OneLine); R7: the note of what did not fit. Takes nothing; prints the lines "WIN paste" and "WIN paste-cut".
 function global:Test-RadePaste {
   $ui.Field.Multiline = $false; $ui.Field.ReadOnly = $false; [RadeStub.Driver]::Clip = "line one`r`n  line two`n"; $pl = & $ui.PasteLine $ui.Field
-  Write-Host ('WIN paste ok=' + $pl + ' text=' + $ui.Field.SelectedText + ' cut=' + (& $ui.OneLine ('x' * 20) 5) + ' joined=' + (& $ui.OneLine "a`tb`r`n`r`nc" 100)) }
+  Write-Host ('WIN paste ok=' + $pl + ' text=' + $ui.Field.SelectedText + ' cut=' + (& $ui.OneLine ('x' * 20) 5) + ' joined=' + (& $ui.OneLine "a`tb`r`n`r`nc" 100) + ' note=' + $ui.Note.Text)
+  # R7: a paste over the room is cut and the gray line under the box says how many characters did not fit.
+  $ui.Field.Text = ('a' * ($ui.Field.MaxLength - 3)); [RadeStub.Driver]::Clip = ('x' * 1237); $pc = & $ui.PasteLine $ui.Field
+  Write-Host ('WIN paste-cut ok=' + $pc + ' inserted=' + $ui.Field.Inserted.Length + ' note=' + $ui.Note.Text + ' shown=' + $ui.Note.Visible)
+  $ui.Field.Text = ('a' * ($ui.Field.MaxLength - 1)); [RadeStub.Driver]::Clip = 'xy'; $null = & $ui.PasteLine $ui.Field; Write-Host ('WIN paste-cut one=' + $ui.Note.Text)
+  $ui.Field.Text = ''; [RadeStub.Driver]::Clip = 'fits'; $null = & $ui.PasteLine $ui.Field; Write-Host ('WIN paste-cut none=[' + $ui.Note.Text + ']') }
 # R33: a check result that comes while the Record is open shows, with its detail also when it passed; Copy all gives the
 # whole Record. Takes nothing; prints the line "WIN record-copy" and puts the check's result back.
 function global:Test-RadeRecordCopy {
@@ -34,7 +39,34 @@ function global:Test-RadeRecordCopy {
   $ui.RecCopy.PerformClick(); $cl = [string][RadeStub.Driver]::Clip; $nm = [string]$ui.RecChecks.Values['AccessibleName']
   Write-Host ('WIN record-copy btn=' + $ui.RecCopy.Text + ' checks=' + ($cl -match '(?m)^CHECKS') + ' detail=' + ($cl -match '(?m)^      R33 detail probe') + ' steps=' + ($cl -match '(?m)^  \[[x ]\] ') + ' text=' + ($cl -match 'Files this round saves') + ' name=' + ($nm -match 'R33 detail probe'))
   $script:checkResults[$cid] = $was; & $ui.RecRefresh }
+<#
+.SYNOPSIS
+The red line of a script whose hash does not match (the Administrator, 2026-11-19): prints the "WIN script-warn" lines.
+.DESCRIPTION
+On the real Choose card: a mismatch, a match and a hash that is not available. Then on cards that have a last line of
+their own (Choose of a test-only paste, Ready with a site, boot): the warning takes that line on a mismatch and the own
+text is back on a match. The real state is restored and Choose is shown again.
+.OUTPUTS
+Nothing; 9 WIN lines.
+#>
+function global:Test-RadeScriptWarn {
+  if ($global:RadeT.WarnDone) { return }; $global:RadeT.WarnDone = $true
+  $was = $script:scriptCheck
+  foreach ($k in @(@('mismatch', 'abc...def', $false), @('match', 'abc...def', $true), @('unavailable', '', $false))) {
+    $script:scriptCheck = @{ Line = 'x'; Short = $k[1]; Ok = $k[2] }; & $ui.VChoose
+    Write-Host ('WIN script-warn ' + $k[0] + ' view=' + $ui.View + ' text=[' + $(if ($ui.Foot.Visible) { $ui.Foot.Text } else { '' }) + '] red=' + [object]::Equals($ui.Foot.ForeColor, $ui.C.Red)) }
+  # Cards that have a last line of their own (Choose of a test-only paste, Ready with a site, boot with none): the warning takes it on a mismatch; the own text is back on a match.
+  foreach ($k in @(@('mismatch', $false), @('match', $true))) {
+    $script:scriptCheck = @{ Line = 'x'; Short = 'abc...def'; Ok = $k[1] }
+    foreach ($v in @(@('choose', 'Last round on this computer: none recorded yet.'), @('ready', 'Site: example'), @('boot', ''))) {
+      & $ui.Show $ui.Foot ([string]$v[1]); & $ui.ScriptWarn @{ View = $v[0]; Foot = $v[1] }   # what SetCard does with the card's own last line
+      Write-Host ('WIN script-warn own ' + $k[0] + ' ' + $v[0] + ' text=[' + $(if ($ui.Foot.Visible) { $ui.Foot.Text } else { '' }) + '] red=' + [object]::Equals($ui.Foot.ForeColor, $ui.C.Red)) } }
+  $script:scriptCheck = $was; & $ui.VChoose }
 function global:Show-RadeCard {
+  # The top bar and the logo block at the first frame (the Administrator, 2026-11-19): one WIN line, once, with the window
+  # title, the name spot (tagline until an application is chosen), whether it and the rule under RADE are shown, and the style.
+  if (-not $global:RadeT.TopBar) { $global:RadeT.TopBar = $true
+    Write-Host ('WIN topbar title=' + $ui.Form.Text + ' spot=' + $ui.AppL.Text + ' shown=' + ($ui.AppL.Visible -and ($ui.AppRow.Visible -or $ui.HeadRule.Visible)) + ' same-font=' + [object]::ReferenceEquals($ui.AppL.Font, $ui.F.Small) + ' right=[' + $ui.RightL.Text + ']') }
   $ps = @($ui.P | Where-Object { $_.Shown } | ForEach-Object { $_.Text }) -join ' / '
   $bs = @($ui.B | Where-Object { $_.Shown } | ForEach-Object { $(if ($_.Enabled) { '[' } else { '(' }) + $_.Text + $(if ($_.Enabled) { ']' } else { ')' }) }) -join ' '
   $os = @($ui.Opts.Controls | ForEach-Object { $(if ($_.Tag.Off) { 'OFF ' } else { [string]$_.Tag.Key + ' ' }) + $_.Tag.Name + $_.Tag.Ver + $(if ($_.Tag.Note) { ' NOTE ' + $_.Tag.Note } else { '' }) }) -join '; '
@@ -143,6 +175,7 @@ The view of the card that shows.
 $true when the card was answered here; $false when the caller must answer it.
 #>
 function global:Step-RadeR31([string]$V) {
+  if ($V -eq 'choose') { Test-RadeScriptWarn }
   if ($V -eq 'tour') {   # RADE_T_WALK=1: every card, with Back one time; else the test user skips it. From Help: skipped.
     if ($env:RADE_T_WALK -eq '1' -and -not $global:RadeT.Helped) {
       if ($ui.Kick.Text -match ' 2 OF 5$' -and -not $global:RadeT.TourBack) { $global:RadeT.TourBack = $true; Push-RadeButton 'Back'; return $true }
