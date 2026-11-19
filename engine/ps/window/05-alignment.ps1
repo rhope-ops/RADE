@@ -160,7 +160,6 @@ $ui.Squeeze = {
     $ui.Scrolls = [bool]$bar; $gap = [math]::Max(0, $min - $hh - $sh - $th)
     $ui.Frame = @{ WantTop = $want; MinH = $min; Moved = ($top -ne $want) }
     if ($ui.Scroll.Width -ne ($bw + $bar) -or $ui.Scroll.Height -ne $sh) { $ui.Scroll.Size = New-Object System.Drawing.Size(($bw + $bar), $sh) }
-    $ms = $(if ($bar) { $bh } else { 0 }); try { if ($ui.Scroll.AutoScrollMinSize.Height -ne $ms) { $ui.Scroll.AutoScrollMinSize = New-Object System.Drawing.Size(0, $ms) } } catch { $null = $_ }   # the scroll range is the text's height, set here (R35 job: a card that scrolled by a few px had no range yet, so the wheel did not move it)
     if ($ui.Gap.Height -ne $gap) { $ui.Gap.Height = $gap }; if ($ui.Gap.Visible -ne [bool]$gap) { $ui.Gap.Visible = [bool]$gap }
     try { if ([int]$ui.CardRows[0].Height -ne $top) { $ui.CardRows[0].Height = $top } } catch { $null = $_ }   # stand-in types: no row styles
   } catch { $null = $_ } finally { $ui.InSqueeze = $false } }   # a size that cannot be read: the next fit places the frame
@@ -359,6 +358,9 @@ $ui.SetCard = { param($c)
   elseif ($ui.Opts.Controls.Count) { foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off) { $f = $o; break } } }
   if (-not $f) { $f = $accept }; if (-not $f) { $f = $first }; if (-not $f) { $f = $ui.RecB }
   if (-not $ui.RecOn) { try { [void]$f.Focus() } catch { $null = $_ } }
+  # Focus on the card's own text (a hand step with no address) must not scroll it: Windows scrolls a focused control into
+  # view, so the card started scrolled to its end (R35 job: deploy-tour-small 08-noaddress-hand, 11 px). It starts at its top.
+  if ([object]::ReferenceEquals($f, $ui.Guide) -or [object]::ReferenceEquals($f, $ui.Sent)) { try { $ui.Scroll.AutoScrollPosition = New-Object System.Drawing.Point(0, 0) } catch { $null = $_ } }   # no scroll position yet: the card is at its top
   # The guard counts from here, when the card is built and the person can see it (M2 review): a click that waited in the
   # queue while the card was built comes in during this DoEvents, inside the guard, and is dropped.
   $ui.CardAt = $ui.Clock.Elapsed.TotalMilliseconds
