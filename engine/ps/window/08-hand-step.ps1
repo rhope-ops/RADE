@@ -7,16 +7,18 @@
 # waits in $script:guideUi until an answer is set: OK = Done or Yes, No, Abort = It failed (with the error text),
 # Cancel = Skip, Not now, or the window closed. Enter never answers here: Done needs a deliberate click.
 $ui.VHand = {
-  $st = $ui.G.Step; $file = [string]$ui.G.File
+  $st = $ui.G.Step; $file = [string]$ui.G.File; $hide = @($st.Hide)
   $clip = $(if (-not $file) { '' } elseif (Copy-TextToClipboard $file) { 'The path of ' + $st.File + ' is on the clipboard.' } else { 'Select "Copy file path" to put the path of ' + $st.File + ' on the clipboard.' })
   $two = $(if ($st.NoText) { @{ Text = [string]$st.NoText; Act = { $ui.Answer = 'No' } } } else { @{ Text = 'It failed'; Act = { & $ui.VHandFail } } })
   # R28 N1: the address row only when the step has an address (or a saved one it can take); N6: the file's full path on the card.
   $addr = [bool]($ui.GUrl -or $st.UrlConfig); $dw = $(if ($st.DoneText) { [string]$st.DoneText } else { 'Done' })
+  # E1 (the Administrator, 2026-11-19): the step's "hide" takes buttons off the card; one button always stays (the build checks it).
+  $bs = @($(if ($hide -notcontains 'done') { @{ Text = $dw; Kind = 'primary'; Act = { $ui.Answer = 'OK' } } }), $(if ($hide -notcontains 'failed') { $two }), $(if ($hide -notcontains 'skip') { @{ Text = $(if ($st.SkipText) { [string]$st.SkipText } else { 'Skip' }); Act = { $ui.Answer = 'Cancel' } } }))
+  $close = $(if ($hide -contains 'done') { '' } elseif ($addr) { 'When you finish in the browser, come back to this window and select "' + $dw + '".' } else { 'When you finish, select "' + $dw + '".' })
   & $ui.SetCard @{ View = 'hand'; Light = 'you'; Kicker = $(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot + 'your turn' } else { 'Your turn' }); Sentence = (Get-StepTitle $st)
-    P = @([string]$st.Note); Lines = @($st.Guide); Close = $(if ($addr) { 'When you finish in the browser, come back to this window and select "' + $dw + '".' } else { 'When you finish, select "' + $dw + '".' })
+    P = @([string]$st.Note); Lines = @($st.Guide); Close = $close
     Field = $(if ($addr) { @{ Label = 'Address'; Text = $ui.GUrl; Name = 'Address to open'; Button = 'Open in browser'; Act = { & $ui.OpenUrl } } } else { $null }); Path = $file; Links = [bool]$file; Note = $clip
-    Buttons = @(@{ Text = $dw; Kind = 'primary'; Act = { $ui.Answer = 'OK' } }, $two, @{ Text = $(if ($st.SkipText) { [string]$st.SkipText } else { 'Skip' }); Act = { $ui.Answer = 'Cancel' } })
-    Right = 'RADE is waiting for you'; NoAccept = $true; Focus = $(if ($addr) { 'fieldbutton' } else { 'text' }) } }
+    Buttons = $bs; Right = 'RADE is waiting for you'; NoAccept = $true; Focus = $(if ($addr) { 'fieldbutton' } else { 'text' }) } }
 # Shows the card where the user pastes the error of a hand step that failed; its button sets the answer to Abort. Takes
 # nothing.
 $ui.VHandFail = {
@@ -36,6 +38,27 @@ $ui.VAnswer = { param($Q, [int]$I, [int]$N)
   if ($Q.Kind -eq 'text') { $c.Field = @{ Label = 'Your answer'; Text = ''; Name = [string]$Q.Prompt; Max = 2000 }; $c.Focus = 'field'; $c.Buttons = @(@{ Text = 'Continue'; Kind = 'primary'; Act = { $ui.Reply = [string]$ui.Field.Text } }) }
   else { $ws = @($(if ($Q.Kind -eq 'yesno') { 'Yes', 'No' } else { $Q.Choices })); $c.Buttons = @(for ($k = 0; $k -lt $ws.Count; $k++) { @{ Text = [string]$ws[$k]; Act = $ui.ReplyActs[$k] } }) }
   & $ui.SetCard $c }
+# E2 (the Administrator, 2026-11-19): after an answer that the manifest marks as a failure ("failOn"), the card where the
+# user pastes the error text. Its button keeps the text in $script:guideError and sets $ui.Reply. No Back. Takes nothing.
+$ui.VAnswerFail = {
+  $ui.Reply = $null
+  & $ui.SetCard @{ View = 'answerfail'; Light = 'you'; Kicker = ($(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot } else { '' }) + 'It failed'); Sentence = 'What did the error say?'
+    P = @('Paste the error message here. Do not include names or a site address. If there is no message, leave the box empty.'); Err = $true
+    Buttons = @(@{ Text = 'Continue'; Kind = 'primary'; Act = { $script:guideError = [string]$ui.ErrBox.Text; $ui.Reply = 'ok' } }); Right = 'RADE is waiting for you'; NoAccept = $true; Focus = 'err' } }
+# Waits until the user answers the card that is shown ($ui.Reply is set) or the window closes. Takes nothing.
+$ui.WaitReply = { while ($null -eq $ui.Reply -and -not $script:closing -and -not $ui.Form.IsDisposed) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 25 } }
+# Asks the questions of a hand step, one card each, in order; a question with "showIf" shows only after one of its
+# answers to the earlier question (E3). Keeps the answers in $script:guideAnswers and the answers that mean a failure
+# in $script:guideFail; after the first of those it asks for the error text. Takes the step; gives back nothing.
+$ui.AskAnswers = { param($Step)
+  $qs = @($Step.Answers | Where-Object { $_ })
+  for ($i = 0; $i -lt $qs.Count -and -not $script:closing -and -not $ui.Form.IsDisposed; $i++) {
+    $q = $qs[$i]; if ($q.ShowKey -and @($q.ShowIn) -cnotcontains [string]$script:guideAnswers[[string]$q.ShowKey]) { continue }
+    $null = & $ui.VAnswer $q ($i + 1) $qs.Count; $null = & $ui.WaitReply
+    if ($null -eq $ui.Reply) { return }
+    $v = [string]$ui.Reply; $script:guideAnswers[[string]$q.Key] = $v
+    if (@($q.FailOn) -ccontains $v) { $script:guideFail += ([string]$q.Key + ': ' + $v); if (@($script:guideFail).Count -eq 1) { $null = & $ui.VAnswerFail; $null = & $ui.WaitReply } }
+  } }
 # Opens the address in the box in the browser and remembers it (also in its file). Takes nothing; says so when the
 # address does not start with https://, or is not on the host of the step's own address (the Administrator, 2026-11-17).
 $ui.OpenUrl = {
@@ -49,20 +72,18 @@ $ui.OpenUrl = {
 $ui.CopyPathB.Add_Click({ & $ui.Say1 $(if (Copy-TextToClipboard ([string]$ui.G.File)) { 'File path copied. Press Ctrl+V in the "File name" box' } else { 'The clipboard is busy. Select "Copy file path" again.' }) })
 $ui.PageB.Add_Click({ try { Start-Process -FilePath $radeUrl } catch { & $ui.Say1 'The browser could not be opened. Open the RADE page from your bookmarks.' } })
 $ui.ShowFileB.Add_Click({ if ($ui.G.File) { Start-Process -FilePath 'explorer.exe' -ArgumentList ('/select,"' + $ui.G.File + '"') } })
-# Shows a hand step and waits until the user answers, then asks the step's questions. Takes the step, the file path, the
-# address and the address file; gives back OK, Abort or Cancel.
+# Shows a hand step and waits until the user answers, then asks the step's questions; a step with "answersOnly" shows its
+# questions at once (E2). Takes the step, the file path, the address and the address file; gives back OK, Abort or Cancel.
 $script:guideUi = { param($Step, [string]$File, [string]$Url, [string]$UrlFile)
   $ui.G = @{ Step = $Step; File = $File; UrlFile = $UrlFile }; $ui.GUrl = $Url; $script:guideError = ''; $ui.Answer = ''; $was = $ui.Busy; $ui.Busy = $false
-  $null = & $ui.VHand; $null = & $ui.ToFront
-  while (-not $ui.Answer -and -not $script:closing -and -not $ui.Form.IsDisposed) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 25 }
+  $script:guideAnswers = @{}; $script:guideFail = @()
+  if ($Step.AnswersOnly) { $ui.Answer = 'OK'; $null = & $ui.ToFront }
+  else { $null = & $ui.VHand; $null = & $ui.ToFront
+    while (-not $ui.Answer -and -not $script:closing -and -not $ui.Form.IsDisposed) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 25 } }
   # After Done (not after "It failed" or Skip): the step's questions, one card each, in order. Their time is the step's time.
-  $script:guideAnswers = @{}; $qs = @($(if ($ui.Answer -eq 'OK') { $Step.Answers }) | Where-Object { $_ })
-  for ($i = 0; $i -lt $qs.Count -and -not $script:closing -and -not $ui.Form.IsDisposed; $i++) {
-    $null = & $ui.VAnswer $qs[$i] ($i + 1) $qs.Count
-    while ($null -eq $ui.Reply -and -not $script:closing -and -not $ui.Form.IsDisposed) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 25 }
-    if ($null -ne $ui.Reply) { $script:guideAnswers[[string]$qs[$i].Key] = [string]$ui.Reply }
-  }
+  if ($ui.Answer -eq 'OK') { $null = & $ui.AskAnswers $Step }
   $ui.Busy = $was; $res = [string]$ui.Answer; if (-not $res) { $res = 'Cancel' }
+  if ($Step.AnswersOnly -and ($script:closing -or $ui.Form.IsDisposed)) { $res = 'Cancel' }   # the window closed before the last answer
   $ui.Guides = @($ui.Guides | Where-Object { $_ -ne [string]$Step.Name })
   if ($ui.Running -and -not $script:closing) { $null = & $ui.ShowRun }
   return $res }
