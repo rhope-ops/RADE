@@ -26,13 +26,16 @@ $ui.LogoPic = { param([string]$Png, [string]$Name)
   } catch { $null } }   # no logo: the row shows its text only
 $ui.TopRow = & $ui.LogoRow
 $ui.Logo = & $ui.LogoPic $logoPng 'RADE logo'; if ($ui.Logo) { [void]$ui.TopRow.Controls.Add($ui.Logo) }
-# The title column beside the RADE logo: the word RADE, and under it the application name when the application has no
-# logo of its own (R29b V1: a title and its subtitle, 4 px apart, G1 of $ui.Z; both start their ink on one edge, $ui.FitHead).
+# The title column beside the RADE logo: the word RADE, and under it, when the application has no logo of its own, a thin
+# line and the application name (L2, the Administrator, 2026-11-19: 4 px, a 1 px line as wide as the word, 4 px, ink to
+# ink; $ui.FitHead). The word and the name draw their own text ink-tight ($ui.InkText in engine/rade_ui.ps1).
 $ui.TitleCol = New-Object System.Windows.Forms.FlowLayoutPanel
 $ui.TitleCol.AutoSize = $true; $ui.TitleCol.AutoSizeMode = 'GrowAndShrink'; $ui.TitleCol.FlowDirection = 'TopDown'; $ui.TitleCol.WrapContents = $false
 $ui.TitleCol.Margin = (& $ui.Pad 0 0 0 0); $ui.TitleCol.Padding = (& $ui.Pad 0 0 0 0); $ui.TitleCol.BackColor = $ui.C.White
-$ui.WordL = & $ui.Label $ui.F.Word $ui.C.Navy 0; $ui.WordL.Text = 'RADE'; $ui.WordL.Visible = $true
-[void]$ui.TitleCol.Controls.Add($ui.WordL); [void]$ui.TopRow.Controls.Add($ui.TitleCol)
+$ui.WordL = & $ui.InkText $ui.F.Word $ui.C.Navy 'RADE' $false; $ui.WordL.Text = 'RADE'; $ui.WordL.Visible = $true
+$ui.HeadRule = New-Object System.Windows.Forms.Panel
+$ui.HeadRule.Size = New-Object System.Drawing.Size(40, 1); $ui.HeadRule.BackColor = $ui.C.Edge; $ui.HeadRule.Margin = (& $ui.Pad 0 $ui.Z.G1 0 0); $ui.HeadRule.Visible = $false
+[void]$ui.TitleCol.Controls.Add($ui.WordL); [void]$ui.TitleCol.Controls.Add($ui.HeadRule); [void]$ui.TopRow.Controls.Add($ui.TitleCol)
 # The link line: 1 px gray, 12 px long, on the middle of the logos ("something minimal"); shown with the application row
 # when both logos are there.
 $ui.LinkLine = New-Object System.Windows.Forms.Panel
@@ -42,8 +45,7 @@ $ui.AppLogo = & $ui.LogoPic $appLogoPng 'Application logo'; if ($ui.AppLogo) { [
 # The application name and version, gray, no mark before it. With an application logo it is beside that logo, in the
 # application row; without one it is the subtitle under the word RADE, in the title column ($ui.AppUnder; shown by $ui.ShowAppRow).
 $ui.AppUnder = -not $ui.AppLogo
-$ui.AppL = & $ui.Label $ui.F.Small $ui.C.Gray $(if ($ui.AppUnder) { $ui.Z.G1 } else { 0 }); $ui.AppL.Visible = (-not $ui.AppUnder)
-$ui.AppL.AutoSize = $false; $ui.AppL.AutoEllipsis = $true; $ui.AppL.Size = New-Object System.Drawing.Size(600, 22)   # a long name and version: cut with "..."; its width follows the window ($ui.Fit)
+$ui.AppL = & $ui.InkText $ui.F.Small $ui.C.Gray 'Application' $true; $ui.AppL.Margin = (& $ui.Pad 0 $(if ($ui.AppUnder) { $ui.Z.G1 } else { 0 }) 0 0)   # a long name and version: cut with "..."; its widest size follows the window ($ui.Fit)
 if ($ui.AppUnder) { [void]$ui.TitleCol.Controls.Add($ui.AppL) } else { [void]$ui.AppRow.Controls.Add($ui.AppL) }
 foreach ($c in @($ui.TopRow, $ui.LinkLine, $ui.AppRow)) { [void]$ui.Top.Controls.Add($c) }
 $ui.Bottom = New-Object System.Windows.Forms.TableLayoutPanel

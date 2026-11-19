@@ -69,12 +69,22 @@ function global:Show-RadeTick {
   Write-Host ('WIN mid tick ' + ($tk -join ' '))
 }
 # R29b: prints "WIN rule head": the header rule fails on any edge difference; the ticker rule allows 1 px at 100, 150 and 200 %
-# (bar 4, 6, 8 high; text 17, 26, 34 high) and fails beyond it. Takes nothing.
+# (bar 4, 6, 8 high; text 17, 26, 34 high) and fails beyond it. R31: prints "WIN rule r31": the rules of the header line (L2), a label
+# above its box (L3) and the card frame (L1), each on a fixture that is right and one that is not. Takes nothing.
 function global:Show-RadeR29bRules {
   $hd = @(& $ui.HeadBad 'fixture' @{ N = 'WordL'; X = 80 } @{ N = 'AppL'; X = 80 }) + @(& $ui.HeadBad 'fixture' @{ N = 'WordL'; X = 86 } @{ N = 'AppL'; X = 80 })
   $tg = @(& $ui.TickBad 'fixture' @{ Top = 11; H = 4 } @{ N = 'StepTime'; Top = 5; H = 17 }) + @(& $ui.TickBad 'fixture' @{ Top = 16; H = 6 } @{ N = 'StepTime'; Top = 7; H = 26 }) + @(& $ui.TickBad 'fixture' @{ Top = 22; H = 8 } @{ N = 'StepTime'; Top = 9; H = 34 })
   $tb = @(& $ui.TickBad 'fixture' @{ Top = 11; H = 4 } @{ N = 'StepTime'; Top = 6; H = 17 }) + @(& $ui.TickBad 'fixture' @{ Top = 16; H = 6 } @{ N = 'StepTime'; Top = 9; H = 26 }) + @(& $ui.TickBad 'fixture' @{ Top = 22; H = 8 } @{ N = 'StepTime'; Top = 7; H = 34 })
-  $hd += @(& $ui.GapBad 'fixture' 6 6) + @(& $ui.GapBad 'fixture' 7 6) + @(& $ui.GapBad 'fixture' 8 6)   # R29b V1 gap: 6 = G1 at 150 %; 1 px off passes, 2 px off fails
+  # R31 L2 (at 100 %: gap 4, tolerance 1): the word's ink ends at 20, the line is 24 to 25 and as wide as the word, the name's capitals start
+  # at 29: no defect, also 1 px off; a gap of 7, a name 3 px low, a line 5 px short and a line 3 px right give one line each.
+  $okM = @{ WordBottom = 20; WordLeft = 80; WordW = 52; RuleTop = 24; RuleBottom = 25; RuleLeft = 80; RuleW = 52; AppTop = 29 }; $ok1 = $okM.Clone(); $ok1.RuleTop = 25; $ok1.RuleBottom = 26; $ok1.AppTop = 31; $ok1.RuleW = 51; $ok1.AppTop = 31
+  $no1 = $okM.Clone(); $no1.RuleTop = 27; $no1.RuleBottom = 28; $no1.AppTop = 35; $no1.RuleW = 47; $no1.RuleLeft = 83; $low = $okM.Clone(); $low.AppTop = $null
+  $l2 = @(& $ui.HeadRuleBad 'fixture' $okM 4) + @(& $ui.HeadRuleBad 'fixture' $ok1 4) + @(& $ui.HeadRuleBad 'fixture' $low 4); $l2no = @(& $ui.HeadRuleBad 'fixture' $no1 4)
+  # R31 L3: a label above its box (label bottom 40, box top 44, on the edge, as wide as the text): no defect; a box beside its label, 12 px right and 200 px short: 3 lines.
+  $l3 = @(& $ui.AboveBad 'fixture' @{ LabelBottom = 40; BoxTop = 44; BoxLeft = 125; BoxW = 590; Edge = 125; TextW = 590 }); $l3no = @(& $ui.AboveBad 'fixture' @{ LabelBottom = 40; BoxTop = 22; BoxLeft = 137; BoxW = 390; Edge = 125; TextW = 590 })
+  # R31 L1: the header row at the fixed top and a frame of its minimum height: no defect (also a card that had to move up); a header 30 px low and a frame 40 px short: 2 lines.
+  $l1 = @(& $ui.FrameBad 'fixture' @{ Top = 96; WantTop = 96; H = 360; MinH = 360; Moved = $false }) + @(& $ui.FrameBad 'fixture' @{ Top = 0; WantTop = 96; H = 500; MinH = 360; Moved = $true }); $l1no = @(& $ui.FrameBad 'fixture' @{ Top = 126; WantTop = 96; H = 320; MinH = 360; Moved = $false })
+  Write-Host ('WIN rule r31 head-ok=' + $l2.Count + ' head-off=' + $l2no.Count + ' above-ok=' + $l3.Count + ' above-off=' + $l3no.Count + ' frame-ok=' + $l1.Count + ' frame-off=' + $l1no.Count + ' ~ ' + (@($l2no) + @($l3no) + @($l1no) -join ' ~ '))
   Write-Host ('WIN rule head=' + $hd.Count + ' tick-ok=' + $tg.Count + ' tick-off=' + $tb.Count + ' ~ ' + (@($hd) + @($tb) -join ' ~ '))
 }
 function global:Push-RadeButton([string]$Text) {
@@ -200,7 +210,7 @@ function global:Push-RadeButton([string]$Text) {
       Write-Host ('WIN shorten=' + $pl.Text + ' body-break=' + $bb)
       Write-Host ('WIN break=' + ((& $ui.BreakLong 'abcdefghij' $ui.F.Body 21) -replace "`n", '|') + ' word-bad=' + (& $ui.WordBad 'fixture' 'P0' 'abcdefghij' $ui.F.Body 50) + ' word-ok=' + ($null -eq (& $ui.WordBad 'fixture' 'P0' 'abc def ghi' $ui.F.Body 50)))
     }
-    if ($ui.FieldRow.Shown) { $m = { param($C) $(if ($C.AutoSize) { $C.Margin.Top + $C.PreferredSize.Height / 2.0 } else { $C.Margin.Top + $C.Height / 2.0 }) }; Write-Host ('WIN mid answer label=' + (& $m $ui.FieldL) + ' box=' + (& $m $ui.FieldBox) + ' h=' + $ui.FieldBox.Height) }
+    if ($ui.FieldRow.Shown) { Write-Host ('WIN mid answer above=' + $ui.FieldAbove + ' box-top=' + $ui.FieldBox.Margin.Top + ' box-left=' + $ui.FieldBox.Margin.Left + ' box-w=' + ($ui.FieldBox.Width - $ui.ContentW) + ' h=' + $ui.FieldBox.Height) }   # R31 L3: the box under its label, on the card's edge, as wide as the text
     if ($ui.FieldRow.Shown) { Write-Host ('WIN answer-box max=' + $ui.Field.Values['MaxLength'] + ' enter=' + $ui.Form.Values['AcceptButton'].Text + ' focus=' + $ui.Field.Focused); $ui.Field.Text = '  Mail someone@example.com about it  '; $ui.Form.Values['AcceptButton'].PerformClick() }
     elseif ($ui.B[0].Text -eq 'Yes') { Push-RadeButton 'No' } else { $ui.B[1].PerformClick() }
   }

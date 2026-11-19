@@ -66,8 +66,8 @@ $ui.ShowAppRow = { param([bool]$On)
   # The name is as tall as its text before the row shows, and the window lays out once more so the logo block (docked,
   # sized by the window) takes the row's height: the first card after the choice is measured before the next fit
   # (Windows job, 18 Nov 26: the row at 76 needed 23 px in a 98 px block).
-  if ($On) { try { $ui.AppL.Height = $ui.AppL.PreferredSize.Height } catch { $null = $_ } }   # no height yet: the next fit sets it
-  if ($ui.AppUnder) { $ui.AppL.Visible = $On } else { $ui.AppRow.Visible = $On }   # no application logo: the name is the subtitle under RADE (R29b V1)
+  if ($On) { & $ui.InkFit $ui.AppL }   # before the window has its scale: the next fit sizes it
+  if ($ui.AppUnder) { $ui.AppL.Visible = $On; $ui.HeadRule.Visible = $On } else { $ui.AppL.Visible = $On; $ui.AppRow.Visible = $On }   # no application logo: the name is the subtitle under RADE (R29b V1)
   $ui.LinkLine.Visible = ($On -and $ui.Logo -and $ui.AppLogo)
   & $ui.FitHead; & $ui.AlignRow (& $ui.RowParts 'Top') 0   # the title column is taller with its subtitle: the RADE row is centered again
   try { $ui.Form.PerformLayout() } catch { $null = $_ }   # no form yet (text mode): nothing to lay out

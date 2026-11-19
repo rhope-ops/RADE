@@ -22,14 +22,16 @@ $ui.FitEdges = { try {
     if ($ui.Guide.Visible) { & $ui.SetLeft $ui.Guide ($x - (& $ui.GuideInk)) }   # the widest number sits on the edge; shorter ones are right-aligned to it
     & $ui.SetLeft $ui.Opts $x } catch { $null = $_ }
   & $ui.FitHead }
-# R29b V1: the word RADE and the line under it (the application name) start their ink on one edge. Each sits at the same
-# x in its row (after a 64 px logo and its 12 px gap, or at 0); the bold 15 pt word has a larger text padding and side
-# bearing than the 10 pt name (6 px at 150 % on the device), so each moves by its own measured ink to the larger of the two.
-# Takes nothing; changes the left margins of $ui.WordL and $ui.AppL.
+# R29b V1: the word RADE and the application name under it start their ink on one edge. Each sits at the same x in its row
+# (after a 64 px logo and its 12 px gap, or at 0) and draws its text ink-tight ($ui.InkText); what is left of a difference
+# (measured) moves each to the larger of the two. Takes nothing; changes the left margins of $ui.WordL, $ui.AppL and
+# $ui.HeadRule, and the width of $ui.HeadRule.
 $ui.FitHead = { try {
     if (-not (& $ui.HeadPair)) { & $ui.SetLeft $ui.WordL 0; & $ui.SetLeft $ui.AppL 0; return }
     $iw = & $ui.Ink $ui.WordL; $ia = & $ui.Ink $ui.AppL; $e = [math]::Max($iw, $ia)
-    & $ui.SetLeft $ui.WordL ($e - $iw); & $ui.SetLeft $ui.AppL ($e - $ia) } catch { $null = $_ } }   # no measure (no window handle yet): the next fit sets the edges
+    & $ui.SetLeft $ui.WordL ($e - $iw); & $ui.SetLeft $ui.AppL ($e - $ia)
+    # L2: the line under the word is as wide as the word's ink and starts where it starts.
+    if ($ui.AppUnder) { & $ui.SetLeft $ui.HeadRule $e; $rw = [math]::Max(1, [int]$ui.WordL.Width - $iw); if ($ui.HeadRule.Width -ne $rw) { $ui.HeadRule.Width = $rw } } } catch { $null = $_ } }   # no measure (no window handle yet): the next fit sets the edges
 # Whether the header shows the application name on the edge of the word RADE: the name has text and shows, and both rows
 # start at the same x (both logos, or no application logo). Takes nothing; gives back $true or $false.
 $ui.HeadPair = { [bool]([string]$ui.AppL.Text -and $(if ($ui.AppUnder) { $ui.AppL.Visible } else { $ui.AppRow.Visible }) -and ($ui.AppUnder -or $ui.Logo)) }
@@ -61,7 +63,10 @@ $ui.RowParts = { param([string]$Row) switch ($Row) { 'Top' { @(@($ui.Logo, $ui.T
 $ui.AlignRows = { try { $bh = [int]$ui.FieldB.PreferredSize.Height; if ($bh -gt 0) { foreach ($p in $ui.Boxes) { if ($p.Height -ne $bh) { $p.Height = $bh } } } } catch { $null = $_ }   # a box is as tall as the compact button, measured
   foreach ($p in $ui.Boxes) { & $ui.BoxFit $p }   # the text box fills its frame (R24 job: a frame whose size never changed kept a 100 px text box at its top)
   & $ui.AlignRow (& $ui.RowParts 'Top') 0; if (-not $ui.AppUnder) { & $ui.AlignRow (& $ui.RowParts 'AppRow') 0 };   # no application logo: the name is in the title column with its own 4 px gap (review of PR 106: a row of one part set it to 0)
-  $mm = & $ui.Sc $ui.Z.M; & $ui.AlignRow (& $ui.RowParts 'FieldRow') $mm; & $ui.AlignRow (& $ui.RowParts 'TestRow') $mm; & $ui.AlignTick }
+  $mm = & $ui.Sc $ui.Z.M; & $ui.AlignRow (& $ui.RowParts 'TestRow') $mm; & $ui.AlignTick
+  # L3 (the Administrator, 2026-11-19): a label above its box (a text answer). The box is on the next line, on the card's edge, 4 px under the label.
+  if ($ui.FieldAbove) { $ui.FieldL.Margin = New-Object System.Windows.Forms.Padding($ui.FieldL.Margin.Left, $mm, 0, 0); $ui.FieldBox.Margin = New-Object System.Windows.Forms.Padding([int]$ui.EdgeX, (& $ui.Sc $ui.Z.G1), $mm, $mm) }
+  else { $bx = $ui.FieldBox.Margin; $g2 = & $ui.Sc $ui.Z.G2; if ($bx.Left -ne $g2) { $ui.FieldBox.Margin = New-Object System.Windows.Forms.Padding($g2, $bx.Top, $mm, $bx.Bottom) }; & $ui.AlignRow (& $ui.RowParts 'FieldRow') $mm } }
 # The question headline (the prompt's first sentence, manifest "answers") shrinks to fit one line: from the headline size
 # in 0.5 pt steps to 60 % of it (never under the body size); only at that size does it wrap. Other cards keep the headline size.
 $ui.SentFonts = @{}
@@ -86,8 +91,11 @@ $ui.FitSent = { try {
     $b = & $ui.BreakLong $t $f $w; if ($ui.Sent.Text -ne $b) { $ui.Sent.Text = $b } } catch { $null = $_ }
   & $ui.BreakAll }
 $ui.FitRow = {
-  # The box of a box row takes the width that is left beside its label and its button (at most 420).
-  try { $cw = $ui.ContentW; $left = $cw - $ui.FieldL.PreferredSize.Width - (& $ui.Sc 20)
+  # The box of a box row takes the width that is left beside its label and its button (at most 420). A box under its
+  # label (L3) is as wide as the card's text: from the card's edge to the end of the text column.
+  try { $cw = $ui.ContentW
+    if ($ui.FieldAbove) { $ui.FieldBox.Width = [math]::Max((& $ui.Sc 160), ($cw - (& $ui.Sc 10))); return }
+    $left = $cw - $ui.FieldL.PreferredSize.Width - (& $ui.Sc 20)
     if ($ui.FieldBOn) { $left -= ($ui.FieldB.PreferredSize.Width + (& $ui.Sc 8)) }
     $ui.FieldBox.Width = [math]::Max((& $ui.Sc 160), [math]::Min((& $ui.Sc 420), [int]$left)) } catch { $null = $_ } }
 $ui.Apart = {
@@ -101,19 +109,25 @@ $ui.Apart = {
     if ($prev -lt 0) { return }
     if ($left -ge (& $ui.Sc 32)) { $ui.B[$n].Margin = (& $ui.Pad ([int]$left) $mm $mm $mm) } else { $ui.BtnRow.SetFlowBreak($ui.B[$prev], $true) }
   } catch { $null = $_ } }
-# Lets the card scroll when it is taller than the window, so the buttons stay in view. Takes nothing; sets the size of
-# $ui.Scroll and $ui.Scrolls.
+# Places the card frame (L1) and lets the card's text scroll when the card is taller than the window, so the buttons stay
+# in view. The frame's top is fixed for a window size; a card too tall for the room under it moves up before it scrolls.
+# A short card gets a gap above its buttons, so the frame is its minimum height. Takes nothing; sets the card's top row,
+# the size of $ui.Scroll and $ui.Gap, $ui.Scrolls and $ui.Frame (what the self-check compares).
 $ui.Squeeze = {
   if (-not $ui.Scaled) { return }
-  # The body is as tall as its parts. Only when the card is then taller than the window, the body gets the height
-  # that is left above the buttons and a scroll bar; the buttons stay in view.
   if ($ui.InSqueeze) { return }; $ui.InSqueeze = $true
-  try { $bh = [int]$ui.Body.Height; $bw = [int]$ui.Body.Width; $avail = [int]$ui.Card.ClientSize.Height - [int]$ui.Tail.Height; $sh = $bh; $bar = 0
+  try { $bh = [int]$ui.Body.Height; $bw = [int]$ui.Body.Width; $H = [int]$ui.Card.ClientSize.Height; $hh = [int]$ui.Head.Height; $th = [int]$ui.Tail.Height
+    $min = [math]::Min((& $ui.Sc $ui.Layout.FrameMin), $H); $want = [int][math]::Floor(($H - $min) * 0.4); $top = $want
+    $need = $hh + $bh + $th; if ($need -gt $H - $top) { $top = [math]::Max(0, $H - $need) }   # a tall card moves up before it gets a scroll bar
+    $avail = $H - $top - $hh - $th; $sh = $bh; $bar = 0
     if ($bh -gt $avail) { $sh = [math]::Max((& $ui.Sc 80), $avail); $bar = [System.Windows.Forms.SystemInformation]::VerticalScrollBarWidth + (& $ui.Sc 4) }
-    $ui.Scrolls = [bool]$bar
+    $ui.Scrolls = [bool]$bar; $gap = [math]::Max(0, $min - $hh - $sh - $th)
+    $ui.Frame = @{ WantTop = $want; MinH = $min; Moved = ($top -ne $want) }
     if ($ui.Scroll.Width -ne ($bw + $bar) -or $ui.Scroll.Height -ne $sh) { $ui.Scroll.Size = New-Object System.Drawing.Size(($bw + $bar), $sh) }
+    if ($ui.Gap.Height -ne $gap) { $ui.Gap.Height = $gap }; if ($ui.Gap.Visible -ne [bool]$gap) { $ui.Gap.Visible = [bool]$gap }
+    try { if ([int]$ui.CardRows[0].Height -ne $top) { $ui.CardRows[0].Height = $top } } catch { $null = $_ }   # stand-in types: no row styles
   } catch { $null = $_ } finally { $ui.InSqueeze = $false } }
-$ui.Body.Add_SizeChanged({ & $ui.Squeeze }); $ui.Tail.Add_SizeChanged({ & $ui.Squeeze })
+$ui.Body.Add_SizeChanged({ & $ui.Squeeze }); $ui.Tail.Add_SizeChanged({ & $ui.Squeeze }); $ui.Head.Add_SizeChanged({ & $ui.Squeeze })
 $ui.Card.Add_SizeChanged({ try { & $ui.Fit } catch { $null = $_ } })
 # Counts how many lines a text takes at a width, at least 1 and at most a limit (0 for no text). Takes the text, font,
 # width, one line's height and the limit; gives back the number.
@@ -195,7 +209,14 @@ $ui.Measure = { param([string]$Card)
   # Returns where a control's ink starts (its left edge plus the measured ink offset: text, edge or drawing). Takes the control.
   $tx = { param($C) (& $sr $C).Left + (& $ui.Ink $C) }
   if ($ui.WordL.Visible -and (& $ui.HeadPair)) { $out += & $ui.HeadBad $Card @{ N = 'WordL'; X = (& $tx $ui.WordL) } @{ N = 'AppL'; X = (& $tx $ui.AppL) } }
-  if ($ui.AppUnder -and $ui.WordL.Visible -and (& $ui.HeadPair)) { $out += & $ui.GapBad $Card ((& $sr $ui.AppL).Top - (& $sr $ui.WordL).Bottom) (& $ui.Sc $ui.Z.G1) }   # R29b V1: a title and its subtitle, G1 apart
+  if ($ui.AppUnder -and $ui.WordL.Visible -and (& $ui.HeadPair)) {   # L2: the word, 4 px, the line, 4 px, the name, measured on the ink Windows drew
+    $rw = & $sr $ui.WordL; $rr = & $sr $ui.HeadRule; $ra = & $sr $ui.AppL; $wi = & $ui.InkBox $ui.WordL; $ai = & $ui.InkBox $ui.AppL
+    $out += & $ui.HeadRuleBad $Card @{ WordBottom = $rw.Top + $wi.Bottom; WordLeft = $rw.Left + $wi.Left; WordW = $wi.Right - $wi.Left; RuleTop = $rr.Top; RuleBottom = $rr.Bottom; RuleLeft = $rr.Left; RuleW = $rr.Width
+      AppTop = $(if ([string]$ui.AppL.Text -cmatch '[A-Z0-9bdfhklt]') { $ra.Top + $ai.Top } else { $null }) } (& $ui.Sc $ui.Z.G1) }
+  if ($ui.FieldRow.Visible -and $ui.FieldAbove -and -not $ui.RecOn) { $rl = & $sr $ui.FieldL; $rb = & $sr $ui.FieldBox   # L3: the label above its box
+    $out += & $ui.AboveBad $Card @{ LabelBottom = $rl.Bottom; BoxTop = $rb.Top; BoxLeft = $rb.Left; BoxW = $rb.Width; Edge = (& $tx $ui.FieldL); TextW = ($ui.ContentW - (& $ui.Sc 10)) } }
+  if ($ui.Frame -and -not $ui.RecOn) { $rh = & $sr $ui.Head; $rt = & $sr $ui.Tail; $rc = & $sr $ui.Card   # L1: the header row at the fixed top, the frame at its minimum height at least
+    $out += & $ui.FrameBad $Card @{ Top = $rh.Top - $rc.Top; WantTop = $ui.Frame.WantTop; H = $rt.Bottom - $rh.Top; MinH = $ui.Frame.MinH; Moved = $ui.Frame.Moved } }
   if ($ui.StepRow.Visible -and -not $ui.RecOn) { $rb = & $sr $ui.StepBar
     foreach ($l in @($ui.StepTime, $ui.StepFrac)) { $rl = & $sr $l; if (($rl.Top - $l.Margin.Top) -eq ($rb.Top - $ui.StepBar.Margin.Top) -and $rl.Left -gt $rb.Left) { $out += & $ui.TickBad $Card @{ Top = $rb.Top; H = $rb.Height } @{ N = (& $ui.NameOf $l); Top = $rl.Top; H = $rl.Height } } } }
   if (-not $ui.RecOn) {
@@ -237,7 +258,7 @@ $ui.LayLine = {
 $ui.Show = { param($C, [string]$Text) $C.Text = $Text; $C.Visible = [bool]$Text }
 $ui.SetCard = { param($c)
   # Shows one card. $c names the parts: View, Light ('you' = yellow, 'bad' = dark red), Kicker, Sentence, Tick, P (up to 4
-  # paragraphs), Options + OnOption, Lines (guide lines, in order: numbered ones first, others after them; one selectable text), Path (a file path), StepRow, Field (Label, Text, Name, Button, Do, Max), Err, Links, Note, Help, Close (the hand card's closing line),
+  # paragraphs), Options + OnOption, Lines (guide lines, in order: numbered ones first, others after them; one selectable text), Path (a file path), StepRow, Field (Label, Text, Name, Button, Do, Max, Above), Err, Links, Note, Help, Close (the hand card's closing line),
   # Buttons (Text, Kind, Do, Apart; up to $ui.NB), Foot, Test, Right, Back, NoAccept, Focus ('field', 'fieldbutton', 'err' or 'text').
   & $ui.Check   # the card that goes away (test rounds only)
   $ui.Hot = $null; $ui.Down = $null   # no hover or pressed state is carried over (R4 review)
@@ -253,6 +274,7 @@ $ui.SetCard = { param($c)
   $ui.PathL.Visible = [bool]$c.Path; & $ui.Show $ui.PathT ([string]$c.Path)
   $ui.StepRow.Visible = [bool]$c.StepRow; & $ui.Show $ui.Now ''; if ($c.StepRow) { $ui.StepTime.Text = '' }   # the last log line shows when a line comes (no empty space)
   $ui.FieldRow.Visible = [bool]$c.Field; $ui.FieldDo = $null
+  $ui.FieldAbove = [bool]($c.Field -and $c.Field.Above); try { $ui.FieldRow.SetFlowBreak($ui.FieldL, $ui.FieldAbove) } catch { $null = $_ }   # L3: the box goes under its label
   if ($c.Field) { $ui.FieldL.Text = [string]$c.Field.Label; $ui.Field.Text = [string]$c.Field.Text; $ui.Field.AccessibleName = [string]$c.Field.Name; $ui.FieldB.Visible = [bool]$c.Field.Button; $ui.FieldBOn = [bool]$c.Field.Button; $ui.FieldB.Text = [string]$c.Field.Button; $ui.FieldDo = $c.Field.Act; $ui.Field.MaxLength = $(if ($c.Field.Max) { [int]$c.Field.Max } else { 32767 }); & $ui.FitRow }
   $ui.ErrRow.Visible = [bool]$c.Err; if ($c.Err) { $ui.ErrBox.Text = '' }
   $ui.LinkRow.Visible = [bool]($c.Links -or $c.PageLink); $ui.CopyPathB.Visible = [bool]$c.Links; $ui.ShowFileB.Visible = [bool]$c.Links; $ui.PageB.Visible = [bool]$c.PageLink

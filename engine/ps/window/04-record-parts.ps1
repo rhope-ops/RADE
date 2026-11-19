@@ -117,8 +117,10 @@ $ui.Fit = {
   $mm = & $ui.Sc $ui.Z.M
   foreach ($r in @($ui.BtnRow, $ui.LinkRow, $ui.TestRow, $ui.FieldRow, $ui.StepRow)) { $r.MaximumSize = New-Object System.Drawing.Size(($cw + 2 * $mm), 0) }
   & $ui.SetWrap $ui.StepName $cw; $ui.ErrBox.Width = [math]::Min((& $ui.Sc 600), ($cw - 2 * $mm))
-  try { $ui.AppL.Width = [math]::Max((& $ui.Sc 60), ($ui.Top.ClientSize.Width - (& $ui.LeftIn $ui.AppL $ui.Top) - (& $ui.Sc 32))) } catch { $null = $_ }   # in the application row or the title column
-  try { $ui.AppL.Height = $ui.AppL.PreferredSize.Height } catch { $null = $_ }
+  # The header's ink-tight texts get their size now that the window has its scale; a long name ends with "..." at the window's edge.
+  try { $ui.AppL.Tag.MaxW = [math]::Max((& $ui.Sc 60), ($ui.Top.ClientSize.Width - (& $ui.LeftIn $ui.AppL $ui.Top) - (& $ui.Sc 32))) } catch { $null = $_ }   # in the application row or the title column
+  & $ui.InkFit $ui.WordL; & $ui.InkFit $ui.AppL
+  try { $lh = [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $ui.Kick.Font).Height + (& $ui.Sc 2); if ($ui.Head.MinimumSize.Height -ne $lh) { $ui.Head.MinimumSize = New-Object System.Drawing.Size(0, $lh) } } catch { $null = $_ }   # L1: the header row keeps its height on a card with no line
   & $ui.FitRow; & $ui.Apart; & $ui.FitSent; & $ui.FitSteps; & $ui.FitEdges; & $ui.AlignRows
   foreach ($o in @($ui.Opts.Controls)) { $o.Width = $cw; try { $o.Height = (& $ui.OptPlan $o.Tag $cw).H } catch { $null = $_ } }
   & $ui.Squeeze }
