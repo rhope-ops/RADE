@@ -48,6 +48,8 @@ Header of the handoff before the move: logo 64 px baseline and app row, PRs 98 a
 
 24. High contrast (the Administrator, 19 Nov 26, "a"; DECISIONS 2026-11-19 point 4): approved, NOT started. When Windows high contrast is on (SystemInformation.HighContrast), the window takes the Windows colors (SystemColors) and draws the logo in one color (WindowText); its own release (ENGINE_RELEASE 26) and a device round. Today every color is fixed in $ui.C (engine/rade_ui.ps1) and the logo is a PNG (window/02-fixed-parts.ps1 $ui.LogoPic). Leftover tests from PR 123: the paste key handler, a lone CR, $ui.RuleW keeping its measure.
 
+25. New RADE logo, Rho USAF version (the Administrator, 19 Nov 26; DECISIONS 2026-11-19 "RADE logo"): on the RADE page now (assets/logo/rho-usaf-*.png). NOT in the engine yet ("don't update the engine just yet"). For the next engine release, with the Administrator's go: engine/rade_build.py LOGO and the hash list point to assets/logo/rho-usaf-128.png; docs/engine.md and docs/window-design.md "Logo block" name Rho USAF; scripts/build_logo.py, logo-rho.svg and logo-rho-*.png go when nothing reads them (check.local.sh, tests/engine_test.sh); raise ENGINE_RELEASE first. The run-time logo spec (docs/specs/run-time-logo.md) still names Rho Bold: update its reference when it is built.
+
 ## Needs the Administrator
 
 - Branch settings: the required pull-request check is now named `checks` (it was `scan`).
