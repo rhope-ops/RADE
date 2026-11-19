@@ -38,6 +38,16 @@ RUNS = [
     # the same bundle with every text at its limit (docs/window-design.md "Text lengths")
     ("long-616", 1, "fail", "1", "1020x616", True),
     ("long-small", 0, "done", "0", "811x469", True),
+    # the work computer of round R32 (the Administrator, 2026-11-18): Windows scaling 150 %, the window on the left half of a
+    # 1920 x 1080 screen (956 x 1081 real pixels). The job's screen draws at 100 %, so the test copy of the bundle makes the
+    # form scale by 1.5 and reports 144 dpi (DEVICE_150 below); the fonts then grow by 1.5 as they do on that computer.
+    ("device150-half", 0, "done", "0", "956x1081", False),
+]
+# Swaps for a "device150-" run: the form's sizes are given at 64 dpi, so Windows Forms scales it by 1.5 on a 96 dpi screen,
+# and the form's dpi reads 144 (the engine's $ui.Sc and its font factor follow it), as on a screen with 150 % scaling.
+DEVICE_150 = [
+    (r"\$ui\.Form\.AutoScaleDimensions = New-Object System\.Drawing\.SizeF\(96, 96\)", "$ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(64, 64)"),
+    (r"if \(\$d -gt 0\) \{ \$ui\.Dpi = \$d \}", "if ($d -gt 0) { $ui.Dpi = $d * 1.5 }"),
 ]
 WORDS = "readiness tracker for each unit member with a reminder before an item is due and one page for the commander "
 
@@ -87,7 +97,7 @@ def file_url(p):
     return pathlib.Path(p).resolve().as_uri()
 
 
-def bundle(t, long, keep=None):
+def bundle(t, long, keep=None, swaps=()):
     app = t / "app"
     shutil.copytree(ROOT / "tests" / "fixture-app", app)
     m = json.loads((ROOT / "schemas" / "examples" / "sample-manifest.json").read_text(encoding="utf-8"))
@@ -131,7 +141,7 @@ def bundle(t, long, keep=None):
         (r"(?m)^\$releaseUrl = '.*'", "$releaseUrl = '%s'" % file_url(t / "rel.json")),
         (r"\$checkGate = \$true", "$checkGate = $false"),
         (r"(?m)^\$sitePrefix = 'https://usaf\.dps\.mil/sites/'", "$sitePrefix = 'https://rade-test.invalid/sites/'"),
-    ]:
+    ] + list(swaps):
         s, n = re.subn(pat, lambda m, new=new: new, s)
         if not n:
             sys.exit("FAIL the bundle has no line for " + pat)
@@ -163,6 +173,14 @@ def r31_why(lines, app, fresh):
     return why
 
 
+def screen():
+    """Ask for a screen of 1920 x 1080, so the window of the "device150-" run fits (the job's screen is smaller).
+    A job that cannot set it goes on. Returns the SCREEN line to print (what the screen is now)."""
+    cmd = "Set-DisplayResolution -Width 1920 -Height 1080 -Force; (Get-DisplayResolution | Out-String).Trim()"
+    rs = subprocess.run(["powershell.exe", "-NoProfile", "-Command", cmd], capture_output=True, text=True, errors="replace")
+    return "SCREEN " + " ".join((rs.stdout + rs.stderr).split())[:160]
+
+
 def main():
     out = pathlib.Path(sys.argv[1]).resolve()
     bad = 0
@@ -170,7 +188,7 @@ def main():
     maint = 0
     for name, app, hand, tour, size, long in RUNS:
         t = pathlib.Path(tempfile.mkdtemp())
-        users = bundle(t, long, home if name.startswith("deploy-") else None)
+        users = bundle(t, long, home if name.startswith("deploy-") else None, DEVICE_150 if name.startswith("device150-") else ())
         d = out / name
         d.mkdir(parents=True, exist_ok=True)
         env = dict(os.environ, RADE_T_OUT=str(d), RADE_T_APP=str(app), RADE_T_HAND=hand, RADE_T_TOUR=tour, RADE_T_SIZE=size, USERPROFILE=str(users / "test1234"))
@@ -230,4 +248,5 @@ def main():
 
 
 if __name__ == "__main__":
+    print(screen())
     sys.exit(main())

@@ -71,6 +71,7 @@ Decided by the Administrator, 2026-11-15. The RADE page picks the app, and each 
 |---|---|---|---|
 | `installed\<12 hex>.json` | One app's install record: version, step states, the made list. Name = the first 12 hex of the SHA-256 of the lower-case record key. Contract: [../schemas/rade-installed.schema.json](../schemas/rade-installed.schema.json) | Only a deploy of that app | The app reads as not installed; with a site marker its next deploy is stopped ("Guardrails") |
 | `rade-checks.json` | Saved checks (a cache). Contract: [../schemas/rade-checks.schema.json](../schemas/rade-checks.schema.json) | Every run of every app | A check runs again |
+| `rade-checks-last.txt` | The checks of the last run on this computer, one line each with the result and the detail (masked), for a person to read; from engine-v22. It is not in a results folder, so no e-mail draft attaches it | Every run of every app (the newest replaces it) | Nothing: the next run writes it again |
 | `rade-mail-to.txt` | The results address (test rounds) | A test round | The owner types it again |
 | `rade-window.json` | Where the user last closed the window: bounds, state, the scale, and the client size and state at close (numbers and two words, no name or path; R28) | Every window, at close | The window opens maximized on the screen with the mouse |
 | `rade-shortcut.txt` | The folder the user chose for the RADE shortcut on the install card (one line; R29 N8) | A deploy, when its install card asked for the folder | The install card offers the Desktop folder again |

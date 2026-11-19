@@ -25,7 +25,7 @@ $ui.Paint = {
   & $ui.ShowTime
   $fr = $(if ($script:prog.Frac -ge 0) { [string]$script:prog.FracText } else { '' }); if ($ui.StepFrac.Text -ne $fr) { $ui.StepFrac.Text = $fr }
   # R21 W6: a time left only when earlier runs give one; never "a guess".
-  $rt = $ui.Words.Work + $dot + [string][int]($g.All * 100) + ' %' + $(if ($g.Known) { $dot + 'about ' + [math]::Max(1, [int][math]::Ceiling($g.Left / 60)) + $(if ([math]::Ceiling($g.Left / 60) -le 1) { ' minute' } else { ' minutes' }) + ' left' } else { '' }); if ($ui.RightL.Text -ne $rt) { $ui.RightL.Text = $rt } }
+  $rt = $ui.Words.Work + ' ' + [string][int]($g.All * 100) + ' %' + $(if ($g.Known) { $dot + 'about ' + [math]::Max(1, [int][math]::Ceiling($g.Left / 60)) + $(if ([math]::Ceiling($g.Left / 60) -le 1) { ' minute' } else { ' minutes' }) + ' left' } else { '' }); if ($ui.RightL.Text -ne $rt) { $ui.RightL.Text = $rt } }
 # The time in this step (R28 N10): "4m 12s"; with hours "1h 04m 12s".
 $ui.Elapsed = { param([double]$Sec) $q = [int][math]::Floor([math]::Max(0, $Sec)); $h = [int][math]::Floor($q / 3600); $m = [int][math]::Floor(($q % 3600) / 60); $x = $q % 60
   if ($h) { return ('{0}h {1:00}m {2:00}s' -f $h, $m, $x) }; return ('{0}m {1:00}s' -f $m, $x) }
