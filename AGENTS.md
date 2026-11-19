@@ -65,15 +65,15 @@ These are defaults: how work normally goes here. The method is yours unless the 
 
 ## Project rules
 
-- Project log: https://claude.ai/artifact/5W4UUpdfMgYJqt6zdB2sBM (private Claude doc; the Administrator, 2026-11-14). This repo is public, so log entries never go in it.
-- Engine source (the Administrator, 2026-11-14; 2026-11-17): the files docs/engine.md "How an app gets the engine" lists (the engine/ folder and the RADE logo). Apps' builds fetch them by commit and check each file's SHA-256.
-- App repos (the Administrator, 2026-11-15): a RADE session never edits an app repo. After an engine change merges, make a release (docs/engine.md "How an app gets the engine") and report its tag and commit; a session of the app changes that app's lock.
+- Project log (2026-11-14): the private doc https://claude.ai/artifact/5W4UUpdfMgYJqt6zdB2sBM, never this public repo.
+- Engine source (2026-11-17): the files docs/engine.md "How an app gets the engine" lists; apps' builds fetch them by commit and check each file's SHA-256.
+- App repos (2026-11-15): a RADE session never edits an app repo; after an engine change merges, it makes a release (docs/engine.md "How an app gets the engine") and reports its tag and commit, and the app's own session changes that app's lock.
 - No reconnaissance (the Administrator, 2026-11-14; cannot be changed): RADE and every app never do anything that is, or could be taken as, network reconnaissance: no host finding or pinging, no port checks, no probing of network or logical boundaries. Detail: docs/engine.md "RADE and the app".
 - DoD365 boundary (the Administrator, 2026-11-14; cannot be changed): no user can write data across the DoD365 boundary through RADE or an app. The only exception, until the test rounds end: the owner's test-round results e-mail (masked counts, sent by hand).
-- RADE and the app (the Administrator, 2026-11-14; 2026-11-17): RADE owns the computer and the run and may know a platform, never an app's objects; it installs apps, and after its checks pass, its Start button opens an installed app from that app's local copy (no download). Table: docs/engine.md "RADE and the app".
-- No code fetch at run time (the Administrator, 2026-11-15): each app is one paste, and the runner never downloads code to run; large data files come from a tagged release, checked by SHA-256.
-- Windows PowerShell 5.1 (the Administrator, 2026-11-14): engine code must run on Windows PowerShell 5.1, the floor on every NIPR computer; cloud tests run PowerShell 7, and a work-computer round is the 5.1 proof.
-- Personal-data guard (the Administrator, 2026-11-15): this repo runs the DoD tier (`profile: dod`), and a push with no name denylist fails. The master denylist is in the Administrator's Google Drive; an agent never opens it.
-- Public repo (the Administrator, 2026-11-14): no e-mail address, DoD ID or its hash goes in this repo; help text names the Teams channel only, with no link or address.
-- Code standard (the Administrator, 2026-11-17): all code is modular, clearly commented and human inspectable, per docs/code-standard.md and docs/code-standard-rade.md (full docs per function included); scripts/code_standard.py enforces it, and its baseline may only shrink.
-- Window (the Administrator, 2026-11-14): the window's UI decisions live in docs/window-design.md; read it before a window change, and record each new window decision there.
+- RADE and the app (2026-11-17): RADE owns the computer and the run and may know a platform, never an app's objects; it installs apps, and after its checks pass its Start button opens an installed app from that app's local copy (no download). Table: docs/engine.md "RADE and the app".
+- No code fetch at run time (2026-11-15): each app is one paste; the runner never downloads code to run; large data files come from a tagged release, checked by SHA-256.
+- Windows PowerShell 5.1 (2026-11-14): engine code runs on Windows PowerShell 5.1, the floor on every NIPR computer; cloud tests run PowerShell 7, so a work-computer round is the 5.1 proof.
+- Personal-data guard (2026-11-15): DoD tier (`profile: dod`); a push with no name denylist fails; an agent never opens the master denylist (the Administrator's Google Drive).
+- Public repo (2026-11-14): no e-mail address, DoD ID or its hash in this repo; help text names the Teams channel only, with no link or address.
+- Code standard (2026-11-17): docs/code-standard.md and docs/code-standard-rade.md (full docs per function); scripts/code_standard.py enforces it, and its baseline may only shrink.
+- Window (2026-11-14): read docs/window-design.md before a window change, and record each new window decision there.
