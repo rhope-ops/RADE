@@ -175,9 +175,17 @@ function Invoke-GuideStep([string]$Base, $Step, [scriptblock]$Say) {
   if ($res -eq 'OK') { foreach ($q in @($Step.Answers | Where-Object { $_ })) { $r.Answers += ('  Answer ' + [string]$q.Key + ': ' + (Get-GuideAnswerText $q)) } }
   return $r
 }
-# Text mode: asks how a hand step ended and reads the answer. Only the answers the step shows are offered (manifest
-# "hide"); an answer that is not offered is asked again, 3 times at most. Takes the step; gives back OK (Done), Abort
-# (It failed) or Cancel (Skip, or no valid answer).
+<#
+.SYNOPSIS
+Text mode: asks how a hand step ended and reads the answer.
+.DESCRIPTION
+Only the answers the step shows are offered (manifest "hide", E1); an answer that is not offered is asked again, 3 times
+at most.
+.PARAMETER Step
+The step (its Hide list names the answers that are not offered: done, failed, skip).
+.OUTPUTS
+OK (Done), Abort (It failed) or Cancel (Skip, or no valid answer).
+#>
 function Read-GuideChoice($Step) {
   $hide = @($Step.Hide)
   $ask = 'Press Enter when the flow run has started, type F and Enter if it failed, or S and Enter to skip this step'

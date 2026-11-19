@@ -49,7 +49,7 @@ function Test-TourSeen { try { return [bool](Test-Path -LiteralPath (Get-RadeCon
 function Save-TourSeen {
   try { $p = Get-RadeConfigFile 'rade-tour.txt'; $d = Split-Path -Parent $p
     if (-not (Test-Path -LiteralPath $d -PathType Container)) { [void](New-Item -ItemType Directory -Path $d -Force) }
-    Write-FileWhole $p ((Get-Date -Format 'yyyy-MM-dd') + "`r`n") } catch { $null = $_ }
+    Write-FileWhole $p ((Get-Date -Format 'yyyy-MM-dd') + "`r`n") } catch { $null = $_ }   # not saved: the tour shows one more time
 }
 function Get-MailTo([string]$Base) {
   # RADE\Config\rade-mail-to.txt: the address the results e-mail goes to (PFM 13 Nov; RADE R17). The window box saves it.

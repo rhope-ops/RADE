@@ -68,9 +68,16 @@ function global:Show-RadeTick {
   $ui.StepTime.Font = $keep.F; $ui.StepFrac.Font = $keep.F; & $ui.AlignTick
   Write-Host ('WIN mid tick ' + ($tk -join ' '))
 }
-# R29b: prints "WIN rule head": the header rule fails on any edge difference; the ticker rule allows 1 px at 100, 150 and 200 %
-# (bar 4, 6, 8 high; text 17, 26, 34 high) and fails beyond it. R31: prints "WIN rule r31": the rules of the header line (L2), a label
-# above its box (L3) and the card frame (L1), each on a fixture that is right and one that is not. Takes nothing.
+<#
+.SYNOPSIS
+Prints "WIN rule head" (R29b) and "WIN rule r31" (R31): the self-check's rules on fixtures that are right and that are not.
+.DESCRIPTION
+R29b: the header rule fails on any edge difference; the ticker rule allows 1 px at 100, 150 and 200 % (bar 4, 6, 8 high;
+text 17, 26, 34 high) and fails beyond it. R31: the rules of the header line (L2), a label above its box (L3) and the
+card frame (L1).
+.OUTPUTS
+Nothing; two WIN lines.
+#>
 function global:Show-RadeR29bRules {
   $hd = @(& $ui.HeadBad 'fixture' @{ N = 'WordL'; X = 80 } @{ N = 'AppL'; X = 80 }) + @(& $ui.HeadBad 'fixture' @{ N = 'WordL'; X = 86 } @{ N = 'AppL'; X = 80 })
   $tg = @(& $ui.TickBad 'fixture' @{ Top = 11; H = 4 } @{ N = 'StepTime'; Top = 5; H = 17 }) + @(& $ui.TickBad 'fixture' @{ Top = 16; H = 6 } @{ N = 'StepTime'; Top = 7; H = 26 }) + @(& $ui.TickBad 'fixture' @{ Top = 22; H = 8 } @{ N = 'StepTime'; Top = 9; H = 34 })
@@ -87,23 +94,59 @@ function global:Show-RadeR29bRules {
   Write-Host ('WIN rule r31 head-ok=' + $l2.Count + ' head-off=' + $l2no.Count + ' above-ok=' + $l3.Count + ' above-off=' + $l3no.Count + ' frame-ok=' + $l1.Count + ' frame-off=' + $l1no.Count + ' ~ ' + (@($l2no) + @($l3no) + @($l1no) -join ' ~ '))
   Write-Host ('WIN rule head=' + $hd.Count + ' tick-ok=' + $tg.Count + ' tick-off=' + $tb.Count + ' ~ ' + (@($hd) + @($tb) -join ' ~ '))
 }
+<#
+.SYNOPSIS
+R31: one time, before the test user's first card: measures the minimum step time (L8), prints what Get-NowText gives (L7),
+and makes each now-doing line print a "WIN now=" line.
+.OUTPUTS
+Nothing; WIN lines. Sets $ui.Layout.StepMs to 0 (the test user does not wait) and wraps $ui.ShowNow.
+#>
+function global:Start-RadeR31 {
+  $ms0 = [int]$ui.Layout.StepMs; $ui.Layout.StepMs = 120; $v0 = $ui.View; $ui.View = 'run'; $ui.StepAt = $ui.Clock.Elapsed.TotalMilliseconds; $t0 = $ui.StepAt; & $ui.HoldStep
+  Write-Host ('WIN hold ms=120 held=' + (($ui.Clock.Elapsed.TotalMilliseconds - $t0) -ge 115) + ' json=' + $ms0); $ui.View = $v0; $ui.StepAt = $null; $ui.Layout.StepMs = 0
+  Write-Host ('WIN now-text pass=' + (Get-NowText 'ITEM m2-list PASS list there') + '|skip=' + (Get-NowText '  SKIP: no flow') + '|fail=' + (Get-NowText 'x FAIL list missing') + '|plain=' + (Get-NowText 'a line that passes nothing') + '|none=' + (Get-NowText 'PASS'))
+  $global:RadeT.ShowNow = $ui.ShowNow
+  # The window's now-doing line, with one WIN line for each text. Takes the text.
+  $ui.ShowNow = { param([string]$Text) if ($Text) { Write-Host ('WIN now=' + $Text) }; & $global:RadeT.ShowNow $Text }
+}
+<#
+.SYNOPSIS
+R31: answers the cards of the R31 brief: the tour (L6), Help from the Ready card (L6), the error text after an answer that
+means a failure (E2) and the last card of a test round (L4).
+.PARAMETER V
+The view of the card that shows.
+.OUTPUTS
+$true when the card was answered here; $false when the caller must answer it.
+#>
+function global:Step-RadeR31([string]$V) {
+  if ($V -eq 'tour') {   # RADE_T_WALK=1: every card, with Back one time; else the test user skips it. From Help: skipped.
+    if ($env:RADE_T_WALK -eq '1' -and -not $global:RadeT.Helped) {
+      if ($ui.Kick.Text -match ' 2 OF 5$' -and -not $global:RadeT.TourBack) { $global:RadeT.TourBack = $true; Push-RadeButton 'Back'; return $true }
+      $ui.Form.Values['AcceptButton'].PerformClick() }
+    else { Push-RadeButton 'Skip the tour' }
+    return $true }
+  if ($V -eq 'answerfail') { $ui.ErrBox.Text = 'The page said: error 42 at https://usaf.dps.mil/sites/fake/x'; Push-RadeButton 'Continue'; return $true }
+  if ($V -eq 'feedback') {   # L3: its label is above its box
+    Write-Host ('WIN feedback max=' + $ui.Field.Values['MaxLength'] + ' enter=' + $ui.Form.Values['AcceptButton'].Text + ' focus=' + $ui.Field.Focused)
+    $ui.Field.Text = $(if ($env:RADE_T_FEEDBACK) { [string]$env:RADE_T_FEEDBACK } else { '' }); Push-RadeButton 'Continue'; return $true }
+  if ($V -eq 'ready' -and $env:RADE_T_WALK -eq '1') {
+    # Help (F1) opens the tour from a card; its end shows that card again (the calls nest here, so the second visit of this card prints the result).
+    if ($global:RadeT.Helped -and -not $global:RadeT.HelpBack) { $global:RadeT.HelpBack = $true; Write-Host ('WIN help link=' + $global:RadeT.HelpLink + ' name=' + $ui.TourB.Text + ' back-on=' + $ui.View + ' same=' + ($ui.Sent.Text -eq $global:RadeT.HelpSent) + ' seen=' + (Test-TourSeen)) }
+    if (-not $global:RadeT.Helped) { $global:RadeT.Helped = $true; $global:RadeT.HelpSent = $ui.Sent.Text; $global:RadeT.HelpLink = [bool]$ui.TourB.Shown; $ui.Form.Key('F1'); return $true } }
+  return $false
+}
 function global:Push-RadeButton([string]$Text) {
   foreach ($b in $ui.B) { if ($b.Shown -and $b.Text -eq $Text) { $b.PerformClick(); return } }
   throw ('the test user found no button "' + $Text + '" in view ' + $ui.View)
 }
 [RadeStub.Driver]::Pump = {
   if (-not $ui -or -not $ui.Form -or $ui.Form.Closed -or -not $ui.View) { return }
-  if (-not $global:RadeT.Quick) { $global:RadeT.Quick = $true; $ui.GuardMs = 0
-    # L8: one measure of the minimum step time, then 0 (the test user does not wait). L7: each now-doing line is printed.
-    $ms0 = [int]$ui.Layout.StepMs; $ui.Layout.StepMs = 120; $v0 = $ui.View; $ui.View = 'run'; $ui.StepAt = $ui.Clock.Elapsed.TotalMilliseconds; $t0 = $ui.StepAt; & $ui.HoldStep
-    Write-Host ('WIN hold ms=120 held=' + (($ui.Clock.Elapsed.TotalMilliseconds - $t0) -ge 115) + ' json=' + $ms0); $ui.View = $v0; $ui.StepAt = $null; $ui.Layout.StepMs = 0
-    Write-Host ('WIN now-text pass=' + (Get-NowText 'ITEM m2-list PASS list there') + '|skip=' + (Get-NowText '  SKIP: no flow') + '|fail=' + (Get-NowText 'x FAIL list missing') + '|plain=' + (Get-NowText 'a line that passes nothing') + '|none=' + (Get-NowText 'PASS'))
-    $global:RadeT.ShowNow = $ui.ShowNow; $ui.ShowNow = { param([string]$Text) if ($Text) { Write-Host ('WIN now=' + $Text) }; & $global:RadeT.ShowNow $Text } }   # the test user acts at once, as if it had waited (the guard is tested on the first question)
+  if (-not $global:RadeT.Quick) { $global:RadeT.Quick = $true; $ui.GuardMs = 0; Start-RadeR31 }   # the test user acts at once, as if it had waited (the guard is tested on the first question)
   $key = [string]$ui.View + '|' + $ui.Sent.Text + '|' + $ui.Kick.Text
   if ($key -eq $global:RadeT.Seen) { return }
   $global:RadeT.Seen = $key
   Show-RadeCard
-  $v = [string]$ui.View
+  $v = [string]$ui.View; if (Step-RadeR31 $v) { return }
   if ($v -eq 'choose') {
     if ($env:RADE_T_FAULT -eq 'noapps' -and -not $global:RadeT.FaultDone) { $global:RadeT.FaultDone = $true; $global:RadeT.Apps = $script:apps; $script:apps = @(); & $ui.VChoose; return }
     if ($ui.Blocked.Count -and -not $global:RadeT.Forced) {
@@ -143,9 +186,6 @@ function global:Push-RadeButton([string]$Text) {
     & $ui.Next
   }
   elseif ($v -eq 'ready') {
-    # R31 L6: Help (F1) opens the tour from a card; its end shows that card again (the calls nest here, so the second visit of this card prints the result)
-    if ($env:RADE_T_WALK -eq '1' -and $global:RadeT.Helped -and -not $global:RadeT.HelpBack) { $global:RadeT.HelpBack = $true; Write-Host ('WIN help link=' + $global:RadeT.HelpLink + ' name=' + $ui.TourB.Text + ' back-on=' + $ui.View + ' same=' + ($ui.Sent.Text -eq $global:RadeT.HelpSent) + ' seen=' + (Test-TourSeen)) }
-    if ($env:RADE_T_WALK -eq '1' -and -not $global:RadeT.Helped) { $global:RadeT.Helped = $true; $global:RadeT.HelpSent = $ui.Sent.Text; $global:RadeT.HelpLink = [bool]$ui.TourB.Shown; $ui.Form.Key('F1'); return }
     if ($env:RADE_T_START -eq 'maint') { return }   # Start on Maintenance: the window starts the application when the checks have passed
     if ($env:RADE_T_LINK -and $ui.FieldRow.Shown -and -not $global:RadeT.Linked) {   # R29 N8: a folder that does not exist is refused; then the folder of the test
       $global:RadeT.Linked = $true; $ui.Field.Text = (Join-Path $env:RADE_T_LINK 'no-such-folder'); Push-RadeButton 'Install'; Write-Host ('WIN link-bad view=' + $ui.View + ' note=' + $ui.Note.Text) }
@@ -217,15 +257,6 @@ function global:Push-RadeButton([string]$Text) {
     if ($ui.FieldRow.Shown) { Write-Host ('WIN answer-box max=' + $ui.Field.Values['MaxLength'] + ' enter=' + $ui.Form.Values['AcceptButton'].Text + ' focus=' + $ui.Field.Focused); $ui.Field.Text = '  Mail someone@example.com about it  '; $ui.Form.Values['AcceptButton'].PerformClick() }
     elseif ($ui.B[0].Text -eq 'Yes') { Push-RadeButton 'No' } else { $ui.B[1].PerformClick() }
   }
-  elseif ($v -eq 'tour') {   # R31 L6: the first-run tour. RADE_T_WALK=1: every card, with Back one time; else the test user skips it. From Help: skipped.
-    if ($env:RADE_T_WALK -eq '1' -and -not $global:RadeT.Helped) {
-      if ($ui.Kick.Text -match ' 2 OF 5$' -and -not $global:RadeT.TourBack) { $global:RadeT.TourBack = $true; Push-RadeButton 'Back'; return }
-      $ui.Form.Values['AcceptButton'].PerformClick() }
-    else { Push-RadeButton 'Skip the tour' } }
-  elseif ($v -eq 'answerfail') { $ui.ErrBox.Text = 'The page said: error 42 at https://usaf.dps.mil/sites/fake/x'; Push-RadeButton 'Continue' }   # E2: the error text after an answer that means a failure
-  elseif ($v -eq 'feedback') {   # L4: the last card of a test round; L3: its label is above its box
-    Write-Host ('WIN feedback max=' + $ui.Field.Values['MaxLength'] + ' enter=' + $ui.Form.Values['AcceptButton'].Text + ' focus=' + $ui.Field.Focused)
-    $ui.Field.Text = $(if ($env:RADE_T_FEEDBACK) { [string]$env:RADE_T_FEEDBACK } else { '' }); Push-RadeButton 'Continue' }
   elseif ($v -eq 'handfail') { $ui.ErrBox.Text = 'Import failed: flow https://usaf.dps.mil/sites/fake/x not found'; $ui.B[0].PerformClick() }
   elseif ($v -in 'done', 'review', 'stopped') {
     [RadeStub.Driver]::Clip = ''

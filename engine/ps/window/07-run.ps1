@@ -8,7 +8,8 @@
 $ui.Say = { param($t) Add-RunLog $t; $ui.Log.Add([string]$t); if ($ui.RecOn) { try { $ui.RecText.AppendText([string]$t + "`r`n") } catch { $null = $_ } }; try { [System.Windows.Forms.Application]::DoEvents() } catch { $null = $_ } }
 # L7 (the Administrator, 2026-11-19): the now-doing line under the step's bar. The engine calls this ($script:nowUi) with a
 # plain sentence for each item a step script reports (Get-NowText) and for a NOW line. Takes the text; '' hides the line.
-$ui.ShowNow = { param([string]$Text) try { if ($ui.View -eq 'run') { $x = $Text.Trim(); & $ui.Show $ui.Now $(if ($x) { & $ui.BreakLong $x $ui.Now.Font (& $ui.GetWrap $ui.Now) } else { '' }) } } catch { $null = $_ } }
+$ui.ShowNow = { param([string]$Text) try { if ($ui.View -eq 'run') { $x = $Text.Trim(); & $ui.Show $ui.Now $(if ($x) { & $ui.BreakLong $x $ui.Now.Font (& $ui.GetWrap $ui.Now) } else { '' }) } } catch { $null = $_ } }   # a line that cannot show never stops a step
+# The engine's callback for the now-doing line (Add-StepLine): shows the text and emits nothing. Takes the text.
 $script:nowUi = { param($t) $null = & $ui.ShowNow ([string]$t) }
 # L8 (the Administrator, 2026-11-19): a step stays on the Run card for $ui.Layout.StepMs (engine/window.json) at least, so a
 # run of fast steps does not flicker. Waits out the rest of that time since the step showed. Takes nothing.

@@ -58,7 +58,7 @@ $ui.Boot = {
   & $ui.SetCard @{ View = 'boot'; Sentence = 'Checking this computer.'; P = @('This takes a few seconds. Nothing is changed.'); Right = $ui.Words.Work }
   try { & $ui.RunBase } catch { if (-not ($ui.Form.IsDisposed -or $script:closing)) { & $ui.VBootErr (ConvertTo-Masked ([string]$_.Exception.Message)) }; return }
   if ($ui.Form.IsDisposed -or $script:closing) { return }
-  if (Test-TourSeen) { & $ui.VChoose } else { $ui.TourTo = { & $ui.VChoose }; & $ui.VTour 0 } }   # L6: the tour comes one time, before the first Choose
+  if (Test-TourSeen) { & $ui.VChoose } else { $ui.TourFrom = $null; & $ui.VTour 0 } }   # L6: the tour comes one time, before the first Choose
 # L6 (the Administrator, 2026-11-19): the RADE tour, 5 cards: what RADE does, your turn and RADE's turn, what Done,
 # It failed and Skip mean, where the results go, and the Record. Shown one time for a Windows profile, before the first
 # Choose (RADE\Config\rade-tour.txt), and again from "Help (F1)". S = the headline of a card, P = its paragraphs.
@@ -79,12 +79,12 @@ $ui.VTour = { param([int]$I)
       $(if ($ui.TourI) { @{ Text = 'Back'; Act = { & $ui.VTour ($ui.TourI - 1) } } } else { $null }), $(if ($last) { $null } else { @{ Text = 'Skip the tour'; Act = { & $ui.EndTour } } })) } }
 # Ends the tour: remembers that it was shown (Save-TourSeen) and shows the card it came from (Choose on the first run).
 # Takes nothing.
-$ui.EndTour = { Save-TourSeen; $to = $ui.TourTo; $ui.TourTo = $null; if ($to) { & $to } else { & $ui.VChoose } }
+$ui.EndTour = { Save-TourSeen; $from = $ui.TourFrom; $ui.TourFrom = $null; if ($from) { & $ui.SetCard $from } else { & $ui.VChoose } }
 # "Help (F1)": opens the tour from a card of $ui.HelpViews while nothing runs; the tour's end shows that card again
 # (a box on it has its first text again). Takes nothing.
 $ui.OpenTour = {
   if ($ui.Busy -or $ui.Running -or $ui.RecOn -or $ui.HelpViews -notcontains [string]$ui.View) { return }
-  $ui.TourFrom = $ui.CardNow; $ui.TourTo = { & $ui.SetCard $ui.TourFrom }; & $ui.VTour 0 }
+  $ui.TourFrom = $ui.CardNow; & $ui.VTour 0 }
 $ui.TourB.Add_Click({ & $ui.OpenTour })
 # Resets what the user chose: each step to its default, clean-up on, no step states. Takes nothing.
 $ui.InitSel = { $ui.Sel = @{}; foreach ($k in $script:appSteps) { $ui.Sel[[int]$k] = [bool](Get-StepDefault $k) }; $ui.Clean = $true; $ui.StepState = @{} }

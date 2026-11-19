@@ -13,7 +13,8 @@ $ui.VHand = {
   # R28 N1: the address row only when the step has an address (or a saved one it can take); N6: the file's full path on the card.
   $addr = [bool]($ui.GUrl -or $st.UrlConfig); $dw = $(if ($st.DoneText) { [string]$st.DoneText } else { 'Done' })
   # E1 (the Administrator, 2026-11-19): the step's "hide" takes buttons off the card; one button always stays (the build checks it).
-  $bs = @($(if ($hide -notcontains 'done') { @{ Text = $dw; Kind = 'primary'; Act = { $ui.Answer = 'OK' } } }), $(if ($hide -notcontains 'failed') { $two }), $(if ($hide -notcontains 'skip') { @{ Text = $(if ($st.SkipText) { [string]$st.SkipText } else { 'Skip' }); Act = { $ui.Answer = 'Cancel' } } }))
+  $one = @{ Text = $dw; Kind = 'primary'; Act = { $ui.Answer = 'OK' } }; $three = @{ Text = $(if ($st.SkipText) { [string]$st.SkipText } else { 'Skip' }); Act = { $ui.Answer = 'Cancel' } }
+  $bs = @($(if ($hide -notcontains 'done') { $one }), $(if ($hide -notcontains 'failed') { $two }), $(if ($hide -notcontains 'skip') { $three }))
   $close = $(if ($hide -contains 'done') { '' } elseif ($addr) { 'When you finish in the browser, come back to this window and select "' + $dw + '".' } else { 'When you finish, select "' + $dw + '".' })
   & $ui.SetCard @{ View = 'hand'; Light = 'you'; Kicker = $(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot + 'your turn' } else { 'Your turn' }); Sentence = (Get-StepTitle $st)
     P = @([string]$st.Note); Lines = @($st.Guide); Close = $close

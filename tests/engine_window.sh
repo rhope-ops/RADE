@@ -219,8 +219,8 @@ def c5(m): step(m, 'T05')['answers'][0]['failOn'] = ['A word that is no answer']
 def c6(m): step(m, 'T05')['answers'][0]['showIf'] = {'key': 'more', 'in': ['Yes']}
 def c7(m): step(m, 'T05')['answers'][1]['showIf'] = {'key': 'page', 'in': ['Maybe']}
 def c8(m): del step(m, 'T05')['answers']
-cases = [(c1, 'hide: 1 or 2 of'), (c2, 'hide: only a guide step'), (c3, 'answersOnly: the step has no Done card'), (c4, 'failOn is only for a step with "answersOnly"'), (c5, 'failOn names 1 or more of the answers'),
-         (c6, 'showIf needs "key" (an earlier'), (c7, 'showIf "in" names 1 or more of the answers'), (c8, 'answersOnly: only a guide step (kind "guide") with "answers"')]
+cases = [(c1, 'hide: only for a guide step'), (c2, 'hide: only for a guide step'), (c3, 'no Done card (so without: guide)'), (c4, 'failOn (only in a step with "answersOnly"'), (c5, 'failOn (only in a step with'),
+         (c6, 'showIf needs "key" (an earlier'), (c7, 'showIf needs "key" (an earlier'), (c8, 'answersOnly: true, only for a guide step')]
 for change, want in cases:
     m = copy.deepcopy(base); change(m); json.dump(m, open(a / 'scripts' / 'paste_bundles.json', 'w'))
     b = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(a)], capture_output=True, text=True)

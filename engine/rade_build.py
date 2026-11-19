@@ -200,44 +200,27 @@ def app_lines(b):
     return out
 
 
-ANSWER_KINDS = ('yesno', 'pick', 'text')
-
-
-HAND_BUTTONS = ('done', 'failed', 'skip')
-
-
 def hand_part(s):
-    """The button fields of a guide step (docs/engine.md "Step contract", "Buttons of a hand step") as a part of its
-    $steps line, or '' when it has none. A bad field stops the build (the schema says the same).
+    """The fields "hide" and "answersOnly" of a guide step (docs/engine.md "Step contract") as a part of its $steps line.
 
     Args:
-        s: the manifest step. "hide" names the buttons its card does not show (1 or 2 of done, failed, skip);
-            "answersOnly": true shows the step's questions at once, with no Done card.
+        s: the manifest step; a bad field stops the build (the schema says the same).
 
     Returns:
-        The text '; Hide = @(...)' and/or '; AnswersOnly = $true', or ''.
+        '; Hide = @(...)' and/or '; AnswersOnly = $true', or ''.
     """
     def no(why):
         """Stop the build with the step name and the reason."""
         raise SystemExit('step %r: %s' % (s['name'], why))
-    out = ''
+    out, guide, hide = '', s.get('kind', 'script') == 'guide', s.get('hide')
     if 'hide' in s:
-        hide = s['hide']
-        if s.get('kind', 'script') != 'guide':
-            no('hide: only a guide step (kind "guide") has buttons to hide')
-        if not isinstance(hide, list) or not 1 <= len(hide) <= 2 or len(set(hide)) != len(hide) or any(h not in HAND_BUTTONS for h in hide):
-            no('hide: 1 or 2 of done, failed and skip, each one time (one button stays)')
+        if not guide or not isinstance(hide, list) or not 1 <= len(hide) <= 2 or len(set(hide)) != len(hide) or set(hide) - {'done', 'failed', 'skip'}:
+            no('hide: only for a guide step (kind "guide"): 1 or 2 of done, failed and skip, each one time (one button stays)')
         out += '; Hide = @(%s)' % ', '.join(q(h) for h in hide)
     if 'answersOnly' in s:
-        if s['answersOnly'] is not True:
-            no('answersOnly: true, or leave the field out')
-        if s.get('kind', 'script') != 'guide' or not s.get('answers'):
-            no('answersOnly: only a guide step (kind "guide") with "answers" can show its questions at once')
-        for f in ('hide', 'doneText', 'doneLog', 'marker', 'url', 'urlConfig'):
-            if s.get(f):
-                no('answersOnly: the step has no Done card, so it cannot have %r' % f)
-        if s['file'] or s.get('guide'):
-            no('answersOnly: the step has no Done card, so "file" and "guide" must be empty')
+        used = [f for f in ('hide', 'doneText', 'doneLog', 'marker', 'url', 'urlConfig', 'file', 'guide') if s.get(f)]
+        if s['answersOnly'] is not True or not guide or not s.get('answers') or used:
+            no('answersOnly: true, only for a guide step (kind "guide") with "answers" and no Done card (so without: %s)' % (', '.join(used) or 'nothing'))
         out += '; AnswersOnly = $true'
     return out
 
@@ -267,7 +250,7 @@ def answers_part(s):
             no('question %d: the key %r is used twice' % (i, key))
         if not isinstance(prompt, str) or not 1 <= len(prompt) <= TEXT_LIMITS['answer prompt']:
             no('question %r: the prompt must have 1 to %d characters' % (key, TEXT_LIMITS['answer prompt']))
-        if kind not in ANSWER_KINDS:
+        if kind not in ('yesno', 'pick', 'text'):
             no('question %r: the kind must be yesno, pick or text' % key)
         if kind == 'pick':
             if not isinstance(choices, list) or not 2 <= len(choices) <= 4 or not all(isinstance(c, str) and 1 <= len(c) <= TEXT_LIMITS['answer choice'] for c in choices):
@@ -277,39 +260,23 @@ def answers_part(s):
         elif 'choices' in a:
             no('question %r: only a pick has choices' % key)
         mine = [] if kind == 'text' else ['Yes', 'No'] if kind == 'yesno' else [c.strip() for c in choices]
-        more = ''
-        if 'failOn' in a:   # the answers that mean the step failed (E2, the Administrator, 2026-11-19)
-            if not s.get('answersOnly'):
-                no('question %r: failOn is only for a step with "answersOnly": true' % key)
-            if not mine or not word_list(a['failOn'], mine):
-                no('question %r: failOn names 1 or more of the answers of this yes/no or pick question, each one time' % key)
-            more += '; FailOn = @(%s)' % ', '.join(q(w.strip()) for w in a['failOn'])
-        if 'showIf' in a:   # the question shows only after one of these answers to an earlier question (E3)
-            dep = a['showIf']
-            if not isinstance(dep, dict) or set(dep) != {'key', 'in'} or dep['key'] not in words or not words[dep['key']]:
-                no('question %r: showIf needs "key" (an earlier yes/no or pick question of this step) and "in"' % key)
-            if not word_list(dep['in'], words[dep['key']]):
-                no('question %r: showIf "in" names 1 or more of the answers of %r, each one time' % (key, dep['key']))
-            more += '; ShowKey = %s; ShowIn = @(%s)' % (q(dep['key']), ', '.join(q(w.strip()) for w in dep['in']))
+        fail, dep = a.get('failOn'), a.get('showIf')   # E2: the answers that mean the step failed; E3: the question shows only after these answers
+        if 'failOn' in a and not (s.get('answersOnly') and mine and word_list(fail, mine)):
+            no('question %r: failOn (only in a step with "answersOnly": true) names 1 or more answers of this yes/no or pick question, each one time' % key)
+        dep_ok = isinstance(dep, dict) and set(dep) == {'key', 'in'} and isinstance(dep['key'], str) and word_list(dep['in'], words.get(dep['key'], []))
+        if 'showIf' in a and not dep_ok:
+            no('question %r: showIf needs "key" (an earlier yes/no or pick question of this step) and "in" (1 or more of its answers, each one time)' % key)
+        more = ('; FailOn = @(%s)' % ', '.join(q(w.strip()) for w in fail)) if fail else ''
+        more += ('; ShowKey = %s; ShowIn = @(%s)' % (q(dep['key']), ', '.join(q(w.strip()) for w in dep['in']))) if dep else ''
         words[key] = mine
         out.append('@{ Key = %s; Prompt = %s; Kind = %s; Choices = @(%s)%s }' % (q(key), q(prompt.strip()), q(kind), ', '.join(q(c.strip()) for c in choices or []), more))
     return '; Answers = @(%s)' % ', '.join(out)
 
 
 def word_list(value, allowed):
-    """Say whether `value` is a list of 1 or more different words, each one of `allowed` (spaces at the ends ignored).
-
-    Args:
-        value: the manifest value (failOn, or the "in" of showIf).
-        allowed: the button words of the question it refers to.
-
-    Returns:
-        True when the list is valid.
-    """
-    if not isinstance(value, list) or not value or not all(isinstance(w, str) for w in value):
-        return False
-    got = [w.strip() for w in value]
-    return len(set(got)) == len(got) and all(w in allowed for w in got)
+    """Say whether `value` is a list of 1 or more different words that are all in `allowed` (spaces at the ends ignored)."""
+    got = [w.strip() for w in value] if isinstance(value, list) and all(isinstance(w, str) for w in value) else []
+    return bool(got) and len(set(got)) == len(got) and all(w in allowed for w in got)
 
 
 # ---- Bundle layout (the Administrator, 2026-11-17: docs/code-standard.md C5, C6). A bundle is read by a person before it
@@ -391,7 +358,8 @@ def step_lines(b):
     for s in b['steps']:
         assert s.get('url') or not s.get('urlConfig'), 'a step with "urlConfig" needs its own "url" (the host rule): %s' % s['name']
         assert (s.get('kind') == 'guide' and not s['file']) or any(f['dir'] == s['dir'] and Path(f['src']).name == s['file'] for f in b['files']), s
-    return [line[:-2] + (('; Doing = %s' % q(s['doing'].strip())) if s.get('doing') else '') + hand_part(s) + answers_part(s) + ' }' for line, s in zip(steps, b['steps'])]   # a step without these fields: the line as before
+    doing = lambda s: ('; Doing = %s' % q(s['doing'].strip())) if s.get('doing') else ''   # L7: the now-doing sentence; a step without these fields: the line as before
+    return [line[:-2] + doing(s) + hand_part(s) + answers_part(s) + ' }' for line, s in zip(steps, b['steps'])]
 
 
 def fetch_lines(b):
@@ -412,8 +380,7 @@ def window_values():
     """Read engine/window.json and check it. The build stops when a value is missing or out of range.
 
     Returns:
-        A dict of placeholder -> text: the text column share (percent) and cap, the minimum window size and the card
-        frame's minimum height (pixels at 100 %), and the minimum time a step stays on the Run card (ms).
+        A dict of placeholder -> text: text column share (percent) and cap, minimum window size and frame height (pixels at 100 %), minimum step time (ms).
     """
     w = json.loads(WINDOW_FILE.read_text(encoding='utf-8'))
     share, cap = float(w['textColumn']['sharePercent']), int(w['textColumn']['maxPx'])
@@ -422,8 +389,7 @@ def window_values():
     assert 240 <= cap <= 4000, 'engine/window.json textColumn.maxPx must be 240 to 4000'
     assert 400 <= min_w <= 1920 and 300 <= min_h <= 1080, 'engine/window.json minSize must be 400 x 300 to 1920 x 1080'
     frame, step_ms = int(w['cardFrame']['minHeight']), int(w['minStepMs'])
-    assert 120 <= frame <= 1080, 'engine/window.json cardFrame.minHeight must be 120 to 1080'
-    assert 0 <= step_ms <= 3000, 'engine/window.json minStepMs must be 0 to 3000'
+    assert 120 <= frame <= 1080 and 0 <= step_ms <= 3000, 'engine/window.json cardFrame.minHeight must be 120 to 1080 and minStepMs 0 to 3000'
     return {'@@TEXT_SHARE@@': repr(share), '@@TEXT_MAX@@': str(cap), '@@MIN_W@@': str(min_w), '@@MIN_H@@': str(min_h),
             '@@FRAME_MIN@@': str(frame), '@@MIN_STEP_MS@@': str(step_ms)}
 

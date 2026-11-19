@@ -171,7 +171,7 @@ $ui.InkOf = { param([string]$Text, $Font)
 # Bottom = one past the bottom of "g". Measured one time for each font; an estimate when it cannot be measured.
 $ui.FontInk = { param($Font)
   $k = [string]$Font.Name + '|' + $Font.SizeInPoints + '|' + $Font.Style; if ($ui.FontInks.ContainsKey($k)) { return $ui.FontInks[$k] }
-  $h = 18; try { $h = [int][System.Windows.Forms.TextRenderer]::MeasureText('Hg', $Font).Height } catch { $null = $_ }
+  $h = 18; try { $h = [int][System.Windows.Forms.TextRenderer]::MeasureText('Hg', $Font).Height } catch { $null = $_ }   # no measure: the height of the form font
   $v = @{ Top = [int][math]::Round($h * 0.27); Base = [int][math]::Round($h * 0.8); Bottom = $h }
   $a = & $ui.InkOf 'H' $Font; $d = & $ui.InkOf 'g' $Font
   if ($a -and $d) { $v = @{ Top = [int]$a.Top; Base = [int]$a.Bottom; Bottom = [int][math]::Max($a.Bottom, $d.Bottom) }; $ui.FontInks[$k] = $v }   # only a measure is kept
@@ -193,19 +193,19 @@ $ui.InkFit = { param($P)
       else { $w = [int][System.Windows.Forms.TextRenderer]::MeasureText([string]$P.Text, $P.Font).Width } }
     if ([int]$P.Tag.MaxW -gt 0) { $w = [math]::Min($w, [int]$P.Tag.MaxW) }
     $ns = New-Object System.Drawing.Size(([math]::Max(1, $w)), ([math]::Max(1, $h))); if ($P.Width -ne $ns.Width -or $P.Height -ne $ns.Height) { $P.Size = $ns }
-    if ($P.Text) { $P.AccessibleName = [string]$P.Text }; $P.Invalidate() } catch { $null = $_ } }
+    if ($P.Text) { $P.AccessibleName = [string]$P.Text }; $P.Invalidate() } catch { $null = $_ } }   # no size now: the next fit sizes it
 # Draws the text of an ink-tight panel: moved left and up by the empty room of its text cell, so the ink starts at the
 # panel's left and top edge; a text wider than the panel ends with "...". Takes the panel and its Graphics.
 $ui.InkPaint = { param($P, $G)
   try { $G.Clear($P.BackColor); if (-not $P.Text) { return }
     $fi = & $ui.FontInk $P.Font; $l = [int]$P.Tag.Left
-    [System.Windows.Forms.TextRenderer]::DrawText($G, [string]$P.Text, $P.Font, (New-Object System.Drawing.Rectangle((-$l), (-[int]$fi.Top), ($P.ClientSize.Width + $l), ([int]$fi.Bottom + 4))), $P.ForeColor, $P.BackColor, [System.Windows.Forms.TextFormatFlags]'Left, Top, NoPadding, NoPrefix, SingleLine, EndEllipsis') } catch { $null = $_ } }
+    [System.Windows.Forms.TextRenderer]::DrawText($G, [string]$P.Text, $P.Font, (New-Object System.Drawing.Rectangle((-$l), (-[int]$fi.Top), ($P.ClientSize.Width + $l), ([int]$fi.Bottom + 4))), $P.ForeColor, $P.BackColor, [System.Windows.Forms.TextFormatFlags]'Left, Top, NoPadding, NoPrefix, SingleLine, EndEllipsis') } catch { $null = $_ } }   # drawing never stops the window
 # Where the ink of a control is, measured on what Windows drew (DrawToBitmap; the first 240 px of its width): gives back
 # @{ Top; Bottom; Left; Right } in the control's own pixels, or its whole box when it cannot be measured. Takes the control.
 $ui.InkBox = { param($C)
   $all = @{ Top = 0; Bottom = [int]$C.Height; Left = 0; Right = [int]$C.Width }
   try { $w = [math]::Max(1, [math]::Min([int]$C.Width, (& $ui.Sc 240))); $h = [math]::Max(1, [int]$C.Height); $bm = New-Object System.Drawing.Bitmap($w, $h)
-    try { $C.DrawToBitmap($bm, (New-Object System.Drawing.Rectangle(0, 0, $w, $h))); $box = & $ui.InkScan $bm; if ($box) { return $box } } finally { $bm.Dispose() } } catch { $null = $_ }
+    try { $C.DrawToBitmap($bm, (New-Object System.Drawing.Rectangle(0, 0, $w, $h))); $box = & $ui.InkScan $bm; if ($box) { return $box } } finally { $bm.Dispose() } } catch { $null = $_ }   # no bitmap (the test stand-ins): the whole box
   return $all }
 # ---- Long words and one-line texts
 # A word wider than the line (no space in it) is cut into pieces that fit, one per line: it wraps by character and is

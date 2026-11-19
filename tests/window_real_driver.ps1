@@ -36,6 +36,14 @@ function global:Save-RadeCard([string]$Tag) {
   $global:RadeT.Lay = $ui.LayBad.Count
   if ($ui.Scrolls -and -not $ui.RecOn) { Write-Host ('WIN scrolls ' + $card) }
 }
+# R31: answers the cards of the R31 brief. tour: each card (Next, then "Close the tour"); answer: the answer that means a
+# failure when the card has one (so its error card is drawn), else the first button; answerfail: a fake error text;
+# feedback: a fake note. Takes the view of the card.
+function global:Step-RadeR31([string]$V) {
+  if ($V -eq 'answerfail') { $ui.ErrBox.Text = 'The page said: error 42' } elseif ($V -eq 'feedback') { $ui.Field.Text = 'Sample feedback' }
+  $fb = @($ui.B | Where-Object { $_.Visible -and $_.Text -like 'An error*' })[0]
+  if ($V -eq 'answer' -and $fb) { $fb.PerformClick() } else { $ui.B[0].PerformClick() }
+}
 function global:Step-Rade {
   if (((Get-Date) - $global:RadeT.T0).TotalSeconds -gt 240) { Write-Host ('WIN TIMEOUT view=' + $ui.View + ' sent=' + $ui.Sent.Text); [Environment]::Exit(3) }
   if (-not $ui -or -not $ui.Form -or $ui.Form.IsDisposed -or -not $ui.Form.Visible -or -not $ui.View) { return }
@@ -86,12 +94,8 @@ function global:Step-Rade {
     elseif ($global:RadeT.Hand -eq 'fail') { $ui.B[1].PerformClick() } else { $ui.B[0].PerformClick() }
   }
   elseif ($v -eq 'answer') {
-    if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }
-    $fb = @($ui.B | Where-Object { $_.Visible -and $_.Text -like 'An error*' })[0]   # R31 E2: the answer that means a failure, so its card is drawn
-    if ($fb) { $fb.PerformClick() } else { $ui.B[0].PerformClick() } }
-  elseif ($v -eq 'tour') { $ui.B[0].PerformClick() }   # R31 L6: the first-run tour, each card (Next, then "Close the tour")
-  elseif ($v -eq 'answerfail') { $ui.ErrBox.Text = 'The page said: error 42'; $ui.B[0].PerformClick() }   # R31 E2: the error text after an answer that means a failure
-  elseif ($v -eq 'feedback') { $ui.Field.Text = 'Sample feedback'; $ui.B[0].PerformClick() }   # R31 L4: the last card of a test round
+    if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }; Step-RadeR31 $v }
+  elseif ($v -in 'tour', 'answerfail', 'feedback') { Step-RadeR31 $v }
   elseif ($v -eq 'handfail') { $ui.ErrBox.Text = 'Import failed: flow https://usaf.dps.mil/sites/fake/x not found'; $ui.B[0].PerformClick() }
   elseif ($v -in 'done', 'review', 'stopped') {
     foreach ($l in @($ui.Log)) { if ([string]$l -match 'failed|FAILED|STOPPED|could not') { Write-Host ('WIN log ' + ([string]$l).Trim()) } }

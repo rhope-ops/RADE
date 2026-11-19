@@ -109,11 +109,17 @@ $ui.Apart = {
     if ($prev -lt 0) { return }
     if ($left -ge (& $ui.Sc 32)) { $ui.B[$n].Margin = (& $ui.Pad ([int]$left) $mm $mm $mm) } else { $ui.BtnRow.SetFlowBreak($ui.B[$prev], $true) }
   } catch { $null = $_ } }
-# Places the card frame (L1) and lets the card's text scroll when the card is taller than the window, so the buttons stay
-# in view. The frame's top is fixed for a window size; a card too tall for the room under it moves up before it scrolls.
-# A short card gets a gap above its buttons, so the frame is its minimum height. Takes nothing; sets the card's top row,
-# the size of $ui.Scroll and $ui.Gap, $ui.Scrolls and $ui.Frame (what the self-check compares).
+# Places the card frame (L1) and lets the card's text scroll when the card is taller than the window (the help below).
 $ui.Squeeze = {
+  <#
+  .SYNOPSIS
+  Places the card frame (L1) and lets the card's text scroll when the card is taller than the window, so the buttons stay in view.
+  .DESCRIPTION
+  The frame's top is fixed for a window size; a card too tall for the room under it moves up before it scrolls. A short
+  card gets a gap above its buttons, so the frame is its minimum height.
+  .OUTPUTS
+  Nothing. Sets the card's top row, the size of $ui.Scroll and $ui.Gap, $ui.Scrolls and $ui.Frame (what the self-check compares).
+  #>
   if (-not $ui.Scaled) { return }
   if ($ui.InSqueeze) { return }; $ui.InSqueeze = $true
   try { $bh = [int]$ui.Body.Height; $bw = [int]$ui.Body.Width; $H = [int]$ui.Card.ClientSize.Height; $hh = [int]$ui.Head.Height; $th = [int]$ui.Tail.Height
@@ -126,7 +132,7 @@ $ui.Squeeze = {
     if ($ui.Scroll.Width -ne ($bw + $bar) -or $ui.Scroll.Height -ne $sh) { $ui.Scroll.Size = New-Object System.Drawing.Size(($bw + $bar), $sh) }
     if ($ui.Gap.Height -ne $gap) { $ui.Gap.Height = $gap }; if ($ui.Gap.Visible -ne [bool]$gap) { $ui.Gap.Visible = [bool]$gap }
     try { if ([int]$ui.CardRows[0].Height -ne $top) { $ui.CardRows[0].Height = $top } } catch { $null = $_ }   # stand-in types: no row styles
-  } catch { $null = $_ } finally { $ui.InSqueeze = $false } }
+  } catch { $null = $_ } finally { $ui.InSqueeze = $false } }   # a size that cannot be read: the next fit places the frame
 $ui.Body.Add_SizeChanged({ & $ui.Squeeze }); $ui.Tail.Add_SizeChanged({ & $ui.Squeeze }); $ui.Head.Add_SizeChanged({ & $ui.Squeeze })
 $ui.Card.Add_SizeChanged({ try { & $ui.Fit } catch { $null = $_ } })
 # Counts how many lines a text takes at a width, at least 1 and at most a limit (0 for no text). Takes the text, font,

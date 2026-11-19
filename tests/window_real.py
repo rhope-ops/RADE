@@ -142,6 +142,27 @@ def bundle(t, long, keep=None):
     return users
 
 
+def r31_why(lines, app, fresh):
+    """Say what a run misses of the cards of the R31 brief (docs/reviews/2026-11-19-r31-plan.md).
+
+    Args:
+        lines: the output lines of the run.
+        app: the application of the run (0 = the test application).
+        fresh: True when the run starts on a new Windows profile, so the tour shows.
+
+    Returns:
+        A list of reasons (empty when nothing is missing): a first window draws the 5 tour cards; a test round draws
+        the error card of an answer that means a failure and its last card.
+    """
+    views = [re.sub(r"^WIN card=\d+-(\S+) .*$", r"\1", l) for l in lines if l.startswith("WIN card=")]
+    why = []
+    if fresh and views.count("tour") != 5:
+        why.append("the tour drew %d cards, not 5" % views.count("tour"))
+    if app == 0 and not {"answerfail", "feedback"} <= set(views):
+        why.append("a test round did not draw the cards answerfail and feedback")
+    return why
+
+
 def main():
     out = pathlib.Path(sys.argv[1]).resolve()
     bad = 0
@@ -174,7 +195,7 @@ def main():
                 print("   " + l[:300])
         # a hand card ("Your turn") may scroll at any size (the Administrator, 2026-11-17); every other card only at the smallest
         scrolls = [l for l in lines if l.startswith("WIN scrolls ") and not l.rstrip().endswith("-hand")]
-        why = []
+        why = r31_why(lines, app, name == RUNS[0][0] or not name.startswith("deploy-"))   # R31: the tour, and the cards of a test round
         if not closed:
             why.append("the window did not reach its end")
         if layout:
@@ -190,14 +211,6 @@ def main():
             why.append("the question cards (answer-yesno, answer-pick, answer-text) were not all drawn: %s" % sorted(got))
         if size == SMALLEST and hand == "done" and "answer-text" not in got:
             why.append("the text question (answer-text) was not drawn in the smallest window")
-        # R31: a first window of a Windows profile draws the 5 tour cards; a test round draws the error card of an answer that
-        # means a failure and its last card
-        views = [re.sub(r"^WIN card=\d+-(\S+) .*$", r"\1", l) for l in lines if l.startswith("WIN card=")]
-        if not name.startswith("deploy-") or first:
-            if views.count("tour") != 5:
-                why.append("the tour drew %d cards, not 5" % views.count("tour"))
-        if app == 0 and not {"answerfail", "feedback"} <= set(views):
-            why.append("a test round did not draw the cards answerfail and feedback")
         broken = [l for l in lines if l.startswith(("WIN PNG-FAILED", "WIN DRIVER-ERROR", "WIN TIMEOUT", "WIN BAD"))]
         if broken:
             why.append(broken[0][:120])
