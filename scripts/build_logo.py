@@ -9,7 +9,7 @@ font would turn it into a Latin "p"), with a blue halo that clears the beam arou
 Source: RhoBold.dc.html on the Rho canvas (https://claude.ai/artifact/Qw7iSQaz1FMzZQtycjrZxq); this script makes the same SVG.
 Master copy: this repo (assets/logo). Other repos copy a PNG only where a build needs the file and say so.
 
-Run: python3 scripts/build_logo.py, then node scripts/render_logo.js for the PNGs. Never hand-edit the outputs.
+Run: python3 scripts/build_logo.py, then node scripts/render_logo.js logo-rho for the PNGs. Never hand-edit the outputs.
 """
 import pathlib
 

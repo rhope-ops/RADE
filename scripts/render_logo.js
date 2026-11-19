@@ -1,7 +1,7 @@
 // Render RADE's logo SVGs in assets/logo to PNG (headless Chromium via Playwright).
-//   node scripts/render_logo.js            renders every mark below
-//   node scripts/render_logo.js rho-usaf   renders one mark (use it so a mark you did not change keeps its PNG bytes:
-//                                          the render is not byte-stable, and the engine checks logo-rho-128.png by SHA-256)
+//   node scripts/render_logo.js            renders the marks the engine does not read (today: rho-usaf)
+//   node scripts/render_logo.js logo-rho   renders a named mark; name the engine's mark only when you change it on purpose:
+//                                          the render is not byte-stable, and the engine checks logo-rho-128.png by SHA-256
 // Marks:
 //   logo-rho  Rho Bold (USAF-B); its SVG comes from scripts/build_logo.py. The engine reads logo-rho-128.png (the window).
 //   rho-usaf  Rho, USAF version (Logo Studies canvas, the Administrator, 2026-11-19); its SVG is copied from the canvas,
@@ -10,6 +10,7 @@
 const {chromium} = require('playwright'); const fs = require('fs'); const path = require('path');
 const dir = path.join(__dirname, '..', 'assets', 'logo');
 const MARKS = ['logo-rho', 'rho-usaf'];
+const ENGINE_MARKS = ['logo-rho'];   // read by the engine (engine/rade_build.py LOGO): rendered only when named
 const SIZES = [512, 128, 64, 32, 16];
 
 /**
@@ -33,6 +34,6 @@ async function renderMark(browser, mark) {
   const unknown = wanted.filter((m) => !MARKS.includes(m));
   if (unknown.length) { console.error(`unknown mark: ${unknown.join(', ')} (marks: ${MARKS.join(', ')})`); process.exit(2); }
   const b = await chromium.launch();
-  for (const mark of (wanted.length ? wanted : MARKS)) await renderMark(b, mark);
+  for (const mark of (wanted.length ? wanted : MARKS.filter((m) => !ENGINE_MARKS.includes(m)))) await renderMark(b, mark);
   await b.close();
 })();
