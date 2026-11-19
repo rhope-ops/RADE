@@ -160,6 +160,7 @@ $ui.Squeeze = {
     $ui.Scrolls = [bool]$bar; $gap = [math]::Max(0, $min - $hh - $sh - $th)
     $ui.Frame = @{ WantTop = $want; MinH = $min; Moved = ($top -ne $want) }
     if ($ui.Scroll.Width -ne ($bw + $bar) -or $ui.Scroll.Height -ne $sh) { $ui.Scroll.Size = New-Object System.Drawing.Size(($bw + $bar), $sh) }
+    $ms = $(if ($bar) { $bh } else { 0 }); try { if ($ui.Scroll.AutoScrollMinSize.Height -ne $ms) { $ui.Scroll.AutoScrollMinSize = New-Object System.Drawing.Size(0, $ms) } } catch { $null = $_ }   # the scroll range is the text's height, set here (R35 job: a card that scrolled by a few px had no range yet, so the wheel did not move it)
     if ($ui.Gap.Height -ne $gap) { $ui.Gap.Height = $gap }; if ($ui.Gap.Visible -ne [bool]$gap) { $ui.Gap.Visible = [bool]$gap }
     try { if ([int]$ui.CardRows[0].Height -ne $top) { $ui.CardRows[0].Height = $top } } catch { $null = $_ }   # stand-in types: no row styles
   } catch { $null = $_ } finally { $ui.InSqueeze = $false } }   # a size that cannot be read: the next fit places the frame
@@ -349,7 +350,7 @@ $ui.SetCard = { param($c)
   $ui.Form.AcceptButton = $(if ($c.NoAccept) { $null } else { $accept })   # Enter = the primary button, except on a hand step
   $ui.CardNow = $c; $ui.TourB.Visible = ($ui.HelpViews -contains [string]$c.View -and -not $ui.RecOn)   # L6: Help on a card that can be shown again
   $ui.Back = $c.Back; $ui.BackB.Visible = ([bool]$c.Back -and -not $ui.RecOn); $ui.RightL.Text = $(if ($c.Right) { [string]$c.Right } else { '' })   # R-top-bar (2026-11-19): no state words; only the percent, the time or a result word
-  & $ui.FitSent; & $ui.FitEdges; & $ui.AlignRows
+  & $ui.FitSent; & $ui.FitEdges; & $ui.FitBar; & $ui.AlignRows   # the step bar's width for this card's step row before it is drawn (R35 job: the first Run card wrapped the time under the title)
   $ui.Card.ResumeLayout(); try { $ui.Card.PerformLayout() } catch { $null = $_ }
   if ($ui.Guide.Visible) { try { $ui.Guide.Refresh() } catch { $null = $_ }; & $ui.GuideFit; & $ui.FitEdges }   # the rich text box finishes its layout when it paints: paint it (no message pump), then measure its edge again (R28 job: 4 to 13 px off on the first hand card)
   try { $ui.Scroll.AutoScrollPosition = New-Object System.Drawing.Point(0, 0) } catch { $null = $_ }; & $ui.Squeeze   # a new card starts at its top
