@@ -61,8 +61,8 @@ $ui.AlignTick = { try {
 $ui.FitBar = { try {
     $full = & $ui.Sc 200; $m = $ui.StepBar.Margin; $row = [int]$ui.StepRow.MaximumSize.Width; if ($row -le 0) { return }
     $tw = [int][math]::Max((& $ui.WordW '00m 00s' $ui.StepTime.Font), [int]$ui.StepTime.PreferredSize.Width)
-    $fw = $(if ([string]$ui.StepFrac.Text) { [int]$ui.StepFrac.PreferredSize.Width + $ui.StepFrac.Margin.Left } else { 0 })
-    $room = $row - [int]$ui.StepName.Width - $ui.StepName.Margin.Left - $m.Left - $m.Right - $tw - $fw - (& $ui.Sc 4)
+    $fw = [int]$ui.StepFrac.PreferredSize.Width + $ui.StepFrac.Margin.Left   # the count is in the row also when it is empty: with no room it took a line of its own, which was the empty space under the title
+    $room = $row - [int]$ui.StepName.Width - $ui.StepName.Margin.Left - $m.Left - $m.Right - $tw - $fw - (& $ui.Sc 8)
     $w = $(if ($room -ge (& $ui.Sc 60)) { [int][math]::Min($full, $room) } else { $full })
     if ($ui.StepBar.Width -ne $w) { $ui.StepBar.Width = $w } } catch { $null = $_ } }   # no measure yet: the next fit sets it
 # Centers a row of controls up and down by changing their top and bottom margins. Takes the controls and the top margin
