@@ -4,17 +4,22 @@ Short record: only project rules changed (`.claude/skills/rule-change/SKILL.md` 
 
 ## Changed lines
 
-Ten lines of AGENTS.md "Project rules": Project log, Engine source, App repos, RADE and the app, No code fetch at run time, Windows PowerShell 5.1, Personal-data guard, Public repo, Code standard, Window. Before and after, in full: the text of the pull request. The aim is the same meaning in fewer bytes (session load ~4,985 to ~4,876 tokens; cap 5,000).
+Ten lines of AGENTS.md "Project rules": Project log, Engine source, App repos, RADE and the app, No code fetch at run time, Windows PowerShell 5.1, Personal-data guard, Public repo, Code standard, Window. Before and after, in full: the text of the pull request. The aim is the same meaning in fewer bytes (session load ~4,985 to ~4,906 tokens; cap 5,000).
 
 ## Status
 
-Draft by the agent. The Administrator has not approved the text yet; the merge of the pull request is the approval (lane C).
+Draft by the agent. The Administrator has not approved the text yet: AGENTS.md "Rule text" needs the Administrator's approval of the exact text, which the pull request shows in full.
+
+## Fresh review of the first draft (commit 8fb4df3)
+
+A fresh reviewer (the `reviewer` subagent, the author's model tier) compared each old and new line. 1 MAJOR, fixed in the second draft: "Code standard" had lost its duty ("all code is modular, clearly commented and human inspectable"); the words are back. MINOR, fixed: "Windows PowerShell 5.1" keeps "must run" and "and"; "Project log" keeps "log entries never go in"; "Personal-data guard" keeps "this repo runs the". MINOR, left for the Administrator to decide:
+
+- "Engine source" drops the gloss "(the engine/ folder and the RADE logo)". docs/engine.md "How an app gets the engine" lists the files, but docs/reviews/2026-11-17-rule-conflict.md records the gloss as approved text.
+- All ten lines drop "the Administrator," and the older of two dates from the bracket; the two fixed rules keep the old form, so the section has two bracket forms.
 
 ## Step 1 result (search for the same topic)
 
-- By the author, plus a fresh reviewer on the diff (result in the pull request).
-- No rule is added or removed and no topic is new, so no new overlap with "Hard rules", "Defaults" or docs/DECISIONS.md can arise from this change. Each shorter line was compared with its old line for a lost condition.
-- Dropped on purpose, as not a rule: the words "the Administrator," in each date bracket (the header names the owner), the older of two dates, and "clearly commented and human inspectable" in "Code standard" (the two linked documents state it).
+- No rule is added or removed and no topic is new. The reviewer found no script, skill or document that reads an old line, and the rule labels are unchanged, so the citations in docs/standards-mapping.md and docs/code-standard-rade.md still resolve.
 - Result: no conflict found.
 
-rule-conflict-check: 75ceeed3ec5b
+rule-conflict-check: 532eea5ddfcf
