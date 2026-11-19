@@ -10,7 +10,7 @@ $ui.RunBase = {
   try {
     foreach ($id in $ui.BaseIds) {
       if ($ui.Form.IsDisposed -or $script:closing) { return }
-      $i++; $d = Get-CheckDef $id; $ui.RightL.Text = $ui.Words.Work + $dot + 'Check ' + $i + ' of ' + $ui.BaseIds.Count
+      $i++; $d = Get-CheckDef $id; $ui.RightL.Text = $ui.Words.Work + ' Check ' + $i + ' of ' + $ui.BaseIds.Count
       $r = Get-CheckToRun $d $cache $bp $site $false
       if (-not $r) { $r = Invoke-Check $d $bp $site { [System.Windows.Forms.Application]::DoEvents() } }
       $ui.BaseRes[$id] = $r
@@ -162,7 +162,7 @@ $ui.Checks = { param([bool]$Force)
       if ($have -and -not $Force) { continue }
       $sv = Get-CheckToRun $d $cache $bp $site $Force
       if ($sv) { $script:checkResults[$id] = $sv; continue }
-      $ui.P[0].Text = [string]$d.Name; $ui.RightL.Text = $ui.Words.Work + $dot + 'Check ' + ($i + 1) + ' of ' + $ids.Count; & $ui.SetBar 'all' ($i / [math]::Max(1, $ids.Count)) $true
+      $ui.P[0].Text = [string]$d.Name; $ui.RightL.Text = $ui.Words.Work + ' Check ' + ($i + 1) + ' of ' + $ids.Count; & $ui.SetBar 'all' ($i / [math]::Max(1, $ids.Count)) $true
       [System.Windows.Forms.Application]::DoEvents()
       $script:checkResults[$id] = Invoke-Check $d $bp $site { [System.Windows.Forms.Application]::DoEvents() }
       if ($ui.BaseRes.ContainsKey($id)) { $ui.BaseRes[$id] = $script:checkResults[$id] }   # Choose shows the newest result of a base check

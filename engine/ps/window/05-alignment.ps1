@@ -40,17 +40,31 @@ $ui.HeadPair = { [bool]([string]$ui.AppL.Text -and $(if ($ui.AppUnder) { $ui.App
 $ui.LeftIn = { param($C, $P) $x = 0; $c = $C; while ($c -and -not [object]::ReferenceEquals($c, $P)) { $x += [int]$c.Left; $c = $c.Parent }; $x }
 # The step bar's own top margin, scaled ($ui.Z.BarTop at 100 %). Takes nothing; gives back the pixels.
 $ui.BarTop = { & $ui.Sc $ui.Z.BarTop }
+# The height a label has with a text in it. An empty label asks for less (31 against 33 px at 150 %; R32), so a row aligned
+# before its first text was 1.5 px off the bar afterwards. Takes the label; gives back the pixels.
+$ui.LabelH = { param($L) try { if (-not [string]$L.Text) { $ui.Probe.Font = $L.Font; $ui.Probe.Text = '0'; return [int]$ui.Probe.PreferredSize.Height } } catch { $null = $_ }; return [int]$L.PreferredSize.Height }   # no probe: the label's own answer
 # R29b N3: the time in this step and its count sit on the vertical midpoint of the step's bar (the same flow line: each
 # part's top is the line's top plus its top margin). A text taller than the bar's place moves the bar down; that lift is
 # worked out from $ui.BarTop each time, so it never adds up. Takes nothing; changes the top margins of $ui.StepBar,
 # $ui.StepTime and $ui.StepFrac.
 $ui.AlignTick = { try {
     $b0 = [int](& $ui.BarTop)
-    $h = [int]$ui.StepTime.PreferredSize.Height; $lift = [int][math]::Max(0, [math]::Ceiling($h / 2.0 - ($b0 + [double]$ui.StepBar.Height / 2.0)))   # a text taller than the bar's place: the bar moves down
+    $h = [int](& $ui.LabelH $ui.StepTime); $lift = [int][math]::Max(0, [math]::Ceiling($h / 2.0 - ($b0 + [double]$ui.StepBar.Height / 2.0)))   # a text taller than the bar's place: the bar moves down
     $m = $ui.StepBar.Margin; if ($m.Top -ne $b0 + $lift) { $ui.StepBar.Margin = New-Object System.Windows.Forms.Padding($m.Left, ($b0 + $lift), $m.Right, $m.Bottom) }
     $bm = [double]$ui.StepBar.Margin.Top + [double]$ui.StepBar.Height / 2.0
-    foreach ($l in @($ui.StepTime, $ui.StepFrac)) { $hl = [int]$l.PreferredSize.Height; $t = [int][math]::Max(0, [math]::Round($bm - $hl / 2.0, [System.MidpointRounding]::AwayFromZero)); $m = $l.Margin
+    foreach ($l in @($ui.StepTime, $ui.StepFrac)) { $hl = [int](& $ui.LabelH $l); $t = [int][math]::Max(0, [math]::Round($bm - $hl / 2.0, [System.MidpointRounding]::AwayFromZero)); $m = $l.Margin
       if ($m.Top -ne $t) { $l.Margin = New-Object System.Windows.Forms.Padding($m.Left, $t, $m.Right, $m.Bottom) } } } catch { $null = $_ } }   # no bar yet: the next fit aligns the row
+# R32 (the Administrator, 2026-11-18: "too much dead space", "the bar is not on the middle of the sentence"): in a narrow
+# window a step title of some length left no room for the 200 px bar, so the bar went to a line of its own under the
+# title. The bar now takes the room that is left beside the title and the time (200 px at most, 60 at least, at 100 %)
+# and goes under the title only when even 60 does not fit. Takes nothing; changes the width of $ui.StepBar.
+$ui.FitBar = { try {
+    $full = & $ui.Sc 200; $m = $ui.StepBar.Margin; $row = [int]$ui.StepRow.MaximumSize.Width; if ($row -le 0) { return }
+    $tw = [int][math]::Max((& $ui.WordW '00m 00s' $ui.StepTime.Font), [int]$ui.StepTime.PreferredSize.Width)
+    $fw = [int]$ui.StepFrac.PreferredSize.Width + $ui.StepFrac.Margin.Left   # the count is in the row also when it is empty: with no room it took a line of its own, which was the empty space under the title
+    $room = $row - [int]$ui.StepName.Width - $ui.StepName.Margin.Left - $m.Left - $m.Right - $tw - $fw - (& $ui.Sc 8)
+    $w = $(if ($room -ge (& $ui.Sc 60)) { [int][math]::Min($full, $room) } else { $full })
+    if ($ui.StepBar.Width -ne $w) { $ui.StepBar.Width = $w } } catch { $null = $_ } }   # no measure yet: the next fit sets it
 # Centers a row of controls up and down by changing their top and bottom margins. Takes the controls and the top margin
 # of the row; gives back nothing.
 $ui.AlignRow = { param($Parts, [int]$Base)
@@ -210,6 +224,8 @@ $ui.Measure = { param([string]$Card)
     $ps = @(& $ui.RowParts $row); if ($ps.Count -lt 2 -or -not $ps[0].Parent.Visible) { continue }   # the parts AlignRow aligns (R5 review: one rule for both)
     $out += & $ui.RowBad $Card $row @($ps | ForEach-Object { $rr = & $sr $_; @{ N = (& $ui.NameOf $_); Top = $rr.Top; H = $rr.Height; Line = $rr.Top - $_.Margin.Top; Kind = $(if ($ui.Boxes -contains $_) { 'box' } elseif ($_ -is [System.Windows.Forms.Button] -and $_.FlatAppearance.BorderSize -gt 0) { 'button' } else { 'other' }) } })
   }
+  # R32: the bottom line's link and its text at the right share one midpoint.
+  if ($ui.RecB.Visible -and $ui.RightL.Visible -and [string]$ui.RightL.Text) { $out += & $ui.RowBad $Card 'Bottom' @(@($ui.RecB, $ui.RightL) | ForEach-Object { $rr = & $sr $_; @{ N = (& $ui.NameOf $_); Top = $rr.Top; H = $rr.Height; Line = 0; Kind = 'other' } }) }
   # R29b: the header's two lines start their ink on one edge (no difference allowed), and the step's time and count sit on
   # the bar's midpoint (1 px at any scale) when they are on the bar's line.
   # Returns where a control's ink starts (its left edge plus the measured ink offset: text, edge or drawing). Takes the control.

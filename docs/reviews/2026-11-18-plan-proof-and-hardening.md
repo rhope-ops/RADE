@@ -14,7 +14,7 @@ Why this plan: on 2026-11-18 the build was ahead of its proof (18 engine release
 
 ## Stage 1: the next device round (the Administrator runs it; the first 90-161.Z round on engine-v21 or later)
 
-Read these lines in the round's results. Each one answers a question of this plan. The app's session moves the lock to engine-v21 first. R31 ran on engine-v18 and R32 is planned on engine-v20 (18 Nov 26): those rounds have no `Script check` line, and before engine-v21 the checks `child`, `lang` and `ps` were reused from saved results for 7 days, against docs/engine.md "Results" (engine-v21 runs them fresh), so on an older engine delete RADE\Config\rade-checks.json before the paste to see the `without Bypass` part.
+Each line below answers a question of this plan. Where to read them (corrected 2026-11-18, after R32): the report and the e-mail hold the check counts and the detail of a check that did not pass only, so the check lines are in the window's Record (F2) and, from engine-v22, in the file `RADE\Config\rade-checks-last.txt` (in the user's OneDrive; no e-mail attaches it); the `Script check` line is in the report. The app's session moves the lock to engine-v21 first. R31 ran on engine-v18 and R32 is planned on engine-v20 (18 Nov 26): those rounds have no `Script check` line, and before engine-v21 the checks `child`, `lang` and `ps` were reused from saved results for 7 days, against docs/engine.md "Results" (engine-v21 runs them fresh), so on an older engine delete RADE\Config\rade-checks.json before the paste to see the `without Bypass` part.
 
 | Line in the results | Question | If the answer is bad |
 |---|---|---|
@@ -25,6 +25,8 @@ Read these lines in the round's results. Each one answers a question of this pla
 | R29a (download and saved-address steps) | No result yet since engine-v14 | Run it in the same sitting |
 
 From engine-v21 also read the second line of the results, `Script check: <first 12>...<last 4> (checked)`, and compare the value with the RADE page and the window's title bar: all three must be the same. `DOES NOT MATCH` after an honest paste in ISE means the paste changed the text: send the line as it is (stage 2.2 then changes how the text is hashed). Before this round the app's session moves the lock to engine-v21 and commits the new `*.ps1.sha256.json` files.
+
+R32 on engine-v20 (18 Nov 26; rhope-ops/90-161.Z docs/reviews/2026-11-18-r32-results.md) gave: shared files 4 of 4 PASS; a paste of 812,186 bytes works in ISE; the layout self-check at 150 % in a half-width window (956 x 1081) 82 defects in 58 cards; 4 screenshots of visual defects. Engine-v22 answers them: the header words whole, the bottom line level, the bar beside the title, the time on the bar's midpoint, the mouse wheel, no middle dot after "RADE is working...". The Windows job now draws that computer's case (run `device150-half` of tests/window_real.py: the form scaled by 1.5 at 956 x 1081), which is this plan's item 3.6. Open from R32, not reproduced in the job: "Field line cut: one line needs 32 high, has 27" (the box sizes itself for 96 dpi text and the check measures at 144 dpi on that computer; no cut box was reported), "answer Gap overlaps Tail" (1), "answer frame: 468 high, the minimum is 540" (1), and the window that opened at 956 x 1081 though its saved place was maximized.
 
 ## Stage 2: integrity (what a user copies is what was reviewed)
 
@@ -48,7 +50,7 @@ One or two items for each engine release, in this order. Each has a test before 
 | 3.3 Discarded errors | 105 catches give no reason (rule X7). Add reasons or handle the error; the count only goes down | tests/bundle_layout_test.py `SILENT_CATCHES` |
 | 3.4 One test for each guardrail | NIPR name, site prefix, site rights, one install per site; and a results e-mail draft with a planted invented name that must come out masked | threat model gap 5 |
 | 3.5 Strict mode on | After 3.2 and a clean device round | standards mapping PW.6 |
-| 3.6 Drawn proof at 125 % and 150 % | Today CI draws at 100 % and the rest is arithmetic; find out whether the Windows job can set the scale | handoff item 17 |
+| 3.6 Drawn proof at 125 % and 150 % | Done for 150 % (2026-11-18): the run `device150-half` of tests/window_real.py makes the form scale by 1.5 on the job's 100 % screen. Open: 125 %, and a 150 % run at full width | handoff item 17 |
 | 3.7 Keep the output of a failed check run | The failure of 18 Nov was never explained because its output was lost | standards close-out |
 
 ## Stage 4: authority

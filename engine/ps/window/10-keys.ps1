@@ -45,7 +45,25 @@ $ui.WinNow = { $f = $ui.Form; $s = [string]$f.WindowState; if ($s -notin 'Normal
 $ui.ResizeT = New-Object System.Windows.Forms.Timer; $ui.ResizeT.Interval = 400
 $ui.ResizeT.Add_Tick({ $ui.ResizeT.Stop(); try { if ($ui.Scaled -and [string]$ui.Form.WindowState -ne 'Minimized') { & $ui.Fit; & $ui.Check } } catch { $null = $_ } })
 $ui.Form.Add_Resize({ try { if ($ui.Scaled) { $ui.ResizeT.Stop(); $ui.ResizeT.Start() } } catch { $null = $_ } })
+# The mouse wheel (R32, the Administrator, 2026-11-18: "scroll works only when hovering the scroll bar"). Windows sends the
+# wheel to the control that has the focus, and a text of the card or a button does not pass it on. So every control of the
+# window hands the wheel to $ui.Wheel: it moves the Record's list when the Record is open, else the card's text, 3 lines for
+# each notch, when that area has more than it shows. A box that scrolls its own text (the log) keeps the wheel.
+# Takes the control that got the wheel and the event; marks the event as handled when it moved an area.
+$ui.Wheel = { param($S, $E)
+  try {
+    if (($S -is [System.Windows.Forms.TextBoxBase]) -and $S.Multiline -and [string]$S.ScrollBars -ne 'None') { return }
+    if ($S -is [System.Windows.Forms.ScrollableControl] -and $S.AutoScroll -and $S.VerticalScroll.Visible) { return }   # an area that scrolls moves itself
+    $a = $(if ($ui.RecOn) { $ui.RecScroll } else { $ui.Scroll }); if (-not $a -or -not $a.VerticalScroll.Visible) { return }
+    $y = [math]::Abs($a.AutoScrollPosition.Y) - [int][math]::Round($E.Delta / 120.0 * 3 * $ui.F.Body.Height)
+    $a.AutoScrollPosition = New-Object System.Drawing.Point(0, ([int][math]::Max(0, $y)))
+    if ($E -is [System.Windows.Forms.HandledMouseEventArgs]) { $E.Handled = $true }
+  } catch { $null = $_ } }   # the wheel never stops the window
+# Hooks the wheel on a control and on every control inside it (a control added later hands the wheel to its parent, which
+# has the hook). Takes the control.
+$ui.WheelOn = { param($C) try { $C.Add_MouseWheel({ & $ui.Wheel $this $_ }) } catch { $null = $_ }; foreach ($k in @($C.Controls)) { & $ui.WheelOn $k } }   # a control with no wheel event: skipped
 $ui.Form.Add_Shown({
+  & $ui.WheelOn $ui.Form
   $ui.Opened = $true; & $ui.FormDpi; $ui.Scaled = $true   # the form has its scale now: from here the size handlers work (each runs once below or on the first card)
   & $ui.Place
   & $ui.Fit; $ui.ShownAt = & $ui.WinNow; $ui.Anim.Start()

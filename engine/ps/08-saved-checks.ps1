@@ -98,6 +98,29 @@ function Save-CheckCache($Results, [string]$Base, [string]$Site) {
     }
     Write-FileWhole $p ($doc | ConvertTo-Json -Depth 5)
   } catch { $null = $_ }   # saving is a convenience: never stop for it
+  Save-CheckDetail $Results   # every check's detail, in a file beside the saved checks
+}
+<#
+.SYNOPSIS
+Writes each check of this run, with its result and its detail, to the file RADE\Config\rade-checks-last.txt.
+.DESCRIPTION
+The Administrator, 2026-11-18: a round's report and e-mail hold the check counts and only the detail of a check that did
+not pass, so a detail such as "without Bypass [ran]" was only in the window's Record. This file holds every detail and
+is not sent: it is in RADE\Config (the user's OneDrive), not in the results folder, so no e-mail draft attaches it (the detail of the child check
+names an execution policy, a setting of this computer). The newest run replaces it. Never an error: it is a convenience.
+.PARAMETER Results
+The check results of this run, by check id.
+#>
+function Save-CheckDetail($Results) {
+  try {
+    $lines = @(('RADE checks of ' + (Get-Date -Format 'yyyy-MM-dd HH:mm') + ', round ' + $round + ', build ' + $buildId + ', engine release ' + $engineRelease), 'RADE does not send this file: no e-mail draft attaches it. It is in your OneDrive folder, as all of RADE\Config. The newest run replaces it.', '')
+    foreach ($id in $script:appChecks) {
+      $r = $Results[$id]; if (-not $r) { continue }
+      $d = Get-CheckDef $id
+      $lines += ConvertTo-Masked ([string]$r.State + ': ' + $d.Name + '. ' + [string]$r.Detail + $(if ($r.Saved -and $r.Found) { ' | ' + [string]$r.Found } else { '' }))
+    }
+    Write-FileWhole (Get-RadeConfigFile 'rade-checks-last.txt') (($lines -join "`r`n") + "`r`n")
+  } catch { $null = $_ }   # a convenience file: a run never stops for it
 }
 function Get-CheckToRun($Def, $Cache, [string]$Base, [string]$Site, [bool]$Force) {
   # $null = run it now; else the saved result to show.
