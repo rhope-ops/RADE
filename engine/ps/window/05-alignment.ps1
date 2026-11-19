@@ -38,7 +38,9 @@ $ui.FitHead = { try {
 # panel size. Takes nothing; gives back the width in pixels (at least 1).
 $ui.RuleW = { $w = $ui.WordL; $f = $w.Font; $k = 'rule|' + [string]$w.Text + '|' + $f.Name + '|' + $f.SizeInPoints + '|' + $w.Width + 'x' + $w.Height
   if ($ui.Inks.ContainsKey($k)) { return [int]$ui.Inks[$k] }
-  $b = & $ui.InkBox $w; $v = [math]::Max(1, [int]$b.Right - [int]$b.Left); if ($v -lt [int]$w.Width) { $ui.Inks[$k] = $v }   # only a measure is kept: the whole box is the fallback
+  $b = & $ui.InkBox $w; $v = [math]::Max(1, [int]$b.Right - [int]$b.Left)
+  $all = ([int]$b.Left -eq 0 -and [int]$b.Top -eq 0 -and [int]$b.Right -eq [int]$w.Width -and [int]$b.Bottom -eq [int]$w.Height)
+  if (-not $all) { $ui.Inks[$k] = $v }   # only a measure is kept (review of PR 123: also when the ink is as wide as the panel); the whole box is the fallback
   return $v }   # no measure (no window handle yet): the next fit sets the edges
 # Whether the header shows the application name on the edge of the word RADE: the name has text and shows, and both rows
 # start at the same x (both logos, or no application logo). Takes nothing; gives back $true or $false.

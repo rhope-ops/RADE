@@ -82,7 +82,7 @@ $ui.CopyText = { param($C)
 # R34 (the PFM: the answer box did not take a pasted block): a one-line box keeps only the first line of a paste, so a
 # paste into it comes here. $ui.OneLine joins the lines of a text with one space and cuts it to the room that is left.
 # Takes the text and the room (characters); gives back the text to put in.
-$ui.OneLine = { param([string]$T, [int]$Room) $s = ($T -replace '\s*\r?\n\s*', ' ' -replace '\t', ' ').Trim(); if ($Room -lt 0) { $Room = 0 }; if ($s.Length -gt $Room) { $s = $s.Substring(0, $Room) }; return $s }
+$ui.OneLine = { param([string]$T, [int]$Room) $s = ($T -replace '\s*(\r\n|\r|\n)\s*', ' ' -replace '\t', ' ').Trim(); if ($Room -lt 0) { $Room = 0 }; if ($s.Length -gt $Room) { $s = $s.Substring(0, $Room) }; return $s }
 # Pastes the clipboard text into a one-line text box as one line, in place of its selection. Takes the box; gives back
 # $true when it pasted (the key is then handled), $false when the clipboard has no text or the box is multi-line.
 $ui.PasteLine = { param($Tb)
