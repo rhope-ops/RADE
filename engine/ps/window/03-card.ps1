@@ -28,8 +28,14 @@ $ui.Stack = & $ui.MkStack; $ui.Stack.Anchor = 'Top, Left'; $ui.Body = & $ui.MkSt
 $ui.Scroll = New-Object System.Windows.Forms.Panel
 $ui.Scroll.AutoScroll = $true; $ui.Scroll.Margin = (& $ui.Pad 0 0 0 0); $ui.Scroll.BackColor = $ui.C.White; $ui.Scroll.AccessibleName = 'Card text'
 $ui.Body.Location = New-Object System.Drawing.Point(0, 0); [void]$ui.Scroll.Controls.Add($ui.Body)
-$ui.Kick = & $ui.Text $ui.F.SmallB $ui.C.Gray 0 'Card line'
-$ui.Head = & $ui.Flow 0; $ui.Head.Visible = $true; $ui.Head.AccessibleName = 'Card header'; [void]$ui.Head.Controls.Add($ui.Kick)   # as tall as one line also when the card has no line ($ui.Fit)
+$ui.Kick = & $ui.Text $ui.F.SmallB $ui.C.Gray 0 'Card line'; $ui.Kick.Visible = $true; $ui.MinLines[$ui.Kick] = 1   # one line tall also when the card has no line
+# "Your turn" (the Administrator, 2026-11-19): bold, in the accent color (Air Force blue), on its own line right above the
+# headline, only while RADE waits for the person (a card with the yellow light). Its line keeps its room when it is empty,
+# so nothing moves between a card that waits and one that does not ($ui.Hold: one line, any text).
+$ui.Turn = & $ui.Text $ui.F.Turn $ui.C.Blue 0 'Your turn'; $ui.Turn.Visible = $true; $ui.Hold[$ui.Turn] = 1
+# The header row: the line in capitals, then the "Your turn" line, one under the other. It never scrolls and never moves.
+$ui.Head = & $ui.Flow 0; $ui.Head.FlowDirection = 'TopDown'; $ui.Head.Visible = $true; $ui.Head.AccessibleName = 'Card header'
+[void]$ui.Head.Controls.Add($ui.Kick); [void]$ui.Head.Controls.Add($ui.Turn)
 $ui.Gap = New-Object System.Windows.Forms.Panel; $ui.Gap.Size = New-Object System.Drawing.Size(1, 0); $ui.Gap.Margin = (& $ui.Pad 0 0 0 0); $ui.Gap.BackColor = $ui.C.White; $ui.Gap.Visible = $false
 $ui.SentRow = & $ui.Flow $ui.Z.G1; $ui.SentRow.Visible = $true
 $ui.TickP = New-Object System.Windows.Forms.Panel
@@ -58,6 +64,10 @@ $ui.StepBar = & $ui.MkBar 'step' 'Progress of this step'; $ui.StepBar.Width = 20
 # R28 N10: the time in this step, at the right end of its bar ("4m 12s"), every second ($ui.TimeT). The log keeps "Started".
 $ui.StepTime = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepTime.Visible = $true; $ui.StepTime.AccessibleName = 'Time in this step'
 $ui.StepFrac = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepFrac.Visible = $true; $ui.StepFrac.Margin = (& $ui.Pad $ui.Z.G3 2 0 0)
+# The time ("4m 12s", "1h 04m 12s") and the count ("3 of 12") keep one size from their widest value ($ui.FixW), so the bar
+# beside them never changes its width as they count (the Administrator, 2026-11-19).
+$ui.Most[$ui.StepTime] = @('9h 59m 59s'); $ui.Most[$ui.StepFrac] = @('999 of 999')
+foreach ($c in @($ui.StepTime, $ui.StepFrac)) { $c.Add_TextChanged({ & $ui.FixW $this }) }
 foreach ($c in @($ui.StepName, $ui.StepBar, $ui.StepTime, $ui.StepFrac)) { [void]$ui.StepRow.Controls.Add($c) }
 # The now-doing line (L7, the Administrator, 2026-11-19; the last log line before): what the running step does now, as a plain
 # sentence ($ui.ShowNow). It has a fixed room of $ui.NowLines lines, shown also with no text, and a longer text ends with "..."
@@ -71,12 +81,16 @@ $ui.FieldL = & $ui.Label $ui.F.SmallB $ui.C.Gray 9; $ui.FieldL.Visible = $true
 $ui.Boxes = @()
 # Sizes and centers the text box inside its one-line frame. Takes the frame panel; does nothing before the window has
 # its scale; gives back nothing.
-$ui.BoxFit = { param($P) if (-not $ui.Scaled) { return }; try { $tb = $P.Controls[0]; $in = & $ui.Sc 6; $tb.Width = [math]::Max(10, $P.ClientSize.Width - 2 * $in); $tb.Location = New-Object System.Drawing.Point($in, [int][math]::Floor(($P.ClientSize.Height - $tb.Height) / 2)) } catch { $null = $_ } }
+# The text box is one line of its font tall, as Windows draws the text ($ui.LineH; R35: a box that sized itself was 27 high
+# where a line needs 32 at 150 %), and never taller than the frame inside its edge.
+$ui.BoxFit = { param($P) if (-not $ui.Scaled) { return }
+  try { $tb = $P.Controls[0]; $in = & $ui.Sc 6; $h = [math]::Max(1, [math]::Min((& $ui.LineH $tb.Font), ($P.ClientSize.Height - (& $ui.Sc 2)))); if ($tb.Height -ne $h) { $tb.Height = $h }
+    $tb.Width = [math]::Max(10, $P.ClientSize.Width - 2 * $in); $tb.Location = New-Object System.Drawing.Point($in, [int][math]::Floor(($P.ClientSize.Height - $tb.Height) / 2)) } catch { $null = $_ } }
 # Wraps a text box in a one-line frame with its own 1 px edge and a focus ring. Takes the text box and the frame width;
 # gives back the frame panel and remembers it in $ui.Boxes.
 $ui.MkBox = { param($Tb, [int]$W)
   $p = New-Object System.Windows.Forms.Panel; $p.Size = New-Object System.Drawing.Size($W, $ui.Z.CompactH); $p.BackColor = $ui.C.White; $p.AccessibleName = 'Text box'
-  $Tb.BorderStyle = 'None'; $Tb.Font = $ui.F.Small; $Tb.ForeColor = $ui.C.Ink; [void]$p.Controls.Add($Tb); $Tb.Add_GotFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } }); $Tb.Add_LostFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } })
+  $Tb.BorderStyle = 'None'; $Tb.AutoSize = $false; $Tb.Font = $ui.F.Small; $Tb.ForeColor = $ui.C.Ink; [void]$p.Controls.Add($Tb); $Tb.Add_GotFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } }); $Tb.Add_LostFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } })
   $p.Add_Paint({ try { $pn = New-Object System.Drawing.Pen($ui.C.Edge); $_.Graphics.DrawRectangle($pn, 0, 0, ($this.ClientSize.Width - 1), ($this.ClientSize.Height - 1)); $pn.Dispose() } catch { $null = $_ } })
   $p.Add_SizeChanged({ & $ui.BoxFit $this }); $p.Add_Click({ try { [void]$this.Controls[0].Focus() } catch { $null = $_ } }); $ui.Boxes += $p; $p }
 $ui.Field = New-Object System.Windows.Forms.TextBox

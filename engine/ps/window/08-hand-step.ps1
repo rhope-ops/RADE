@@ -16,7 +16,7 @@ $ui.VHand = {
   $one = @{ Text = $dw; Kind = 'primary'; Act = { $ui.Answer = 'OK' } }; $three = @{ Text = $(if ($st.SkipText) { [string]$st.SkipText } else { 'Skip' }); Act = { $ui.Answer = 'Cancel' } }
   $bs = @($(if ($hide -notcontains 'done') { $one }), $(if ($hide -notcontains 'failed') { $two }), $(if ($hide -notcontains 'skip') { $three }))
   $close = $(if ($hide -contains 'done') { '' } elseif ($addr) { 'When you finish in the browser, come back to this window and select "' + $dw + '".' } else { 'When you finish, select "' + $dw + '".' })
-  & $ui.SetCard @{ View = 'hand'; Light = 'you'; Kicker = $(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot + 'your turn' } else { 'Your turn' }); Sentence = (Get-StepTitle $st)
+  & $ui.SetCard @{ View = 'hand'; Light = 'you'; Kicker = $(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN } else { '' }); Sentence = (Get-StepTitle $st)
     P = @([string]$st.Note); Lines = @($st.Guide); Close = $close
     Field = $(if ($addr) { @{ Label = 'Address'; Text = $ui.GUrl; Name = 'Address to open'; Button = 'Open in browser'; Act = { & $ui.OpenUrl } } } else { $null }); Path = $file; Links = [bool]$file; Note = $clip
     Buttons = $bs; NoAccept = $true; Focus = $(if ($addr) { 'fieldbutton' } else { 'text' }) } }

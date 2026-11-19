@@ -62,18 +62,65 @@ function global:Test-RadeScriptWarn {
       & $ui.Show $ui.Foot ([string]$v[1]); & $ui.ScriptWarn @{ View = $v[0]; Foot = $v[1] }   # what SetCard does with the card's own last line
       Write-Host ('WIN script-warn own ' + $k[0] + ' ' + $v[0] + ' text=[' + $(if ($ui.Foot.Visible) { $ui.Foot.Text } else { '' }) + '] red=' + [object]::Equals($ui.Foot.ForeColor, $ui.C.Red)) } }
   $script:scriptCheck = $was; & $ui.VChoose }
+<#
+.SYNOPSIS
+The Administrator, 2026-11-19 ("values cause fluttering"): prints "WIN steady", proof that no control moves or resizes
+while the values of a card change through their range.
+.DESCRIPTION
+The stand-ins have no layout, so a control's place is its margins and its size is what RADE sets (an AutoSize label: the
+size it asks for). On the Run card: every step title with its number, the time in the step from 0 s to 9 h 58 m 20 s, the
+count from none to "999 of 999", the percent from 0 to 100 and the now-doing line short, long and empty. On the checking
+card: every check name and "Check i of n". Then a probe: a title that is not in the card's range must show as a change
+(the test can see one). The values of the card are put back after.
+.PARAMETER V
+The view of the card that shows; only the first Run card with a step and the first checking card are measured.
+.OUTPUTS
+Nothing; one WIN line for each of the two cards.
+#>
+function global:Test-RadeSteady([string]$V) {
+  $run = ($V -eq 'run' -and $ui.Kick.Text -match '^STEP ' -and $script:prog -and $script:stepStart -and -not $global:RadeT.SteadyRun)
+  $chk = ($V -eq 'checking' -and $ui.Sent.Text -eq 'Checking this computer and your access.' -and -not $global:RadeT.SteadyChk)
+  if (-not ($run -or $chk)) { return }
+  # One text per shown control: its place (margins, left, top) and its size; the same card, so the same controls in order.
+  $snap = { $all = New-Object 'System.Collections.Generic.List[System.Windows.Forms.Control]'; $ui.Form.Walk($all); $k = 0
+    foreach ($c in $all) { $k++; if (-not $c.Shown) { continue }; $m = $c.Margin; $z = $(if ($c.Values['AutoSize'] -eq $true -and $c -is [System.Windows.Forms.Label]) { $c.PreferredSize } else { $c.Size })
+      [string]$k + ' ' + (& $ui.NameOf $c) + ' ' + $z.Width + 'x' + $z.Height + ' m=' + $m.Left + ',' + $m.Top + ',' + $m.Right + ',' + $m.Bottom + ' at=' + $c.Left + ',' + $c.Top } }
+  $keep = @{ Kick = $ui.Kick.Text; Name = $ui.StepName.Text; Time = $ui.StepTime.Text; Frac = $ui.StepFrac.Text; Right = $ui.RightL.Text; P0 = $ui.P[0].Text; Start = $script:stepStart; NowRaw = $ui.NowRaw; Now = $ui.Now.Text }
+  foreach ($b in @($ui.Wrap.Keys)) { & $ui.Reflow $b }; foreach ($l in @($ui.Most.Keys)) { & $ui.FixW $l }
+  $s0 = @(& $snap); $n = 0; $moved = @(); $sn = $(if ($global:RadeT.ShowNow) { $global:RadeT.ShowNow } else { $ui.ShowNow })
+  # The stand-ins fire no TextChanged: each box and label is sized here as its TextChanged handler sizes it on Windows.
+  $look = { foreach ($b in @($ui.Wrap.Keys)) { & $ui.Reflow $b }; foreach ($l in @($ui.Most.Keys)) { & $ui.FixW $l }; $s1 = @(& $snap); for ($i = 0; $i -lt [math]::Max($s0.Count, $s1.Count); $i++) { if ($s0[$i] -ne $s1[$i]) { $script:steadyMoved += ($s0[$i] + ' -> ' + $s1[$i]) } } }
+  $script:steadyMoved = @()
+  if ($run) { $global:RadeT.SteadyRun = $true; $fr = @($script:prog.Frac, $script:prog.FracText); $sc = @($steps).Count
+    for ($i = 0; $i -lt $sc; $i++) { & $ui.ShowStep ($i + 1) $sc ([string]$steps[$i].Name); $n++; & $look }
+    & $ui.ShowStep 1 $sc 'Clean-up'; $n++; & $look
+    foreach ($sec in 0, 5, 65, 754, 3599, 3725, 35900) { $script:stepStart = (Get-Date).AddSeconds(-$sec); & $ui.ShowTime; $n++; & $look }
+    foreach ($f in '1 of 2', '12 of 40', '999 of 999', '') { $script:prog.Frac = $(if ($f) { 0.5 } else { -1 }); $script:prog.FracText = $f; & $ui.Paint; $n++; & $look }
+    foreach ($r in '0 %', '7 %', '62 %', '100 %') { $ui.RightL.Text = $r; $n++; & $look }
+    foreach ($w in 'Copying the list files.', ('word ' * 100), '') { & $sn $w; $n++; & $look }
+    $script:prog.Frac = $fr[0]; $script:prog.FracText = $fr[1]; $script:stepStart = $keep.Start }
+  else { $global:RadeT.SteadyChk = $true; $ids = @($script:appChecks)
+    for ($i = 0; $i -lt $ids.Count; $i++) { $ui.P[0].Text = [string](Get-CheckDef $ids[$i]).Name; $ui.RightL.Text = 'Check ' + ($i + 1) + ' of ' + $ids.Count; $n++; & $look } }
+  $pb = $(if ($run) { $ui.StepName } else { $ui.P[0] }); $pb.Text = ('Probe ' * 60); & $ui.Reflow $pb; & $ui.FitEdges; & $ui.FitBar; $probe = [bool](@(& $snap) -join '|').CompareTo((@($s0) -join '|'))
+  $ui.Kick.Text = $keep.Kick; $ui.StepName.Text = $keep.Name; $ui.StepTime.Text = $keep.Time; $ui.StepFrac.Text = $keep.Frac; $ui.RightL.Text = $keep.Right; $ui.P[0].Text = $keep.P0
+  $ui.NowRaw = $keep.NowRaw; $ui.Now.Text = $keep.Now; foreach ($b in @($ui.Wrap.Keys)) { & $ui.Reflow $b }; & $ui.FitEdges; & $ui.FitBar
+  Write-Host ('WIN steady ' + $V + ' values=' + $n + ' moved=' + @($script:steadyMoved).Count + ' probe=' + $probe + ' ~ ' + (@($script:steadyMoved | Select-Object -First 4) -join ' ~ '))
+}
 function global:Show-RadeCard {
   # The top bar and the logo block at the first frame (the Administrator, 2026-11-19): one WIN line, once, with the window
   # title, the name spot (tagline until an application is chosen), whether it and the rule under RADE are shown, and the style.
   if (-not $global:RadeT.TopBar) { $global:RadeT.TopBar = $true
-    Write-Host ('WIN topbar title=' + $ui.Form.Text + ' spot=' + $ui.AppL.Text + ' shown=' + ($ui.AppL.Visible -and ($ui.AppRow.Visible -or $ui.HeadRule.Visible)) + ' same-font=' + [object]::ReferenceEquals($ui.AppL.Font, $ui.F.Small) + ' right=[' + $ui.RightL.Text + ']') }
+    Write-Host ('WIN topbar title=' + $ui.Form.Text + ' spot=' + $ui.AppL.Text + ' shown=' + ($ui.AppL.Visible -and ($ui.AppRow.Visible -or $ui.HeadRule.Visible)) + ' same-font=' + [object]::ReferenceEquals($ui.AppL.Font, $ui.F.Small) + ' right=[' + $ui.RightL.Text + ']')
+    # "Your turn" (the Administrator, 2026-11-19): bold, blue, in the header row under the line in capitals; its line is as tall empty as shown.
+    $tw = $ui.Turn.Text; $ui.Turn.Text = 'Your turn'; $h1 = $ui.Turn.Height; $ui.Turn.Text = ''; $h2 = $ui.Turn.Height; $ui.Turn.Text = $tw
+    Write-Host ('WIN turn font=' + $ui.Turn.Font.Name + ' ' + $ui.Turn.Font.SizeInPoints + ' ' + $ui.Turn.Font.Style + ' blue=' + [object]::Equals($ui.Turn.ForeColor, $ui.C.Blue) + ' head=' + ((@($ui.Head.Controls) | ForEach-Object { & $ui.NameOf $_ }) -join ',') + ' down=' + $ui.Head.Values['FlowDirection'] + ' same-h=' + ($h1 -eq $h2 -and $h1 -gt 0) + ' shown=' + $ui.Turn.Shown) }
   $ps = @($ui.P | Where-Object { $_.Shown } | ForEach-Object { $_.Text }) -join ' / '
   $bs = @($ui.B | Where-Object { $_.Shown } | ForEach-Object { $(if ($_.Enabled) { '[' } else { '(' }) + $_.Text + $(if ($_.Enabled) { ']' } else { ')' }) }) -join ' '
   $os = @($ui.Opts.Controls | ForEach-Object { $(if ($_.Tag.Off) { 'OFF ' } else { [string]$_.Tag.Key + ' ' }) + $_.Tag.Name + $_.Tag.Ver + $(if ($_.Tag.Note) { ' NOTE ' + $_.Tag.Note } else { '' }) }) -join '; '
   Write-Host ('WIN view=' + $ui.View + ' light=' + ([string]$ui.Light.AccessibleName).Substring(14) + ' kick=' + $(if ($ui.Kick.Shown) { $ui.Kick.Text } else { '' }) + ' sent=' + $ui.Sent.Text + ' p=' + $ps + $(if ($ui.Opts.Shown) { ' opts=' + $os } else { '' }) +
     $(if ($ui.Guide.Shown -and @($ui.GuideNums).Count) { ' steps=' + ((@(for ($i = 0; $i -lt @($ui.GuideNums).Count; $i++) { $ui.GuideNums[$i] + ' ' + $ui.GuideTexts[$i] })) -join ' ~ ') } else { '' }) + $(if ($ui.Guide.Shown -and @($ui.GuideRest).Count) { ' rest=' + (@($ui.GuideRest) -join ' ~ ') } else { '' }) + $(if ($ui.Close.Shown) { ' close=' + $ui.Close.Text } else { '' }) + $(if ($ui.Note.Shown) { ' note=' + $ui.Note.Text } else { '' }) + $(if ($ui.Help.Shown) { ' help=' + $ui.Help.Text } else { '' }) + ' btn=' + $bs + $(if ($ui.Foot.Shown) { ' foot=' + $ui.Foot.Text } else { '' }) + $(if ($ui.StepRow.Shown) { ' step=' + $ui.StepName.Text + ' now-font=' + $ui.Now.Font.Name + $ui.Now.Font.SizeInPoints } else { '' }) +
     $(if ($ui.TestRow.Shown) { ' test=shown' } else { '' }) + ' back=' + [bool]$ui.BackB.Shown + ' right=' + $ui.RightL.Text + ' app=' + $ui.AppL.Text +
-    $(if ($ui.FieldRow.Shown) { ' field=' + $ui.FieldL.Text + ':' + $ui.Field.Text } else { '' }) + $(if ($ui.PathT.Shown) { ' path=' + ($ui.PathT.Text -replace "`n", '') } else { '' }) + $(if ($ui.StepRow.Shown) { ' time=' + $ui.StepTime.Text } else { '' }) + ' help=' + [bool]$ui.TourB.Shown)
+    $(if ($ui.FieldRow.Shown) { ' field=' + $ui.FieldL.Text + ':' + $ui.Field.Text } else { '' }) + $(if ($ui.PathT.Shown) { ' path=' + ($ui.PathT.Text -replace "`n", '') } else { '' }) + $(if ($ui.StepRow.Shown) { ' time=' + $ui.StepTime.Text } else { '' }) + ' help=' + [bool]$ui.TourB.Shown + ' turn=' + $(if ($ui.Turn.Shown) { $ui.Turn.Text } else { 'hidden' }))
   # The stand-ins have no layout: a button keeps the width of its longest text unless it can shrink (Windows Forms GrowOnly).
   for ($k = 0; $k -lt @($ui.B).Count; $k++) { $b = $ui.B[$k]; if (-not $b.Shown) { continue }; $was = [int]$global:RadeT.Long[$k]
     if ($was -gt $b.Text.Length -and [string]$b.Values['AutoSizeMode'] -ne 'GrowAndShrink') { Write-Host ('WIN BAD button ' + $k + ' "' + $b.Text + '" keeps the width of a ' + $was + '-character text in view ' + $ui.View) }
@@ -90,6 +137,7 @@ function global:Show-RadeCard {
     # Focus is always visible: the parent draws the ring ($ui.Ring), or the control is a choice, which draws its own.
     if ($t -in 'Button', 'TextBox', 'CheckBox' -and -not ($c.Parent -and $c.Parent.Events.ContainsKey('Paint')) -and -not ($c.Tag -is [hashtable]) -and -not ($c.Values.ContainsKey('TabStop') -and $c.Values['TabStop'] -eq $false)) { Write-Host ('WIN NOFOCUS ' + $t + ' "' + $c.Text + '" in view ' + $ui.View) }
   }
+  Test-RadeSteady ([string]$ui.View)
 }
 <#
 .SYNOPSIS

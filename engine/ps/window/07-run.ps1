@@ -27,15 +27,15 @@ $ui.Paint = {
   & $ui.SetBar 'all' ([math]::Max($g.All, $ui.Bars['all'].Target)) $true; & $ui.SetBar 'step' ([math]::Max($g.StepShown, $ui.Bars['step'].Target)) $true
   if ($ui.View -ne 'run') { return }
   & $ui.ShowTime
-  $fr = $(if ($script:prog.Frac -ge 0) { [string]$script:prog.FracText } else { '' }); if ($ui.StepFrac.Text -ne $fr) { $ui.StepFrac.Text = $fr; & $ui.FitBar }
+  $fr = $(if ($script:prog.Frac -ge 0) { [string]$script:prog.FracText } else { '' }); if ($ui.StepFrac.Text -ne $fr) { $ui.StepFrac.Text = $fr }   # one size ($ui.FixW): the bar keeps its width
   # R21 W6: a time left only when earlier runs give one; never "a guess".
   $rt = [string][int]($g.All * 100) + ' %'; if ($ui.RightL.Text -ne $rt) { $ui.RightL.Text = $rt } }
 # The time in this step (R28 N10): "4m 12s"; with hours "1h 04m 12s".
 $ui.Elapsed = { param([double]$Sec) $q = [int][math]::Floor([math]::Max(0, $Sec)); $h = [int][math]::Floor($q / 3600); $m = [int][math]::Floor(($q % 3600) / 60); $x = $q % 60
   if ($h) { return ('{0}h {1:00}m {2:00}s' -f $h, $m, $x) }; return ('{0}m {1:00}s' -f $m, $x) }
-# Shows the time in this step on the step line, once for each second. A longer text (hours) takes room from the bar, so
-# the bar is fitted again then. Takes nothing; a failure is ignored.
-$ui.ShowTime = { try { if ($ui.View -eq 'run' -and $script:stepStart) { $t = & $ui.Elapsed ((Get-Date) - $script:stepStart).TotalSeconds; if ($ui.StepTime.Text -ne $t) { $longer = ($t.Length -ne ([string]$ui.StepTime.Text).Length); $ui.StepTime.Text = $t; if ($longer) { & $ui.FitBar } } } } catch { $null = $_ } }
+# Shows the time in this step on the step line, once for each second. The time keeps one size from its widest value
+# ($ui.FixW), so the bar beside it never changes its width. Takes nothing; a failure is ignored.
+$ui.ShowTime = { try { if ($ui.View -eq 'run' -and $script:stepStart) { $t = & $ui.Elapsed ((Get-Date) - $script:stepStart).TotalSeconds; if ($ui.StepTime.Text -ne $t) { $ui.StepTime.Text = $t } } } catch { $null = $_ } }
 $ui.TimeT = New-Object System.Windows.Forms.Timer; $ui.TimeT.Interval = 1000; $ui.TimeT.Add_Tick({ & $ui.ShowTime })
 # The tick callback of a running step: repaints the bars and lets the window handle its events. Emits nothing.
 $ui.Tick = { $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }   # a callback must emit nothing: its output would join the engine function's return value
@@ -45,9 +45,13 @@ $ui.TitleOf = { param([string]$Name) foreach ($s in @($steps)) { if ([string]$s.
 $ui.ShowRun = {
   & $ui.SetCard @{ View = 'run'; Kicker = $(if ($ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN } else { 'Starting' }); Sentence = $(if (Test-Deploy) { 'Installing ' + $script:app.Name + '.' } else { 'Running round ' + $round + '.' })
     StepRow = $true; Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { $ui.Form.Close() } })   # asks first while a step runs (the window's X does the same)
+    Range = @{ Kick = @('STARTING', 'STEP 00 OF 00'); StepName = @(@($steps | ForEach-Object { Get-StepTitle $_ }) + @('Clean-up')) }   # every step title: the step row keeps its place
     Right = '0 %'
     Foot = $(if (@($ui.Guides).Count) { 'RADE needs you next at "' + (& $ui.TitleOf $ui.Guides[0]) + '". Until then, keep this window open.' } elseif (-not (Test-Deploy) -and -not $ui.Asked) { 'RADE asks you one last question at the end. Until then, keep this window open.' } else { 'Nothing is needed from you. Keep this window open.' }) }
   $ui.StepName.Text = (& $ui.TitleOf $ui.StepNow); $null = & $ui.FitEdges; $null = & $ui.FitBar; $null = & $ui.ShowTime }   # the edge follows the ink of the new text's first letter (titles start with any letter)
+# Shows a new step on the Run card that is shown: its number in the line in capitals and its title. Both keep their size
+# ($ui.Range of the card), and the edges are fitted for the title's first letter. Takes the step number, the count and the name.
+$ui.ShowStep = { param([int]$I, [int]$N, [string]$Name) $ui.Kick.Text = ('Step ' + $I + ' of ' + $N).ToUpperInvariant(); $ui.StepName.Text = (& $ui.TitleOf $Name); $null = & $ui.FitEdges; $null = & $ui.FitBar }
 # Invoke-Round calls this when a step starts: keeps its name, start and estimate, and moves the run card on.
 # Takes the step index, the step count, the name and the estimate.
 $ui.OnStatus = { param($i, $count, $name, $estimate)
@@ -55,7 +59,7 @@ $ui.OnStatus = { param($i, $count, $name, $estimate)
   $script:statusBase = $name; $script:stepStart = Get-Date; $script:stepEst = $estimate
   if ($i -le 1) { $null = & $ui.SetBar 'all' 0 $true }
   $ui.StepI = [int]$i; $ui.StepN = [int]$count; $ui.StepNow = [string]$name
-  if ($ui.View -ne 'run') { $null = & $ui.ShowRun } else { $ui.Kick.Text = ('Step ' + $i + ' of ' + $count).ToUpperInvariant(); $ui.StepName.Text = (& $ui.TitleOf $name); $null = & $ui.FitEdges; $null = & $ui.FitBar }
+  if ($ui.View -ne 'run') { $null = & $ui.ShowRun } else { $null = & $ui.ShowStep $i $count $name }
   $null = & $ui.SetBar 'step' 0 $true; $ui.StepFrac.Text = ''; $null = & $ui.FitBar; $null = & $ui.ShowTime
   $doing = ''; foreach ($s in @($steps)) { if ([string]$s.Name -ceq [string]$name) { $doing = [string]$s.Doing } }; $null = & $ui.ShowNow $doing; $ui.StepAt = $ui.Clock.Elapsed.TotalMilliseconds   # L7: the step's own present-tense sentence, until its first item
   $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }

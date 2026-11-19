@@ -14,14 +14,19 @@
 # and for a button's 4 px margin, because a negative margin is taken as 0 in a table cell (R24 job).
 $ui.FitEdges = { try {
     $mm = & $ui.Sc $ui.Z.M; $x = & $ui.Sc 10; $ui.EdgeX = $x
-    foreach ($l in @($ui.Kick, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathL, $ui.PathT, $ui.Note, $ui.Help, $ui.Foot, $ui.Close, $ui.Now, $ui.FieldL, $ui.TestL)) { & $ui.SetLeft $l ($x - (& $ui.Ink $l)) }
+    foreach ($l in @($ui.Kick, $ui.Turn, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathL, $ui.PathT, $ui.Note, $ui.Help, $ui.Foot, $ui.Close, $ui.Now, $ui.FieldL, $ui.TestL)) { & $ui.SetLeft $l ($x - (& $ui.Ink $l)) }
     & $ui.SetLeft $ui.TickP 0; & $ui.SetLeft $ui.SentRow ($x - $(if ($ui.TickP.Visible) { & $ui.Ink $ui.TickP } else { & $ui.Ink $ui.Sent }))
-    & $ui.SetLeft $ui.StepRow ($x - (& $ui.Ink $ui.StepName)); & $ui.SetLeft $ui.ErrRow ($x - $ui.ErrBox.Margin.Left)
+    & $ui.FitStepEdge; & $ui.SetLeft $ui.ErrRow ($x - $ui.ErrBox.Margin.Left)
     & $ui.SetLeft $ui.BtnRow ($x - $mm)   # a button's own 4 px margin (room for the ring)
     $l1 = @($ui.LinkRow.Controls | Where-Object { $_.Visible })[0]; if ($l1) { & $ui.SetLeft $ui.LinkRow ($x - $mm - (& $ui.Ink $l1)) }   # a link's text is in the middle of its box
     if ($ui.Guide.Visible) { & $ui.SetLeft $ui.Guide ($x - (& $ui.GuideInk)) }   # the widest number sits on the edge; shorter ones are right-aligned to it
     & $ui.SetLeft $ui.Opts $x } catch { $null = $_ }
   & $ui.FitHead }
+# The step title's ink on the card's edge, and nothing after it in the step row moves when a new title starts with
+# another letter (the Administrator, 2026-11-19): the row is 8 px left of the edge, and the title's left and right
+# margins share those 8 px (left = 8 - the ink of its first letter). Takes nothing; uses $ui.EdgeX.
+$ui.FitStepEdge = { $sd = & $ui.Sc 8; & $ui.SetLeft $ui.StepRow ([int]$ui.EdgeX - $sd); $il = [int][math]::Max(0, [math]::Min($sd, $sd - (& $ui.Ink $ui.StepName))); $m = $ui.StepName.Margin
+  if ($m.Left -ne $il -or $m.Right -ne $sd - $il) { $ui.StepName.Margin = New-Object System.Windows.Forms.Padding($il, $m.Top, ($sd - $il), $m.Bottom) } }
 # R29b V1: the word RADE and the application name under it start their ink on one edge. Each sits at the same x in its row
 # (after a 64 px logo and its 12 px gap, or at 0) and draws its text ink-tight ($ui.InkText); what is left of a difference
 # (measured) moves each to the larger of the two. Takes nothing; changes the left margins of $ui.WordL, $ui.AppL and
@@ -70,9 +75,9 @@ $ui.AlignTick = { try {
 # and goes under the title only when even 60 does not fit. Takes nothing; changes the width of $ui.StepBar.
 $ui.FitBar = { try {
     $full = & $ui.Sc 200; $m = $ui.StepBar.Margin; $row = [int]$ui.StepRow.MaximumSize.Width; if ($row -le 0) { return }
-    $tw = [int][math]::Max((& $ui.WordW '00m 00s' $ui.StepTime.Font), [int]$ui.StepTime.PreferredSize.Width)
-    $fw = [int]$ui.StepFrac.PreferredSize.Width + $ui.StepFrac.Margin.Left   # the count is in the row also when it is empty: with no room it took a line of its own, which was the empty space under the title
-    $room = $row - [int]$ui.StepName.Width - $ui.StepName.Margin.Left - $m.Left - $m.Right - $tw - $fw - (& $ui.Sc 8)
+    $tw = [int]$ui.StepTime.Width   # one size from its widest value ($ui.FixW), so the bar keeps its width while the time counts
+    $fw = [int]$ui.StepFrac.Width + $ui.StepFrac.Margin.Left   # the count is in the row also when it is empty: with no room it took a line of its own, which was the empty space under the title
+    $room = $row - [int]$ui.StepName.Width - $ui.StepName.Margin.Left - $ui.StepName.Margin.Right - $m.Left - $m.Right - $tw - $fw - (& $ui.Sc 8)
     $w = $(if ($room -ge (& $ui.Sc 60)) { [int][math]::Min($full, $room) } else { $full })
     if ($ui.StepBar.Width -ne $w) { $ui.StepBar.Width = $w } } catch { $null = $_ } }   # no measure yet: the next fit sets it
 # Centers a row of controls up and down by changing their top and bottom margins. Takes the controls and the top margin
@@ -254,7 +259,8 @@ $ui.Measure = { param([string]$Card)
     foreach ($l in @($ui.StepTime, $ui.StepFrac)) { $rl = & $sr $l; if (($rl.Top - $l.Margin.Top) -eq ($rb.Top - $ui.StepBar.Margin.Top) -and $rl.Left -gt $rb.Left) { $out += & $ui.TickBad $Card @{ Top = $rb.Top; H = $rb.Height } @{ N = (& $ui.NameOf $l); Top = $rl.Top; H = $rl.Height } } } }
   if (-not $ui.RecOn) {
     $es = @()   # the card column: where each part's ink starts ($tx above)
-    if ($ui.Kick.Visible) { $es += @{ N = 'Kick'; X = (& $tx $ui.Kick) } }
+    if ($ui.Kick.Visible -and $ui.Kick.Text) { $es += @{ N = 'Kick'; X = (& $tx $ui.Kick) } }
+    if ($ui.Turn.Visible -and $ui.Turn.Text) { $es += @{ N = 'Turn'; X = (& $tx $ui.Turn) } }
     if ($ui.TickP.Visible) { $es += @{ N = 'TickP'; X = (& $tx $ui.TickP) } } elseif ($ui.Sent.Visible -and $ui.Sent.Text) { $es += @{ N = 'Sent'; X = (& $tx $ui.Sent) } }
     foreach ($l in @(@($ui.P) + @($ui.PathL, $ui.PathT, $ui.Close, $ui.StepName, $ui.Now, $ui.FieldL, $ui.Note, $ui.Help, $ui.Foot, $ui.TestL))) { if ($l.Visible -and $l.Text) { $es += @{ N = (& $ui.NameOf $l); X = (& $tx $l) } } }
     if ($ui.Guide.Visible) { $es += @{ N = 'Guide'; X = (& $sr $ui.Guide).Left + (& $ui.GuideInk) } }   # the widest number of the numbered list
@@ -299,8 +305,12 @@ $ui.ScriptWarn = { param($c)
   $bad = [bool]($script:scriptCheck.Short -and -not $script:scriptCheck.Ok)
   if ($bad -and [string]$c.View -in 'boot', 'choose', 'ready') { & $ui.Show $ui.Foot 'This script does not match its hash. Do not run it.'; $ui.Foot.ForeColor = $ui.C.Red }
   else { $ui.Foot.ForeColor = $ui.C.Gray } }
+# Sets what each card text box with changing values can show on the card that comes ($ui.Range): the card's Range names
+# them (Kick, P0, StepName: lists of texts); a part the card does not name has no range. Takes the card's Range (or $null).
+$ui.SetRange = { param($R) foreach ($k in 'Kick', 'P0', 'StepName') { $box = $(if ($k -eq 'P0') { $ui.P[0] } else { $ui[$k] })
+    $v = $(if ($R -and $R[$k]) { @($R[$k] | ForEach-Object { [string]$_ }) } else { $null }); if ($v) { $ui.Range[$box] = $v } else { $ui.Range.Remove($box) }; & $ui.Reflow $box } }
 $ui.SetCard = { param($c)
-  # Shows one card. $c names the parts: View, Light ('you' = yellow, 'bad' = dark red), Kicker, Sentence, Tick, P (up to 4
+  # Shows one card. $c names the parts: View, Light ('you' = yellow and "Your turn", 'bad' = dark red), Range ($ui.SetRange), Kicker, Sentence, Tick, P (up to 4
   # paragraphs), Options + OnOption, Lines (guide lines, in order: numbered ones first, others after them; one selectable text), Path (a file path), StepRow, Field (Label, Text, Name, Button, Do, Max, Above), Err, Links, Note, Help, Close (the hand card's closing line),
   # Buttons (Text, Kind, Do, Apart; up to $ui.NB), Foot, Test, Right, Back, NoAccept, Focus ('field', 'fieldbutton', 'err' or 'text').
   & $ui.Check   # the card that goes away (test rounds only)
@@ -309,7 +319,8 @@ $ui.SetCard = { param($c)
   $ui.View = [string]$c.View; $ui.Card.SuspendLayout()
   $ui.Light.BackColor = $(if ($c.Light -eq 'you') { $ui.C.Yellow } elseif ($c.Light -eq 'bad') { $ui.C.Red } else { $ui.C.White })
   $ui.Light.AccessibleName = 'Status light: ' + $(if ($c.Light -eq 'you') { 'your turn' } elseif ($c.Light -eq 'bad') { 'failed' } else { 'off' })
-  & $ui.Show $ui.Kick ([string]$c.Kicker).ToUpperInvariant()
+  & $ui.SetRange $c.Range; $ui.Kick.Text = ([string]$c.Kicker).ToUpperInvariant()   # the line in capitals keeps its line also when empty
+  $ui.Turn.Text = $(if ($c.Light -eq 'you') { 'Your turn' } else { '' }); $ui.Turn.AccessibleName = $(if ($ui.Turn.Text) { 'Your turn' } else { 'Your turn line (empty)' })
   $ui.SentRaw = [string]$c.Sentence; $ui.Sent.Text = $ui.SentRaw; $ui.TickP.Visible = [bool]$c.Tick
   $ps = @($c.P | Where-Object { $_ }); for ($k = 0; $k -lt 4; $k++) { & $ui.Show $ui.P[$k] $(if ($k -lt $ps.Count) { [string]$ps[$k] } else { '' }) }
   $ui.OnOpt = $c.OnOption; & $ui.FillOpts $c.Options; $ui.Opts.Visible = [bool]$ui.Opts.Controls.Count
