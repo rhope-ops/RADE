@@ -8,6 +8,7 @@ For each application in apps.json it makes a fresh, shallow copy of the app repo
 folder (read-only: nothing is pushed, the app repository is never changed, and no RADE checkout of the app is used), then:
   1. checks the app's manifest with scripts/check_manifest.py (the schema in this checkout);
   2. builds every bundle with the engine in this checkout.
+A bundle that builds is also read for the words of the "No reconnaissance" rule (scripts/no_recon.py): NOTE lines only.
 If 1 or 2 fails, it does the same with what the app has locked (its rade.lock.json beside the manifest): the schema at the
 locked commit, and the locked engine, both taken from this repository's history.
   - The locked schema and engine accept it: this checkout breaks the app. FAIL.
@@ -25,6 +26,8 @@ import json, os, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / 'scripts'))
+import no_recon   # the word search of the "No reconnaissance" rule (scripts/no_recon.py)
 ENGINE = ROOT / 'engine/rade_build.py'
 SCHEMA = 'schemas/rade-manifest.schema.json'
 
@@ -117,6 +120,17 @@ def locked_accepts(lock, app_dir, manifest_rel, tmp):
     return '' if code == 0 else 'it does not build with its own locked engine:\n' + tail(out, 3)
 
 
+def recon_notes(app_dir, manifest):
+    """Lines for the words of the "No reconnaissance" rule (AGENTS.md "Project rules") in the app's built bundles.
+    A note for the app's own session and never a FAIL: the search also reads comments, and RADE cannot fix an app."""
+    lines = []
+    for b in manifest['bundles']:
+        out = app_dir / b['out']
+        text = out.read_text(encoding='utf-8', errors='replace') if out.is_file() else ''
+        lines += ['no-reconnaissance word to review: %s:%d: %s: %s' % (b['out'], n, kind, word) for n, kind, word in no_recon.find(text)]
+    return lines[:8] + (['... and %d more' % (len(lines) - 8)] if len(lines) > 8 else [])
+
+
 def check(app, tmp):
     """Returns (status, lines): status is 'ok', 'fail' (this checkout breaks the app) or 'note' (the app is broken by itself)."""
     repo, manifest_rel = app['repo'], app['manifest']
@@ -153,7 +167,7 @@ def check(app, tmp):
     if not problems:
         # A text longer than its limit (docs/window-design.md "Text lengths") is a note for the app's own session, not a FAIL.
         long = sorted(set(l.replace('WARNING text length: ', 'text length: ') for l in out.splitlines() if l.startswith('WARNING text length: ')))
-        return 'ok', ['%d bundle(s) built with this engine' % count] + long
+        return 'ok', ['%d bundle(s) built with this engine' % count] + long + recon_notes(d, manifest)
     try:
         lock = read_lock(base, manifest_rel)
         if lock is None:

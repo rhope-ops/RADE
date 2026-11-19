@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Rules of the app canary (scripts/check_apps.py) for content from an app repository: no path leaves its folder, a lock
-names an engine among its own files, and a symbolic link is found. No network. Pass = last line "CANARY rules ok ...".
+names an engine among its own files, a symbolic link is found, and a no-reconnaissance word in a built bundle gives a NOTE line. No network. Pass = last line "CANARY rules ok ...".
 Run by scripts/check.local.sh."""
 import copy, json, os, sys, tempfile
 from pathlib import Path
@@ -42,5 +42,10 @@ with tempfile.TemporaryDirectory() as t:
         sys.exit('FAIL a bad lock was accepted: %r' % bad)
     os.symlink('/etc', t / 'lnk')
     assert c.links(t) == ['lnk'], c.links(t)
+    # A built bundle with a word of the "No reconnaissance" rule gives one NOTE line; a clean or missing bundle gives none.
+    (t / 'o.ps1').write_text("'ok'\nTest-NetConnection $h\n")
+    assert c.recon_notes(t, m) == ['no-reconnaissance word to review: o.ps1:2: host or port test: Test-NetConnection'], c.recon_notes(t, m)
+    (t / 'o.ps1').write_text("'ok'\n")
+    assert c.recon_notes(t, m) == [] and c.recon_notes(t / 'none', m) == []
 
-print('CANARY rules ok: %d bad manifest paths, %d bad locks, 1 symbolic link' % (len(muts), len(bads)))
+print('CANARY rules ok: %d bad manifest paths, %d bad locks, 1 symbolic link, 1 no-reconnaissance note' % (len(muts), len(bads)))

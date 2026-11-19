@@ -8,6 +8,9 @@ set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 engine_src="engine/rade_build.py $(ls engine/ps/*.ps1 engine/ps/window/*.ps1 | tr '\n' ' ')"   # the build file and its PowerShell parts (docs/code-standard.md C10)
 pass=0; fail=0
+# Every run below gets this variable, as a RADE started from its shortcut has it on Windows (-ExecutionPolicy Bypass hands
+# it down). The child check's probe must take it out: its line "without Bypass [ran]" below fails if it does not.
+export PSExecutionPolicyPreference=Bypass
 ok() { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL $1"; }
 # Groups (bloat audit P8, 2026-11-16): a section whose runs use only their own folders runs in the background, between
@@ -348,6 +351,8 @@ grep -q "^Mode: deploy, version 1.0.0 (not installed yet)" "$od/RADE/SampleApp/R
 # Item 3, safe second run: T01 PASSED in run 0, so it is off now; only the two steps left run, and the version is installed.
 grep -q "^Step 1 of 2: T02 Sample import r1" "$t/out.txt" && ! grep -q "contract=1" "$t/out.txt" && grep -q "^T01 Sample check r1: already done for version 1.0.0, not run again" "$od/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && ok || { bad "item 3: a step that PASSED must start off"; grep "^Step " "$t/out.txt"; }
 grep -q "^Version 1.0.0 of Sample app (deploy) is recorded as installed" "$t/out.txt" && grep -q "^DONE in .*Nothing was sent\.$" "$t/out.txt" && ok || bad "deploy 1: DONE line says nothing was sent"
+# The child check's probe (the Administrator, 2026-11-18): the detail says whether a script also runs with no -ExecutionPolicy setting.
+grep -rq "Test script ran.*, without Bypass \[ran\]" "$t/out.txt" "$od/RADE/SampleApp/Rounds/R01" && ok || { bad "child check: the detail has no 'without Bypass [ran]'"; grep -rh "Test script" "$t/out.txt" "$od/RADE/SampleApp/Rounds/R01" | head -3; }
 ! grep -qi "outlook\|e-mail\|draft\|Summary copied" "$t/out.txt" && ok || { bad "deploy 1: output names Outlook, an e-mail, a draft or a copied summary"; grep -i "outlook\|e-mail\|draft\|Summary copied" "$t/out.txt"; }
 [ ! -e "$cfg/rade-mail-to.txt" ] && ok || bad "deploy 1: an e-mail address file was written"
 [ "$(js)" = "rade-installed/2 1 1.0.0 1.0.0 PASSED" ] && ! grep -q "test1234\|$t" "$inst" && ok || { bad "deploy 1: rade-installed.json ($(js))"; cat "$inst"; }
