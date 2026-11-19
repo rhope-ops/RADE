@@ -8,6 +8,9 @@ set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 engine_src="engine/rade_build.py $(ls engine/ps/*.ps1 engine/ps/window/*.ps1 | tr '\n' ' ')"   # the build file and its PowerShell parts (docs/code-standard.md C10)
 pass=0; fail=0
+# Every run below gets this variable, as a RADE started from its shortcut has it on Windows (-ExecutionPolicy Bypass hands
+# it down). The child check's probe must take it out: its line "without Bypass [ran]" below fails if it does not.
+export PSExecutionPolicyPreference=Bypass
 ok() { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL $1"; }
 # Groups (bloat audit P8, 2026-11-16): a section whose runs use only their own folders runs in the background, between

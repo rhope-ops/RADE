@@ -3,7 +3,8 @@
 
 Reads PowerShell text and reports each word that finds hosts, pings, tests a port, looks up a name, maps a network,
 searches a directory or opens a session on another computer. It is a word search, not a proof: it reads comments and
-strings too, so a hit means "a person must look", and code that hides a call from a word search passes.
+strings too, so a hit means "a person must look", and code that hides a call from a word search passes (for example a short type
+name after "using namespace").
   python3 scripts/no_recon.py          reads the engine sources and the sample app's scripts; exit 1 on a hit
   python3 scripts/no_recon.py --test   the check proves itself: each planted word is found, each allowed text passes
   no_recon.find(text)                  scripts/check_apps.py reads each real app's built bundles with it (NOTE lines)
@@ -25,17 +26,18 @@ SOURCES = ('engine/ps/*.ps1', 'engine/ps/window/*.ps1', 'engine/rade_ui.ps1', 'e
 # computer's own domain name) and Sockets.SocketException (an error kind the reach check names in its detail).
 RULES = (
     ('host or port test', r'\b(Test-Connection|Test-NetConnection|Test-WSMan)\b'),
-    ('ping', r'\bping(\.exe)?\b'),
+    ('ping', r'\bping(\.exe)?\b|\bWin32_PingStatus\b'),
     ('name lookup', r'\b(Resolve-DnsName|nslookup|GetHostEntry|GetHostAddresses|GetHostByName)\b|\[(System\.)?Net\.Dns\]'),
-    ('network map', r'\b(Get-NetNeighbor|Get-NetRoute|Find-NetRoute|Get-NetTCPConnection|tracert|pathping|nbtstat|netstat|arp|nmap|portqry|nltest)\b|\bnet\s+view\b'),
+    ('network map', r'\b(Get-NetNeighbor|Get-NetRoute|Find-NetRoute|Get-NetTCPConnection|tracert|pathping|nbtstat|netstat|arp|nmap|portqry|nltest)\b|\bnet(\.exe)?\s+view\b|\bqwinsta\b'),
     ('raw socket', r'\bSockets\.(TcpClient|UdpClient|TcpListener|Socket)\b'),
-    ('directory search', r'\bGet-AD[A-Za-z]+\b|\bDirectory(Searcher|Entry)\b'),
+    ('directory search', r'\bGet-AD[A-Za-z]+\b|\bDirectory(Searcher|Entry)\b|\[adsi(searcher)?\]'),
     ('other computer', r'\b(New-PSSession|Enter-PSSession|New-CimSession)\b|(?<!\w)-ComputerName\b'),
 )
 # Self-test data: each FOUND text must give exactly one hit; each ALLOWED text must give none.
 FOUND = ('Test-NetConnection $h -Port 443', 'ping.exe $h', '& PING $h', 'Resolve-DnsName $h', '[System.Net.Dns]::GetHostName()',
          '[Net.Dns]::x', 'net  view', 'arp -a', 'New-Object System.Net.Sockets.TcpClient', 'Get-ADComputer -Filter *',
-         'New-Object DirectoryServices.DirectorySearcher', 'Get-CimInstance Win32_Bios -ComputerName $h', 'Enter-PSSession $h')
+         'New-Object DirectoryServices.DirectorySearcher', 'Get-CimInstance Win32_Bios -ComputerName $h', 'Enter-PSSession $h',
+         'net.exe view', 'Get-CimInstance Win32_PingStatus', '[adsisearcher]"(objectClass=computer)"', '[ADSI]"LDAP://x"', 'qwinsta /server:x')
 ALLOWED = ('[System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().DomainName',
            '$x -is [System.Net.Sockets.SocketException]', 'shipping and mapping', 'Connect-PnPOnline -Url $site -UseWebLogin',
            '$env:COMPUTERNAME', 'Start-Process -FilePath $url')
