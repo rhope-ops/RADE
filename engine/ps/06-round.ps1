@@ -118,6 +118,16 @@ function Invoke-RoundStepAt($run, [int]$K, [string]$Ans, [scriptblock]$Tick, [sc
   Add-RoundHistory $run.Base $step.Name $(if ($state -eq 'PASSED') { 'OK' } else { 'CHECK' }) ([int]$secs)
 }
 
+# L4 (the Administrator, 2026-11-19), test rounds only: asks the last question "Anything else about this round or the app?"
+# in the window ($script:feedbackUi) and gives back its report line. The text is masked as a text answer is and kept
+# whole; empty is allowed. Text mode asks nothing. Takes the log callback; gives back the line "Other feedback: ...".
+function Get-RoundFeedback([scriptblock]$Say) {
+  if ($script:textMode -or -not $script:feedbackUi) { $v = 'not asked (text mode)' }
+  else { $v = ConvertTo-UserText ([string](@(& $script:feedbackUi))[-1]); if (-not $v) { $v = '(none)' } }
+  & $Say ('Other feedback: ' + $v)
+  return ('Other feedback: ' + $v)
+}
+
 # Test rounds only: runs the shared-file self-test (docs/engine.md "Shared files") on a scratch folder that is removed
 # again, logs its lines and adds one summary line. Changes $run.Summary and, on a failure, the round state.
 function Test-RoundSharedFile($run) {
@@ -200,7 +210,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
       Invoke-RoundStepAt $run $k $ans $Tick $OnStep $OnStatus
     }
     & $speak ''
-    if (-not $run.Deploy) { Test-RoundSharedFile $run }
+    if (-not $run.Deploy) { $run.Summary += (Get-RoundFeedback $speak); Test-RoundSharedFile $run }
     if ($script:closing) { throw 'the window was closed (Exit) while the round ran' }
     $run.Summary += (Get-FolderInventory $run.Base)
   } catch {

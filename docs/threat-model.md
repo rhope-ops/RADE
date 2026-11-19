@@ -36,7 +36,7 @@ REC = recommendation, not a decision. Cites are files in this repo.
 
 ## Open gaps, in priority order
 
-1. A person cannot check that the pasted bundle is the reviewed one (rows 1, 2 and 8). Design: [specs/bundle-hash.md](specs/bundle-hash.md), approved 2026-11-18 and built (engine-v20 and the page): a check for a change on the way, not a security control; the bundle's stop on a mismatch waits for one work-computer round.
+1. A person cannot check that the pasted bundle is the reviewed one (rows 1, 2 and 8). Design: [specs/bundle-hash.md](specs/bundle-hash.md), approved 2026-11-18 and built (engine-v21 and the page): a check for a change on the way, not a security control; the bundle's stop on a mismatch waits for one work-computer round.
 2. Code signing is an open gap. The owner has no code-signing certificate and is not sure one can be had. No agent handles a certificate or a key. Until there is a way to sign, `-ExecutionPolicy Bypass` and the unsigned bundle stay. From engine-v19 the child check also runs its test script with no such setting and shows the answer, so a work-computer round proves whether the setting is needed (plan of 2026-11-18, stage 2.4).
 3. The page serves each app's `main`, not a tagged release.
 4. One maintainer account for the repo, the releases and the merges.

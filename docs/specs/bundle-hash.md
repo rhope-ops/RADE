@@ -1,6 +1,6 @@
 # Spec: bundle hash display
 
-Status: approved 2026-11-18 (the Administrator: "take all five RECs"); built in engine release 20 and on the page; the stop in the bundle (R6) waits for one work-computer round (Q5) · Owner: the Administrator · Updated: 2026-11-18
+Status: approved 2026-11-18 (the Administrator: "take all five RECs"); built in engine release 21 and on the page; the stop in the bundle (R6) waits for one work-computer round (Q5) · Owner: the Administrator · Updated: 2026-11-18
 
 ## Goal
 A person who pastes a bundle can check, in seconds and with no tool, that the text in front of them is the text that was built and reviewed: the same short hash shows on the bookmark page, in the stored release data, and on the bundle's first screen.

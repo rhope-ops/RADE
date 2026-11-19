@@ -17,7 +17,8 @@ VALIDATOR = Draft202012Validator(SCHEMA)
 
 
 def refs(m):
-    """Errors the schema cannot find: step files, unique step names and answer keys, app and collect step names."""
+    """Errors the schema cannot find: step files, unique step names and answer keys, the answers that failOn and showIf
+    name, app and collect step names."""
     out = []
     for b in m.get('bundles', []):
         r = b.get('round', '?')
@@ -36,11 +37,26 @@ def refs(m):
             keys = [a['key'] for a in qs if isinstance(a, dict) and isinstance(a.get('key'), str)]
             for k in sorted({k for k in keys if keys.count(k) > 1}):
                 out.append('%s: step %r: answers: the key %r is used twice' % (r, s['name'], k))
+            if isinstance(s.get('hide'), list) and 'done' in s['hide'] and s.get('answers'):
+                out.append('%s: step %r: hide: a step with answers cannot hide done (its questions come after Done)' % (r, s['name']))
+            words = {}   # key -> the button words of each earlier yes/no or pick question (for failOn and showIf)
             for a in qs:
                 cs = a.get('choices') if isinstance(a, dict) and isinstance(a.get('choices'), list) else []
                 low = [c.strip().lower() for c in cs if isinstance(c, str)]
                 if len(set(low)) != len(low):
                     out.append('%s: step %r: answers: the choices of %r must differ (case and spaces ignored)' % (r, s['name'], a.get('key')))
+                if not isinstance(a, dict):
+                    continue
+                mine = ['Yes', 'No'] if a.get('kind') == 'yesno' else [c.strip() for c in cs if isinstance(c, str)] if a.get('kind') == 'pick' else []
+                if 'failOn' in a and not s.get('answersOnly'):
+                    out.append('%s: step %r: answers: failOn of %r is only for a step with "answersOnly": true' % (r, s['name'], a.get('key')))
+                if 'failOn' in a and not named(a['failOn'], mine):
+                    out.append('%s: step %r: answers: failOn of %r must name answers of this yes/no or pick question' % (r, s['name'], a.get('key')))
+                dep = a.get('showIf') if isinstance(a.get('showIf'), dict) else None
+                if dep is not None and not named(dep.get('in'), words.get(dep.get('key'), [])):
+                    out.append('%s: step %r: answers: showIf of %r must name an earlier yes/no or pick question and answers of it' % (r, s['name'], a.get('key')))
+                if isinstance(a.get('key'), str):
+                    words[a['key']] = mine
         for a in b.get('apps', []):
             for n in a['steps']:
                 if n not in names:
@@ -49,6 +65,19 @@ def refs(m):
             if c.get('step') and c['step'] not in names:
                 out.append('%s: collect %r: unknown step %r' % (r, c['name'], c['step']))
     return out
+
+
+def named(value, allowed):
+    """Say whether `value` is a list of 1 or more words that are all in `allowed` (spaces at the ends ignored).
+
+    Args:
+        value: the manifest value (failOn, or the "in" of showIf).
+        allowed: the button words of the question it refers to.
+
+    Returns:
+        True when the list is valid.
+    """
+    return isinstance(value, list) and bool(value) and all(isinstance(w, str) and w.strip() in allowed for w in value)
 
 
 def main(paths):

@@ -24,8 +24,10 @@ if ($env:OS -eq 'Windows_NT') {
 $ui = @{ View = ''; Running = $false; Busy = $false; RecOn = $false; Edit = $false; Answer = ''; Acts = @(); Back = $null; OnOpt = $null; FieldDo = $null
   Log = (New-Object System.Collections.Generic.List[string]); Summary = @(); Sel = @{}; Clean = $true; StepState = @{}; Plan = $null; Picked = $false
   BaseIds = @(); BaseRes = @{}; Blocked = @{}; Newer = @{}; Bars = @{}; G = $null; GUrl = ''; CurId = ''; StepI = 0; StepN = 0; StepNow = ''; BusyShown = $false; Always = @($false, $false, $false, $false, $false, $false); NB = 6; StartAfter = $false; Cancel = $false; Dpi = 96.0; ScreenDpi = 96.0; FontK = 1.0; FontDpi = 96.0; Scaled = $false; Full = @{}; Clock = [System.Diagnostics.Stopwatch]::StartNew(); CardAt = -1000000.0; GuardMs = 400; Calm = $false; ContentW = 780 }
-# Layout values from engine/window.json, put in by the build (text column share and cap, minimum window size; pixels at 100 %).
-$ui.Layout = @{ Share = [double]'@@TEXT_SHARE@@'; MaxW = [int]'@@TEXT_MAX@@'; MinW = [int]'@@MIN_W@@'; MinH = [int]'@@MIN_H@@' }
+# L5 (the Administrator, 2026-11-19): 2 fixed state texts, the same words every time. You = the person acts; Work = RADE acts.
+$ui.Words = @{ You = 'Your turn.'; Work = 'RADE is working...' }
+# Layout values from engine/window.json, put in by the build (text column share and cap, minimum window size, minimum height of the card frame; pixels at 100 %; the minimum time of a step on the Run card, ms).
+$ui.Layout = @{ Share = [double]'@@TEXT_SHARE@@'; MaxW = [int]'@@TEXT_MAX@@'; MinW = [int]'@@MIN_W@@'; MinH = [int]'@@MIN_H@@'; FrameMin = [int]'@@FRAME_MIN@@'; StepMs = [int]'@@MIN_STEP_MS@@' }
 $ui.Hist = Read-RoundHistory (Get-BasePath)
 $script:secret = Get-Secret (Get-ProfileLeaf) (Get-ProfileLeaf)   # saved checks are masked before they are written
 try { $ui.Calm = -not [System.Windows.Forms.SystemInformation]::UIEffectsEnabled } catch { $null = $_ }

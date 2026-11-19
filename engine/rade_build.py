@@ -44,13 +44,12 @@ It runs only the steps embedded in it and never fetches code (PFM 3A). If no win
 it runs the same steps as text.
 Text files are embedded as readable single-quoted here-strings, so anyone can read the code.
 The build id (first 8 hex of the sha256 of the bundle body) shows in the window title and the summary.
-The first line of a bundle is its hash (HASH_LINE: the SHA-256 of all the text after it); the build writes the same value
-to <bundle>.sha256.json beside the bundle, for the RADE page to compare (docs/specs/bundle-hash.md).
 Usage: python3 engine/rade_build.py --app-root DIR [--manifest scripts/paste_bundles.json] [--check] [--sha]
   --check: exit 1 if a bundle is out of date. --sha: print the engine's sha256 (every engine file, see ENGINE_SHA).
 """
 import base64, hashlib, json, re, sys, textwrap
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent)); import rade_hash   # the bundle hash, beside this file (found also when this file is run by another script)
 
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
 WINDOW_FILE = ENGINE_ROOT / 'engine/window.json'   # the window's layout values (the Administrator, 2026-11-18; docs/window-design.md)
@@ -202,12 +201,35 @@ def app_lines(b):
     return out
 
 
-ANSWER_KINDS = ('yesno', 'pick', 'text')
+def hand_part(s):
+    """The fields "hide" and "answersOnly" of a guide step (docs/engine.md "Step contract") as a part of its $steps line.
+
+    Args:
+        s: the manifest step; a bad field stops the build (the schema says the same).
+
+    Returns:
+        '; Hide = @(...)' and/or '; AnswersOnly = $true', or ''.
+    """
+    def no(why):
+        """Stop the build with the step name and the reason."""
+        raise SystemExit('step %r: %s' % (s['name'], why))
+    out, guide, hide = '', s.get('kind', 'script') == 'guide', s.get('hide')
+    if 'hide' in s:
+        if not guide or not isinstance(hide, list) or not 1 <= len(hide) <= 2 or len(set(hide)) != len(hide) or set(hide) - {'done', 'failed', 'skip'} or ('done' in hide and s.get('answers')):
+            no('hide: only for a guide step (kind "guide"): 1 or 2 of done, failed and skip, each one time (one button stays); not done when the step has answers')
+        out += '; Hide = @(%s)' % ', '.join(q(h) for h in hide)
+    if 'answersOnly' in s:
+        used = [f for f in ('hide', 'doneText', 'doneLog', 'marker', 'url', 'urlConfig', 'file', 'guide') if s.get(f)]
+        if s['answersOnly'] is not True or not guide or not s.get('answers') or used:
+            no('answersOnly: true, only for a guide step (kind "guide") with "answers" and no Done card (so without: %s)' % (', '.join(used) or 'nothing'))
+        out += '; AnswersOnly = $true'
+    return out
 
 
 def answers_part(s):
-    """The "answers" of a guide step (questions asked after Done; docs/engine.md "Step contract") as the end of its
-    $steps line, or '' when it has none. A bad list stops the build (the schema says the same: scripts/check_manifest.py)."""
+    """The "answers" of a guide step (questions asked after Done, or at once with "answersOnly"; docs/engine.md "Step
+    contract") as the end of its $steps line, or '' when it has none. A bad list stops the build (the schema says the
+    same: scripts/check_manifest.py)."""
     if 'answers' not in s:
         return ''
     qs = s['answers']
@@ -218,19 +240,18 @@ def answers_part(s):
         no('only a guide step (kind "guide") can ask questions')
     if not isinstance(qs, list) or not 1 <= len(qs) <= 4:
         no('1 to 4 questions, not %s' % (len(qs) if isinstance(qs, list) else type(qs).__name__))
-    keys, out = set(), []
+    words, out = {}, []   # words: key -> the button words of each earlier yes/no or pick question
     for i, a in enumerate(qs, 1):
-        if not isinstance(a, dict) or set(a) - {'key', 'prompt', 'kind', 'choices'}:
-            no('question %d: only key, prompt, kind and choices' % i)
+        if not isinstance(a, dict) or set(a) - {'key', 'prompt', 'kind', 'choices', 'failOn', 'showIf'}:
+            no('question %d: only key, prompt, kind, choices, failOn and showIf' % i)
         key, prompt, kind, choices = a.get('key'), a.get('prompt'), a.get('kind'), a.get('choices')
         if not isinstance(key, str) or not re.fullmatch(r'[a-z][a-z0-9-]{0,23}', key):
             no('question %d: the key must be 1 to 24 lowercase letters, digits or "-", starting with a letter' % i)
-        if key in keys:
+        if key in words:
             no('question %d: the key %r is used twice' % (i, key))
-        keys.add(key)
         if not isinstance(prompt, str) or not 1 <= len(prompt) <= TEXT_LIMITS['answer prompt']:
             no('question %r: the prompt must have 1 to %d characters' % (key, TEXT_LIMITS['answer prompt']))
-        if kind not in ANSWER_KINDS:
+        if kind not in ('yesno', 'pick', 'text'):
             no('question %r: the kind must be yesno, pick or text' % key)
         if kind == 'pick':
             if not isinstance(choices, list) or not 2 <= len(choices) <= 4 or not all(isinstance(c, str) and 1 <= len(c) <= TEXT_LIMITS['answer choice'] for c in choices):
@@ -239,8 +260,24 @@ def answers_part(s):
                 no('question %r: the choices of a pick must differ (case and spaces ignored)' % key)
         elif 'choices' in a:
             no('question %r: only a pick has choices' % key)
-        out.append('@{ Key = %s; Prompt = %s; Kind = %s; Choices = @(%s) }' % (q(key), q(prompt.strip()), q(kind), ', '.join(q(c.strip()) for c in choices or [])))
+        mine = [] if kind == 'text' else ['Yes', 'No'] if kind == 'yesno' else [c.strip() for c in choices]
+        fail, dep = a.get('failOn'), a.get('showIf')   # E2: the answers that mean the step failed; E3: the question shows only after these answers
+        if 'failOn' in a and not (s.get('answersOnly') and mine and word_list(fail, mine)):
+            no('question %r: failOn (only in a step with "answersOnly": true) names 1 or more answers of this yes/no or pick question, each one time' % key)
+        dep_ok = isinstance(dep, dict) and set(dep) == {'key', 'in'} and isinstance(dep['key'], str) and word_list(dep['in'], words.get(dep['key'], []))
+        if 'showIf' in a and not dep_ok:
+            no('question %r: showIf needs "key" (an earlier yes/no or pick question of this step) and "in" (1 or more of its answers, each one time)' % key)
+        more = ('; FailOn = @(%s)' % ', '.join(q(w.strip()) for w in fail)) if fail else ''
+        more += ('; ShowKey = %s; ShowIn = @(%s)' % (q(dep['key']), ', '.join(q(w.strip()) for w in dep['in']))) if dep else ''
+        words[key] = mine
+        out.append('@{ Key = %s; Prompt = %s; Kind = %s; Choices = @(%s)%s }' % (q(key), q(prompt.strip()), q(kind), ', '.join(q(c.strip()) for c in choices or []), more))
     return '; Answers = @(%s)' % ', '.join(out)
+
+
+def word_list(value, allowed):
+    """Say whether `value` is a list of 1 or more different words that are all in `allowed` (spaces at the ends ignored)."""
+    got = [w.strip() for w in value] if isinstance(value, list) and all(isinstance(w, str) for w in value) else []
+    return bool(got) and len(set(got)) == len(got) and all(w in allowed for w in got)
 
 
 # ---- Bundle layout (the Administrator, 2026-11-17: docs/code-standard.md C5, C6). A bundle is read by a person before it
@@ -322,7 +359,8 @@ def step_lines(b):
     for s in b['steps']:
         assert s.get('url') or not s.get('urlConfig'), 'a step with "urlConfig" needs its own "url" (the host rule): %s' % s['name']
         assert (s.get('kind') == 'guide' and not s['file']) or any(f['dir'] == s['dir'] and Path(f['src']).name == s['file'] for f in b['files']), s
-    return [line[:-2] + answers_part(s) + ' }' for line, s in zip(steps, b['steps'])]   # a step without "answers": the line as before
+    doing = lambda s: ('; Doing = %s' % q(s['doing'].strip())) if s.get('doing') else ''   # L7: the now-doing sentence; a step without these fields: the line as before
+    return [line[:-2] + doing(s) + hand_part(s) + answers_part(s) + ' }' for line, s in zip(steps, b['steps'])]
 
 
 def fetch_lines(b):
@@ -343,7 +381,7 @@ def window_values():
     """Read engine/window.json and check it. The build stops when a value is missing or out of range.
 
     Returns:
-        A dict of placeholder -> text: the text column share (percent) and cap, and the minimum window size (pixels at 100 %).
+        A dict of placeholder -> text: text column share (percent) and cap, minimum window size and frame height (pixels at 100 %), minimum step time (ms).
     """
     w = json.loads(WINDOW_FILE.read_text(encoding='utf-8'))
     share, cap = float(w['textColumn']['sharePercent']), int(w['textColumn']['maxPx'])
@@ -351,7 +389,10 @@ def window_values():
     assert 40 <= share <= 100, 'engine/window.json textColumn.sharePercent must be 40 to 100'
     assert 240 <= cap <= 4000, 'engine/window.json textColumn.maxPx must be 240 to 4000'
     assert 400 <= min_w <= 1920 and 300 <= min_h <= 1080, 'engine/window.json minSize must be 400 x 300 to 1920 x 1080'
-    return {'@@TEXT_SHARE@@': repr(share), '@@TEXT_MAX@@': str(cap), '@@MIN_W@@': str(min_w), '@@MIN_H@@': str(min_h)}
+    frame, step_ms = int(w['cardFrame']['minHeight']), int(w['minStepMs'])
+    assert 120 <= frame <= 1080 and 0 <= step_ms <= 3000, 'engine/window.json cardFrame.minHeight must be 120 to 1080 and minStepMs 0 to 3000'
+    return {'@@TEXT_SHARE@@': repr(share), '@@TEXT_MAX@@': str(cap), '@@MIN_W@@': str(min_w), '@@MIN_H@@': str(min_h),
+            '@@FRAME_MIN@@': str(frame), '@@MIN_STEP_MS@@': str(step_ms)}
 
 
 def engine_for_app(ui_text):
@@ -447,34 +488,8 @@ def part_lines():
     return '  Engine parts, in run order:\n' + ''.join('    %s\n' % r for r in rows)
 
 
-# Bundle hash (docs/specs/bundle-hash.md; the Administrator, 2026-11-18). The first line of a bundle holds the SHA-256 of
-# all the text after it (line ends as LF), so the value is not inside the text it covers. The page (index.html) and the
-# bundle itself (Get-ScriptCheck, engine/ps/05-installed.ps1) hash the same text and show the same short form.
-HASH_LINE = '# @@BUNDLE-HASH %s @@\n'
-
-
-def bundle_hash(text):
-    """Return (the SHA-256 on the first line of a bundle or '', the SHA-256 of the text after that line with LF line ends)."""
-    first, _, rest = text.replace('\r\n', '\n').partition('\n')
-    m = re.fullmatch(r'# @@BUNDLE-HASH ([0-9a-f]{64}) @@', first)
-    return (m.group(1) if m else ''), hashlib.sha256(rest.encode('ascii')).hexdigest()
-
-
-def short_hash(sha):
-    """The form a person compares: the first 12 and the last 4 hex characters."""
-    return sha[:12] + '...' + sha[-4:]
-
-
-def hash_record(b, text):
-    """The text of the stored hash file beside a bundle (<bundle>.sha256.json): what the page compares its own hash with."""
-    sha = bundle_hash(text)[0]
-    build_id = re.search(r"(?m)^\$buildId = '([0-9a-f]{8})'$", text).group(1)
-    rec = {'file': Path(b['out']).name, 'sha256': sha, 'short': short_hash(sha), 'buildId': build_id, 'engineRelease': ENGINE_RELEASE}
-    return json.dumps(rec, indent=2) + '\n'
-
-
 def build(b):
-    """Return the whole bundle text for one manifest bundle: the hash line (HASH_LINE), the header (what it is, how to
+    """Return the whole bundle text for one manifest bundle: the hash line (engine/rade_hash.py), the header (what it is, how to
     run it, its sources), the contents list and the body. The build id is the first 8 hex of the body's SHA-256."""
     ui_text = UI_FILE.read_text(encoding='ascii')
     body = bundle_body(b, ui_text)
@@ -490,8 +505,7 @@ def build(b):
             '  and saves its results in Rounds\\%s%s No download, no admin rights.\n'
             '  To read it: the Contents list below gives the line of each part and file; each part starts with a "# ====" line.\n'
             '#>\n$buildId = \'%s\'\n$engineRelease = %d\n' % (b['title'], file_sha('engine/rade_build.py'), hashlib.sha256(ui_text.encode('ascii')).hexdigest()[:12], MANIFEST, part_lines(), APP['folder'], b['round'], sends, build_id, ENGINE_RELEASE))
-    rest = head + contents(head, body) + body
-    return HASH_LINE % hashlib.sha256(rest.encode('ascii')).hexdigest() + rest
+    return rade_hash.add_line(head + contents(head, body) + body)
 
 
 # Text lengths (the Administrator, 2026-11-15; docs/window-design.md "Text lengths"). The most characters of each text an
@@ -501,7 +515,7 @@ def build(b):
 # failure; a later release makes it a failure. This table is the one source: tests/engine_test.sh checks that the
 # document has the same numbers.
 TEXT_LIMITS = {'application name': 48, 'version': 14, 'summary': 150, 'step name': 56, 'step note': 200,
-               'step title': 56, 'guide line': 100, 'guide lines': 10, 'doneText': 24, 'step help': 160, 'answer prompt': 120, 'answer choice': 40}
+               'step title': 56, 'guide line': 100, 'guide lines': 10, 'doneText': 24, 'step doing': 80, 'step help': 160, 'answer prompt': 120, 'answer choice': 40}
 
 
 def text_lengths(b):
@@ -525,6 +539,7 @@ def text_lengths(b):
         over(what, 'step title', st.get('title'))
         over(what, 'step note', st.get('note'))
         over(what, 'doneText', st.get('doneText'))
+        over(what, 'step doing', st.get('doing'))
         over(what, 'step help', st.get('help'))
         for g in st.get('guide', []):
             over(what, 'guide line', g)
@@ -556,16 +571,12 @@ def main():
     for b in m['bundles']:
         out = ROOT / b['out']
         text = build(b)
-        rec_file, rec = out.with_name(out.name + '.sha256.json'), hash_record(b, text)   # the stored hash, beside the bundle
         if a.check:
-            if not out.exists() or out.read_bytes() != text.encode('ascii') or not rec_file.exists() or rec_file.read_bytes() != rec.encode('ascii'):
-                print('STALE ' + b['out']); stale += 1
+            stale += rade_hash.stale(out, text, ENGINE_RELEASE, b['out'])   # prints STALE: the bundle or its stored hash file is old
             continue
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_bytes(text.encode('ascii'))
-        rec_file.write_bytes(rec.encode('ascii'))   # bytes: the same file on every platform
         print('BUILT %s bytes=%d files=%d steps=%d' % (b['out'], len(text), len(b['files']), len(b['steps'])))
-        print('HASH %s %s (%s)' % (b['out'], bundle_hash(text)[0], short_hash(bundle_hash(text)[0])))
+        print(rade_hash.write(out, text, ENGINE_RELEASE))   # writes the bundle and its stored hash file; gives the HASH line
         for line in text_lengths(b):
             print(line)
     if a.check:
@@ -577,11 +588,11 @@ def main():
 # part in build order, the shared UI file, the window layout values and the logo (path, then bytes). An app's lock still checks each file on its
 # own, and a bundle's header names each file with its own hash (part_lines); this one value is what --sha prints.
 ENGINE_SHA = hashlib.sha256(b''.join(rel.encode() + b'\0' + (ENGINE_ROOT / rel).read_bytes() + b'\0' for rel in
-                                     ['engine/rade_build.py'] + ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS]
+                                     ['engine/rade_build.py', 'engine/rade_hash.py'] + ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS]
                                      + ['engine/rade_ui.ps1', 'engine/window.json', 'assets/logo/logo-rho-128.png'])).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
-ENGINE_RELEASE = 20
+ENGINE_RELEASE = 21
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':

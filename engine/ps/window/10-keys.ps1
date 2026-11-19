@@ -2,10 +2,11 @@
 # saved and restored, and the call that shows the form. It is the last window part.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
-# ---- Keys: F2 = the Record (Page Down and Page Up move its check list, and on a card that is taller than the window its text); Esc = close the Record, else Back, and on Choose (no Back) it exits; 1 to 9 = a choice. Tab reaches every control.
+# ---- Keys: F1 = Help (the RADE tour); F2 = the Record (Page Down and Page Up move its check list, and on a card that is taller than the window its text); Esc = close the Record, else Back, and on Choose (no Back) it exits; 1 to 9 = a choice. Tab reaches every control.
 $ui.Form.Add_KeyDown({
   $k = [string]$_.KeyCode
   if ($_.Control -and $k -eq 'C' -and (& $ui.CopyText $ui.Form.ActiveControl)) { $_.SuppressKeyPress = $true }   # Ctrl+C copies the selected card text
+  elseif ($k -eq 'F1') { $_.SuppressKeyPress = $true; & $ui.OpenTour }   # L6: Help = the RADE tour
   elseif ($k -eq 'F2') { $_.SuppressKeyPress = $true; if ($ui.RecOn) { & $ui.CloseRecord } else { & $ui.VRecord } }
   elseif ($ui.RecOn -and $k -in 'PageDown', 'Next', 'PageUp', 'Prior' -and -not (& $ui.InField)) {   # the check list by keyboard when it is taller than the window; Windows names these keys Next and Prior; in the log box they page the log
     $_.SuppressKeyPress = $true; try { $y = [math]::Abs($ui.RecScroll.AutoScrollPosition.Y) + $(if ($k -in 'PageDown', 'Next') { 1 } else { -1 }) * [math]::Max((& $ui.Sc 40), $ui.RecScroll.ClientSize.Height - (& $ui.Sc 40)); $ui.RecScroll.AutoScrollPosition = New-Object System.Drawing.Point(0, [math]::Max(0, $y)) } catch { $null = $_ } }
