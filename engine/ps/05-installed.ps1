@@ -232,6 +232,36 @@ $script:selfText = ''
 try { if ($PSCommandPath -and (Test-Path -LiteralPath $PSCommandPath -PathType Leaf)) { $script:selfText = [System.IO.File]::ReadAllText($PSCommandPath) } } catch { $null = $_ }
 if (-not $script:selfText) { try { if ($psISE -and $psISE.CurrentFile) { $script:selfText = [string]$psISE.CurrentFile.Editor.Text } } catch { $null = $_ } }
 if (-not $script:selfText) { try { $script:selfText = [string]$MyInvocation.MyCommand.ScriptBlock } catch { $null = $_ } }
+<#
+.SYNOPSIS
+The bundle's own hash check: the line to show, the short form and whether the text matches its first line.
+.DESCRIPTION
+Script check (docs/specs/bundle-hash.md; the Administrator, 2026-11-18): the first line of a bundle holds the SHA-256 of
+all the text after it (line ends as LF; engine/rade_hash.py HASH_LINE). RADE hashes its own text ($script:selfText) the
+same way and shows the short form (first 12 and last 4 hex), so a person can compare it with the RADE page. It catches a
+change on the way (a half copy, an old page); a changed script can print any value, so it is no security control. This
+release shows the answer and stops nothing: a work-computer round must first prove that a paste keeps the text (Q5).
+.OUTPUTS
+A table: Line (the text to show), Short (the short form, or '' when RADE cannot read its own text) and Ok ($true only
+when the hash of the text is the value on its first line).
+#>
+function Get-ScriptCheck {
+  $res = @{ Line = 'Script check: not available (RADE could not read its own text)'; Short = ''; Ok = $false }
+  try {
+    $t = ([string]$script:selfText) -replace "`r`n", "`n"
+    $m = [regex]::Match($t, '^\s*# @@BUNDLE-HASH ([0-9a-f]{64}) @@\n')
+    if (-not $m.Success) { return $res }
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { $hex = -join @($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($t.Substring($m.Length))) | ForEach-Object { $_.ToString('x2') }) } finally { $sha.Dispose() }
+    $own = [string]$m.Groups[1].Value
+    $res.Short = $hex.Substring(0, 12) + '...' + $hex.Substring(60)
+    $res.Ok = ($hex -eq $own)
+    if ($res.Ok) { $res.Line = 'Script check: ' + $res.Short + ' (checked)' }
+    else { $res.Line = 'Script check: ' + $res.Short + ' DOES NOT MATCH the line in the script (' + $own.Substring(0, 12) + '...' + $own.Substring(60) + ')' }
+  } catch { $res.Line = 'Script check: not available (' + $_.Exception.GetType().Name + ')' }
+  return $res
+}
+$script:scriptCheck = Get-ScriptCheck
 function Save-RunnerCopy {
   # Returns $true when the runner is saved. Only the text of this bundle is saved (its build id must be in it). Never an error.
   # Only a newer RADE replaces a saved copy (the Administrator, 2026-11-17): a copy with a higher or equal engine release stays.

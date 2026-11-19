@@ -222,7 +222,11 @@ if git show "$v1:engine/rade_build.py" > "$t/v1/engine/rade_build.py" 2>/dev/nul
   xrun "$t/x-v1.ps1" "$t/x2.txt"; h1=$(sha "$xi"); n1=$(ls "$xo/RADE/Config/installed" | wc -l)
   xrun "$t/x-new.ps1" "$t/x3.txt"
   ! cmp -s "$t/x-new.ps1" "$t/x-v1.ps1" && grep -q "is recorded as installed" "$t/x1.txt" && grep -q "is recorded as installed" "$t/x2.txt" && [ -f "$xo/RADE/Config/rade-installed.json" ] && [ "$h0" = "$h1" ] && [ "$n0$n1" = 11 ] && ok || { bad "cross-version: engine-v1 changed this engine's record ($n0 $n1)"; tail -3 "$t/x2.txt"; }
-  grep -q "^Mode: deploy, version 1.0.0 is installed" "$t/x3.txt" && grep -q "PASSED: PowerShell is version 5.1 or newer. Last check: " "$t/x3.txt" && valid schemas/rade-installed.schema.json "$xi" && valid schemas/rade-checks.schema.json "$xo/RADE/Config/rade-checks.json" && ok || { bad "cross-version: this engine after engine-v1 (its record, the saved checks)"; grep "^Mode\|PowerShell is version" "$t/x3.txt"; }
+  grep -q "^Mode: deploy, version 1.0.0 is installed" "$t/x3.txt" && valid schemas/rade-installed.schema.json "$xi" && valid schemas/rade-checks.schema.json "$xo/RADE/Config/rade-checks.json" && ok || { bad "cross-version: this engine after engine-v1 (its record, the saved checks)"; grep "^Mode" "$t/x3.txt"; }
+  # Saved checks (docs/engine.md "Results"): a slow check is reused; the fast checks ps and child run fresh (from engine-v21).
+  grep -q "PASSED: Your OneDrive folder is set up. Last check: " "$t/x3.txt" && ok || bad "saved checks: the OneDrive check is not reused"
+  grep -q "PASSED: PowerShell is version 5.1 or newer. Version \[" "$t/x3.txt" && ok || bad "saved checks: the ps check did not run fresh"
+  grep -q "PASSED: RADE can run its scripts. Test script ran" "$t/x3.txt" && ok || bad "saved checks: the child check did not run fresh"
 else bad "cross-version: the engine-v1 commit $v1 is not in this clone and could not be fetched (git fetch origin $v1)"; fi
 echo "GROUP $pass $fail"; } > "$t/grp-X.log" 2>&1 &
 
@@ -438,6 +442,35 @@ psrun "$t/g.ps1" "$t/outg2.txt" $'2\n\n\n\n' RADE_TEST_FQDN="PC01.AREA52.EXAMPLE
 grep -q "PASSED: This computer is on NIPR (area52 domain)" "$t/outg2.txt" && ! grep -qi "example" "$t/outg2.txt" && ! grep -q "cannot be installed" "$t/outg2.txt" && ok || { bad "guard: an area52 name in capitals must pass and never be shown"; head -5 "$t/outg2.txt"; }
 grep -q "PASSED: This computer is on NIPR (area52 domain)" "$t/out0.txt" && ok || bad "guard: the check line is in a normal run"
 echo "GROUP $pass $fail"; } > "$t/grp-G.log" 2>&1 &
+# ---- Bundle hash (docs/specs/bundle-hash.md; the Administrator, 2026-11-18). The build: the first line holds the SHA-256
+# of the text after it, the stored file beside the bundle says the same, and --check sees a missing or changed stored file.
+hb="$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1"
+python3 - "$hb" <<'P' && ok || bad "bundle hash: the first line, the stored file and the text do not agree"
+import hashlib, json, re, sys
+t = open(sys.argv[1], newline='').read(); first, rest = t.split('\n', 1); j = json.load(open(sys.argv[1] + '.sha256.json'))
+sha = hashlib.sha256(rest.encode()).hexdigest()
+assert first == '# @@BUNDLE-HASH %s @@' % sha, first
+assert j['sha256'] == sha and j['short'] == sha[:12] + '...' + sha[-4:] and j['file'] == 'SAMPLE-R01-round-r1.ps1' and j['engineRelease'] > 0, j
+assert re.search(r"(?m)^\$buildId = '%s'$" % j['buildId'], t), j
+P
+python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && cp "$hb.sha256.json" "$t/hj" && echo x >> "$hb.sha256.json" && ! python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && rm "$hb.sha256.json" && ! python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && cp "$t/hj" "$hb.sha256.json" && ok || bad "bundle hash: --check must fail on a changed or missing stored file"
+# The bundle checks itself. The test copy is a changed text (swap), so it must say so; with the first line made right again
+# it must say "checked", also when every line ends in CR LF (as a paste in ISE can make it) and with a blank line above.
+go H; {   # group H: runs in the background (see "go" above)
+mkdir -p "$t/hu/test1234/OneDrive - United States Air Force"; sed "s#usersRoot = '$t/u'#usersRoot = '$t/hu'#" "$t/b.ps1" > "$t/h1.ps1"
+python3 - "$t/h1.ps1" "$t/h2.ps1" "$t/h3.ps1" <<'P'
+import hashlib, sys
+first, rest = open(sys.argv[1], newline='').read().split('\n', 1)
+good = '# @@BUNDLE-HASH %s @@\n' % hashlib.sha256(rest.encode()).hexdigest() + rest
+open(sys.argv[2], 'w', newline='').write(good)
+open(sys.argv[3], 'w', newline='').write('\r\n' + good.replace('\n', '\r\n'))
+P
+for n in 1 2 3; do psrun "$t/h$n.ps1" "$t/outh$n.txt" $'2\n\n\n\n' USERPROFILE="$t/hu/test1234"; done
+sed -n 2p "$t/outh1.txt" | grep -q "^Script check: [0-9a-f]\{12\}\.\.\.[0-9a-f]\{4\} DOES NOT MATCH the line in the script ([0-9a-f]\{12\}\.\.\.[0-9a-f]\{4\})$" && ok || { bad "bundle hash: a changed bundle must say DOES NOT MATCH on its second line"; head -3 "$t/outh1.txt"; }
+want="Script check: $(python3 -c "import sys; h=open(sys.argv[1]).readline().split()[2]; print(h[:12]+'...'+h[-4:])" "$t/h2.ps1") (checked)"
+[ "$(sed -n 2p "$t/outh2.txt")" = "$want" ] && [ "$(sed -n 2p "$t/outh3.txt")" = "$want" ] && ok || { bad "bundle hash: a whole bundle must say '$want' (LF and CR LF)"; sed -n 2p "$t/outh2.txt" "$t/outh3.txt"; }
+grep -rqF "$want" "$t/hu/test1234/OneDrive - United States Air Force/RADE" && ok || bad "bundle hash: the line is in the round's log or report"
+echo "GROUP $pass $fail"; } > "$t/grp-H.log" 2>&1 &
 # 2. Only a site on the DAF SharePoint host is accepted.
 grep "^\$sitePrefix = \|^function Test-SiteUrl" "$t/b.ps1" > "$t/site.ps1"
 cat >> "$t/site.ps1" <<'P'

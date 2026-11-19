@@ -1,6 +1,6 @@
 # Spec: bundle hash display
 
-Status: proposed, not approved · Owner: the Administrator · Updated: 2026-11-17
+Status: approved 2026-11-18 (the Administrator: "take all five RECs"); built in engine release 21 and on the page; the stop in the bundle (R6) waits for one work-computer round (Q5) · Owner: the Administrator · Updated: 2026-11-18
 
 ## Goal
 A person who pastes a bundle can check, in seconds and with no tool, that the text in front of them is the text that was built and reviewed: the same short hash shows on the bookmark page, in the stored release data, and on the bundle's first screen.
@@ -44,9 +44,20 @@ Proposal: C, with R5 (hash the text after the marked line). The first-screen lin
 ## Decisions
 | ID | Decision | By | Date | Alternatives rejected, and why |
 |---|---|---|---|---|
-| none | Nothing is decided; the questions are below | | | |
+| D1 | Q1: the stored value is a JSON file beside each bundle in the app's repo (`<bundle>.sha256.json`), written by the build; the release notes follow when the page serves tagged releases | the Administrator | 2026-11-18 | Release only: the page could not compare for `main` |
+| D2 | Q2: the short form is the first 12 and the last 4 hex characters | the Administrator | 2026-11-18 | First 8 only: weaker against a made-up near match |
+| D3 | Q3: way C: the bundle hashes its own text, prints the value and compares it with its first line | the Administrator | 2026-11-18 | A or B alone |
+| D4 | Q4: the page serves a tagged release instead of `main`, as a separate step (plan "proof and hardening", 2.3) | the Administrator | 2026-11-18 | Stay on `main` |
+| D5 | Q5: built now; one work-computer round proves that a paste in ISE hashes the same text | the Administrator | 2026-11-18 | Wait for the round before building |
 
-## Open questions for the Administrator
+As built (agent choices inside the decisions; say so if one is wrong):
+- Until the round of D5, a mismatch in the bundle is shown and stops nothing (R6 for the bundle is not on yet): a false alarm from a paste would block every round. The page does stop (no Copy button).
+- The bundle shows the line in text mode (second line), in the round's log and report, and the short form in the window's title bar. A place inside the window is a window-design decision that is not made.
+- The bundle reads its own text from its file (the saved runner, a `-File` run) or from the ISE script pane. Pasted into a plain console it cannot, and says "not available".
+- The page: a script with no hash line is offered as "an older build" only when no stored file is there; a stored file that cannot be read, or that differs, is a mismatch. The script and its stored file are two downloads, and the host can hand out an old copy of one for some minutes after a push, so that card says to wait 5 minutes and try again before it says "do not run" (not measured: a risk to watch at the first app release).
+- Blank lines above the first line are allowed (R4 says "from the first byte after the header line"); a script of an older build has no hash line, and the page says so.
+
+## Questions (answered 2026-11-18: each REC is taken; see Decisions)
 - Q1. Where is the stored value? REC: a JSON file beside each bundle in the app's repo, written by the build (the page already reads from the app repo), and also in the release notes once the page serves tagged releases. Alternative: release only (fewer files, but the page cannot compare for `main`).
 - Q2. Which short form? REC: first 12 and last 4 hex characters (a person reads 16 characters; a mismatch in any part of the text changes both ends). Alternative: first 8 only (shorter; weaker against a made-up near match).
 - Q3. Way A, B or C for the bundle? REC: C (print the run-time hash and compare with the header line).

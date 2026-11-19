@@ -49,6 +49,7 @@ Usage: python3 engine/rade_build.py --app-root DIR [--manifest scripts/paste_bun
 """
 import base64, hashlib, json, re, sys, textwrap
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent)); import rade_hash   # the bundle hash, beside this file (found also when this file is run by another script)
 
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
 WINDOW_FILE = ENGINE_ROOT / 'engine/window.json'   # the window's layout values (the Administrator, 2026-11-18; docs/window-design.md)
@@ -474,7 +475,7 @@ def contents(head, body):
             marks.append((n, line.strip()[7:]))
         elif line.endswith("@'"):
             inside = True
-    first = head.count('\n') + len(marks) + 2   # the bundle line of body line 1: after the header and this list
+    first = head.count('\n') + len(marks) + 3   # the bundle line of body line 1: after the hash line, the header and this list
     rows = ['#   line %5d  %s' % (first + n - 1, (('  ' if line.startswith('File') else '') + line)[:150]) for n, line in marks]
     return '# ==== Contents (GENERATED; the line numbers are lines of this bundle)\n' + '\n'.join(rows) + '\n'
 
@@ -488,8 +489,8 @@ def part_lines():
 
 
 def build(b):
-    """Return the whole bundle text for one manifest bundle: the header (what it is, how to run it, its sources), the
-    contents list and the body. The build id is the first 8 hex of the body's SHA-256."""
+    """Return the whole bundle text for one manifest bundle: the hash line (engine/rade_hash.py), the header (what it is, how to
+    run it, its sources), the contents list and the body. The build id is the first 8 hex of the body's SHA-256."""
     ui_text = UI_FILE.read_text(encoding='ascii')
     body = bundle_body(b, ui_text)
     build_id = hashlib.sha256(body.encode('ascii')).hexdigest()[:8]
@@ -504,7 +505,7 @@ def build(b):
             '  and saves its results in Rounds\\%s%s No download, no admin rights.\n'
             '  To read it: the Contents list below gives the line of each part and file; each part starts with a "# ====" line.\n'
             '#>\n$buildId = \'%s\'\n$engineRelease = %d\n' % (b['title'], file_sha('engine/rade_build.py'), hashlib.sha256(ui_text.encode('ascii')).hexdigest()[:12], MANIFEST, part_lines(), APP['folder'], b['round'], sends, build_id, ENGINE_RELEASE))
-    return head + contents(head, body) + body
+    return rade_hash.add_line(head + contents(head, body) + body)
 
 
 # Text lengths (the Administrator, 2026-11-15; docs/window-design.md "Text lengths"). The most characters of each text an
@@ -571,12 +572,11 @@ def main():
         out = ROOT / b['out']
         text = build(b)
         if a.check:
-            if not out.exists() or out.read_bytes() != text.encode('ascii'):
-                print('STALE ' + b['out']); stale += 1
+            stale += rade_hash.stale(out, text, ENGINE_RELEASE, b['out'])   # prints STALE: the bundle or its stored hash file is old
             continue
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_bytes(text.encode('ascii'))
         print('BUILT %s bytes=%d files=%d steps=%d' % (b['out'], len(text), len(b['files']), len(b['steps'])))
+        print(rade_hash.write(out, text, ENGINE_RELEASE))   # writes the bundle and its stored hash file; gives the HASH line
         for line in text_lengths(b):
             print(line)
     if a.check:
@@ -588,11 +588,11 @@ def main():
 # part in build order, the shared UI file, the window layout values and the logo (path, then bytes). An app's lock still checks each file on its
 # own, and a bundle's header names each file with its own hash (part_lines); this one value is what --sha prints.
 ENGINE_SHA = hashlib.sha256(b''.join(rel.encode() + b'\0' + (ENGINE_ROOT / rel).read_bytes() + b'\0' for rel in
-                                     ['engine/rade_build.py'] + ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS]
+                                     ['engine/rade_build.py', 'engine/rade_hash.py'] + ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS]
                                      + ['engine/rade_ui.ps1', 'engine/window.json', 'assets/logo/logo-rho-128.png'])).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
-ENGINE_RELEASE = 20
+ENGINE_RELEASE = 21
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':

@@ -42,6 +42,7 @@ function Initialize-RoundRun([bool]$Clean, [bool[]]$Selected, [scriptblock]$Say,
 function Invoke-RoundSetup($run, [bool]$Clean, [string]$To, [scriptblock]$OnStatus) {
   $speak = $run.Speak
   & $speak ('RADE, round ' + $round + ' (build ' + $buildId + '), started ' + (Get-Date -Format 'yyyy-MM-dd HH:mm'))
+  & $speak $script:scriptCheck.Line   # in the log and the report, so a round's results show it (docs/specs/bundle-hash.md)
   $run.Base = Move-ToRade $speak
   $base = $run.Base
   & $speak ('Working folder: ' + (ConvertTo-Masked $base))

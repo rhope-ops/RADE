@@ -83,6 +83,37 @@ function remember(v){try{localStorage.setItem(KEY,v)}catch(e){}}
 function web(u){return /^https:\/\//i.test(String(u||''))?String(u):''}   // links from a manifest: https only
 function get(url,asJson){return fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('code ['+r.status+']');return asJson?r.json():r.text()})}
 // light: 'fail' turns the small caps line dark red; 'turn' (the page waits for you) and '' change nothing on the page, which has no light bar on its top edge (the Administrator, 18 Nov 26). done = the bar turns green.
+// Script check (docs/specs/bundle-hash.md; the Administrator, 18 Nov 26): the first line of a script holds the SHA-256 of all the text
+// after it (line ends as LF). The page hashes the text it fetched the same way (Web Crypto, no library) and compares it with that line
+// and with the stored file beside the script (<script>.sha256.json). It shows the first 12 and the last 4 hex characters, as the RADE
+// window does. state: 'match', 'bad' (do not run), 'nostored' (no stored file to compare), 'nocrypto' (this browser cannot hash),
+// 'none' (a script of an older build: it has no hash line). Gives a promise of {state, short, why}.
+function short(h){return h.slice(0,12)+'...'+h.slice(-4)}
+function scriptCheck(text,url){
+  var t=text.replace(/\r\n/g,'\n'),m=/^\s*# @@BUNDLE-HASH ([0-9a-f]{64}) @@\n/.exec(t);   // blank lines above the line are allowed, as in the bundle's own check
+  // The stored file: its SHA-256, '' when there is none (code 404 or no answer), or null when it is there and cannot be read.
+  var stored=function(){return get(url+'.sha256.json',true).then(function(j){var v=String(j&&j.sha256||'');return /^[0-9a-f]{64}$/.test(v)?v:null},function(e){return /^code \[/.test(String(e&&e.message))||!(e instanceof SyntaxError)?'':null})};
+  var later='A new version can be on its way: the script and its stored hash are two downloads. Wait 5 minutes, then select "Try again". If it fails again, do not run the script: ask in the Teams channel.';
+  if(!m){   // no hash line: right for a script of an older build, wrong when a stored hash says the script must have one
+    return stored().then(function(st){return st===''?{state:'none'}:{state:'bad',why:'the script has no hash line, and a stored hash is there',todo:later}});
+  }
+  if(!(window.crypto&&crypto.subtle&&window.TextEncoder)){return Promise.resolve({state:'nocrypto'})}
+  return crypto.subtle.digest('SHA-256',new TextEncoder().encode(t.slice(m[0].length))).then(function(buf){
+    var hex=Array.prototype.map.call(new Uint8Array(buf),function(x){return ('0'+x.toString(16)).slice(-2)}).join('');
+    if(hex!==m[1]){return {state:'bad',short:short(hex),why:'the text gives '+short(hex)+', its own first line says '+short(m[1])}}
+    return stored().then(function(st){
+      if(st===''){return {state:'nostored',short:short(hex)}}
+      return st===hex?{state:'match',short:short(hex)}:{state:'bad',short:short(hex),why:'the text gives '+short(hex)+', the stored hash '+(st?'is '+short(st):'cannot be read'),todo:later};
+    });
+  });
+}
+function checkLine(a){
+  var h=a.check||{state:'none'};
+  if(h.state==='match'){return '<br>Script check: <span class="file">'+esc(h.short)+'</span>, matches the stored hash. The RADE window shows the same value in its title bar.'}
+  if(h.state==='nostored'){return '<br>Script check: <span class="file">'+esc(h.short)+'</span>, no stored value to compare.'}
+  if(h.state==='nocrypto'){return '<br>Script check: hash not available in this browser.'}
+  return '<br>Script check: this script has no hash (an older build).';
+}
 function show(o){
   win.setAttribute('data-light',o.light||'');
   if(o.done){win.setAttribute('data-done','')}else{win.removeAttribute('data-done')}
@@ -132,7 +163,16 @@ function open(a){
     return get(a.url,false);
   }).then(function(t){
     if(my!==load||t===null){return}
-    a.text=t;a.loaded=new Date();ready(a,false);
+    a.text=t;bar.style.width='80%';
+    return scriptCheck(t,a.url).then(function(h){
+      if(my!==load){return}
+      a.check=h;a.loaded=new Date();
+      if(h.state==='bad'){   // R6: say so in plain words and stop; no Copy button
+        failCard('The script does not match its hash. Do not run it.',h.why,h.todo||'Select "Try again". If it fails again, do not run the script: ask in the Teams channel.','<button type="button" class="btn primary" data-act="open" data-focus>Try again</button>');
+        return;
+      }
+      ready(a,false);
+    });
   }).catch(function(e){
     if(my!==load){return}
     var link=a.url?'<a class="btn" href="'+esc(a.url)+'">Open the script</a>':'<a class="btn" href="https://github.com/'+esc(a.repo)+'">Open the repository</a>';
@@ -142,7 +182,7 @@ function open(a){
 }
 function facts(a){
   var bytes=(window.TextEncoder?new TextEncoder().encode(a.text).length:a.text.length);
-  return '<p class="second"><span class="file">'+esc(a.file)+'</span><br>'+num(bytes)+' bytes, '+num(a.text.split('\n').length)+' lines</p>';
+  return '<p class="second"><span class="file">'+esc(a.file)+'</span><br>'+num(bytes)+' bytes, '+num(a.text.split('\n').length)+' lines'+checkLine(a)+'</p>';
 }
 var STEPS='<ol><li>Start menu: type ISE and open Windows PowerShell ISE as yourself (not "Run as administrator").</li>'+
   '<li>File &gt; New. Click in the white script pane. Press Ctrl+V, then F5.</li><li>The RADE window opens. Do what it says.</li></ol>';

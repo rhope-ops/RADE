@@ -32,7 +32,7 @@ $ui.Hist = Read-RoundHistory (Get-BasePath)
 $script:secret = Get-Secret (Get-ProfileLeaf) (Get-ProfileLeaf)   # saved checks are masked before they are written
 try { $ui.Calm = -not [System.Windows.Forms.SystemInformation]::UIEffectsEnabled } catch { $null = $_ }
 $ui.Form = New-Object System.Windows.Forms.Form
-$ui.Form.Text = 'RADE - ' + 'Test, deploy, enjoy' + ' - ' + $round + ' - build ' + $buildId   # the tagline (the Administrator, 18 Nov 26) is in the title bar; the window itself has none
+$ui.Form.Text = 'RADE - ' + 'Test, deploy, enjoy' + ' - ' + $round + ' - build ' + $buildId + $(if ($script:scriptCheck.Short) { ' - script ' + $script:scriptCheck.Short + $(if (-not $script:scriptCheck.Ok) { ' DOES NOT MATCH' } else { '' }) } else { '' })   # the bundle hash (docs/specs/bundle-hash.md); the tagline (the Administrator, 18 Nov 26) is in the title bar; the window itself has none
 $ui.Form.SuspendLayout()
 $ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(96, 96); $ui.Form.AutoScaleMode = 'Dpi'   # sizes below are at 100 % scaling
 # @@UI@@
