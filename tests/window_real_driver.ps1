@@ -41,7 +41,7 @@ function global:Save-RadeCard([string]$Tag) {
   # R32 measures (screen pixels, top/height): the bottom line's two texts, the header's widths, and on the Run card the step row.
   try { $sr = { param($C) $q = $C.RectangleToScreen($C.ClientRectangle); [string]$q.Top + '/' + $q.Height }
     $m = 'WIN r32 ' + $card + ' rec=' + (& $sr $ui.RecB) + ' right=' + (& $sr $ui.RightL) + ' word=' + $ui.WordL.Width + ' rule=' + $ui.HeadRule.Width + ' app=' + $ui.AppL.Width
-    if ($ui.View -eq 'run') { $m += ' name=' + (& $sr $ui.StepName) + ' bar=' + (& $sr $ui.StepBar) + '/m' + $ui.StepBar.Margin.Top + ' time=' + (& $sr $ui.StepTime) + '/m' + $ui.StepTime.Margin.Top + '/pref' + $ui.StepTime.PreferredSize.Height + ' [' + $ui.StepTime.Text + '] now=' + (& $sr $ui.Now) + '/m' + $ui.Now.Margin.Top + '/' + $ui.Now.Visible }
+    if ($ui.View -eq 'run') { $m += ' name=' + (& $sr $ui.StepName) + ' bar=' + (& $sr $ui.StepBar) + '/m' + $ui.StepBar.Margin.Top + ' time=' + (& $sr $ui.StepTime) + '/m' + $ui.StepTime.Margin.Top + '/pref' + $ui.StepTime.PreferredSize.Height + ' [' + $ui.StepTime.Text + '] now=' + (& $sr $ui.Now) + '/m' + $ui.Now.Margin.Top + '/' + $ui.Now.Visible + ' row=' + $ui.StepRow.Height + ' frac=' + (& $sr $ui.StepFrac) }
     Write-Host $m } catch { Write-Host ('WIN r32 ' + $card + ' error=' + $_.Exception.Message) }
 }
 # R31: answers the cards of the R31 brief. tour: each card (Next, then "Close the tour"); answer: the answer that means a
