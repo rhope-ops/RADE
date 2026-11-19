@@ -190,7 +190,7 @@ has "view=answer light=your turn kick=STEP 4 OF 4 · QUESTION 1 OF 2 sent=What d
 # The top bar and the state text (the Administrator, 2026-11-19): the title is the full name, the build and nothing else (no round, no
 # tagline); at the first frame the tagline stands in the name's spot, shown, in the name's font; the bottom right has the percent only.
 grep -q "^WIN script-warn mismatch view=choose text=\[This script does not match its hash. Do not run it.\] red=True$" "$wd/win.txt" && grep -q "^WIN script-warn match view=choose text=\[\] red=False$" "$wd/win.txt" && grep -q "^WIN script-warn unavailable view=choose text=\[\] red=False$" "$wd/win.txt" &&
-  for v in choose ready boot; do grep -q "^WIN script-warn own mismatch $v text=\[This script does not match its hash. Do not run it.\] red=True$" "$wd/win.txt" || false; done &&
+  ( for v in choose ready boot; do grep -q "^WIN script-warn own mismatch $v text=\[This script does not match its hash. Do not run it.\] red=True$" "$wd/win.txt" || exit 1; done ) &&
   grep -q "^WIN script-warn own match choose text=\[Last round on this computer: none recorded yet.\] red=False$" "$wd/win.txt" &&
   grep -q "^WIN script-warn own match ready text=\[Site: example\] red=False$" "$wd/win.txt" &&
   grep -q "^WIN script-warn own match boot text=\[\] red=False$" "$wd/win.txt" && ok || bad "script hash warning: red line on a mismatch, none on a match or when not available"
