@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # RADE engine tests, the window part: sourced by tests/engine_test.sh (its section "window"), never run alone. Split out
 # of engine_test.sh by the speed audit of 2026-11-17 (docs/code-standard.md C4: a file is at most 600 lines). Uses what
-# engine_test.sh defined before it: $t, $b, $engine_src, swap, go, ok and bad. Starts the background groups W, W2 and W3;
+# engine_test.sh defined before it: $t, $b, $engine_src, swap, ans, go, ok and bad. Starts the background groups W, W2, W3 and W4;
 # engine_test.sh "gather" waits for them and adds their counts.
 # Network: none.
 # Writes: temporary files under the test folder $t, deleted on exit.
@@ -22,7 +22,7 @@ stub() { if [ -s "$t/window_stub.dll" ]; then echo "$t/window_stub.dll"; else ec
 # win APP HAND RECORD TOUR [BUNDLE]: runs the window for application APP (0 = test, 1 = deploy); output in $wd/win.txt.
 win() { sed -E -e 's#Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing#$null = 0#' -e "s#^\\\$sitePrefix = 'https://usaf.dps.mil/sites/'#\$sitePrefix = 'https://rade-test.invalid/sites/'#" -e 's#System\.Drawing\.(FontStyle|Font|Pen|SolidBrush|Image|Graphics)\b#RadeDraw.\1#g' "${5:-$wd/wb.ps1}" > "$wd/wb2.ps1"
   cat tests/window_driver.ps1 "$wd/wb2.ps1" > "$wd/w.ps1"
-  RADE_T_FAULT="${fault:-}" RADE_T_CANCEL="${cancel:-}" RADE_T_START="${start:-}" RADE_T_LINK="${link:-}" RADE_T_SCALE="${scale:-}" RADE_T_LOOP="${loop:-}" RADE_T_STUB="$(stub)" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$wd/u/test1234" timeout 180 pwsh -NoProfile -File "$wd/w.ps1" < /dev/null > "$wd/win.txt" 2>&1; }
+  RADE_T_FAULT="${fault:-}" RADE_T_CANCEL="${cancel:-}" RADE_T_START="${start:-}" RADE_T_LINK="${link:-}" RADE_T_SCALE="${scale:-}" RADE_T_LOOP="${loop:-}" RADE_T_FEEDBACK="${feedback:-}" RADE_T_STUB="$(stub)" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$wd/u/test1234" timeout 180 pwsh -NoProfile -File "$wd/w.ps1" < /dev/null > "$wd/win.txt" 2>&1; }
 # has TEXT...: every text is in the window output, and the window did not fall back to text mode or miss a name.
 has() { local x; grep -q "No window could open\|WIN NONAME\|WIN NOFOCUS\|WIN BAD" "$wd/win.txt" && { grep -m3 "No window could open\|WIN NONAME\|WIN NOFOCUS\|WIN BAD" "$wd/win.txt" | cut -c1-300; return 1; }; for x in "$@"; do grep -qF -- "$x" "$wd/win.txt" || { echo "  missing: $x"; return 1; }; done; grep -q "^WIN closed=True" "$wd/win.txt"; }
 go W; {   # group W: runs in the background (see "go" in tests/engine_test.sh)
@@ -155,3 +155,42 @@ printf '{"x":50,"y":40,"w":1100,"h":650,"state":"Normal","dpi":96}' > "$wp"; win
 has "placed=saved" "shown=1100x650/Normal" && grep -q '"w": 1100' "$wp" && ok || bad "window place: saved bounds are used and saved again"
 
 echo "GROUP $pass $fail"; } > "$t/grp-W3.log" 2>&1 &
+
+go W4; {   # group W4: runs in the background (see "go" in tests/engine_test.sh)
+wgo w4
+# 7. The R31 brief (docs/reviews/2026-11-19-r31-plan.md; fake data): its own bundle, the sample with: T01 "doing"; the hand step T02
+# without Skip ("hide") and its text question only after "Yes" ("showIf"); a step T05 that shows only questions ("answersOnly"), with an
+# answer that means a failure ("failOn") and a question after the other answer. No application logo: the name is under the word RADE.
+mkdir -p "$t/r31/app/scripts"; cp -r tests/fixture-app/. "$t/r31/app/"; cp schemas/examples/sample-manifest.json "$t/r31/app/scripts/paste_bundles.json"; ans "$t/r31/app/scripts/paste_bundles.json"
+python3 - "$t/r31/app/scripts/paste_bundles.json" <<'P'
+import json, sys
+p = sys.argv[1]; m = json.load(open(p)); b = m['bundles'][0]
+for s in b['steps']:
+    if s['name'].startswith('T01 '): s['doing'] = 'Checking the sample files.'
+    if s['name'].startswith('T02 '): s['hide'] = ['skip']; s['answers'][2]['showIf'] = {'key': 'run-started', 'in': ['Yes']}
+b['steps'].append({'name': 'T05 Sample questions r1', 'dir': 'T05', 'file': '', 'kind': 'guide', 'guide': [], 'answersOnly': True, 'answers': [
+    {'key': 'page', 'prompt': 'What does the page show?', 'kind': 'pick', 'choices': ['The list', 'An error'], 'failOn': ['An error']},
+    {'key': 'more', 'prompt': 'Does the list show two rows?', 'kind': 'yesno', 'showIf': {'key': 'page', 'in': ['The list']}}]})
+b['apps'][0]['steps'].append('T05 Sample questions r1')
+json.dump(m, open(p, 'w'), indent=2)
+P
+python3 scripts/check_manifest.py "$t/r31/app/scripts/paste_bundles.json" > "$t/r31/check.txt" 2>&1 && python3 engine/rade_build.py --app-root "$t/r31/app" > "$t/r31/build.txt" 2>&1 && swap "$t/r31/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$wd/r31.ps1" "$wd/u" && ok || { bad "r31: the bundle with hide, answersOnly, failOn, showIf and doing is valid and builds"; tail -3 "$t/r31/check.txt" "$t/r31/build.txt"; }
+feedback='The second card was slow. Mail someone@example.com' win 0 done 0 0 "$wd/r31.ps1"
+wr="$wd/u/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt"
+# E1: the hand card has Done and It failed, no Skip. E3: the text question is not asked after "No", and the report says so.
+has "view=hand light=your turn kick=STEP 3 OF 4 · YOUR TURN" 'btn=[Imported] [It failed] back=' && ! grep -q "^WIN view=hand .*\[Skip\]" "$wd/win.txt" && [ "$(grep -c "^WIN view=answer .*STEP 3 OF 4" "$wd/win.txt")" = 2 ] &&
+  [ "$(grep -A3 "^T02 Sample import r1: PASSED (confirmed by you) in " "$wr" | tail -3 | tr -d '\r' | tr '\n' '|')" = "  Answer run-started: No|  Answer flow-count: Two|  Answer note: not asked|" ] && ok || { bad "r31 E1, E3: a hidden button and a question that depends on an answer"; grep "^WIN view=hand\|^WIN view=answer" "$wd/win.txt" | cut -c1-260; grep -A3 "^T02" "$wr"; }
+# E2: the step with only questions shows no hand card; its marked answer asks for the error text, the step is FAILED (reported by you)
+# with the answer and the masked text, the question after the other answer is not asked, and the round needs review.
+has "view=answer light=your turn kick=STEP 4 OF 4 · QUESTION 1 OF 2 sent=What does the page show? p= btn=[The list] [An error]" "view=answerfail light=your turn kick=STEP 4 OF 4 · IT FAILED sent=What did the error say?" "btn=[Continue]" "view=review light=failed" &&
+  [ "$(grep -c "^WIN view=hand " "$wd/win.txt")" = 1 ] && grep -q "^T05 Sample questions r1: FAILED (reported by you) in .*: answer page: An error. Error text: The page said: error 42 at <SITE>" "$wr" &&
+  [ "$(grep -A2 "^T05 Sample questions r1: FAILED" "$wr" | tail -2 | tr -d '\r' | tr '\n' '|')" = "  Answer page: An error|  Answer more: not asked|" ] && head -1 "$wr" | grep -q "NEEDS REVIEW" && ok || { bad "r31 E2: a step with only questions, and an answer that means a failure"; grep "^WIN view=answer\|^T05\|Answer" "$wd/win.txt" "$wr" | cut -c1-260; }
+# L4: the last card of a test round (after the last step); its text is in the report under its own line, masked. L5: the 2 state texts.
+has "view=feedback light=your turn kick=LAST QUESTION sent=Anything else about this round or the app? p=This is optional. Do not type names or addresses. btn=[Continue]" "right=Your turn." "WIN feedback max=2000 enter=Continue focus=True" "right=RADE is working... · " 'foot=RADE asks you one last question at the end. Until then, keep this window open.' &&
+  grep -q "^Other feedback: The second card was slow. Mail <EMAIL>" "$wr" && ! grep -q "someone@\|RADE is waiting for you" "$wd/win.txt" "$wr" && [ "$(cat $engine_src engine/rade_ui.ps1 | grep -c "RADE is waiting for you")" = 0 ] && ok || { bad "r31 L4, L5: the last card, its report line, the state texts"; grep "view=feedback\|Other feedback\|foot=" "$wd/win.txt" "$wr" | cut -c1-260; }
+# L7: the now-doing line shows the step's "doing", then a plain sentence for each result line, and a NOW line; none of them is in the log.
+# L8: a step stays on the Run card for the minimum time (engine/window.json minStepMs; the test user sets it to 0 after this one measure).
+has "WIN now=Checking the sample files." "WIN now=Checked: sample check: PowerShell" "WIN now-text pass=Checked: list there|skip=Skipped: no flow|fail=Needs review: list missing|plain=|none=" "WIN hold ms=120 held=True json=500" && ! grep -q "Checking the sample files" "$wr" && ok || { bad "r31 L7, L8: the now-doing line and the minimum step time"; grep "WIN now\|WIN hold" "$wd/win.txt" | cut -c1-200; }
+# A deploy asks no last question.
+! grep -q "view=feedback" "$t/w1/win.txt" && ! grep -q "^Other feedback" "$t/w1/u/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && ok || bad "r31 L4: a deploy has no last question"
+echo "GROUP $pass $fail"; } > "$t/grp-W4.log" 2>&1 &
