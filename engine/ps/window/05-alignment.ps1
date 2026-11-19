@@ -33,7 +33,7 @@ $ui.FitHead = { try {
     # L2: the line under the word is as wide as the word's ink and starts where it starts.
     # R34: the width comes from the ink Windows drew in the panel ($ui.InkBox, the measure of the self-check), not from the
     # panel's width: at 150 % in ISE the panel was 114 wide and the drawn word 93 (each card had the defect).
-    if ($ui.AppUnder) { & $ui.SetLeft $ui.HeadRule $e; $rw = & $ui.RuleW; if ($ui.HeadRule.Width -ne $rw) { $ui.HeadRule.Width = $rw } } } catch { $null = $_ } }
+    if ($ui.AppUnder) { & $ui.SetLeft $ui.HeadRule $e; $rw = & $ui.RuleW; if ($ui.HeadRule.Width -ne $rw) { $ui.HeadRule.Width = $rw } } } catch { $null = $_ } }   # no measure (no window handle yet): the next fit sets the edges
 # The width of the line under the word RADE: the width of the word's drawn ink, measured once for each text, font and
 # panel size. Takes nothing; gives back the width in pixels (at least 1).
 $ui.RuleW = { $w = $ui.WordL; $f = $w.Font; $k = 'rule|' + [string]$w.Text + '|' + $f.Name + '|' + $f.SizeInPoints + '|' + $w.Width + 'x' + $w.Height

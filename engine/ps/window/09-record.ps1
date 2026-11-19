@@ -47,7 +47,7 @@ $ui.RecChecks.Add_Paint({
 # Reads the check results again while the Record is open (R33: a check that ended after F2 still showed NOT RUN). Takes
 # nothing; does nothing when the Record is closed. Called after each check result of the window's check runs.
 $ui.RecRefresh = { if (-not $ui.RecOn) { return }
-  try { $ui.RecData = @(& $ui.RecRows); & $ui.RecTall; & $ui.RecName; $ui.RecChecks.Invalidate() } catch { $null = $_ } }
+  try { $ui.RecData = @(& $ui.RecRows); & $ui.RecTall; & $ui.RecName; $ui.RecChecks.Invalidate() } catch { $null = $_ } }   # a form being closed: nothing to redraw
 # Sets the screen-reader text of the check list from $ui.RecData. Takes nothing.
 $ui.RecName = { $ui.RecChecks.AccessibleName = 'Checks. ' + ((@($ui.RecData) | ForEach-Object { if ($_.Head) { $_.Head + ':' } else { $_.Name + ' ' + $_.State + $(if (@($_.More).Count) { ', ' + (@($_.More) -join ', ') } else { '' }) } }) -join '. ') }
 # The whole Record as plain text, for Copy all (R33): the title, each check with its result and its detail lines, each step
