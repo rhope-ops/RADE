@@ -29,7 +29,7 @@ function global:Test-RadePaste {
   Write-Host ('WIN paste ok=' + $pl + ' text=' + $ui.Field.SelectedText + ' cut=' + (& $ui.OneLine ('x' * 20) 5) + ' joined=' + (& $ui.OneLine "a`tb`r`n`r`nc" 100) + ' note=' + $ui.Note.Text)
   # R7: a paste over the room is cut and the gray line under the box says how many characters did not fit.
   $ui.Field.Text = ('a' * ($ui.Field.MaxLength - 3)); [RadeStub.Driver]::Clip = ('x' * 1237); $pc = & $ui.PasteLine $ui.Field
-  Write-Host ('WIN paste-cut ok=' + $pc + ' len=' + $ui.Field.Text.Length + ' note=' + $ui.Note.Text + ' shown=' + $ui.Note.Visible)
+  Write-Host ('WIN paste-cut ok=' + $pc + ' inserted=' + $ui.Field.Inserted.Length + ' note=' + $ui.Note.Text + ' shown=' + $ui.Note.Visible)
   $ui.Field.Text = ('a' * ($ui.Field.MaxLength - 1)); [RadeStub.Driver]::Clip = 'xy'; $null = & $ui.PasteLine $ui.Field; Write-Host ('WIN paste-cut one=' + $ui.Note.Text)
   $ui.Field.Text = ''; [RadeStub.Driver]::Clip = 'fits'; $null = & $ui.PasteLine $ui.Field; Write-Host ('WIN paste-cut none=[' + $ui.Note.Text + ']') }
 # R33: a check result that comes while the Record is open shows, with its detail also when it passed; Copy all gives the
