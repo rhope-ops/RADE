@@ -232,8 +232,7 @@ $ui.Own = { param($B) $B.UseVisualStyleBackColor = $false; $B.Add_Paint({ & $ui.
 # 'compact' (96 x 30: beside a box, "Back (Esc)", the Record's buttons; 160 x 30 when its label needs more room). A label
 # that needs more than the widest size is cut, and the self-check reports it (rule B1). Sizes: $ui.Z.
 $ui.BtnKind = @{}
-# The size a button of a kind takes for its text, in pixels: at 100 % before the window has its scale (Windows Forms
-# scales it then), else scaled. Takes the button; gives back a Size.
+# The size of a button of a kind for its text: at 100 % before the window has its scale (Windows Forms scales it), else scaled.
 $ui.BtnSize = { param($B)
   $k = [string]$ui.BtnKind[$B]; $s = $(if ($ui.Scaled) { $ui.Sc } else { { param([double]$Px) [int]$Px } })
   $h = $(if ($k -eq 'compact') { $ui.Z.CompactH } else { $ui.Z.ActionH }); $ws = $(if ($k -eq 'compact') { @($ui.Z.CompactW, $ui.Z.ActionW) } else { @($ui.Z.ActionW, $ui.Z.WideW) })
