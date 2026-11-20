@@ -29,7 +29,7 @@ $ui.Z = @{ ActionW = 160; WideW = 240; ActionH = 40; CompactW = 96; CompactH = 3
   G1 = 4; G2 = 8; G3 = 12; G4 = 16; G6 = 24
   FieldS = 240; FieldM = 420; FieldL = 600 }
 # Faces: name = @(family, the font file's name in the bundle ('' = none), the family used when the font cannot be loaded).
-$ui.Faces = @{ title = @('Sofia Sans Condensed SemiBold', '', 'Segoe UI Semibold'); text = @('Sofia Sans', '', 'Segoe UI'); strong = @('Sofia Sans SemiBold', '', 'Segoe UI Semibold'); mono = @('Consolas', '', 'Consolas') }
+$ui.Faces = @{ title = @('Sofia Sans Condensed SemiBold', 'SofiaSansCondensed-SemiBold.ttf', 'Segoe UI Semibold'); text = @('Sofia Sans', 'SofiaSans-Regular.ttf', 'Segoe UI'); strong = @('Sofia Sans SemiBold', 'SofiaSans-SemiBold.ttf', 'Segoe UI Semibold'); mono = @('Consolas', '', 'Consolas') }
 # Text styles: name = @(face, size in points at 100 %, font style ('' = regular)); uses: the file.
 $ui.Styles = [ordered]@{}
 $ui.Styles.Sent = @('title', 22, ''); $ui.Styles.Word = @('title', 15, 'Bold'); $ui.Styles.Body = @('text', 12, ''); $ui.Styles.Small = @('text', 10, '')

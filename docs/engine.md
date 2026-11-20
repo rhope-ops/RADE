@@ -164,7 +164,7 @@ After the owner's test rounds end, the test branch and its results e-mail (draft
 
 Decided by the Administrator, 2026-11-14: RADE offers Install, Diagnose, Restore and Uninstall as run types and keeps the record right for each (version, step states, made list); the app supplies what each needs. Not built.
 
-Decided by the Administrator, 2026-11-14: the screen has the title "Maintenance", is shown for an app that is installed, and has five action buttons:
+Decided by the Administrator, 2026-11-14 (changed 2026-11-20, UI standard v1: the card has Start, Maintenance and Uninstall, and "Maintenance" opens its own screen with the other actions; [window-design.md](window-design.md) "Cards"): the screen has the title "Maintenance", is shown for an app that is installed, and has five actions:
 
 | Button | Does | Writes | Asks first |
 |---|---|---|---|

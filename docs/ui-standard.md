@@ -22,9 +22,9 @@ Sizes are pixels at 100 % Windows scaling; every size set after the window has i
 | B12 | Type: Sofia Sans Condensed for titles (the headline, the word RADE), Sofia Sans for text, Consolas for the Record's text box only; Segoe UI when a font cannot be loaded. The fonts load for the process only (PrivateFontCollection and a GDI memory font: no install, no administrator). Styles and sizes: the tokens. The RADE page uses the same families with Segoe UI after them. | The SCALE facts (`WIN high=... fonts=...`); stand-in tests (one font per style) |
 | B13 | Feedback: in a test round, every card has the link "Feedback" at the same place (the bottom line). It opens a comment card; Save writes the comment (masked as a text answer is) and a PNG of the window into `Rounds\<round>\Feedback`. That folder is not attached to the results e-mail: the picture shows the real profile path (AGENTS.md "Project rules", DoD365 boundary). | Stand-in test `WIN note` (tests/engine_window.sh, window 3) |
 
-## Fonts (B12): open item
+## Fonts (B12)
 
-The font files are not in the repo yet. They are binary, the content check does not scan binary files, and a `skip:` line in `.check` is the Administrator's to add (AGENTS.md "Guards and checks"). Until then each face uses its fallback (Segoe UI). [scripts/build_fonts.py](../scripts/build_fonts.py) makes the three files (a Latin subset of the Sofia Sans release files, SIL Open Font License 1.1, about 43 KB each, so a bundle grows by about 170 KB); then each file is named in the tokens' `faces`, with engine/fonts/OFL.txt beside them.
+engine/fonts holds the three files: a Latin subset of the Sofia Sans release files, SIL Open Font License 1.1 (engine/fonts/OFL.txt), about 43 KB each, so a bundle grows by about 170 KB. [scripts/build_fonts.py](../scripts/build_fonts.py) makes them again from the release files, checked by SHA-256. They are binary, so the content check skips them (`.check`: `skip: engine/fonts/*.ttf`, the Administrator, 2026-11-20). A character outside the subset (Basic Latin, Latin-1, Latin Extended-A, common punctuation, arrows) can show as a box.
 
 ## Proof
 

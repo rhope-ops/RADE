@@ -1,6 +1,6 @@
-# Plan: the Maintenance screen and its tools (draft, 2026-11-20)
+# Plan: the Maintenance screen and its tools (2026-11-20)
 
-Status: DRAFT for the Administrator's approval. Asked by the Administrator (as PFM, 2026-11-20, relayed by the 90-161.Z session): keep Diagnose, Back up and Restore, put them with Update/Repair on their own Maintenance screen, and build them far enough to be tested. The run types and their functions are already decided in [../engine.md](../engine.md) "Maintenance run types" (2026-11-14); this plan orders the build and names what a test round checks.
+Status: approved by the Administrator, 2026-11-20 (questions 2 to 4 below: yes; all three tools in the next release after engine-v28, not one each). Asked by the Administrator (as PFM, 2026-11-20, relayed by the 90-161.Z session): keep Diagnose, Back up and Restore, put them with Update/Repair on their own Maintenance screen, and build them far enough to be tested. The run types are decided in [../engine.md](../engine.md) "Maintenance run types" (2026-11-14); the function lists there are an agent recommendation, not yet approved. This plan orders the build and names what a test round checks. It adds D0 (the checks again) and, for this first build, leaves out D5 to D8, R6 and R7; Restore v1 keeps engine.md's rule "missing rows only, no overwrite". The function list for the build comes back to the Administrator with the next PR.
 
 ## Stage 0: the screen (built in PR 136, engine-v28)
 

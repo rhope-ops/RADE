@@ -124,10 +124,11 @@ $ui.VMaint = { param($Inst)
   # It runs the checks first (Start comes only after they pass: AGENTS.md "RADE and the app"), then starts the application.
   $ui.StartAfter = $false; $startB = $null; $startMain = $false
   if ([string]$script:app.Start -and (Get-StartPath)) { $startMain = ([string]$Inst.version -eq [string]$script:app.Version); $startB = @{ Text = 'Start ' + $script:app.Name; Kind = $(if ($startMain) { 'primary' } else { '' }); Act = { $ui.StartAfter = $true; & $ui.Checks $false } } }
+  $ui.MaintVerb = $verb   # read when the button is clicked (a scriptblock does not keep this card's local variables)
   & $ui.SetCard @{ View = 'maint'; Kicker = ($script:app.Name + ' ' + $Inst.version + $on); Sentence = 'Maintenance'
     P = @(('Maintenance holds ' + $verb + ', Diagnose, Back up and Restore.'), $(if ($startB) { 'Start runs the checks, then opens ' + $script:app.Name + '.' } else { '' }))
     Note = 'Uninstall is not in this version of RADE yet.'
-    Buttons = @($startB, @{ Text = 'Uninstall'; Kind = 'dangeroff' }, @{ Text = 'Maintenance'; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.VTools $verb } })   # B5: 1 primary + 3 others at most
+    Buttons = @(@{ Text = 'Uninstall'; Kind = 'dangeroff' }, $startB, @{ Text = 'Maintenance'; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.VTools $ui.MaintVerb } })   # Uninstall first: away from the primary   # B5: 1 primary + 3 others at most
     Back = { & $ui.VChoose } } }
 # The Maintenance screen (the Administrator, 2026-11-20): Update or Repair (works: the checks, then the install run),
 # and Diagnose, Back up and Restore, shown not available until they are built (docs/engine.md "Maintenance run types").

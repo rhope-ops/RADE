@@ -18,6 +18,8 @@ area.example.smil.mil
 notsmil.mil
 skip: assets/logo/*.png
 skip: tests/fixture-app/flow/SAMPLE-T02-import-r1.zip
+# The RADE fonts: binary OFL font files, not scannable (UI standard v1 B12; the Administrator, 2026-11-20).
+skip: engine/fonts/*.ttf
 # Code standard and audit settings (the keys: the header of scripts/check_settings.py).
 code-max-line-chars: 200
 code-c1-safety: on

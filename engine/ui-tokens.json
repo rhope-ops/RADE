@@ -48,9 +48,9 @@
   "gaps": { "G1": 4, "G2": 8, "G3": 12, "G4": 16, "G6": 24 },
   "fields": { "FieldS": 240, "FieldM": 420, "FieldL": 600 },
   "faces": {
-    "title": { "family": "Sofia Sans Condensed SemiBold", "file": "", "fallback": "Segoe UI Semibold" },
-    "text": { "family": "Sofia Sans", "file": "", "fallback": "Segoe UI" },
-    "strong": { "family": "Sofia Sans SemiBold", "file": "", "fallback": "Segoe UI Semibold" },
+    "title": { "family": "Sofia Sans Condensed SemiBold", "file": "engine/fonts/SofiaSansCondensed-SemiBold.ttf", "fallback": "Segoe UI Semibold" },
+    "text": { "family": "Sofia Sans", "file": "engine/fonts/SofiaSans-Regular.ttf", "fallback": "Segoe UI" },
+    "strong": { "family": "Sofia Sans SemiBold", "file": "engine/fonts/SofiaSans-SemiBold.ttf", "fallback": "Segoe UI Semibold" },
     "mono": { "family": "Consolas", "file": "", "fallback": "Consolas" }
   },
   "styles": {
