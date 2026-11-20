@@ -74,6 +74,7 @@ $ui.RecSteps.Add_SizeChanged({ & $ui.RecFit })
 # Opens the Record (F2): every check, the step boxes, the files, the made list and the log, sized to its rows.
 $ui.VRecord = {
   & $ui.Check
+  if ($ui.View -eq 'ready' -and -not $ui.Running) { $ui.Edit = $true }   # B7 (UI standard v1): the Record is a link only; opened from Ready, its boxes can change
   $ui.RecOn = $true; $ui.RecData = @(& $ui.RecRows)
   $ui.RecW = 0; & $ui.RecTall   # as tall as its rows (the same plan as the Paint handler)
   & $ui.RecName; $ui.RecCopy.Text = 'Copy all'
@@ -83,7 +84,7 @@ $ui.VRecord = {
   & $mk 'STEPS' $ui.F.SmallB $ui.C.Gray
   if (-not $ui.Picked) { & $mk 'Choose an application first.' $ui.F.Small $ui.C.Gray }
   else {
-    if (-not $ui.Edit) { & $mk $(if ($ui.Running) { 'The run has started: the boxes are locked.' } else { 'To change the boxes, go to "Ready" and select "Record".' }) $ui.F.Small $ui.C.Gray }
+    if (-not $ui.Edit) { & $mk $(if ($ui.Running) { 'The run has started: the boxes are locked.' } else { 'To change the boxes, go to "Ready" and select "Record (F2)".' }) $ui.F.Small $ui.C.Gray }
     $list = @(); if ($cleanup.Count) { $list += -1 }; $list += @($script:appSteps); $n = 0
     foreach ($k in $list) {
       $cb = New-Object System.Windows.Forms.CheckBox
@@ -110,16 +111,17 @@ $ui.VRecord = {
   $ui.RecText.Text = ($t -join "`r`n") + "`r`n"   # ends with a line break: a live log line is added below
   $ui.RecTitle.Text = 'Record' + $(if ($ui.Picked) { $dot + $script:app.Name } else { '' })
   & $ui.RecFit
-  $ui.Card.Visible = $false; $ui.Rec.Visible = $true; & $ui.RecTall; $ui.RecChecks.Invalidate(); $ui.RecB.Visible = $false; $ui.TourB.Visible = $false; $ui.BackB.Visible = $false
+  $ui.Card.Visible = $false; $ui.Rec.Visible = $true; & $ui.RecTall; $ui.RecChecks.Invalidate(); $ui.RecB.Visible = $false; $ui.TourB.Visible = $false; $ui.BackB.Visible = $false; $ui.FeedB.Visible = $false
   try { [void]$ui.RecClose.Focus() } catch { $null = $_ } }
 # Closes the Record and shows the card again; redraws the ready card when a step box was changed. Takes nothing.
 $ui.CloseRecord = {
   & $ui.Check
-  $ui.RecOn = $false; $ui.Rec.Visible = $false; $ui.Card.Visible = $true; $ui.RecB.Visible = $true; $ui.TourB.Visible = ($ui.HelpViews -contains [string]$ui.View); $ui.BackB.Visible = [bool]$ui.Back
+  $ui.RecOn = $false; $ui.Rec.Visible = $false; $ui.Card.Visible = $true; $ui.RecB.Visible = $true; $ui.TourB.Visible = ($ui.HelpViews -contains [string]$ui.View); $ui.BackOn = [bool]$ui.Back; $ui.BackB.Visible = $ui.BackOn; $ui.BtnRow.Visible = [bool](@($ui.BOn | Where-Object { $_ }).Count -or $ui.BackOn); & $ui.Apart; $ui.FeedB.Visible = [bool]((& $ui.NoteOn) -and [string]$ui.View -notin $ui.NoNoteViews)
   if ($ui.Edit) { $ui.Edit = $false; if ($ui.View -eq 'ready') { & $ui.VReady } }   # the plan line follows the boxes
   try { [void]$ui.RecB.Focus() } catch { $null = $_ } }
 $ui.RecB.Add_Click({ & $ui.VRecord })
+$ui.FeedB.Add_Click({ if (& $ui.Settled) { & $ui.VNote } })   # B13: the feedback card for the card on screen
 $ui.RecClose.Add_Click({ & $ui.CloseRecord })
 $ui.RecCopy.Add_Click({ & $ui.RecCopyAll })
-$ui.BackB.Add_Click({ if ($ui.Back -and -not $ui.RecOn -and -not $ui.Busy -and -not $ui.Running) { & $ui.Back } })
+$ui.BackB.Add_Click({ if ((& $ui.Settled) -and $ui.Back -and -not $ui.RecOn -and -not $ui.Busy -and -not $ui.Running) { & $ui.Back } })
 

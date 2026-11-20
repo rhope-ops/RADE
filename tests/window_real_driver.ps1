@@ -51,13 +51,18 @@ function global:Save-RadeCard([string]$Tag) {
 function global:Step-RadeR31([string]$V) {
   if ($V -eq 'answerfail') { $ui.ErrBox.Text = 'The page said: error 42' } elseif ($V -eq 'feedback') { $ui.Field.Text = 'Sample feedback' }
   $fb = @($ui.B | Where-Object { $_.Visible -and $_.Text -like 'An error*' })[0]
-  if ($V -eq 'answer' -and $fb) { $fb.PerformClick() } else { $ui.B[0].PerformClick() }
+  if ($V -eq 'answer' -and $fb) { $fb.PerformClick() } else { (Get-RadeMain).PerformClick() }
 }
+# The primary button of the card on screen (UI standard v1: the last one), or the first shown button when it has none.
+function global:Get-RadeMain { $m = @($ui.B | Where-Object { $_.Visible -and [string]$ui.Kinds[$_] -eq 'primary' }); if ($m.Count) { return $m[0] }; return @($ui.B | Where-Object { $_.Visible })[0] }
+# Prints the action row of the card on screen: its wrap width, the text column, and each button's place and left margin.
+function global:Write-RadeRow { Write-Host ('WIN row max=' + $ui.BtnRow.MaximumSize.Width + ' cw=' + $ui.ContentW + ' w=' + $ui.BtnRow.Width + ' ' + ((@(@($ui.BackB) + @($ui.B)) | Where-Object { $_.Visible } |
+    ForEach-Object { $_.Text + ':' + $_.Left + '/' + $_.Top + '/' + $_.Width + '/m' + $_.Margin.Left }) -join ' ')) }
 function global:Step-Rade {
   if (((Get-Date) - $global:RadeT.T0).TotalSeconds -gt 240) { Write-Host ('WIN TIMEOUT view=' + $ui.View + ' sent=' + $ui.Sent.Text); [Environment]::Exit(3) }
   if (-not $ui -or -not $ui.Form -or $ui.Form.IsDisposed -or -not $ui.Form.Visible -or -not $ui.View) { return }
   if (-not $global:RadeT.Env) {
-    $global:RadeT.Env = $true; $sc = [System.Windows.Forms.Screen]::PrimaryScreen
+    $global:RadeT.Env = $true; $sc = [System.Windows.Forms.Screen]::PrimaryScreen; Write-Host ('WIN high=' + [bool]$ui.High + ' fonts=' + $ui.FontNote + ' standard=' + $ui.Standard)
     Write-Host ('WINENV ps=' + $PSVersionTable.PSVersion + ' dpi=' + $ui.Dpi + ' screen=' + $sc.Bounds.Width + 'x' + $sc.Bounds.Height + ' working=' + $sc.WorkingArea.Width + 'x' + $sc.WorkingArea.Height + ' form=' + $ui.Form.Width + 'x' + $ui.Form.Height + ' interactive=' + [Environment]::UserInteractive)
     foreach ($k in @($ui.F.Keys | Sort-Object)) { $f = $ui.F[$k]; Write-Host ('MEASURE ' + $k + ' ' + $f.Name + ' ' + $f.SizeInPoints + ' ' + $f.Style + ' = ' + [System.Windows.Forms.TextRenderer]::MeasureText('The quick brown fox jumps over the lazy dog 0123456789', $f, (New-Object System.Drawing.Size(9999, 99)), [System.Windows.Forms.TextFormatFlags]'NoPadding, NoPrefix, SingleLine').Width + ' h=' + [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $f).Height) }
   }
@@ -79,7 +84,7 @@ function global:Step-Rade {
     foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Index -eq $global:RadeT.App) { $o.PerformClick(); return } }
     Write-Host 'WIN BAD no choice for the application'; [Environment]::Exit(4)
   }
-  elseif ($v -eq 'maint') { @($ui.B | Where-Object { $_.Visible -and $_.Enabled -and $_.Text -notlike 'Start *' })[0].PerformClick() }   # Repair or Update (Start would start the application)
+  elseif ($v -eq 'maint') { Write-RadeRow; @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Maintenance' })[0].PerformClick() } elseif ($v -eq 'tools') { (Get-RadeMain).PerformClick() }   # the Maintenance screen, then Repair or Update (Start would start the application)
   elseif ($v -eq 'site') { $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }
   elseif ($v -in 'fail', 'need') {
     $id = [string]@($script:appChecks)[([int]($ui.Kick.Text -replace '^CHECK (\d+) OF .*$', '$1')) - 1]
@@ -99,8 +104,8 @@ function global:Step-Rade {
       $global:RadeT.NoAddr = $true; $g0 = $ui.GUrl; $s0 = $ui.G.Step; $ui.GUrl = ''; $ui.G.Step = $s0.Clone(); $ui.G.Step.UrlConfig = ''
       & $ui.VHand; Save-RadeCard 'noaddress-hand'; Write-Host ('WIN no-address field=' + $ui.FieldRow.Visible + ' guide=' + $ui.Guide.Visible + ' path=' + $ui.PathT.Visible)
       $ui.GUrl = $g0; $ui.G.Step = $s0; & $ui.VHand }
-    if ($ui.B[1].Text -ne 'It failed') { $ui.B[0].PerformClick() }
-    elseif ($global:RadeT.Hand -eq 'fail') { $ui.B[1].PerformClick() } else { $ui.B[0].PerformClick() }
+    $hf = @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'It failed' })[0]   # B3: Done (primary) is the last button
+    if (-not $hf) { (Get-RadeMain).PerformClick() } elseif ($global:RadeT.Hand -eq 'fail') { $hf.PerformClick() } else { (Get-RadeMain).PerformClick() }
   }
   elseif ($v -eq 'answer') {
     if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }; Step-RadeR31 $v }

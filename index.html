@@ -10,11 +10,12 @@
    (the header of the 90-161.Z page: navy to blue, a yellow line under it; the logo, RADE with the tagline under it, and
    TEAMS at the right on the row of RADE with the channel name under it; the Administrator, 18 Nov 26), one card and a bottom line in the same centered 860 px column, and a 4 px bar on the bottom edge.
    Colors, one meaning each: navy = text and focus; blue = the action and progress; yellow = the line under the band;
-   dark red = failed; green = done; gray = second lines. The light-theme values are the window's ($ui.C in
-   engine/rade_build.py). Sizes: docs/window-design.md "Sizes" (a button is 132 x 40 at least; a link is underlined). */
-:root{--bg:#ffffff;--navy:#0b2545;--text:#1b2430;--gray:#5a6573;--action:#00539f;--action-fg:#ffffff;--link:#00539f;
---turn:#ffd520;--fail:#8b1a1a;--pass:#2e8540;--edge:#7a8794;--track:#e3e8ee;--btn:#ffffff;
---ui:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;--mono:Consolas,"Cascadia Mono",ui-monospace,monospace}
+   dark red = failed; green = done; gray = second lines. The light colors, the fonts and the contrast blocks come from
+   engine/ui-tokens.json (UI standard v1, docs/ui-standard.md); the dark scheme is the page's own. A link is underlined. */
+/* >>> ui-tokens: generated from engine/ui-tokens.json by scripts/ui_tokens.py --write (do not edit) */
+:root{--bg:#ffffff;--navy:#0b2545;--text:#1b2430;--gray:#5a6573;--action:#00539f;--action-fg:#ffffff;--link:#00539f;--turn:#ffd520;--fail:#8b1a1a;--pass:#2e8540;--edge:#7a8794;--track:#e3e8ee;--btn:#ffffff;
+--ui:"Sofia Sans","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;--title:"Sofia Sans Condensed","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;--mono:Consolas,"Cascadia Mono",ui-monospace,monospace}
+/* <<< ui-tokens */
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e141c;--navy:#dde8f3;--text:#e6ebf1;--gray:#a5b1c0;--action:#00539f;--action-fg:#ffffff;--link:#8db4ec;
 --turn:#ffd520;--fail:#f0a3a3;--pass:#6cc487;--edge:#8794a6;--track:#243143;--btn:#172130;color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#0e141c;--navy:#dde8f3;--text:#e6ebf1;--gray:#a5b1c0;--action:#00539f;--action-fg:#ffffff;--link:#8db4ec;
@@ -43,7 +44,7 @@ body{margin:0;background:var(--bg);color:var(--text);font:1rem/1.5 var(--ui)}
 .card{max-width:42rem;min-width:0;padding-block:16px;display:flex;flex-direction:column;gap:14px}
 .caps{margin:0;font-size:.8125rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gray)}
 .win[data-light="fail"] .caps{color:var(--fail)}
-h1{margin:0;font-size:1.8rem;line-height:1.2;font-weight:600;color:var(--navy);text-wrap:balance}
+h1{margin:0;font-family:var(--title);font-size:1.8rem;line-height:1.2;font-weight:600;color:var(--navy);text-wrap:balance}
 .card p{margin:0;max-width:65ch;overflow-wrap:anywhere}
 .second{color:var(--gray);font-size:.875rem;font-variant-numeric:tabular-nums}
 .file{font-family:var(--mono);font-size:.8125rem}
@@ -66,6 +67,10 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 .bar i{display:block;height:100%;width:0;background:var(--fill,var(--action));transition:width .25s linear}
 .win[data-done] .bar i{background:var(--pass)}
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+/* >>> ui-tokens-contrast: generated from engine/ui-tokens.json by scripts/ui_tokens.py --write (do not edit) */
+@media (prefers-contrast:more){:root{--gray:#1b2430;--edge:#0b2545;--track:#7f93a8}}
+@media (forced-colors:active){:root,:root[data-theme]{--bg:Canvas;--navy:CanvasText;--text:CanvasText;--gray:GrayText;--action:Highlight;--action-fg:HighlightText;--link:LinkText;--turn:Highlight;--fail:CanvasText;--pass:Highlight;--edge:ButtonText;--track:GrayText;--btn:ButtonFace}}
+/* <<< ui-tokens-contrast */
 /* Contrast modes (the Administrator, 19 Nov 26: "ensure the html site supports contrast modes").
    1. More contrast (prefers-contrast:more): second lines, edges and links move toward the text color; the band is one solid
       navy with white text; the focus ring is 3 px. The bar has an edge line above it; light: its track is the page color;

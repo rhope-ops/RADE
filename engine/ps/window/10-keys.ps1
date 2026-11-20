@@ -66,9 +66,11 @@ $ui.WheelOn = { param($C) try { $C.Add_MouseWheel({ & $ui.Wheel $this $_ }) } ca
 $ui.Form.Add_Shown({
   & $ui.WheelOn $ui.Form
   $ui.Opened = $true; & $ui.FormDpi; $ui.Scaled = $true   # the form has its scale now: from here the size handlers work (each runs once below or on the first card)
+  foreach ($b in @($ui.BtnKind.Keys)) { & $ui.FitBtn $b }   # UI standard v1: every button at its fixed size for this scale
   & $ui.Place
   & $ui.Fit; $ui.ShownAt = & $ui.WinNow; $ui.Anim.Start()
   & $ui.Boot })
+$ui.Form.Add_SystemColorsChanged({ & $ui.Recolor $false })   # a contrast theme came on or went off (UI standard v1, B11): the window's own thread
 $ui.Form.Add_FormClosing({
   # The window's X (there is no Exit button): ask first only while a step runs, because closing stops it (R17).
   if ($ui.Running -and -not $script:closing) {

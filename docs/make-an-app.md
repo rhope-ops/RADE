@@ -33,6 +33,16 @@ What an application repository must hold so that RADE can test and deploy it. RA
 4. Test the bundle in the app repo: run it in PowerShell 7 text mode with the users folder swapped for a temporary one (the example's `tests/run.sh` shows how). Engine behavior is tested in RADE ([../tests/engine_test.sh](../tests/engine_test.sh)); an app tests only its own bundle and files.
 5. Ask the Administrator to add the app to [../apps.json](../apps.json) (`repo` and `manifest`). The RADE page then offers the last bundle in the manifest.
 
+## Adopt the UI standard
+
+UI standard v1 ([ui-standard.md](ui-standard.md); the Administrator, 2026-11-20) holds for every window an app shows, also its own (for example a step's own form). For a bundle the engine does it all: a lock on an engine release from engine-v29 is enough. For an app's own window:
+
+1. Copy `engine/rade_ui.ps1` of the locked commit into the window as it is (its token block comes with it); build every button with `$ui.Btn` (`'action'` or `'compact'`) and every link with `$ui.LinkBtn`, and take colors only from `$ui.C` and sizes only from `$ui.Z`.
+2. Put the primary button last in the action row, one at most, at most 3 others; Back is a compact "Back (Esc)" at the left end.
+3. Hook `$ui.Recolor` on the form's `SystemColorsChanged`, as the engine does (engine/ps/window/10-keys.ps1), so a contrast theme takes effect while the window is open.
+4. Run `$ui.Check` on each card in a test round and fix every `LAYOUT` line; set `RADE_INVENTORY` to keep a JSON line per control.
+5. Set `"ui": "v1"` for the app in [../apps.json](../apps.json) when its windows follow the standard (the Administrator's change, as in step 5 above).
+
 ## Rules
 
 - A RADE session never edits an app repo, and an app session never edits RADE: an engine change is a RADE pull request, then a release, then a lock change in the app.
