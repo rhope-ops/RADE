@@ -6,7 +6,7 @@
   What it is: a plain HTML page saved with the .aspx extension. Upload it to a SharePoint Online library and open it.
   It answers one question: can a RADE-style page (HTML, CSS and inline script) run from SharePoint Online on this site?
 
-  What it does: it runs 8 checks inside the browser only and shows the result of each.
+  What it does: it shows 9 checks, all inside the browser only: 8 pass or fail, and row 9 is information only.
   What it never does: no network request of any kind (no fetch, no XHR, no image or script from another place), no
   read of SharePoint lists or files, no write, no cookie, and it does not show the page address (the address names the
   site). RADE project rule "No reconnaissance": every check reads only this browser's own features.
@@ -67,8 +67,9 @@ var CHECKS=[
   ['6. SHA-256 hash (Web Crypto)',function(){return !!(window.crypto&&crypto.subtle&&window.TextEncoder)},'The page can check a script against its hash before you copy it.'],
   ['7. Text file in the browser (Blob)',function(){var u=URL.createObjectURL(new Blob(['RADE'],{type:'text/plain'}));URL.revokeObjectURL(u);return true},'"View as .txt" and "Save as .txt" can work.'],
   ['8. Local storage',function(){var k='rade-ops-check';localStorage.setItem(k,'1');var ok=localStorage.getItem(k)==='1';localStorage.removeItem(k);return ok},'The page can remember the last app you chose (this browser only).'],
-  ['9. Page frame',function(){return window.top===window.self?'not in a frame':'in a frame'},'Information only: "in a frame" means SharePoint shows the page inside another page.']
 ];
+// Row 9 is information only: it is shown, never counted as a pass or a fail.
+var INFO=['9. Page frame',window.top===window.self?'not in a frame':'in a frame','"In a frame" means SharePoint shows the page inside another page.'];
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 var rows=document.getElementById('rows'),html='',pass=0,fail=0;
 rows.rows[1].parentNode.removeChild(rows.rows[1]);   // row 2 is the static "Not run" row: the script ran, so replace it
@@ -78,9 +79,10 @@ CHECKS.forEach(function(c){
   if(ok){pass++}else{fail++}
   html+='<tr><td>'+esc(c[0])+'</td><td class="r '+(ok?'pass':'fail')+'">'+(ok?'Pass':'Fail')+(typeof r==='string'?'<br><span class="second">'+esc(r)+'</span>':'')+'</td><td>'+esc(ok?c[2]:'Not available here. Tell the Teams channel which row failed.')+'</td></tr>';
 });
+html+='<tr><td>'+esc(INFO[0])+'</td><td class="r wait">Info<br><span class="second">'+esc(INFO[1])+'</span></td><td>'+esc(INFO[2])+'</td></tr>';
 rows.insertAdjacentHTML('beforeend',html);
 pass++;   // row 1 (the page opens) passed: you can read it
-document.getElementById('sum').textContent=fail?pass+' of '+(pass+fail)+' checks passed. '+fail+' failed: see the rows marked Fail.':'All '+pass+' checks passed. A RADE page can run on this site.';
+document.getElementById('sum').textContent=fail?pass+' of '+(pass+fail)+' checks passed. '+fail+' failed: see the rows marked Fail.':'All '+pass+' checks passed. A RADE page can run on this site.'   // 8 checks: rows 1 to 8;
 var t=new Date();document.getElementById('when').textContent='Checked at '+('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)+' on this computer. Nothing was sent anywhere.';
 })();
 </script>

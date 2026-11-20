@@ -106,7 +106,7 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 'use strict';
 var KEY='rade-page-app-v1';
 var win=document.getElementById('win'),card=document.getElementById('card'),state=document.getElementById('state'),bar=document.getElementById('bar'),back=document.getElementById('back');
-var HELP='',APPS=[],cur=null,load=0,ready0=false;   // ready0: apps.json has loaded once (HELP is set)   // load: a counter for each load, so a late answer of an older load is dropped
+var HELP='',APPS=[],cur=null,load=0,ready0=false;   // ready0: apps.json has loaded once (HELP is set); load: a counter for each load, so a late answer of an older load is dropped
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function num(n){return Number(n).toLocaleString('en-US')}
 function recall(){try{return localStorage.getItem(KEY)}catch(e){return null}}
@@ -150,7 +150,7 @@ function show(o){
   if(o.done){win.setAttribute('data-done','')}else{win.removeAttribute('data-done')}
   bar.style.width=(o.bar==null?0:o.bar)+'%';
   state.textContent=o.state||'';
-  back.hidden=!(cur&&(cur.sp||APPS.length>1));   // from the SharePoint check, Back goes to the applications
+  back.hidden=!(cur&&(cur.sp||APPS.length>1));   // from the SharePoint check, Back goes to the RADE start (the last application on this browser, or the list)
   card.innerHTML=o.html;
   var f=card.querySelector('[data-focus]');if(f){f.focus()}
 }
@@ -166,11 +166,12 @@ function start(){
     HELP=c.help||'';ready0=true;
     document.getElementById('team').hidden=!HELP;document.getElementById('chan').textContent=HELP;   // the band shows the channel name (one place: apps.json)
     APPS=(c.apps||[]).map(function(a){return {repo:a.repo,base:a.base||('https://raw.githubusercontent.com/'+a.repo+'/main/'),manifest:a.manifest}});
+    if(location.hash==='#sharepoint'){spOpen();return}   // a link straight to the SharePoint check (it needs no application)
     if(!APPS.length){show({state:'No applications',html:'<p class="caps">RADE</p><h1>No application is available yet.</h1>'+helpLine()});return}
-    if(location.hash==='#sharepoint'){spOpen();return}   // a link straight to the SharePoint check
     var last=recall(),pick=APPS.length===1?APPS[0]:APPS.filter(function(a){return a.repo===last})[0];
     if(pick){open(pick)}else{choose()}
   }).catch(function(e){
+    ready0=true;if(location.hash==='#sharepoint'){spOpen();return}   // the SharePoint check does not need apps.json
     failCard('The list of applications did not load.',e.message||'no answer','Check the network connection, then select "Try again".','<button type="button" class="btn primary" data-act="start" data-focus>Try again</button>');
   });
 }
@@ -258,12 +259,13 @@ var SP_STEPS='<p><b>Before you start:</b> use a test SharePoint Online site wher
   '<li>On the SharePoint site: Settings (gear) &gt; Site contents &gt; Site Assets (if there is none: Documents). Select Upload &gt; Files and choose <span class="file">rade-ops-check.aspx</span>.</li>'+
   '<li>If SharePoint does not take the file, custom script is blocked on this site (the SharePoint Online default). Stop here. Ask your SharePoint Administrator to allow custom script on this one site (<span class="file">Set-SPOSite &lt;site address&gt; -DenyAddAndCustomizePages 0</span>, or the admin center: Active sites &gt; the site &gt; Settings &gt; Custom scripts). It stays allowed for 24 hours only, so do step 2 again in that time.</li>'+
   '<li>Select the file name to open it. If the browser downloads it and does not show it, that is a fail: write down "downloads".</li>'+
-  '<li>Read the page: it shows 9 checks and how many passed. Open it again the next day, after the 24 hours: the result then shows if a hosted RADE page keeps working.</li>'+
+  '<li>Read the page: it shows 8 checks, how many passed, and 1 information row. Open it again the next day, after the 24 hours: the result then shows if a hosted RADE page keeps working.</li>'+
   '<li>Say the result in the Teams channel: the count and the names of the rows that failed. Do not send the page address.</li>'+
   '<li>When you are done, delete the file from Site Assets.</li></ol>'+
   '<p class="second">The test page sends nothing and reads no SharePoint data: it checks only the browser features a RADE page uses.</p>';
 function spOpen(){
   if(cur&&cur.blob){URL.revokeObjectURL(cur.blob);cur.blob=''}
+  if(SP.blob){URL.revokeObjectURL(SP.blob);SP.blob=''}   // the new fetch can differ: Save and View must give the same text as Copy
   cur=SP;var my=++load;
   show({bar:40,state:'Loading',html:'<p class="caps">Ops check</p><h1>Getting the SharePoint test page.</h1>'});
   get(SP.url,false).then(function(t){
