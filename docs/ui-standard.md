@@ -8,7 +8,7 @@ Sizes are pixels at 100 % Windows scaling; every size set after the window has i
 
 | No. | Rule | Check |
 |---|---|---|
-| B1 | Buttons have fixed sizes, never AutoSize: action 160 x 40; wide 240 x 40 only for a label that does not fit 160; compact 96 x 30 (beside a box, "Back (Esc)", the Record's buttons), 160 x 30 for a compact label that does not fit 96; a link is as wide as its text and 28 high. A label must fit its button. | Self-check `$ui.BtnBad`; stand-in test `WIN BAD button` (tests/window_driver.ps1) |
+| B1 | Buttons have fixed sizes, never AutoSize: action 160 x 40; wide 240 x 40 only for a label that does not fit 160; compact 96 x 30 (beside a box, "Back (Esc)", the Record's buttons), 160 x 30 for a compact label that does not fit 96; a link is as wide as its text and 28 high. A label must fit its button. A one-line box is as tall as the compact button (R36: at 150 % an unscaled frame cut the box's line). | Self-check `$ui.BtnBad` and the box-height line; stand-in test `WIN BAD button` (tests/window_driver.ps1) |
 | B2 | Gaps are 4, 8, 12, 16 or 24 only; one side inset, 24. A button or link keeps a 4 px margin for the focus ring. | engine/rade_tokens.py stops a build with other gaps; review |
 | B3 | The primary button is the last one, alone at the right end of the action row; Enter selects it. | Self-check `$ui.RowRuleBad`; `$ui.SetCard` orders the row |
 | B4 | At most one primary button on a card. A card that waits for a choice of the person has one; a question whose buttons are its answers and the Run card's Cancel have none. | Self-check `$ui.RowRuleBad` |

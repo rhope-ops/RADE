@@ -565,6 +565,7 @@ $ui.Check = {
       for ($i = 0; $i -lt $kids.Count; $i++) {
         $c = $kids[$i]; $r = $c.RectangleToScreen($c.ClientRectangle); if ($r.Width -le 0 -or $r.Height -le 0) { continue }
         if ($ui.InvFile) { & $ui.InvLine $card $c $r }
+        if ($ui.Boxes -contains $c -and [int]$c.Height + 1 -lt (& $ui.Sc $ui.Z.CompactH)) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' box: ' + $c.Height + ' high, the rule is ' + (& $ui.Sc $ui.Z.CompactH) + ' (B1; R36: a frame that did not scale cut its line at 150 %)') }
         if ($c -is [System.Windows.Forms.Button] -and [int]$c.FlatAppearance.BorderSize -gt 0 -and $ui.BtnKind.ContainsKey($c)) { foreach ($l in @(& $ui.BtnBad $card (& $ui.NameOf $c) $c)) { $ui.LayBad.Add([string]$l) } }
         if ($c.Text -and $c.Enabled -and ($c -is [System.Windows.Forms.Label] -or $c -is [System.Windows.Forms.ButtonBase] -or (& $ui.IsCardText $c))) {   # B10: text at least 4.5:1 on its own background
           $cr = & $ui.Ratio $c.ForeColor $c.BackColor; if ($cr -lt 4.5) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' contrast: ' + [math]::Round($cr, 2) + ':1, the rule is 4.5:1 (B10)') } }
