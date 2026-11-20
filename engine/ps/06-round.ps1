@@ -109,7 +109,8 @@ function Invoke-RoundStepAt($run, [int]$K, [string]$Ans, [scriptblock]$Tick, [sc
   if ($state -ne 'PASSED' -and -not [bool]$step.Optional) { $run.Whole = $false }   # a skipped step is not installed (review, deploy v1); an optional step that fails makes the run NEEDS REVIEW
   $made = @($r.Made | Where-Object { $_ }); if ($state -eq 'PASSED') { foreach ($m in @($step.Makes)) { $made += @{ kind = [string]$m.kind; name = [string]$m.name } } }
   $run.RunState[[string]$step.Name] = $state
-  if (-not $need) { $run.StepRecs[[string]$step.Name] = @{ state = $state; made = $made } }   # a step skipped for a missing dependency keeps its older record
+  if ($script:closing -and $state -ne 'PASSED') { $state = 'INTERRUPTED' }   # the window closed while it ran: a resume runs it again
+  if (-not $need) { $run.StepRecs[[string]$step.Name] = @{ state = $(if ($state -eq 'INTERRUPTED') { 'NEEDS REVIEW' } else { $state }); made = $made } }   # the record schema has no INTERRUPTED   # a step skipped for a missing dependency keeps its older record
   $line = Get-StepLine $step $r $secs
   $lines = @($line) + @($r.Answers | Where-Object { $_ } | ForEach-Object { [string]$_ })   # a hand step's answers, under its line
   & $speak ('  Result: ' + ($line.Substring($step.Name.Length + 2)))
@@ -120,7 +121,7 @@ function Invoke-RoundStepAt($run, [int]$K, [string]$Ans, [scriptblock]$Tick, [sc
   & $OnStep $K $line
   Add-RoundHistory $run.Base $step.Name $(if ($state -eq 'PASSED') { 'OK' } else { 'CHECK' }) ([int]$secs)
   Save-RoundState $run $run.Sel   # pause and resume: the state after each step that ends (12-resume.ps1)
-  if ($state -eq 'INTERRUPTED') {   # the CAC is out: stop here; the state above lets Resume run this step again
+  if ($state -eq 'INTERRUPTED' -and -not $script:closing) {   # the CAC is out: stop here; the state above lets Resume run this step again
     throw ('INTERRUPTED: the sign-in failed in step "' + (Get-StepTitle $step) + '". Insert your CAC, then select Resume') }
 }
 
@@ -202,7 +203,8 @@ function Complete-TestRun($run, $Z, [string]$To, [scriptblock]$WindowLine, [bool
 # subject). A run that stops writes its report first, then throws again.
 function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock]$Say, [scriptblock]$Tick, [scriptblock]$OnStep, [scriptblock]$OnStatus, [scriptblock]$WindowLine, [string[]]$Answers, [string[]]$CheckLines) {
   $resume = $script:resume; $script:resume = $null   # the round state to resume from (window or text mode), once
-  if ($resume) { $Clean = $false; $Selected = Get-ResumeSelection $resume }
+  if ($resume) { $Clean = $false; $rsel = Get-ResumeSelection $resume   # a step whose folder was not picked now stays off
+    for ($k = 0; $k -lt $steps.Count; $k++) { if ($steps[$k].AskParam -and -not $Selected[$k]) { $rsel[$k] = $false } }; $Selected = $rsel }
   $run = Initialize-RoundRun $Clean $Selected $Say $CheckLines
   if ($resume) { Initialize-RoundResume $run $resume }
   $sayRaw = $Say

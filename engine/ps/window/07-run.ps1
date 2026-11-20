@@ -120,7 +120,7 @@ $ui.Run = {
     $msg = 'STOPPED: ' + (ConvertTo-Masked ([string]$_)); & $ui.Say $msg
     $what = [string](Get-WhatToDo $msg); if ($what) { & $ui.Say $what }
     & $ui.VStopped $msg.Substring(9) $what
-  } finally { $ui.Running = $false; try { $ui.TimeT.Stop() } catch { $null = $_ }; $sv = $ui.StepState; & $ui.InitSel; $ui.StepState = $sv } }
+  } finally { $script:resume = $null; $ui.Running = $false; try { $ui.TimeT.Stop() } catch { $null = $_ }; $sv = $ui.StepState; & $ui.InitSel; $ui.StepState = $sv } }
 # Pause and resume (the PFM, 2026-11-20; docs/engine.md "Pause and resume"): runs the round again from its saved state.
 # The steps that passed stay done; the step that was running and the steps after it run. Takes nothing.
 $ui.ResumeRun = {

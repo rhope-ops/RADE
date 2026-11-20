@@ -35,7 +35,9 @@ Assert-Case 'read: same build reads ok' ($st.State -eq 'ok')
 Assert-Case 'read: resume at step 2 of 3' ($st.Next -eq 2 -and $st.Total -eq 3)
 # resume: only the passed step is kept, with its made list; the selection comes back.
 $kept = Get-ResumeKept $st.Doc
-Assert-Case 'resume: keeps the passed step only' ($kept.Count -eq 1 -and $kept.ContainsKey('T01 One'))
+Assert-Case 'resume: keeps the finished step, not the interrupted one' ($kept.Count -eq 1 -and $kept.ContainsKey('T01 One'))
+$kept2 = Get-ResumeKept ([pscustomobject]@{ steps = @([pscustomobject]@{ name = 'T01 One'; state = 'NEEDS REVIEW' }, [pscustomobject]@{ name = 'T02 Two'; state = 'SKIPPED' }) })
+Assert-Case 'resume: keeps failed and skipped steps too' ($kept2.Count -eq 2)
 $sel = Get-ResumeSelection $st.Doc
 Assert-Case 'resume: the selection comes back' ($sel.Count -eq 3 -and $sel[0] -and $sel[1] -and $sel[2])
 $r2 = @{ Summary = @(); Kept = @{} }; Initialize-RoundResume $r2 $st.Doc
@@ -58,7 +60,7 @@ $r = @{ Pass = 0; Fail = 0; Skip = 0; Exit = 1; Made = @(); Fallback = ''; SignI
 Add-StepLine 'FAIL Connect: the smart card was removed' @{ ScreenOnly = '' } $r '' { param($t) $null = $t }
 Assert-Case 'CAC out: the step is INTERRUPTED' ((Get-StepState $r) -eq 'INTERRUPTED')
 $r = @{ Pass = 0; Fail = 0; Skip = 0; Exit = 1; Made = @(); Fallback = ''; SignIn = $false }
-Add-StepLine 'FAIL the list has no column' @{ ScreenOnly = '' } $r '' { param($t) $null = $t }
+Add-StepLine 'FAIL AADSTS50105: the account has no CAC role for the list' @{ ScreenOnly = '' } $r '' { param($t) $null = $t }
 Assert-Case 'other failure: the step NEEDS REVIEW' ((Get-StepState $r) -eq 'NEEDS REVIEW')
 # No scripts in results: the collect step copies no script file, and logs one line for it.
 $src = Join-Path $base 'T22'; [void](New-Item -ItemType Directory -Path $src -Force)

@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
 """RADE engine: build an application's round bundles from its RADE manifest (schemas/rade-manifest.schema.json).
 
-Moved from rhope-ops/90-161.Z scripts/build_paste_bundles.py (the Administrator, 2026-11-14: start using this repo).
-App facts (name, folder, file prefix, home page, own file patterns, repo) come from the manifest "application" block;
-RADE's own logo comes from this repo (assets/logo/rho-fulcrum-128.png: Rho Fulcrum, from engine-v28; Rho Bold from engine-v10 to v27). The history notes below name 90-161.Z, the first app.
+Moved from rhope-ops/90-161.Z (the Administrator, 2026-11-14). App facts come from the manifest "application" block;
+RADE's own logo is assets/logo/rho-fulcrum-128.png (Rho Fulcrum from engine-v28; Rho Bold from engine-v10 to v27).
 
-A bundle is one PowerShell text (RADE, the Redacted Application Deployment Engine, PFM 14 Nov 26; Windows PowerShell 5.1)
-that the PFM pastes into Windows PowerShell ISE and runs with F5. It writes the app's files under OneDrive\\RADE\\<app>,
-recycles the app's finished files, runs the checks and the steps (a child powershell.exe each, or a hand step of kind
-"guide"), saves the round state after each step (pause and resume, from engine-v28), and writes the results folder
-Rounds\\<round> (one report and copies of the collect files, never a script file) for one Outlook draft (test rounds,
-never sent) or the app's install record (deploy). What each part does and who decided it: docs/engine.md.
+A bundle is one PowerShell text (RADE, PFM 14 Nov 26; Windows PowerShell 5.1) that the PFM pastes into Windows PowerShell
+ISE and runs with F5: it writes the app's files, runs the checks and the steps, saves the round state after each step, and
+writes the results folder for one Outlook draft (test) or the install record (deploy). Each part: docs/engine.md.
 The window (the Administrator, 2026-11-14, "One thing"; docs/window-design.md) shows one statement or one question at a
 time: the application, a check that failed or needs you, the plan, the run, a step you do by hand, the result. All
 checks, the step boxes, the files, the made list and the log are in the Record (F2). The Local checks run when the window
@@ -425,14 +421,19 @@ SCRIPT_EXTS = ['.ps1', '.psm1', '.psd1', '.bat', '.cmd', '.vbs', '.js', '.wsf', 
                '.lnk', '.scr']
 
 
+def ends_in(pat, x):
+    """Return True when collect name pat can match a name that ends in x: only its text after the last * limits the end."""
+    tail = pat.lower().rsplit('*', 1)[-1]
+    if len(tail) >= len(x):
+        return fnmatch.fnmatchcase(x, tail[-len(x):])
+    return '*' in pat and fnmatch.fnmatchcase(x[len(x) - len(tail):], tail)
+
+
 def collect_problems(b):
-    """Return one line for each collect name of bundle b that can match a script file: a pattern (names joined by ';'
-    one by one) that ends in * or ?, or whose extension is, or can match, one of SCRIPT_EXTS; [] when all are safe."""
-    pats = [(c['dir'], pat) for c in b['collect'] for pat in c['name'].split(';')]
-    ext = lambda pat: pat.lower().rsplit('.', 1)[1] if '.' in pat else ''
+    """Return one line for each collect name of bundle b (names joined by ';' one by one) that can match a script file."""
     return ['collect %s\\%s: the name can match a script file (%s); name the result files by their own extension, for '
-            'example *.pdf (scripts never go in results)' % (d, pat, ' '.join(SCRIPT_EXTS)) for d, pat in pats
-            if pat.endswith(('*', '?')) or (ext(pat) and any(fnmatch.fnmatchcase(x[1:], ext(pat)) for x in SCRIPT_EXTS))]
+            'example *.pdf (scripts never go in results)' % (c['dir'], p, ' '.join(SCRIPT_EXTS))
+            for c in b['collect'] for p in c['name'].split(';') if any(ends_in(p, x) for x in SCRIPT_EXTS)]
 
 
 def bundle_body(b, ui_text):

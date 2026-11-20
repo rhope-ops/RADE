@@ -48,7 +48,7 @@ grep -q "^The saved progress of this round could not be read (the file is not va
   && grep -q "^Step 1 of " "$t/outr5.txt" && ok || { bad "resume: a corrupt state file starts over"; head -20 "$t/outr5.txt"; }
 # 6. No scripts in results: the build refuses a collect name that can match a script file (a pattern that ends in * or ?,
 # or that names a script extension); a pattern with its own extension builds.
-for nm in 'SAMPLE-T01-feedback-*' 'SAMPLE-T01-*.ps1' 'SAMPLE-T01-r1.CMD' 'run.p?1' 'SAMPLE-T01-*.pdf;SAMPLE-*.bat'; do
+for nm in 'SAMPLE-T01-feedback-*' 'SAMPLE-T01-*.ps1' 'SAMPLE-T01-r1.CMD' 'run.p?1' 'SAMPLE-T01-*1' 'SAMPLE-T01-*.pdf;SAMPLE-*.bat'; do
   rm -rf "$t/rc"; mkdir -p "$t/rc"; cp -r "$t/app" "$t/rc/app"
   python3 -c "import json,sys; p=sys.argv[1]; m=json.load(open(p)); m['bundles'][0]['collect'][0]['name']=sys.argv[2]; json.dump(m,open(p,'w'))" "$t/rc/app/scripts/paste_bundles.json" "$nm"
   if python3 engine/rade_build.py --app-root "$t/rc/app" > "$t/rc.txt" 2>&1; then bad "collect: the build accepts $nm"

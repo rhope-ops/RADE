@@ -10,8 +10,7 @@
 $stateName = 'rade-state.json'   # the state file in the round's results folder; never attached to the e-mail draft
 $stateSchema = 'rade-state/1'
 # A step line that says the sign-in failed: the CAC may be out. Such a step is INTERRUPTED, not FAILED (the PFM, 2026-11-20).
-$signInLost = '(?i)smart ?card|\bCAC\b|AADSTS\d+|sign-?in (failed|was cancel+ed|timed out)' +
-  '|authentication (failed|was cancel+ed)|user cancel+ed authentication'
+$signInLost = '(?i)smart ?card|sign-?in (failed|was cancel+ed|timed out)|authentication (failed|was cancel+ed)|user cancel+ed authentication'
 
 # Gives the path of the round state file. Takes the RADE app folder; gives back Rounds\<round>\rade-state.json.
 function Get-RoundStatePath([string]$Base) { return (Join-Path (Join-Path (Join-Path $Base 'Rounds') $round) $stateName) }
@@ -34,7 +33,8 @@ function Save-RoundState($run, [bool[]]$Selected) {
 Reads the round state file Rounds\<round>\rade-state.json.
 .DESCRIPTION
 Only a file of this round, this build and this application can resume; another build never resumes (the PFM,
-2026-11-20). Next and Total give "Resume at step Next of Total": Next is the first selected step that has not PASSED.
+2026-11-20). Next and Total give "Resume at step Next of Total": Next is the first selected step that a resume runs.
+The state of another application of the same paste reads as 'none' and stays in place.
 .PARAMETER Base
 The RADE app folder.
 .OUTPUTS
@@ -48,7 +48,8 @@ function Read-RoundState([string]$Base) {
   try { $j = [System.IO.File]::ReadAllText($p) | ConvertFrom-Json -ErrorAction Stop } catch { $res.State = 'bad'; $res.Why = 'the file is not valid JSON'; return $res }
   if (-not $j -or [string]$j.schema -ne $stateSchema -or $null -eq $j.selected -or $null -eq $j.steps) {
     $res.State = 'bad'; $res.Why = 'the file is not a RADE round state'; return $res }
-  if ([string]$j.round -ne [string]$round -or [string]$j.build -ne [string]$buildId -or [string]$j.app -ne [string]$script:app.Name) {
+  if ([string]$j.app -ne [string]$script:app.Name) { return $res }   # another application of this paste: its state stays for it
+  if ([string]$j.round -ne [string]$round -or [string]$j.build -ne [string]$buildId) {
     $res.State = 'other'; $res.Why = 'it was saved by build ' + [string]$j.build; return $res }
   $sel = @($j.selected | ForEach-Object { [string]$_ }); $kept = Get-ResumeKept $j
   $res.Total = $sel.Count; $res.Next = $sel.Count
@@ -58,11 +59,11 @@ function Read-RoundState([string]$Base) {
   return $res
 }
 
-# Gives the finished steps a resume keeps: each step that PASSED (an answered hand step too). Takes the state document;
-# gives back a table of step name to the saved step.
+# Gives the finished steps a resume keeps: every step that ended (passed, failed, skipped, answered), not the one that
+# was INTERRUPTED (CAC out, or the window closed while it ran). Takes the state document; gives back name to saved step.
 function Get-ResumeKept($Doc) {
   $kept = @{}
-  foreach ($s in @($Doc.steps)) { if ($s -and [string]$s.state -eq 'PASSED') { $kept[[string]$s.name] = $s } }
+  foreach ($s in @($Doc.steps)) { if ($s -and [string]$s.state -and [string]$s.state -ne 'INTERRUPTED') { $kept[[string]$s.name] = $s } }
   return $kept
 }
 
@@ -94,7 +95,7 @@ function Initialize-RoundResume($run, $Doc) {
 .SYNOPSIS
 Puts a kept step back into a resumed run, as if it ran; it does not run again.
 .DESCRIPTION
-Adds its summary lines, its PASSED state (for "after"), its record and made list, the step counters and its weight on
+Adds its summary lines, its saved state (for "after"), its record and made list, the step counters and its weight on
 the overall bar, logs one "kept from the earlier run" line and tells the window that the step ended.
 .PARAMETER run
 The run table (Invoke-Round); its Kept table holds the saved step.
@@ -106,13 +107,14 @@ The window's step-ended callback.
 Nothing; changes $run.
 #>
 function Restore-RoundStep($run, [int]$K, [scriptblock]$OnStep) {
-  $step = $steps[$K]; $s = $run.Kept[[string]$step.Name]; $lines = @($s.lines | ForEach-Object { [string]$_ })
+  $step = $steps[$K]; $s = $run.Kept[[string]$step.Name]; $lines = @($s.lines | ForEach-Object { [string]$_ }); $st = [string]$s.state
   $run.N++; $run.K1++
   $made = @(foreach ($m in @($s.made)) { if ($m) { @{ kind = [string]$m.kind; name = [string]$m.name } } })
-  $run.RunState[[string]$step.Name] = 'PASSED'; $run.StepRecs[[string]$step.Name] = @{ state = 'PASSED'; made = $made }
-  $script:ranSteps += $step.Name; $run.Summary += $lines
-  $run.Done += @{ Name = [string]$step.Name; State = 'PASSED'; Lines = $lines; Made = $made }
+  $run.RunState[[string]$step.Name] = $st; $run.StepRecs[[string]$step.Name] = @{ state = $st; made = $made }
+  if ($st -ne 'SKIPPED') { $script:ranSteps += $step.Name }; $run.Summary += $lines
+  if ($st -eq 'NEEDS REVIEW') { $script:roundBad = $true }; if ($st -ne 'PASSED' -and -not [bool]$step.Optional) { $run.Whole = $false }
+  $run.Done += @{ Name = [string]$step.Name; State = $st; Lines = $lines; Made = $made }
   $script:prog.Done += (Get-StepWeight $run.Hist $step).Seconds
-  & $run.Speak ('Step ' + $run.K1 + ' of ' + $run.Total + ': ' + $step.Name + ': kept from the earlier run (PASSED), not run again.')
+  & $run.Speak ('Step ' + $run.K1 + ' of ' + $run.Total + ': ' + $step.Name + ': kept from the earlier run (' + $st + '), not run again.')
   & $OnStep $K $lines[0]
 }
