@@ -34,6 +34,9 @@ RUNS = [
     # Maintenance card shows, with "Uninstall" at the right end (1020 wide) and on its own row (811 wide)
     ("deploy-616", 1, "done", "1", "1020x616", False),
     ("deploy-tour-small", 1, "fail", "1", "811x469", False),
+    # the Maintenance card and its tools screen at 150 % and with a contrast theme (the PFM's preview, 2026-11-20)
+    ("device150-maint", 1, "done", "0", "956x1081", False),
+    ("contrast-maint", 1, "done", "0", "", False),
     ("test-small", 0, "done", "0", "811x469", False),
     # the same bundle with every text at its limit (docs/window-design.md "Text lengths")
     ("long-616", 1, "fail", "1", "1020x616", True),
