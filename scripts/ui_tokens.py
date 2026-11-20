@@ -57,10 +57,11 @@ def page_blocks(t):
     col = t['colors']
     light = ';'.join('--%s:%s' % (v, col[k]['hex'].lower()) for v, k in PAGE_VARS)
     forced = ';'.join('--%s:%s' % (v, CSS_SYSTEM[col[k]['system']]) for v, k in PAGE_VARS)
+    # plain :root (no higher specificity), so the page's own hand-written contrast rules after this block win where they differ
     more = '--gray:%s;--edge:%s;--track:%s' % (col['Ink']['hex'].lower(), col['Navy']['hex'].lower(), col['Track']['hex'].lower())
     return {
         'ui-tokens': ':root{%s;\n--ui:%s;--title:%s;--mono:Consolas,"Cascadia Mono",ui-monospace,monospace}' % (light, FONT_STACK, TITLE_STACK),
-        'ui-tokens-contrast': '@media (prefers-contrast:more){:root:not([data-theme="dark"]){%s}}\n'
+        'ui-tokens-contrast': '@media (prefers-contrast:more){:root{%s}}\n'
                               '@media (forced-colors:active){:root,:root[data-theme]{%s}}' % (more, forced),
     }
 
