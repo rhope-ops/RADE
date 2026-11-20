@@ -69,7 +69,7 @@ $ui.TourCards = @(
   @{ S = 'The results stay on this computer.'; P = @('RADE writes a report into its results folder. RADE sends nothing.', 'After a test round RADE makes an e-mail draft with the results. You read it, and you send it.') },
   @{ S = 'The Record shows everything.'; P = @('Select "Record" or press F2 to see all checks, steps, files and the log.', 'Select "Help" or press F1 to see this tour again.') })
 # The cards that "Help (F1)" can leave and show again: no step or check runs on them, and none waits inside the engine.
-$ui.HelpViews = @('choose', 'maint', 'site', 'fail', 'need', 'ready', 'nodrive', 'done', 'review', 'stopped', 'noapps', 'booterr')
+$ui.HelpViews = @('choose', 'maint', 'tools', 'site', 'fail', 'need', 'ready', 'nodrive', 'done', 'review', 'stopped', 'noapps', 'booterr')
 # Shows card $I of the tour (0 = the first). "Next" and "Back" move; "Skip the tour" and the last card's button end it.
 # Takes the card number.
 $ui.VTour = { param([int]$I)
@@ -112,9 +112,10 @@ $ui.Pick = { param([int]$J)
   $e = $null; if (Test-Deploy) { $e = (Read-Installed (Get-InstalledKey $script:app)) }
   if ($e -and $e.installed) { & $ui.VMaint $e.installed } else { & $ui.Checks $false } }
 $ui.VMaint = { param($Inst)
+  $ui.MaintInst = $Inst   # Back on the Maintenance screen shows this card again
   # Maintenance (the Administrator, 2026-11-14; docs/engine.md "Maintenance run types"): shown for an application that is
-  # installed. Install works ("Update to <version>" or "Repair"). Diagnose, Back up, Restore and Uninstall have no engine
-  # function yet: they are shown off, Uninstall set apart.
+  # installed. UI standard v1 (the Administrator, 2026-11-20): the card has Start, "Maintenance" (its own screen,
+  # $ui.VTools: Update or Repair, Diagnose, Back up, Restore) and Uninstall set apart; Uninstall has no engine function yet.
   $on = ''; try { $on = $dot + 'installed ' + ([datetime][string]$Inst.at).ToString('d MMM yy', [System.Globalization.CultureInfo]::InvariantCulture) } catch { $null = $_ }
   $verb = 'Install ' + $script:app.Version
   try { $c = ([version][string]$script:app.Version).CompareTo([version][string]$Inst.version); if ($c -gt 0) { $verb = 'Update to ' + $script:app.Version } elseif ($c -eq 0) { $verb = 'Repair' } } catch { $null = $_ }
@@ -123,10 +124,18 @@ $ui.VMaint = { param($Inst)
   $ui.StartAfter = $false; $startB = $null; $startMain = $false
   if ([string]$script:app.Start -and (Get-StartPath)) { $startMain = ([string]$Inst.version -eq [string]$script:app.Version); $startB = @{ Text = 'Start ' + $script:app.Name; Kind = $(if ($startMain) { 'primary' } else { '' }); Act = { $ui.StartAfter = $true; & $ui.Checks $false } } }
   & $ui.SetCard @{ View = 'maint'; Kicker = ($script:app.Name + ' ' + $Inst.version + $on); Sentence = 'Maintenance'
-    P = @($(if ($verb -eq 'Repair') { 'Repair adds what is missing and keeps your data.' } else { $verb + ' adds what is missing and keeps your data.' }), $(if ($startB) { 'Start runs the checks, then opens ' + $script:app.Name + '.' } else { '' }))
-    Note = 'Diagnose, Back up, Restore and Uninstall are not in this version of RADE yet.'
-    Buttons = @($startB, @{ Text = $verb; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.Checks $false } }, @{ Text = 'Uninstall'; Kind = 'dangeroff' })   # B5 (at most 4 buttons): no placeholders for Diagnose, Back up and Restore
+    P = @(('Maintenance holds ' + $verb + ', Diagnose, Back up and Restore.'), $(if ($startB) { 'Start runs the checks, then opens ' + $script:app.Name + '.' } else { '' }))
+    Note = 'Uninstall is not in this version of RADE yet.'
+    Buttons = @($startB, @{ Text = 'Uninstall'; Kind = 'dangeroff' }, @{ Text = 'Maintenance'; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.VTools $verb } })   # B5: 1 primary + 3 others at most
     Back = { & $ui.VChoose } } }
+# The Maintenance screen (the Administrator, 2026-11-20): Update or Repair (works: the checks, then the install run),
+# and Diagnose, Back up and Restore, shown not available until they are built (docs/engine.md "Maintenance run types").
+# Takes the install verb ("Update to <version>" or "Repair").
+$ui.VTools = { param([string]$Verb)
+  & $ui.SetCard @{ View = 'tools'; Kicker = [string]$ui.Kick.Text; Sentence = 'Maintenance'
+    P = @(($Verb + ' adds what is missing and keeps your data.'), 'Diagnose, Back up and Restore are planned. They are not in this version of RADE yet.')
+    Buttons = @(@{ Text = 'Diagnose'; Kind = 'off' }, @{ Text = 'Back up'; Kind = 'off' }, @{ Text = 'Restore'; Kind = 'off' }, @{ Text = $Verb; Kind = 'primary'; Act = { & $ui.Checks $false } })
+    Back = { & $ui.VMaint $ui.MaintInst } } }
 # Says whether the chosen application has a check that needs the site address. Takes nothing; gives back $true or
 # $false.
 $ui.NeedSite = { [bool](@($script:appChecks | Where-Object { $_ -in 'net-site', 'site-rights' }).Count) }
