@@ -2,9 +2,9 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>RADE</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<link rel="icon" href="assets/logo/rho-usaf-32.png">
 <link rel="icon" href="assets/logo/rho-usaf-32.png" media="(prefers-color-scheme:light)">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png" media="(prefers-color-scheme:dark)">
-<link rel="icon" href="assets/logo/rho-usaf-32.png">
 <style>
 /* Layout: the RADE window as a page ("One thing", docs/window-design.md): the band
    (the header of the 90-161.Z page: navy to blue, a yellow line under it; the logo, RADE with the tagline under it, and
@@ -66,21 +66,23 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 .bottom a{display:inline-flex;align-items:center;min-height:24px}
 .bottom .state{margin-left:auto;color:var(--gray);font-variant-numeric:tabular-nums}
 .bar{height:4px;flex:none;background:var(--track)}
-.bar i{display:block;height:100%;width:0;background:var(--action);transition:width .25s linear}
+.bar i{display:block;height:100%;width:0;background:var(--fill,var(--action));transition:width .25s linear}
 .win[data-done] .bar i{background:var(--pass)}
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
 /* Contrast modes (the Administrator, 19 Nov 26: "ensure the html site supports contrast modes").
-   1. More contrast (prefers-contrast:more): second lines, edges and the bar track move toward the text color; the band is one
-      solid navy with white text; the focus ring is 3 px. Light and dark each have their own values (same selectors as the themes).
+   1. More contrast (prefers-contrast:more): second lines, edges and links move toward the text color; the band is one solid
+      navy with white text; the focus ring is 3 px. The bar's track is the page color with an edge line above it, and its fill
+      is at least 3:1 against the page (dark: the link blue). Light and dark each have their own values (same selectors as the themes).
    2. Forced colors (Windows contrast themes): the browser takes the system colors. Parts that only a background color shows
       (the band, the bar and its fill, the main button) get a system-color border or fill, so they stay visible. The logo is an
       image and keeps its own colors (its disc carries it on any background). */
 @media (prefers-contrast:more){
-:root{--gray:#333d48;--edge:#1b2430;--link:#003f7a;--track:#8a96a3}
+:root{--gray:#333d48;--edge:#1b2430;--link:#003f7a;--track:var(--bg)}
+.bar{border-top:1px solid var(--edge)}
 .band{background:#0b2545}.band .sub,.band .chan{color:#fff}
 :focus-visible{outline-width:3px}}
-@media (prefers-contrast:more) and (prefers-color-scheme:dark){:root:not([data-theme="light"]){--gray:#d5dde6;--edge:#c3ccd8;--link:#b3cff5;--track:#5a6573}}
-@media (prefers-contrast:more){:root[data-theme="dark"]{--gray:#d5dde6;--edge:#c3ccd8;--link:#b3cff5;--track:#5a6573}}
+@media (prefers-contrast:more) and (prefers-color-scheme:dark){:root:not([data-theme="light"]){--gray:#d5dde6;--edge:#c3ccd8;--link:#b3cff5;--fill:#8db4ec}}
+@media (prefers-contrast:more){:root[data-theme="dark"]{--gray:#d5dde6;--edge:#c3ccd8;--link:#b3cff5;--fill:#8db4ec}}
 @media (forced-colors:active){
 .band{background:Canvas;color:CanvasText;border-bottom-color:CanvasText}
 .band .name,.band .team,.band .sub,.band .chan{color:CanvasText}
