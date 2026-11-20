@@ -1,5 +1,5 @@
 # A fake PnP.PowerShell for tests/engine_test.sh (no SharePoint, no network). Its state is the JSON file named by
-# RADE_FAKE_PNP: { "admin": true, "rights": true, "list": true, "rows": { "<Title>": "<value>" } }.
+# RADE_FAKE_PNP: { "admin": true, "rights": true, "list": true, "rows": { "<Title>": "<value>" }, "items": { "<list>": [ { field: value } ] } }.
 if (-not ('Microsoft.SharePoint.Client.PermissionKind' -as [type])) {
   Add-Type -TypeDefinition 'namespace Microsoft.SharePoint.Client { public enum PermissionKind { ViewListItems, AddListItems, EditListItems, ManageLists, ManageWeb, ManagePermissions } }'
 }
@@ -13,8 +13,12 @@ function Get-PnPWeb {
 }
 function Get-PnPList { param([string]$Identity) if ((Get-FakeState).listError) { throw "list read failed" }; if ((Get-FakeState).list) { return [pscustomobject]@{ Title = $Identity } } }
 function Get-PnPListItem {
-  param($List, [string]$Query)
+  param($List, [string]$Query, [int]$PageSize)
   $s = Get-FakeState; $i = 0
+  # Back up (no query): the rows of "items"."<list>", each with FieldValues as SharePoint gives them; a list not there throws.
+  if (-not $Query) { $rows = $null; if ($s.items) { $rows = $s.items.PSObject.Properties[[string]$List] }
+    if (-not $rows) { throw 'list not found' }
+    return @(foreach ($r in @($rows.Value)) { $d = New-Object 'System.Collections.Generic.Dictionary[string,object]'; foreach ($q in $r.PSObject.Properties) { $d[$q.Name] = $q.Value }; [pscustomobject]@{ FieldValues = $d } }) }
   foreach ($p in @($s.rows.PSObject.Properties)) { $i++; if ($Query -like ("*>" + $p.Name + "<*")) { $h = @{ Title = $p.Name; SettingValue = [string]$p.Value }; $h | Add-Member -NotePropertyName Id -NotePropertyValue $i; return , $h } }
 }
 function Set-FakeRow([hashtable]$Values, [string]$Title) {

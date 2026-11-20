@@ -1,7 +1,7 @@
 # RADE engine tests, part of tests/engine_test.sh (sourced there; uses its $t, ok, bad, go, psrun and the built sample).
 # Pause and resume (docs/engine.md "Pause and resume"; the PFM, 2026-11-20) and no scripts in results (the PFM,
 # 2026-11-20): the engine parts on their own (tests/resume_unit.ps1), a text-mode round that resumes, and the build
-# check of collect names. Group R runs in the background in its own users folder ($t/ru).
+# check of collect names; and the Maintenance tools (tests/tools_unit.ps1). Group R runs in the background in its own users folder ($t/ru).
 # Network: none.
 # Writes: only under $t (the temporary folder of tests/engine_test.sh).
 # Credentials: none.
@@ -9,6 +9,9 @@ go R; {   # group R: runs in the background (see "go" in tests/engine_test.sh)
 mkdir -p "$t/ru-unit"
 pwsh -NoProfile -File tests/resume_unit.ps1 "$t/ru-unit" > "$t/resume-unit.txt" 2>&1
 grep -q "^RESUME-UNIT pass=[1-9][0-9]* fail=0$" "$t/resume-unit.txt" && ok || { bad "resume: engine parts (tests/resume_unit.ps1)"; grep -v "^PASS" "$t/resume-unit.txt"; }
+# The Maintenance tools Diagnose and Back up (engine-v30), with the fake PnP: tests/tools_unit.ps1.
+mkdir -p "$t/tools-unit"; pwsh -NoProfile -File tests/tools_unit.ps1 "$t/tools-unit" > "$t/tools-unit.txt" 2>&1
+grep -q "^TOOLS-UNIT pass=[1-9][0-9]* fail=0$" "$t/tools-unit.txt" && ok || { bad "tools: Diagnose and Back up (tests/tools_unit.ps1)"; grep -v "^PASS" "$t/tools-unit.txt"; }
 sed "s#usersRoot = '$t/u'#usersRoot = '$t/ru'#" "$t/b.ps1" > "$t/r.ps1"; rod="$t/ru/test1234/OneDrive - United States Air Force"; mkdir -p "$rod"
 rr="$rod/RADE/SampleApp/Rounds/R01"; rs="$rr/rade-state.json"; rrep="$rr/SAMPLE-R01-report-r1.txt"
 bid=$(sed -n "s/^\$buildId = '\([0-9a-f]*\)'$/\1/p" "$t/b.ps1")

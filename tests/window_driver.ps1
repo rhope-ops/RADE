@@ -254,6 +254,16 @@ function global:Step-RadeNote([string]$V) {
 }
 # The primary button of the card on screen (UI standard v1: the last one), or the first shown button when it has none.
 function global:Get-RadeMain { $m = @($ui.B | Where-Object { $_.Shown -and [string]$ui.Kinds[$_] -eq 'primary' }); if ($m.Count) { return $m[0] }; return @($ui.B | Where-Object { $_.Shown })[0] }
+# The Maintenance screen (view tools): Esc first (the card again), then Diagnose, then Back up (engine-v30), then the
+# install verb (Repair or Update). The result card (view toolres): one line with the tool and the file name, then Done.
+# Takes the view.
+function global:Step-RadeTools([string]$V) {
+  if ($V -eq 'toolres') { $n = $(if ($ui.Sent.Text -like 'Diagnose*') { 'Diagnose' } else { 'Back up' })
+    Write-Host ('WIN toolres ' + $n + ' path=' + [System.IO.Path]::GetFileName([string]$ui.CardNow.Path)); Push-RadeButton 'Done'; return }
+  if (-not $global:RadeT.ToolsEsc) { $global:RadeT.ToolsEsc = $true; Write-Host ('WIN tools main=' + (Get-RadeMain).Text + ' help=' + [bool]$ui.TourB.Shown); $ui.Form.Key('Escape'); return }
+  $global:RadeT.Tool = 1 + [int]$global:RadeT.Tool; if ($global:RadeT.Tool -le 2) { & $ui.OnOpt ($global:RadeT.Tool - 1); return }
+  (Get-RadeMain).PerformClick()
+}
 function global:Push-RadeButton([string]$Text) {
   if ($Text -eq 'Record' -and $ui.RecB.Shown) { $ui.RecB.PerformClick(); return }   # B7: the Record is the link "Record (F2)"
   if ($Text -in 'Back', 'Back (Esc)' -and $ui.BackB.Shown) { $ui.BackB.PerformClick(); return }   # B6: the one Back pattern
@@ -291,7 +301,7 @@ function global:Push-RadeButton([string]$Text) {
     if (-not $global:RadeT.Esc) { $global:RadeT.Esc = $true; Write-Host 'WIN esc'; $ui.Form.Key('Escape'); return }   # Esc = Back: Choose again; the user chooses the same application
     if ($env:RADE_T_START -eq 'maint') { Push-RadeButton ('Start ' + $script:app.Name); Write-Host ('WIN maint-start started=' + $ui.Started + ' closed=' + $ui.Form.Closed); Write-Host ('WIN closed=' + $ui.Form.Closed); return }   # R28: Start runs the checks, then starts the application
     Push-RadeButton 'Maintenance'   # the Maintenance screen, then Repair (or Update) on it
-  } elseif ($v -eq 'tools') { if (-not $global:RadeT.ToolsEsc) { $global:RadeT.ToolsEsc = $true; Write-Host ('WIN tools main=' + (Get-RadeMain).Text + ' help=' + [bool]$ui.TourB.Shown); $ui.Form.Key('Escape'); return }; (Get-RadeMain).PerformClick() }   # Esc: the card again
+  } elseif ($v -in 'tools', 'toolres') { Step-RadeTools $v }
   elseif ($v -eq 'site') { $ui.Field.Text = 'not an address'; $ui.B[0].PerformClick(); Write-Host ('WIN site-note=' + $ui.Note.Text); $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }   # .invalid never resolves: the site check fails on every computer
   elseif ($v -in 'fail', 'need') {
     # The check on the card: the look-and-answer check is answered through its own card; any other is set to PASSED.

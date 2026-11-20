@@ -75,10 +75,10 @@ def q(s):
 # kept 4 spaces less indented than in the bundle and go where engine/ps/10-window.ps1 has its "# @@WINDOW@@" line.
 ENGINE_DIR = ENGINE_ROOT / 'engine/ps'
 ENGINE_PARTS = ['01-base.ps1', '02-config.ps1', '03-files.ps1', '04-steps.ps1', '05-installed.ps1', '06-round.ps1', '12-resume.ps1',
-                '07-checks.ps1', '08-saved-checks.ps1', '09-start.ps1', '10-window.ps1', '11-text-mode.ps1']
+                '07-checks.ps1', '08-saved-checks.ps1', '13-maintenance.ps1', '09-start.ps1', '10-window.ps1', '11-text-mode.ps1']
 WINDOW_PARTS = ['window/01-setup.ps1', 'window/02-fixed-parts.ps1', 'window/03-card.ps1', 'window/04-record-parts.ps1',
                 'window/05-alignment.ps1', 'window/06-open.ps1', 'window/07-run.ps1', 'window/08-hand-step.ps1',
-                'window/09-record.ps1', 'window/10-keys.ps1']
+                'window/09-record.ps1', 'window/11-tools.ps1', 'window/10-keys.ps1']   # 11-tools before 10-keys: the keys part shows the form
 WINDOW_SLOT = '    # @@WINDOW@@\n'
 
 
@@ -158,20 +158,20 @@ def app_lines(b):
                 hand.append(names[i])
             elif mode == 'deploy' and hand and not (reach(names[i]) & set(hand)):
                 raise SystemExit('app %r: automatic step %r comes after the hand step %r but does not need it: move it before, or name the step it needs in "after"' % (a['name'], names[i], hand[0]))
-        # "marker": the app's install record on the site (one row of its own list). Plain names only: they go into a
-        # command line and a CAML query. It needs the sign-in check, which reads it.
+        # "marker": the app's install record on the site (one row of its own list); plain names (a command line and a CAML query).
         mk = a.get('marker')
         marker = '$null'
         if mk:
             assert re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ]*', mk['list']) and re.fullmatch(r'[A-Za-z0-9]+', mk['key']) and re.fullmatch(r'[A-Za-z0-9_]+', mk['field']), 'app %r: marker list, key and field hold letters and digits only' % a['name']
             assert mode == 'deploy' and 'site-rights' in need, 'app %r: a marker needs mode deploy and a step that needs site-rights' % a['name']
             marker = '@{ List = %s; Key = %s; Field = %s }' % (q(mk['list']), q(mk['key']), q(mk['field']))
-        # "start" (R28): the app's start script, a path inside its local install folder (OneDrive\\RADE\\<folder>). RADE's Start button runs
-        # it in its own powershell.exe process after the checks pass; nothing is downloaded. Plain relative .ps1 paths only.
+        # "start" (R28): the app's start script, a plain relative .ps1 path in its install folder; Start runs it after the checks pass.
         start = a.get('start', '')
         assert not start or START_RE.fullmatch(start), 'app %r: start must be a relative .ps1 path of plain names (letters, digits, space, ".", "_", "-"), for example App/Start-App.ps1' % a['name']
-        out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s; Marker = %s; Start = %s }'
-                   % (q(a['name']), q(a['summary']), ', '.join(str(i) for i in idx), ', '.join(q(c) for c in checks), q(mode), q(version), marker, q(start)))
+        backup = a.get('backup', [])   # (2026-11-20) the app's own lists Back up saves; plain names (a command line); RADE never finds lists
+        assert all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 _-]*', n) for n in backup) and len(set(backup)) == len(backup), 'app %r: backup: unique plain list titles' % a['name']
+        out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s; Marker = %s; Start = %s; Backup = @(%s) }'
+                   % (q(a['name']), q(a['summary']), ', '.join(map(str, idx)), ', '.join(map(q, checks)), q(mode), q(version), marker, q(start), ', '.join(map(q, backup))))
     return out
 
 
@@ -592,7 +592,7 @@ ENGINE_SHA = hashlib.sha256(b''.join(rel.encode() + b'\0' + (ENGINE_ROOT / rel).
                                      + ['engine/rade_ui.ps1', 'engine/window.json', 'assets/logo/rho-fulcrum-128.png'] + rade_tokens.FILES)).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
-ENGINE_RELEASE = 29
+ENGINE_RELEASE = 30
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':

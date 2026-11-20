@@ -714,6 +714,17 @@
             "type": "string"
           },
           "description": "Step names, in run order."
+        },
+        "backup": {
+          "type": "array",
+          "maxItems": 30,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9 _-]*$",
+            "maxLength": 120
+          },
+          "description": "Optional (the Administrator, 2026-11-20). The titles of the app's own SharePoint lists that the Maintenance tool \"Back up\" saves (JSON plus a CSV copy, on this computer). RADE never finds lists itself; an app that names none gets \"names no lists to back up\"."
         }
       },
       "if": {
