@@ -60,7 +60,7 @@
     "Small": { "face": "text", "pt": 10, "style": "", "use": "second lines, notes, box text" },
     "SmallB": { "face": "strong", "pt": 10, "style": "", "use": "the line in capitals, labels, every button" },
     "Link": { "face": "strong", "pt": 10, "style": "Underline", "use": "links (underlined: not color alone)" },
-    "Turn": { "face": "text", "pt": 12, "style": "Bold", "use": "Your turn (bold: R35)" },
+    "Turn": { "face": "strong", "pt": 12, "style": "Bold", "use": "Your turn (bold: R35; the SemiBold file when Bold is not in it)" },
     "Mono": { "face": "mono", "pt": 9, "style": "", "use": "the Record's text box" }
   }
 }

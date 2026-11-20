@@ -33,7 +33,7 @@ $ui.Faces = @{ title = @('Sofia Sans Condensed SemiBold', '', 'Segoe UI Semibold
 # Text styles: name = @(face, size in points at 100 %, font style ('' = regular)); uses: the file.
 $ui.Styles = [ordered]@{}
 $ui.Styles.Sent = @('title', 22, ''); $ui.Styles.Word = @('title', 15, 'Bold'); $ui.Styles.Body = @('text', 12, ''); $ui.Styles.Small = @('text', 10, '')
-$ui.Styles.SmallB = @('strong', 10, ''); $ui.Styles.Link = @('strong', 10, 'Underline'); $ui.Styles.Turn = @('text', 12, 'Bold'); $ui.Styles.Mono = @('mono', 9, '')
+$ui.Styles.SmallB = @('strong', 10, ''); $ui.Styles.Link = @('strong', 10, 'Underline'); $ui.Styles.Turn = @('strong', 12, 'Bold'); $ui.Styles.Mono = @('mono', 9, '')
 # ---- End of the UI tokens
 # ---- Colors and Windows contrast themes (UI standard v1, the Administrator, 2026-11-20; docs/ui-standard.md B10, B11)
 # One meaning each (the "use" of each token above): navy = card text, Air Force blue = the action and progress, yellow =
@@ -277,7 +277,7 @@ $ui.Roles = @{}; $ui.Recolor = {
     foreach ($b in @($ui.Kinds.Keys)) { try { $en = $b.Enabled; & $ui.Style $b ([string]$ui.Kinds[$b]); if ([string]$ui.Kinds[$b] -notin 'off', 'dangeroff') { $b.Enabled = $en } } catch { $null = $_ } }   # a button that is gone: nothing to paint
     foreach ($b in @($ui.Links)) { try { $b.BackColor = $ui.C.White; $b.ForeColor = $ui.C.Link; $b.FlatAppearance.MouseOverBackColor = $ui.C.White; $b.FlatAppearance.MouseDownBackColor = $ui.C.Hair } catch { $null = $_ } }   # same: a link that is gone
     if ($ui.CardNow -and -not $ui.RecOn -and -not $ui.Busy -and -not $ui.Running) { $k = @([string]$ui.Field.Text, [string]$ui.ErrBox.Text, [string]$ui.Note.Text); $on = $ui.LayOn; $ui.LayOn = $false
-      & $ui.SetCard $ui.CardNow; $ui.LayOn = $on; $ui.Field.Text = $k[0]; $ui.ErrBox.Text = $k[1]; & $ui.Say1 $k[2] }; $ui.Form.Invalidate($true) } catch { $null = $_ } }   # the card's own colors, typed text kept; never stops the window
+      try { & $ui.SetCard $ui.CardNow } finally { $ui.LayOn = $on }; $ui.Field.Text = $k[0]; $ui.ErrBox.Text = $k[1]; & $ui.Say1 $k[2] }; $ui.Form.Invalidate($true) } catch { $null = $_ } }   # the card's own colors, typed text kept; never stops the window
 # ---- Where ink starts
 $ui.Inks = @{}
 $ui.Ink = { param($C)

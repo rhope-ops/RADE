@@ -57,7 +57,7 @@ has "WIN guide one-box=True rtf=True selectable=True" "WIN guide-copy=1. Open th
 # step title, the time to about 10 hours, the count to "999 of 999", the percent, the now-doing line) and the checking card (each check
 # name and its count), and the probe (a title outside the card's range) shows that the test sees a change. (A long WIN line that the
 # console wrapped is not read for "turn=".)
-has "WIN turn font=Segoe UI 12 Bold blue=True head=Kick,Turn down=TopDown same-h=True shown=True" "WIN steady run values=23 moved=0 probe=True" "WIN steady checking values=" &&
+has "WIN turn font=Segoe UI Semibold 12 Bold blue=True head=Kick,Turn down=TopDown same-h=True shown=True" "WIN steady run values=23 moved=0 probe=True" "WIN steady checking values=" &&
   grep "^WIN steady checking " "$wd/win.txt" | grep -q " moved=0 probe=True" && ! grep -qi "kick=[^=]*your turn" "$wd/win.txt" &&
   [ "$(grep "^WIN view=.* help=[TF][a-z]* turn=" "$wd/win.txt" | awk '{ y = ($0 ~ / light=your turn /); u = ($0 ~ / turn=Your turn$/); s = ($0 ~ / turn=(hidden)?$/); if (y != u || (!y && !s)) n++ } END { print n + 0 }')" = 0 ] &&
   grep -q "^WIN view=hand .* turn=Your turn$" "$wd/win.txt" && grep -q "^WIN view=run .* turn=$" "$wd/win.txt" && ok || { bad "window 1a3: Your turn above the headline, no value moves a control"; grep "WIN turn\|WIN steady" "$wd/win.txt" | cut -c1-400; }
