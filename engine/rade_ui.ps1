@@ -15,47 +15,25 @@ $ui.Sc = { param([double]$Px) [int][math]::Round($Px * $ui.Dpi / 96.0) }   # a s
 # ---- UI tokens (UI standard v1, the Administrator, 2026-11-20; docs/ui-standard.md): written from engine/ui-tokens.json
 # by python3 engine/rade_tokens.py --write. Do not edit these lines: a build stops when they differ from that file.
 $ui.Standard = 'v1'
-# Colors: name = @(red, green, blue, the SystemColors role it takes while a Windows contrast theme is on).
+# Colors: name = @(red, green, blue, the SystemColors role it takes while a Windows contrast theme is on); uses: the file.
 $ui.Tok = [ordered]@{}
-$ui.Tok.White = @(255, 255, 255, 'Window')   # surface: the window, the card, labels and text boxes
-$ui.Tok.Ink = @(27, 36, 48, 'WindowText')   # text in boxes
-$ui.Tok.Navy = @(11, 37, 69, 'WindowText')   # card text, the light's line
-$ui.Tok.Gray = @(90, 101, 115, 'GrayText')   # muted text: second lines, notes, labels
-$ui.Tok.Blue = @(0, 83, 159, 'Highlight')   # the primary button's fill, progress, Your turn
-$ui.Tok.OnBlue = @(255, 255, 255, 'HighlightText')   # text on the primary button
-$ui.Tok.Link = @(0, 83, 159, 'HotTrack')   # links
-$ui.Tok.Focus = @(11, 37, 69, 'HotTrack')   # the 2 px focus ring
-$ui.Tok.Face = @(255, 255, 255, 'ButtonFace')   # a button's fill
-$ui.Tok.FaceInk = @(11, 37, 69, 'ButtonText')   # a button's text
-$ui.Tok.Edge = @(122, 135, 148, 'ButtonText')   # a button's and a box's edge, the header line
-$ui.Tok.Hair = @(227, 232, 238, 'GrayText')   # a button under the pointer, thin lines
-$ui.Tok.Track = @(127, 147, 168, 'GrayText')   # the bar track, the edge of a button that is not available
-$ui.Tok.Off = @(233, 236, 240, 'ButtonFace')   # a button that is not available, a pressed button
-$ui.Tok.OffInk = @(85, 85, 85, 'GrayText')   # the text of a button that is not available
-$ui.Tok.Yellow = @(255, 213, 32, 'Highlight')   # the light: your turn
-$ui.Tok.Red = @(139, 26, 26, 'WindowText')   # FAILED, NEEDS REVIEW, the one destructive action
-$ui.Tok.Green = @(46, 133, 64, 'Highlight')   # the bar of a run that passed
-$ui.Tok.GreenInk = @(31, 107, 49, 'WindowText')   # the word PASSED
+$ui.Tok.White = @(255, 255, 255, 'Window'); $ui.Tok.Ink = @(27, 36, 48, 'WindowText'); $ui.Tok.Navy = @(11, 37, 69, 'WindowText')
+$ui.Tok.Gray = @(90, 101, 115, 'GrayText'); $ui.Tok.Blue = @(0, 83, 159, 'Highlight'); $ui.Tok.OnBlue = @(255, 255, 255, 'HighlightText')
+$ui.Tok.Link = @(0, 83, 159, 'HotTrack'); $ui.Tok.Focus = @(11, 37, 69, 'HotTrack'); $ui.Tok.Face = @(255, 255, 255, 'ButtonFace')
+$ui.Tok.FaceInk = @(11, 37, 69, 'ButtonText'); $ui.Tok.Edge = @(122, 135, 148, 'ButtonText'); $ui.Tok.Hair = @(227, 232, 238, 'GrayText')
+$ui.Tok.Track = @(127, 147, 168, 'GrayText'); $ui.Tok.Off = @(233, 236, 240, 'ButtonFace'); $ui.Tok.OffInk = @(85, 85, 85, 'GrayText')
+$ui.Tok.Yellow = @(255, 213, 32, 'Highlight'); $ui.Tok.Red = @(139, 26, 26, 'WindowText'); $ui.Tok.Green = @(46, 133, 64, 'Highlight')
+$ui.Tok.GreenInk = @(31, 107, 49, 'WindowText')
 # Sizes, gaps and field widths, in pixels at 100 % (every size set after the form has scaled goes through $ui.Sc).
 $ui.Z = @{ ActionW = 160; WideW = 240; ActionH = 40; CompactW = 96; CompactH = 30; LinkH = 28; BarTop = 11; M = 4; Inset = 24
   G1 = 4; G2 = 8; G3 = 12; G4 = 16; G6 = 24
   FieldS = 240; FieldM = 420; FieldL = 600 }
 # Faces: name = @(family, the font file's name in the bundle ('' = none), the family used when the font cannot be loaded).
-$ui.Faces = @{}
-$ui.Faces.title = @('Sofia Sans Condensed SemiBold', '', 'Segoe UI Semibold')
-$ui.Faces.text = @('Sofia Sans', '', 'Segoe UI')
-$ui.Faces.strong = @('Sofia Sans SemiBold', '', 'Segoe UI Semibold')
-$ui.Faces.mono = @('Consolas', '', 'Consolas')
-# Text styles: name = @(face, size in points at 100 %, font style ('' = regular)).
+$ui.Faces = @{ title = @('Sofia Sans Condensed SemiBold', '', 'Segoe UI Semibold'); text = @('Sofia Sans', '', 'Segoe UI'); strong = @('Sofia Sans SemiBold', '', 'Segoe UI Semibold'); mono = @('Consolas', '', 'Consolas') }
+# Text styles: name = @(face, size in points at 100 %, font style ('' = regular)); uses: the file.
 $ui.Styles = [ordered]@{}
-$ui.Styles.Sent = @('title', 22, '')   # the headline of a card
-$ui.Styles.Word = @('title', 15, '')   # the word RADE in the logo block
-$ui.Styles.Body = @('text', 12, '')   # paragraphs, step lines, the help line
-$ui.Styles.Small = @('text', 10, '')   # second lines, notes, box text
-$ui.Styles.SmallB = @('strong', 10, '')   # the line in capitals, labels, every button
-$ui.Styles.Link = @('strong', 10, 'Underline')   # links (underlined: not color alone)
-$ui.Styles.Turn = @('strong', 12, '')   # Your turn
-$ui.Styles.Mono = @('mono', 9, '')   # the Record's text box
+$ui.Styles.Sent = @('title', 22, ''); $ui.Styles.Word = @('title', 15, ''); $ui.Styles.Body = @('text', 12, ''); $ui.Styles.Small = @('text', 10, '')
+$ui.Styles.SmallB = @('strong', 10, ''); $ui.Styles.Link = @('strong', 10, 'Underline'); $ui.Styles.Turn = @('strong', 12, ''); $ui.Styles.Mono = @('mono', 9, '')
 # ---- End of the UI tokens
 # ---- Colors and Windows contrast themes (UI standard v1, the Administrator, 2026-11-20; docs/ui-standard.md B10, B11)
 # One meaning each (the "use" of each token above): navy = card text, Air Force blue = the action and progress, yellow =
@@ -132,10 +110,8 @@ $ui.StyleFont = { param([string]$Name)
 # button, key numbers, the Record's heads and result words; Link = SmallB underlined (a link is marked by more than
 # color); Word = RADE in the logo line; Mono = the Record's text box only; Turn = "Your turn" (in the accent color).
 $ui.F = @{}; foreach ($k in @($ui.Styles.Keys)) { $ui.F[$k] = & $ui.StyleFont $k }; $ui.F.Small = $ui.Form.Font
-# Sizes (the UI tokens above, UI standard v1): action buttons 160 x 40 (wide 240 x 40 for a long label), compact 96 x 30
-# (a button beside a box, "Back (Esc)"), a link is as wide as its text and 28 high. Gaps are 4, 8, 12, 16 and 24 only;
-# the card's side inset is 24. A button or link has a 4 px margin (room for the 2 px focus ring), so two of them are 8 px
-# apart. Field widths: S 240, M 420, L 600.
+# Sizes (the UI tokens above; docs/ui-standard.md): gaps are 4, 8, 12, 16 and 24 only; a button or link has a 4 px
+# margin (room for the 2 px focus ring), so two of them are 8 px apart. The button sizes: $ui.Btn below.
 $ui.Pad = { param([int]$L, [int]$T, [int]$R, [int]$B) New-Object System.Windows.Forms.Padding($L, $T, $R, $B) }
 $ui.Label = { param($Font, $Color, [int]$Top) $l = New-Object System.Windows.Forms.Label; $l.AutoSize = $true; $l.Font = $Font; $l.ForeColor = $Color; $l.BackColor = $ui.C.White; $l.UseMnemonic = $false; $l.Margin = (& $ui.Pad 0 $Top 0 0); $l.Visible = $false; $l }
 # ---- Card text that can be selected (R28, the Administrator, 2026-11-17)
@@ -285,12 +261,9 @@ $ui.Recolor = {
   .SYNOPSIS
   Paints the window again in the colors of the current Windows theme (its own colors, or a contrast theme's system colors).
   .DESCRIPTION
-  Does nothing when the theme did not change, unless Force is set. Finds each control's token for its ForeColor, BackColor
-  and button colors from the colors in use before the change (the first token of that color, in the order of
-  engine/ui-tokens.json), puts the new colors in $ui.C ($ui.UseColors), sets each property from its token, styles each
-  button again by its kind and each link as a link, and repaints the form (paint handlers read $ui.C).
+  Does nothing when the theme did not change, unless Force is set. Each property gets the color of its token (see above).
   .PARAMETER Force
-  $true to paint again also when the theme did not change (the Windows job's contrast run).
+  $true to paint again also when the theme did not change.
   .OUTPUTS
   Nothing.
   #>
@@ -469,7 +442,6 @@ $ui.WordBad = { param([string]$Card, [string]$Name, [string]$Text, $F, [int]$W)
 $ui.Word = { param($G, [string]$Text, $Font, $Color, [int]$X, [int]$Y, [int]$W, [int]$H, [string]$Flags) [System.Windows.Forms.TextRenderer]::DrawText($G, $Text, $Font, (New-Object System.Drawing.Rectangle($X, $Y, [math]::Max(1, $W), $H)), $Color, [System.Windows.Forms.TextFormatFlags]$Flags) }
 # The size of a text that wraps at a width (the real font; docs/window-design.md "Text lengths").
 $ui.Meas = { param([string]$Text, $Font, [int]$W) [System.Windows.Forms.TextRenderer]::MeasureText($Text, $Font, (New-Object System.Drawing.Size([math]::Max(1, $W), 0)), [System.Windows.Forms.TextFormatFlags]'WordBreak, NoPrefix, TextBoxControl') }
-# ---- The layout self-check
 # ---- The layout self-check (docs/window-design.md "Proof"): in a test round, and in the Windows job, RADE measures each
 # card it showed: a text that needs more room than its control has, a control that a parent cuts, two parts that
 # overlap. The result is one line under "Window: OK" in the results e-mail draft ("PASS layout" or the defects), so a
@@ -545,6 +517,37 @@ $ui.TextNeed = { param($C)
   $w = [int](& $ui.GetWrap $C); $s = & $ui.Meas ([string]$C.Text) $C.Font $(if ($w -gt 0) { $w } else { 100000 }); $h = [int]$s.Height + (& $ui.Sc 2)
   try { $n = [int]$C.GetLineFromCharIndex([math]::Max(0, $C.Text.Length - 1)) + 1; $lh = [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $C.Font).Height; if ($n -gt 0 -and $lh -gt 0) { $h = [math]::Max($h, $n * $lh) } } catch { $null = $_ }
   return (New-Object System.Drawing.Size($s.Width, $h)) }
+# ---- UI standard v1 rules of the self-check (the Administrator, 2026-11-20; docs/ui-standard.md, each rule's check)
+# The WCAG relative luminance of a color (0 to 1). Takes the color; gives back a number.
+$ui.Lum = { param($C) $v = foreach ($x in @($C.R, $C.G, $C.B)) { $f = [double]$x / 255.0; if ($f -le 0.04045) { $f / 12.92 } else { [math]::Pow(($f + 0.055) / 1.055, 2.4) } }; 0.2126 * $v[0] + 0.7152 * $v[1] + 0.0722 * $v[2] }
+# The WCAG contrast ratio of two colors (1 to 21). Takes the two colors; gives back a number.
+$ui.Ratio = { param($A, $B) $x = & $ui.Lum $A; $y = & $ui.Lum $B; ([math]::Max($x, $y) + 0.05) / ([math]::Min($x, $y) + 0.05) }
+# B1 (fixed sizes) for one button with an edge: no AutoSize, a size of the set, and a label that fits. Takes the card,
+# the button's name and the button; gives back the defect lines.
+$ui.BtnBad = { param([string]$Card, [string]$Name, $B)
+  $out = @(); $ws = @($ui.Z.CompactW, $ui.Z.ActionW, $ui.Z.WideW | ForEach-Object { & $ui.Sc $_ }); $hs = @($ui.Z.CompactH, $ui.Z.ActionH | ForEach-Object { & $ui.Sc $_ })
+  if ($B.AutoSize) { $out += ('LAYOUT ' + $Card + ' ' + $Name + ' button: AutoSize is on (B1: fixed sizes)') }
+  if ($ws -notcontains [int]$B.Width -or $hs -notcontains [int]$B.Height) { $out += ('LAYOUT ' + $Card + ' ' + $Name + ' button: ' + $B.Width + 'x' + $B.Height + ' is not a size of the set (B1)') }
+  $need = [int][System.Windows.Forms.TextRenderer]::MeasureText([string]$B.Text, $B.Font).Width + (& $ui.Sc 4)
+  if ($B.Text -and $need -gt [int]$B.Width) { $out += ('LAYOUT ' + $Card + ' ' + $Name + ' button text cut: needs ' + $need + ' has ' + $B.Width + ' (B1)') }
+  return $out }
+# B3, B4, B5 for the card's action row: at most one primary button, and it is the last one; at most 3 others ("Back (Esc)"
+# is the Back pattern, not counted). Takes the card and the kinds of the shown buttons in row order; gives back the lines.
+$ui.RowRuleBad = { param([string]$Card, $Kinds)
+  $out = @(); $ks = @($Kinds); $main = @(for ($k = 0; $k -lt $ks.Count; $k++) { if ([string]$ks[$k] -eq 'primary') { $k } })
+  if ($main.Count -gt 1) { $out += ('LAYOUT ' + $Card + ' buttons: ' + $main.Count + ' primary buttons, the rule is one (B4)') }
+  if ($main.Count -eq 1 -and $main[0] -ne $ks.Count - 1) { $out += ('LAYOUT ' + $Card + ' buttons: the primary button is number ' + ($main[0] + 1) + ' of ' + $ks.Count + ', the rule is last (B3)') }
+  if ($ks.Count - $main.Count -gt 3) { $out += ('LAYOUT ' + $Card + ' buttons: ' + ($ks.Count - $main.Count) + ' buttons beside the primary, the rule is 3 at most (B5)') }
+  return $out }
+# Inventory (RADE_INVENTORY = a file path; the Windows job): one JSON line for each control the self-check walks, with
+# the card, the scale, the kind, the screen box, the colors and the accessible name (docs/ui-standard.md "Proof").
+$ui.InvFile = [string]$env:RADE_INVENTORY
+# Writes the inventory line of one control. Takes the card, the control and its screen box.
+$ui.InvLine = { param([string]$Card, $C, $R)
+  try { $o = [ordered]@{ card = $Card; scale = [int][math]::Round($ui.Dpi / 96.0 * 100); high = [bool]$ui.High; kind = $C.GetType().Name; name = (& $ui.NameOf $C)
+      x = [int]$R.Left; y = [int]$R.Top; w = [int]$R.Width; h = [int]$R.Height; fore = '#{0:X6}' -f ($C.ForeColor.ToArgb() -band 0xFFFFFF); back = '#{0:X6}' -f ($C.BackColor.ToArgb() -band 0xFFFFFF)
+      access = [string]$C.AccessibleName; button = [string]$ui.Kinds[$C] }
+    Add-Content -LiteralPath $ui.InvFile -Value (ConvertTo-Json $o -Compress) -Encoding UTF8 -ErrorAction Stop } catch { $null = $_ } }   # the inventory is a test aid: never stop the check
 $ui.Check = {
   if (-not $ui.LayOn -or -not $ui.View) { return }
   if ($ui.Picked -and (Test-Deploy) -and $env:RADE_LAYOUT -ne '1') { return }   # a deploy does not run it, also when the paste has a test application
@@ -561,6 +564,10 @@ $ui.Check = {
       $kids = @($par.Controls | Where-Object { $_.Visible })
       for ($i = 0; $i -lt $kids.Count; $i++) {
         $c = $kids[$i]; $r = $c.RectangleToScreen($c.ClientRectangle); if ($r.Width -le 0 -or $r.Height -le 0) { continue }
+        if ($ui.InvFile) { & $ui.InvLine $card $c $r }
+        if ($c -is [System.Windows.Forms.Button] -and [int]$c.FlatAppearance.BorderSize -gt 0 -and $ui.BtnKind.ContainsKey($c)) { foreach ($l in @(& $ui.BtnBad $card (& $ui.NameOf $c) $c)) { $ui.LayBad.Add([string]$l) } }
+        if ($c.Text -and $c.Enabled -and ($c -is [System.Windows.Forms.Label] -or $c -is [System.Windows.Forms.ButtonBase] -or (& $ui.IsCardText $c))) {   # B10: text at least 4.5:1 on its own background
+          $cr = & $ui.Ratio $c.ForeColor $c.BackColor; if ($cr -lt 4.5) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' contrast: ' + [math]::Round($cr, 2) + ':1, the rule is 4.5:1 (B10)') } }
         if (-not $scroll -and -not $clip.Contains($r)) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' cut: needs ' + $r.Width + 'x' + $r.Height + ' at ' + ($r.Left - $clip.Left) + ',' + ($r.Top - $clip.Top) + ' in ' + $clip.Width + 'x' + $clip.Height) }
         if ($c -is [System.Windows.Forms.Label] -and $c.AutoSize -and $c.MaximumSize.Width -gt 0 -and $c.Text) { $wb = & $ui.WordBad $card (& $ui.NameOf $c) ([string]$c.Text) $c.Font $c.MaximumSize.Width; if ($wb) { $ui.LayBad.Add($wb) } }
         if (& $ui.IsCardText $c) {   # card text boxes are measured as labels are: a word wider than the line, and text that needs more room than the box has
@@ -587,5 +594,6 @@ $ui.Check = {
     }
     # Dead space (R28 N9: a large empty area under the run card's text): the card's text panel is as tall as its text when it does not scroll.
     if ($ui.Scroll -and $ui.Body -and -not $ui.RecOn -and -not $ui.Scrolls -and $ui.Scroll.Visible) { $dead = [int]$ui.Scroll.ClientSize.Height - [int]$ui.Body.Height; if ($dead -gt (& $ui.Sc 2)) { $ui.LayBad.Add('LAYOUT ' + $card + ' Scroll dead space: ' + $dead + ' px under the text') } }
+    if (-not $ui.RecOn) { foreach ($l in @(& $ui.RowRuleBad $card @($ui.B | Where-Object { $_.Visible } | ForEach-Object { [string]$ui.Kinds[$_] }))) { $ui.LayBad.Add([string]$l) } }
     foreach ($l in @(& $ui.Measure $card)) { $ui.LayBad.Add([string]$l) }
   } catch { $ui.LayBad.Add('LAYOUT ' + $card + ' the self-check stopped: ' + (ConvertTo-Masked ([string]$_.Exception.Message))) } }

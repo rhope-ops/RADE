@@ -73,20 +73,20 @@ def ui_token_block(t):
         return '; '.join('%s = %d' % (k, v) for k, v in t[group].items())
     out = [TOKENS_BEGIN, '# by python3 engine/rade_tokens.py --write. Do not edit these lines: a build stops when they differ from that file.',
            "$ui.Standard = %s" % q(t['standard']),
-           '# Colors: name = @(red, green, blue, the SystemColors role it takes while a Windows contrast theme is on).',
+           '# Colors: name = @(red, green, blue, the SystemColors role it takes while a Windows contrast theme is on); uses: the file.',
            '$ui.Tok = [ordered]@{}']
+    cols = []
     for name, c in t['colors'].items():
         r, g, b = (int(c['hex'][i:i + 2], 16) for i in (1, 3, 5))
-        out.append('$ui.Tok.%s = @(%d, %d, %d, %s)   # %s' % (name, r, g, b, q(c['system']), c['use']))
+        cols.append('$ui.Tok.%s = @(%d, %d, %d, %s)' % (name, r, g, b, q(c['system'])))
+    out += ['; '.join(cols[i:i + 3]) for i in range(0, len(cols), 3)]
     out += ['# Sizes, gaps and field widths, in pixels at 100 % (every size set after the form has scaled goes through $ui.Sc).',
             '$ui.Z = @{ %s' % ints('sizes'), '  %s' % ints('gaps'), '  %s }' % ints('fields'),
-            "# Faces: name = @(family, the font file's name in the bundle ('' = none), the family used when the font cannot be loaded).",
-            '$ui.Faces = @{}']
-    for name, f in t['faces'].items():
-        out.append('$ui.Faces.%s = @(%s, %s, %s)' % (name, q(f['family']), q(Path(f['file']).name if f['file'] else ''), q(f['fallback'])))
-    out += ["# Text styles: name = @(face, size in points at 100 %, font style ('' = regular)).", '$ui.Styles = [ordered]@{}']
-    for name, s in t['styles'].items():
-        out.append('$ui.Styles.%s = @(%s, %s, %s)   # %s' % (name, q(s['face']), repr(float(s['pt'])).rstrip('0').rstrip('.'), q(s['style']), s['use']))
+            "# Faces: name = @(family, the font file's name in the bundle ('' = none), the family used when the font cannot be loaded)."]
+    out.append('$ui.Faces = @{ %s }' % '; '.join('%s = @(%s, %s, %s)' % (n, q(f['family']), q(Path(f['file']).name if f['file'] else ''), q(f['fallback'])) for n, f in t['faces'].items()))
+    out += ["# Text styles: name = @(face, size in points at 100 %, font style ('' = regular)); uses: the file.", '$ui.Styles = [ordered]@{}']
+    sty = ['$ui.Styles.%s = @(%s, %s, %s)' % (n, q(x['face']), repr(float(x['pt'])).rstrip('0').rstrip('.'), q(x['style'])) for n, x in t['styles'].items()]
+    out += ['; '.join(sty[i:i + 4]) for i in range(0, len(sty), 4)]
     return out + [TOKENS_END]
 
 

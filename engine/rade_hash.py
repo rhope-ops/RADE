@@ -7,9 +7,12 @@ the value is not inside the text it covers. The same value goes into a small sto
 (first 12 and last 4 hex): the RADE page (index.html, which compares with the stored file), the bundle itself
 (Get-ScriptCheck, engine/ps/05-installed.ps1) and this file. It catches a change on the way; it is no security control.
 Inputs: a bundle text without its hash line (add_line), or a built bundle (the other functions). Outputs: text, or files.
-How to run: it is not run by itself; `python3 engine/rade_build.py --app-root DIR` uses it for every bundle.
+How to run: `python3 engine/rade_build.py --app-root DIR` uses it for every bundle. `python3 engine/rade_hash.py --content
+FILE...` prints the content hash of each file (content_hash: UI standard v1 brief item 9, the Administrator, 2026-11-20):
+the same value for two revisions of a test that differ only in their revision tokens and their header comment lines,
+so an app can tell that a test did not change and retire its old revision.
 Network: none
-Writes: the bundle file and its stored hash file, in the application's folder (write only)
+Writes: the bundle file and its stored hash file, in the application's folder (write only; --content writes nothing)
 Credentials: none
 """
 import hashlib
@@ -75,3 +78,41 @@ def write(out, text, release):
     stored(out).write_bytes(rec.encode('ascii'))
     sha = json.loads(rec)
     return 'HASH %s %s (%s)' % (out.name, sha['sha256'], sha['short'])
+
+
+# A revision token: r or R and a number, as a word (r8, R37, -r1.): what changes between two revisions of a test.
+REVISION = re.compile(r'(?<![A-Za-z0-9])[rR][0-9]+(?![0-9A-Za-z])')
+
+
+def content_hash(text):
+    """Return the content hash of a script text: the SHA-256 of its body, with revision tokens and header lines left out.
+
+    Args:
+        text: the script text (any line ends; a byte order mark is left out).
+
+    Returns:
+        64 hex. The header is every line before the first line of code: blank lines, '#' comment lines and a <# ... #>
+        block at the start. In the body each revision token (REVISION) reads 'r#' and line ends are LF, so only a change
+        of the code itself changes the value.
+    """
+    lines = text.lstrip('\ufeff').replace('\r\n', '\n').replace('\r', '\n').split('\n')
+    i, block = 0, False
+    while i < len(lines):
+        t = lines[i].strip()
+        if block:
+            block = '#>' not in t
+        elif t.startswith('<#'):
+            block = '#>' not in t[2:]
+        elif t and not t.startswith('#'):
+            break
+        i += 1
+    body = REVISION.sub('r#', '\n'.join(lines[i:]))
+    return hashlib.sha256(body.encode('utf-8')).hexdigest()
+
+
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) < 3 or sys.argv[1] != '--content':
+        sys.exit('usage: python3 engine/rade_hash.py --content FILE...')
+    for f in sys.argv[2:]:
+        print('CONTENT %s %s' % (content_hash(Path(f).read_text(encoding='utf-8')), f))

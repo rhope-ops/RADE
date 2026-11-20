@@ -36,6 +36,11 @@ tests/net_rules_test.sh
 # port or looks up a name in the engine sources or the sample app. A word search that proves itself first. Under 1 s.
 python3 scripts/no_recon.py --test
 python3 scripts/no_recon.py
+# UI standard v1 (the Administrator, 2026-11-20; docs/ui-standard.md): every color pair meets its WCAG contrast, and the
+# page's colors are the tokens'. Under 1 s.
+python3 scripts/ui_tokens.py | tail -1
+# The content hash of engine/rade_hash.py (UI standard v1 brief item 9): its unit test. Under 1 s.
+python3 tests/rade_hash_test.py | tail -1
 # Engine (moved from rhope-ops/90-161.Z, 2026-11-14): it compiles. Each app's own tests build and check its bundles.
 python3 -m py_compile engine/rade_build.py
 # Engine file list (apps lock these files; the release workflow signs the list): the trace runs and names the engine.
