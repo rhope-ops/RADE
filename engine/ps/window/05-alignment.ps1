@@ -201,8 +201,9 @@ $ui.PaintOpt = { param($P, $G)
     $one = 'Left, Top, NoPrefix, SingleLine, EndEllipsis'; $wrap = 'Left, Top, NoPrefix, WordBreak, EndEllipsis, TextBoxControl'
     if ($o.Off) {
       $pn = New-Object System.Drawing.Pen($ui.C.Hair); $G.DrawLine($pn, 0, 0, $w, 0); $pn.Dispose()
-      $cp = New-Object System.Drawing.Pen($ui.C.Red, [single](& $ui.Sc 2)); $d = & $ui.Sc 12; $cx = $pad + (& $ui.Sc 6); $cy = [int](($h - $d) / 2)
-      $G.DrawLine($cp, $cx, $cy, ($cx + $d), ($cy + $d)); $G.DrawLine($cp, ($cx + $d), $cy, $cx, ($cy + $d)); $cp.Dispose()
+      $cp = New-Object System.Drawing.Pen($(if ($o.Soon) { $ui.C.Gray } else { $ui.C.Red }), [single](& $ui.Sc 2)); $d = & $ui.Sc 12; $cx = $pad + (& $ui.Sc 6); $cy = [int](($h - $d) / 2)
+      if ($o.Soon) { $G.DrawLine($cp, $cx, ($cy + [int]($d / 2)), ($cx + $d), ($cy + [int]($d / 2))) }   # not built yet: a gray dash, no failure
+      else { $G.DrawLine($cp, $cx, $cy, ($cx + $d), ($cy + $d)); $G.DrawLine($cp, ($cx + $d), $cy, $cx, ($cy + $d)) }; $cp.Dispose()
     } else {
       $foc = [bool]$P.Focused; $t = $(if ($foc) { & $ui.Sc 2 } else { 1 })
       $pn = New-Object System.Drawing.Pen($(if ($foc) { $ui.C.Navy } else { $ui.C.Edge }), [single]$t); $i = [int]($t / 2); $G.DrawRectangle($pn, $i, $i, ($w - 1 - 2 * $i), ($h - 1 - 2 * $i)); $pn.Dispose()
@@ -213,13 +214,13 @@ $ui.PaintOpt = { param($P, $G)
     & $ui.Word $G ([string]$o.Name) $ui.F.Body $(if ($o.Off) { $ui.C.Gray } else { $ui.C.Navy }) $x $y $nw $h1 $one
     if ($o.Ver) { & $ui.Word $G ([string]$o.Ver) $ui.F.Small $ui.C.Gray ($x + $nw) $y ([math]::Max(1, ($tw - $nw))) $h1 $one }
     $yy = $y + $h1
-    if ($o.Sub) { & $ui.Word $G ([string]$o.Sub) $(if ($o.Off) { $ui.F.SmallB } else { $ui.F.Small }) $(if ($o.Off) { $ui.C.Navy } else { $ui.C.Gray }) $x $yy $tw ($pl.S1 * $h2) $wrap; $yy += $pl.S1 * $h2 }
+    if ($o.Sub) { & $ui.Word $G ([string]$o.Sub) $(if ($o.Off) { $ui.F.SmallB } else { $ui.F.Small }) $(if ($o.Off -and -not $o.Soon) { $ui.C.Navy } else { $ui.C.Gray }) $x $yy $tw ($pl.S1 * $h2) $wrap; $yy += $pl.S1 * $h2 }
     if ($o.Sub2) { & $ui.Word $G ([string]$o.Sub2) $ui.F.Small $ui.C.Navy $x $yy $tw ($pl.S2 * $h2) $wrap; $yy += $pl.S2 * $h2 }
     if ($pl.Under) { & $ui.Word $G ((@($o.R1, $o.R2) | Where-Object { $_ }) -join $dot) $ui.F.Small $ui.C.Navy $x $yy $tw $h2 $one; $yy += $h2 }
     if ($o.Note) { & $ui.Word $G ([string]$o.Note) $ui.F.SmallB $ui.C.Navy $x $yy $tw ($pl.NL * $h2) $wrap }
     if ($rw -and -not $pl.Under) {
       $rx = $w - $pad - $rw
-      if ($o.R1) { & $ui.Word $G ([string]$o.R1) $(if ($o.Off) { $ui.F.SmallB } else { $ui.F.Small }) $(if ($o.Off) { $ui.C.Red } else { $ui.C.Navy }) $rx ($y + (& $ui.Sc 2)) $rw $h2 'Right, Top, NoPrefix, SingleLine' }
+      if ($o.R1) { & $ui.Word $G ([string]$o.R1) $(if ($o.Off) { $ui.F.SmallB } else { $ui.F.Small }) $(if ($o.Soon) { $ui.C.Gray } elseif ($o.Off) { $ui.C.Red } else { $ui.C.Navy }) $rx ($y + (& $ui.Sc 2)) $rw $h2 'Right, Top, NoPrefix, SingleLine' }
       if ($o.R2) { & $ui.Word $G ([string]$o.R2) $ui.F.Small $ui.C.Gray $rx ($y + $h1) $rw $h2 'Right, Top, NoPrefix, SingleLine' }
     }
   } catch { $null = $_ } }

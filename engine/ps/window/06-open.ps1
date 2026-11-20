@@ -138,9 +138,9 @@ $ui.VTools = { param([string]$Verb)
     # The tools are a list (the Administrator, 2026-11-20: Repair must not stand alone on a row): one row each, as on Choose,
     # with what it does; shown not available until it is built. The action row is Back (Esc) and the install verb.
     P = @(($Verb + ' adds what is missing and keeps your data.'))
-    Options = @(@{ Off = $true; Index = 0; Name = 'Diagnose'; Ver = ''; Sub = 'Checks the install and the site. Changes nothing.'; R1 = 'Not available yet' },
-      @{ Off = $true; Index = 1; Name = 'Back up'; Ver = ''; Sub = "Saves the app's lists to this computer."; R1 = 'Not available yet' },
-      @{ Off = $true; Index = 2; Name = 'Restore'; Ver = ''; Sub = 'Puts saved rows back on the site, after a dry run.'; R1 = 'Not available yet' })
+    Options = @(@{ Off = $true; Index = 0; Name = 'Diagnose'; Ver = ''; Sub = 'Checks the install and the site. Changes nothing.'; R1 = 'Not available yet'; Soon = $true },
+      @{ Off = $true; Index = 1; Name = 'Back up'; Ver = ''; Sub = "Saves the app's lists to this computer."; R1 = 'Not available yet'; Soon = $true },
+      @{ Off = $true; Index = 2; Name = 'Restore'; Ver = ''; Sub = 'Puts saved rows back on the site, after a dry run.'; R1 = 'Not available yet'; Soon = $true })
     Buttons = @(@{ Text = $Verb; Kind = 'primary'; Act = { & $ui.Checks $false } })
     Back = { & $ui.VMaint $ui.MaintInst } } }
 # Says whether the chosen application has a check that needs the site address. Takes nothing; gives back $true or
