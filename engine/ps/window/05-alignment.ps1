@@ -137,14 +137,14 @@ $ui.Apart = {
     $bt = $mm + $(if (@($ui.BOn | Where-Object { $_ }).Count) { [int][math]::Floor(((& $ui.Sc $ui.Z.ActionH) - $ui.BackB.Height) / 2) } else { 0 })   # Back (Esc) on the midpoint of the 40 px buttons
     $ui.BackB.Margin = (& $ui.Pad $mm $bt $mm $mm); $ui.BtnRow.SetFlowBreak($ui.BackB, $false)
     if ($n -lt 0) { try { $ui.BtnRow.PerformLayout() } catch { $null = $_ }; return }   # no layout yet: the card's layout does it
-    if ($ui.BackB.Visible) { $prev = -2; $used += $ui.BackB.Width + 2 * $mm }
+    if ($ui.BackOn) { $prev = -2; $used += $ui.BackB.Width + 2 * $mm }   # a flag, not .Visible: the row can still be hidden from the card before
     for ($k = 0; $k -lt $n; $k++) { if ($ui.BOn[$k]) { $prev = $k; $used += $ui.B[$k].Width + 2 * $mm } }
     if ($prev -eq -1) { $used = 0 }
     $room = $(if ($ui.BtnRow.MaximumSize.Width -gt 0) { [int]$ui.BtnRow.MaximumSize.Width } else { $ui.ContentW + 2 * $mm }) - (& $ui.Sc 2)   # the width the row really wraps at, 2 px slack
     $left = $room - $used - $ui.B[$n].Width - $mm
     if ($left -lt $mm) { if ($prev -ge 0) { $ui.BtnRow.SetFlowBreak($ui.B[$prev], $true) } elseif ($prev -eq -2) { $ui.BtnRow.SetFlowBreak($ui.BackB, $true) }; $left = $room - $ui.B[$n].Width - $mm }   # too narrow: its own row
     $ui.B[$n].Margin = (& $ui.Pad ([int][math]::Max($mm, $left)) $mm $mm $mm); $ui.BtnRow.PerformLayout()
-    $f = @(@($ui.BackB) + @($ui.B) | Where-Object { $_.Visible })[0]   # the row still wrapped (preview at 1020 px): the primary at the right end of its own row
+    $f = $(if ($ui.BackOn) { $ui.BackB } else { @(for ($k = 0; $k -lt $n; $k++) { if ($ui.BOn[$k]) { $ui.B[$k] } })[0] })   # the row still wrapped: the primary at the right end of its own row
     if ($f -and -not [object]::ReferenceEquals($f, $ui.B[$n]) -and $ui.B[$n].Top -gt $f.Top + $f.Height) { $ui.B[$n].Margin = (& $ui.Pad ([int][math]::Max($mm, $room - $ui.B[$n].Width - $mm)) $mm $mm $mm) }
     $ui.BtnRow.PerformLayout()   # the row's height is right before the frame is placed ($ui.Squeeze)
   } catch { $null = $_ } }
@@ -347,7 +347,7 @@ $ui.SetCard = { param($c)
   # UI standard v1 (B3, B4): the primary button goes last (Enter selects it); the others keep their order.
   $bs = @(@($c.Buttons | Where-Object { $_ -and [string]$_.Kind -ne 'primary' }) + @($c.Buttons | Where-Object { $_ -and [string]$_.Kind -eq 'primary' }))
   $ui.Acts = @(); $first = $null; $accept = $null; $ui.BOn = @($false) * $ui.NB; $ui.BMain = @($false) * $ui.NB; $ui.Always = @($false) * $ui.NB
-  $ui.Back = $c.Back; $ui.BackB.Visible = ([bool]$c.Back -and -not $ui.RecOn)   # B6: Back (Esc) at the left end of the action row
+  $ui.Back = $c.Back; $ui.BackOn = ([bool]$c.Back -and -not $ui.RecOn); $ui.BackB.Visible = $ui.BackOn   # B6: Back (Esc) at the left end of the action row
   for ($k = 0; $k -lt $ui.NB; $k++) {
     $b = $ui.B[$k]
     if ($k -lt $bs.Count) {
@@ -356,7 +356,7 @@ $ui.SetCard = { param($c)
     } else { $b.Visible = $false; $ui.Acts += $null }
   }
   & $ui.Apart
-  $ui.BtnRow.Visible = [bool]($bs.Count -or $ui.BackB.Visible)
+  $ui.BtnRow.Visible = [bool]($bs.Count -or $ui.BackOn)
   $ui.TestRow.Visible = [bool]$c.Test
   $ui.Form.AcceptButton = $(if ($c.NoAccept) { $null } else { $accept })   # Enter = the primary button, except on a hand step
   $ui.CardNow = $c; $ui.TourB.Visible = ($ui.HelpViews -contains [string]$c.View -and -not $ui.RecOn)   # L6: Help on a card that can be shown again
