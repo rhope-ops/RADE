@@ -102,7 +102,8 @@ $ui.StyleFont = { param([string]$Name)
   $s = $ui.Styles[$Name]; $face = $ui.Faces[[string]$s[0]]; $pt = [double]$s[1]
   $st = $(if ([string]$s[2]) { [Enum]::Parse(('System.Drawing.FontStyle' -as [type]), [string]$s[2]) } else { $null })
   $fm = $ui.FontFam[[string]$face[0]]   # no System.Drawing type names in this block: on the test stand-ins they would stop it as it is read
-  if ($fm) { try { $fs = $(if ($null -ne $st) { $st } else { [Enum]::Parse(('System.Drawing.FontStyle' -as [type]), 'Regular') }); $gu = [Enum]::Parse(('System.Drawing.GraphicsUnit' -as [type]), 'Point'); return (New-Object System.Drawing.Font($fm, [single]($pt * $ui.FontK), $fs, $gu)) } catch { $null = $_ } }   # the fallback below
+  if ($fm) { $gu = $null; $rg = $null; try { $rg = [Enum]::Parse(('System.Drawing.FontStyle' -as [type]), 'Regular'); $gu = [Enum]::Parse(('System.Drawing.GraphicsUnit' -as [type]), 'Point') } catch { $null = $_ }   # no types: the fallback below
+    foreach ($fs in @(@($st, $rg) | Where-Object { $null -ne $_ })) { try { return (New-Object System.Drawing.Font($fm, [single]($pt * $ui.FontK), $fs, $gu)) } catch { $null = $_ } } }   # a style the one-weight file lacks (Bold): its own weight
   return (& $ui.Font ([string]$face[2]) $pt $st) }
 & $ui.FormDpi; & $ui.FontScale; & $ui.LoadFonts; $ui.Form.Font = (& $ui.StyleFont 'Small')
 # Text styles (the Administrator, 2026-11-17; faces and sizes from the UI tokens, UI standard v1): Sent = headline; Body =
@@ -149,8 +150,7 @@ $ui.TextSize = { param([string]$Txt, $Font, [int]$W)
   $sl = & $ui.Sc 4; $one = & $ui.Meas $Txt $Font 100000; $sz = $one
   if ($W -gt 0 -and $one.Width -gt $W) { $sz = & $ui.Meas $Txt $Font $W; $bw = $W + $sl } else { $bw = $one.Width + 2 * $sl }
   return (New-Object System.Drawing.Size($bw, ($sz.Height + (& $ui.Sc 2)))) }
-$ui.Menu = New-Object System.Windows.Forms.ContextMenuStrip; $ui.Menu.AccessibleName = 'Text menu'
-$ui.MenuCopy = $ui.Menu.Items.Add('Copy'); $ui.MenuAll = $ui.Menu.Items.Add('Select All')
+$ui.Menu = New-Object System.Windows.Forms.ContextMenuStrip; $ui.Menu.AccessibleName = 'Text menu'; $ui.MenuCopy = $ui.Menu.Items.Add('Copy'); $ui.MenuAll = $ui.Menu.Items.Add('Select All')
 # Copy gives the text as written (R28 N4): a word that RADE broke to fit a line is whole again (the break is a lone line feed), and the
 # lines of a hand step (a rich text box) lose the tabs of their number column: "1. Open the page." on its own line.
 $ui.CopyText = { param($C)
@@ -253,8 +253,7 @@ $ui.Kinds = @{}; $ui.Links = @()   # the kind each button was last styled with; 
 # $ui.Recolor on the window's own thread: PowerShell code cannot run on the thread of SystemEvents, and the event goes with
 # the form when it closes, so nothing is left to detach. $ui.Roles keeps, for each control and color property, the token
 # it was painted with (found from the colors it had), so a switch back gives each part its own color again.
-$ui.Roles = @{}
-$ui.Recolor = {
+$ui.Roles = @{}; $ui.Recolor = {
   <#
   .SYNOPSIS
   Paints the window again in the colors of the current Windows theme (its own colors, or a contrast theme's system colors).
@@ -277,7 +276,8 @@ $ui.Recolor = {
     foreach ($c in $all) { $r = $ui.Roles[$c]; foreach ($pp in @($r.Keys)) { try { $c.$pp = $ui.C[[string]$r[$pp]] } catch { $null = $_ } } }   # a property that cannot be set keeps its color
     foreach ($b in @($ui.Kinds.Keys)) { try { $en = $b.Enabled; & $ui.Style $b ([string]$ui.Kinds[$b]); if ([string]$ui.Kinds[$b] -notin 'off', 'dangeroff') { $b.Enabled = $en } } catch { $null = $_ } }   # a button that is gone: nothing to paint
     foreach ($b in @($ui.Links)) { try { $b.BackColor = $ui.C.White; $b.ForeColor = $ui.C.Link; $b.FlatAppearance.MouseOverBackColor = $ui.C.White; $b.FlatAppearance.MouseDownBackColor = $ui.C.Hair } catch { $null = $_ } }   # same: a link that is gone
-    if ($ui.CardNow -and -not $ui.RecOn -and -not $ui.Busy -and -not $ui.Running) { & $ui.SetCard $ui.CardNow }; $ui.Form.Invalidate($true) } catch { $null = $_ } }   # the card's own colors; never stops the window
+    if ($ui.CardNow -and -not $ui.RecOn -and -not $ui.Busy -and -not $ui.Running) { $k = @([string]$ui.Field.Text, [string]$ui.ErrBox.Text, [string]$ui.Note.Text); $on = $ui.LayOn; $ui.LayOn = $false
+      & $ui.SetCard $ui.CardNow; $ui.LayOn = $on; $ui.Field.Text = $k[0]; $ui.ErrBox.Text = $k[1]; & $ui.Say1 $k[2] }; $ui.Form.Invalidate($true) } catch { $null = $_ } }   # the card's own colors, typed text kept; never stops the window
 # ---- Where ink starts
 $ui.Inks = @{}
 $ui.Ink = { param($C)
