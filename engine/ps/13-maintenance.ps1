@@ -95,7 +95,7 @@ function Invoke-Diagnose([string]$Base, [scriptblock]$Tick) {
   return @{ Lines = $lines; Path = $p; Findings = $n }
 }
 
-# ---- Back up. The child script reads each named list and writes <n>.json and <n>.csv into the folder it is given.
+# ---- Back up. The child script reads each named list and writes ~<n>.json and ~<n>.csv into the folder it is given.
 # It prints only a list number, a row count or an error type: never the site, a name, a value or an error message.
 $backupScript = @'
 param([string]$Site, [string]$Folder, [string]$Lists)
@@ -130,7 +130,7 @@ try {
       $rows = @(foreach ($it in $script:items) { $o = [ordered]@{}
         foreach ($k in @($it.FieldValues.Keys)) { $o[$k] = ConvertTo-PlainValue $it.FieldValues[$k] }
         [pscustomobject]$o })
-      $j = Join-Path $Folder ([string]$i + '.json'); $c = Join-Path $Folder ([string]$i + '.csv')
+      $j = Join-Path $Folder ('~' + $i + '.json'); $c = Join-Path $Folder ('~' + $i + '.csv')   # '~': no list title has it, so no name clash
       [System.IO.File]::WriteAllText($j, (ConvertTo-Json -InputObject @($rows) -Depth 4), (New-Object System.Text.UTF8Encoding $true))
       if ($rows.Count) { $rows | Export-Csv -LiteralPath $c -NoTypeInformation -Encoding UTF8 } else { [System.IO.File]::WriteAllText($c, '') }
       'LIST ' + $i + ' ' + $rows.Count
@@ -140,16 +140,24 @@ try {
 } catch { 'RESULT not-connected ' + $_.Exception.GetType().Name; exit 2 }
 '@
 
-# Gives the folder of a backup, Backups\<time> in the app folder. Takes the RADE app folder and the time stamp.
-function Get-BackupDir([string]$Base, [string]$Stamp) { return (Join-Path (Join-Path $Base 'Backups') $Stamp) }
+# Makes the new folder of a backup, Backups\<time> in the app folder; a folder of that name that is there already (the
+# same second, or the hour that repeats when daylight saving ends) is never reused: -2, -3 and so on follow. Takes the
+# RADE app folder and the time stamp; gives back the new folder, or '' when none could be made.
+function Get-NewBackupDir([string]$Base, [string]$Stamp) {
+  $root = Join-Path $Base 'Backups'
+  for ($k = 1; $k -le 50; $k++) { $d = Join-Path $root ($Stamp + $(if ($k -gt 1) { '-' + $k } else { '' }))
+    if (Test-Path -LiteralPath $d) { continue }
+    try { $null = New-Item -ItemType Directory -Path $d -ErrorAction Stop; return $d } catch { if (-not (Test-Path -LiteralPath $d)) { return '' } } }
+  return '' }
 # Removes the folder of a backup that saved nothing (only the new folder this run made). Takes the folder; gives back
 # $true when it is gone.
 function Clear-BackupDir([string]$Dir) {
   try { Remove-Item -LiteralPath $Dir -Recurse -Force -ErrorAction Stop; return $true } catch { return (-not (Test-Path -LiteralPath $Dir)) } }
-# Gives a saved list its name: <n>.json and <n>.csv become <list>.json and <list>.csv; both must be there. Takes the
+# Gives a saved list its name: ~<n>.json and ~<n>.csv become <list>.json and <list>.csv; both must be there. Takes the
 # folder, the list number and the file name; gives back $true when both files have their name.
 function Rename-BackupFile([string]$Dir, [int]$I, [string]$Name) {
-  try { foreach ($x in '.json', '.csv') { Move-Item -LiteralPath (Join-Path $Dir ([string]$I + $x)) -Destination (Join-Path $Dir ($Name + $x)) -Force -ErrorAction Stop }
+  try { foreach ($x in '.json', '.csv') { $to = Join-Path $Dir ($Name + $x); if (Test-Path -LiteralPath $to) { return $false }   # never over another list's file
+      Move-Item -LiteralPath (Join-Path $Dir ('~' + $I + $x)) -Destination $to -ErrorAction Stop }
     return ((Test-Path -LiteralPath (Join-Path $Dir ($Name + '.json')) -PathType Leaf) -and (Test-Path -LiteralPath (Join-Path $Dir ($Name + '.csv')) -PathType Leaf)) } catch { return $false } }
 
 <#
@@ -173,8 +181,8 @@ function Invoke-Backup([string]$Base, [scriptblock]$Tick) {
   $site = Get-SiteUrl $Base
   if (-not (Test-SiteUrl $site)) {
     return @{ State = 'no-site'; Path = ''; Lines = @('No site address is saved, so Back up did not sign in.', 'Select "Repair": its checks ask for the site address.') } }
-  $dir = Get-BackupDir $Base (Get-ToolStamp)
-  try { $null = New-Item -ItemType Directory -Path $dir -Force } catch { return @{ State = 'failed'; Path = ''; Lines = @('Back up could not make its folder on this computer.') } }
+  $dir = Get-NewBackupDir $Base (Get-ToolStamp)   # always a new folder: a failed run removes only this one
+  if (-not $dir) { return @{ State = 'failed'; Path = ''; Lines = @('Back up could not make its folder on this computer.') } }
   $r = Invoke-ChildScript $backupScript ('-Site "' + $site + '" -Folder "' + $dir + '" -Lists "' + ($lists -join '|') + '"') 1800 $Tick
   $got = @{}; $res = ''
   foreach ($l in $r.Lines) { if ($l -match '^LIST (\d+) (.+)$') { $got[[int]$Matches[1]] = $Matches[2] } elseif ($l -match '^RESULT (\S+)') { $res = $Matches[1] } }

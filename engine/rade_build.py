@@ -120,6 +120,7 @@ CHECK_IDS = re.findall(r"@\{ Id = '([a-z-]+)'", ENGINE)
 
 
 START_RE = re.compile(r'[A-Za-z0-9][A-Za-z0-9 ._-]*(/[A-Za-z0-9][A-Za-z0-9 ._-]*)*\.ps1')   # schemas/rade-manifest.schema.json app.start says the same
+WIN_RESERVED = {'CON', 'PRN', 'AUX', 'NUL'} | {'%s%d' % (p, k) for p in ('COM', 'LPT') for k in range(1, 10)}   # file names Windows refuses (a backup file)
 
 
 def app_lines(b):
@@ -158,18 +159,17 @@ def app_lines(b):
                 hand.append(names[i])
             elif mode == 'deploy' and hand and not (reach(names[i]) & set(hand)):
                 raise SystemExit('app %r: automatic step %r comes after the hand step %r but does not need it: move it before, or name the step it needs in "after"' % (a['name'], names[i], hand[0]))
-        # "marker": the app's install record on the site (one row of its own list); plain names (a command line and a CAML query).
-        mk = a.get('marker')
+        mk = a.get('marker')   # the app's install record on the site (one row of its own list); plain names (a command line, a CAML query)
         marker = '$null'
         if mk:
             assert re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ]*', mk['list']) and re.fullmatch(r'[A-Za-z0-9]+', mk['key']) and re.fullmatch(r'[A-Za-z0-9_]+', mk['field']), 'app %r: marker list, key and field hold letters and digits only' % a['name']
             assert mode == 'deploy' and 'site-rights' in need, 'app %r: a marker needs mode deploy and a step that needs site-rights' % a['name']
             marker = '@{ List = %s; Key = %s; Field = %s }' % (q(mk['list']), q(mk['key']), q(mk['field']))
-        # "start" (R28): the app's start script, a plain relative .ps1 path in its install folder; Start runs it after the checks pass.
-        start = a.get('start', '')
+        start = a.get('start', '')   # (R28) the app's start script, a plain relative .ps1 path in its install folder; Start runs it after the checks
         assert not start or START_RE.fullmatch(start), 'app %r: start must be a relative .ps1 path of plain names (letters, digits, space, ".", "_", "-"), for example App/Start-App.ps1' % a['name']
         backup = a.get('backup', [])   # (2026-11-20) the app's own lists Back up saves; plain names (a command line); RADE never finds lists
-        assert all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 _-]*', n) for n in backup) and len({n.lower() for n in backup}) == len(backup), 'app %r: backup: unique plain titles' % a['name']
+        ok = all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 _-]*', n) for n in backup) and not {n.upper() for n in backup} & WIN_RESERVED   # names in a command line and a file
+        assert ok and len({n.lower() for n in backup}) == len(backup), 'app %r: backup: unique plain titles, not a name Windows reserves' % a['name']
         out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s; Marker = %s; Start = %s; Backup = @(%s) }'
                    % (q(a['name']), q(a['summary']), ', '.join(map(str, idx)), ', '.join(map(q, checks)), q(mode), q(version), marker, q(start), ', '.join(map(q, backup))))
     return out

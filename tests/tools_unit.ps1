@@ -30,7 +30,8 @@ $one = @{ Title = 'One'; Owner = @{ LookupId = 7; LookupValue = 'Sample Person' 
   Area = @{ Label = 'North'; TermGuid = '00000000-0000-0000-0000-000000000001' }; Tags = @(@{ LookupId = 1; LookupValue = 'A' }, @{ LookupId = 2; LookupValue = 'B' })
   Due = '2026-11-20T12:00:00Z' }
 $tasks = @($one, @{ Title = 'Two'; Owner = $null })
-Set-Fake @{ admin = $true; rights = $true; list = $true; rows = @{}; items = @{ 'Sample Tasks' = $tasks; 'Sample Settings' = @() } }
+Set-Fake @{ admin = $true; rights = $true; list = $true; rows = @{}; items = @{ 'Sample Tasks' = $tasks; 'Sample Settings' = @()
+  '2' = @(@{ Title = 'from-list-2' }); 'X' = @(@{ Title = 'from-list-X' }) } }
 
 # Back up with no lists named: says so, writes nothing.
 $script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Backup = @() }
@@ -53,7 +54,8 @@ Assert-Case 'backup: a lookup or person value is kept as id;#text' ([string]$row
 Assert-Case 'backup: a link is kept as url;#text' ([string]$rows[0].Link -eq 'https://example.invalid/a;#Page')
 Assert-Case 'backup: managed metadata is kept as label|guid' ([string]$rows[0].Area -eq 'North|00000000-0000-0000-0000-000000000001')
 Assert-Case 'backup: several lookups are kept, joined with ;#' ([string]$rows[0].Tags -eq '1;#A;#2;#B')
-Assert-Case 'backup: a date is kept in ISO form' ((Get-Content -LiteralPath $j -Raw) -match '"Due":\s*"2026-11-20T12:00:00')   # the raw text: ConvertFrom-Json reads it as a date
+# The raw text: ConvertFrom-Json would read it as a date. 7 digits and Z: the date was converted, not copied.
+Assert-Case 'backup: a date is kept in ISO form (UTC)' ((Get-Content -LiteralPath $j -Raw) -match '"Due":\s*"2026-11-20T12:00:00\.0000000Z"')
 $csvText = Get-Content -LiteralPath $c -Raw
 Assert-Case 'backup: no value is saved as a type name' ($csvText -notmatch 'Microsoft\.|System\.' -and (Get-Content -LiteralPath $j -Raw) -notmatch 'Microsoft\.|System\.')
 Assert-Case 'backup: the CSV copy holds every row' ((Test-Path -LiteralPath $c) -and @(Import-Csv -LiteralPath $c).Count -eq 2)
@@ -75,6 +77,16 @@ $keep = $env:PSModulePath; $env:PSModulePath = ($env:PSModulePath -split [System
 $r3 = Invoke-Backup $base $null; $env:PSModulePath = $keep
 $n3 = @(Get-ChildItem -LiteralPath (Join-Path $base 'Backups') -Directory).Count
 Assert-Case 'backup: a run that saved nothing leaves no folder' ($r3.State -eq 'failed' -and -not $r3.Path -and $n3 -eq 2 -and ($r3.Lines[0] -like 'Back up saved nothing:*'))
+# A folder of the same time stamp is there already: a new one is made (-2), and a failed run never removes the old one.
+$old = Join-Path (Join-Path $base 'Backups') '20991231-235959'; $null = New-Item -ItemType Directory -Path $old; Set-Content -LiteralPath (Join-Path $old 'keep.json') -Value '[]'
+$nd = Get-NewBackupDir $base '20991231-235959'
+Assert-Case 'backup: a folder of the same time is never reused' ($nd -eq ($old + '-2') -and (Test-Path -LiteralPath (Join-Path $old 'keep.json')))
+Remove-Item -LiteralPath $nd, $old -Recurse -Force
+# A list titled with digits only and another list: each file holds its own list (no name clash with the numbered files).
+Start-Sleep -Seconds 1; $script:app.Backup = @('2', 'X'); $r4 = Invoke-Backup $base $null
+$x2 = @(); $xx = @()
+if ($r4.Path) { $x2 = @(Get-Content -LiteralPath (Join-Path $r4.Path '2.json') -Raw | ConvertFrom-Json); $xx = @(Get-Content -LiteralPath (Join-Path $r4.Path 'X.json') -Raw | ConvertFrom-Json) }
+Assert-Case 'backup: a list titled with digits keeps its own rows' ($r4.State -eq 'done' -and $x2[0].Title -eq 'from-list-2' -and $xx[0].Title -eq 'from-list-X')
 
 # Diagnose with no install record: one finding that names the fix, and the report file in Diagnose (not Rounds: the e-mail).
 $script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Backup = @(); Start = '' }
