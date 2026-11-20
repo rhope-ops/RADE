@@ -3,35 +3,14 @@
 
 Moved from rhope-ops/90-161.Z scripts/build_paste_bundles.py (the Administrator, 2026-11-14: start using this repo).
 App facts (name, folder, file prefix, home page, own file patterns, repo) come from the manifest "application" block;
-RADE's own logo comes from this repo (assets/logo/logo-rho-128.png: Rho Bold, from engine-v10). The history notes below name 90-161.Z, the first app.
+RADE's own logo comes from this repo (assets/logo/rho-fulcrum-128.png: Rho Fulcrum, from engine-v28; Rho Bold from engine-v10 to v27). The history notes below name 90-161.Z, the first app.
 
-A bundle is one PowerShell text (RADE, the Redacted Application Deployment Engine, PFM 14 Nov 26; formerly the
-"90-161.Z Deployer" and the "runner") (Windows PowerShell 5.1) that the PFM copies from its raw page, pastes into
-Windows PowerShell ISE and runs with F5. It is a
-bootstrapper for fast test rounds (PFM 1A, 6A: function over form):
-  1. uses the Windows profile folder as the DODID (no question: PFM 13 Nov, the empty-box default worked) and shows
-     the real path on screen (reports and e-mails still mask it);
-  1b. recycles finished files (cleanup list in the JSON; only files 90-161.Z made; to the Recycle Bin) and reports
-     what it recycled and what is left (folder counts, no file names) in the summary (R06, PFM 13 Nov);
-  1c. RADE folder (PFM 14 Nov 26, R17): the app folder is OneDrive\\RADE\\90-161.Z; RADE\\Config holds the engine's own
-     settings (rade-mail-to.txt, rade-checks.json); the app's Config stays in 90-161.Z\\Config. On Run, an old
-     OneDrive\\90-161.Z folder is moved into RADE as one folder move (if the move fails, the round uses the old folder);
-  1d. saved checks (PFM 14 Nov 26): a PASSED check is kept in RADE\\Config\\rade-checks.json for 7 days and is not run
-     again (other apps can read the file; its "about" field says how); a new PowerShell or PnP version, another site,
-     an older result or "Run checks again" runs it again; a check that did not pass always runs again;
-  2. makes each task folder under C:\\Users\\<DODID>\\OneDrive - United States Air Force\\RADE\\90-161.Z if missing and
-     writes every file (text: same content as UTF-8 with BOM and CRLF; binary: byte-exact from base64);
-  3. runs the steps one by one (each a runner file, as a child powershell.exe with -Id and -NoPause), with a live
-     log, DODID masked, and PASS/FAIL counts per step. A step of kind "guide" (R13, PFM 14 Nov 26: RADE
-     delivers every file, no separate downloads) is work the PFM does in another program, such as a flow import:
-     RADE writes its file, opens the address, puts the file path on the clipboard and waits for Done or Skip.
-     Log text (R13, PFM 14 Nov 26): one heading per step ("Step k of n: name"), the step's output indented under it,
-     one result line (PASSED, NEEDS REVIEW or SKIPPED); the e-mail subject ends in PASSED or NEEDS REVIEW;
-  4. writes a results folder Rounds\\<round> with one report file (summary + full masked log) and copies of the
-     collect files (PDFs), ready to attach to one e-mail (no zip: zips do not cross the boundary, PFM 13 Nov);
-  5. makes an Outlook draft (classic Outlook, COM): subject = summary line 1, body = the rest, every results file
-     attached, never sent (R05); To from the window box, saved in RADE\\Config\\rade-mail-to.txt (R06, R17). If no draft can be made, it opens the results folder and puts
-     the summary on the clipboard instead (R04 behavior).
+A bundle is one PowerShell text (RADE, the Redacted Application Deployment Engine, PFM 14 Nov 26; Windows PowerShell 5.1)
+that the PFM pastes into Windows PowerShell ISE and runs with F5. It writes the app's files under OneDrive\\RADE\\<app>,
+recycles the app's finished files, runs the checks and the steps (a child powershell.exe each, or a hand step of kind
+"guide"), saves the round state after each step (pause and resume, from engine-v28), and writes the results folder
+Rounds\\<round> (one report and copies of the collect files, never a script file) for one Outlook draft (test rounds,
+never sent) or the app's install record (deploy). What each part does and who decided it: docs/engine.md.
 The window (the Administrator, 2026-11-14, "One thing"; docs/window-design.md) shows one statement or one question at a
 time: the application, a check that failed or needs you, the plan, the run, a step you do by hand, the result. All
 checks, the step boxes, the files, the made list and the log are in the Record (F2). The Local checks run when the window
@@ -47,13 +26,13 @@ The build id (first 8 hex of the sha256 of the bundle body) shows in the window 
 Usage: python3 engine/rade_build.py --app-root DIR [--manifest scripts/paste_bundles.json] [--check] [--sha]
   --check: exit 1 if a bundle is out of date. --sha: print the engine's sha256 (every engine file, see ENGINE_SHA).
 """
-import base64, hashlib, json, re, sys, textwrap
+import base64, fnmatch, hashlib, json, re, sys, textwrap
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent)); import rade_hash   # the bundle hash, beside this file (found also when this file is run by another script)
 
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
 WINDOW_FILE = ENGINE_ROOT / 'engine/window.json'   # the window's layout values (the Administrator, 2026-11-18; docs/window-design.md)
-LOGO = ENGINE_ROOT / 'assets/logo/logo-rho-128.png'   # RADE's own logo (top left of the window)
+LOGO = ENGINE_ROOT / 'assets/logo/rho-fulcrum-128.png'   # RADE's own logo: the window and its title-bar icon (Fulcrum, the PFM, 2026-11-20)
 UI_FILE = ENGINE_ROOT / 'engine/rade_ui.ps1'   # the shared UI file: theme tokens, builders and the layout self-check (R28; docs/engine.md "How an app gets the engine")
 ROOT = None   # the application repo root (--app-root)
 TEXT = {'.ps1', '.json', '.txt', '.md', '.csv'}
@@ -100,7 +79,7 @@ def q(s):
 # in run order into the text every bundle carries. Each part is a whole file that parses alone. The window parts are
 # kept 4 spaces less indented than in the bundle and go where engine/ps/10-window.ps1 has its "# @@WINDOW@@" line.
 ENGINE_DIR = ENGINE_ROOT / 'engine/ps'
-ENGINE_PARTS = ['01-base.ps1', '02-config.ps1', '03-files.ps1', '04-steps.ps1', '05-installed.ps1', '06-round.ps1',
+ENGINE_PARTS = ['01-base.ps1', '02-config.ps1', '03-files.ps1', '04-steps.ps1', '05-installed.ps1', '06-round.ps1', '12-resume.ps1',
                 '07-checks.ps1', '08-saved-checks.ps1', '09-start.ps1', '10-window.ps1', '11-text-mode.ps1']
 WINDOW_PARTS = ['window/01-setup.ps1', 'window/02-fixed-parts.ps1', 'window/03-card.ps1', 'window/04-record-parts.ps1',
                 'window/05-alignment.ps1', 'window/06-open.ps1', 'window/07-run.ps1', 'window/08-hand-step.ps1',
@@ -439,6 +418,23 @@ def app_logo_bytes():
     return data
 
 
+# No scripts in results (the PFM, 2026-11-20; R37: a collect pattern matched the .ps1 runner and the work e-mail gateway
+# blocked the results e-mail). The one list of script extensions: the build refuses a collect name that can match one,
+# and every bundle carries it ($scriptExts) so the collect step never copies such a file (engine/ps/04-steps.ps1).
+SCRIPT_EXTS = ['.ps1', '.psm1', '.psd1', '.bat', '.cmd', '.vbs', '.js', '.wsf', '.hta', '.py', '.sh', '.exe', '.dll', '.msi',
+               '.lnk', '.scr']
+
+
+def collect_problems(b):
+    """Return one line for each collect name of bundle b that can match a script file: a pattern (names joined by ';'
+    one by one) that ends in * or ?, or whose extension is, or can match, one of SCRIPT_EXTS; [] when all are safe."""
+    pats = [(c['dir'], pat) for c in b['collect'] for pat in c['name'].split(';')]
+    ext = lambda pat: pat.lower().rsplit('.', 1)[1] if '.' in pat else ''
+    return ['collect %s\\%s: the name can match a script file (%s); name the result files by their own extension, for '
+            'example *.pdf (scripts never go in results)' % (d, pat, ' '.join(SCRIPT_EXTS)) for d, pat in pats
+            if pat.endswith(('*', '?')) or (ext(pat) and any(fnmatch.fnmatchcase(x[1:], ext(pat)) for x in SCRIPT_EXTS))]
+
+
 def bundle_body(b, ui_text):
     """Return the bundle text after its header: the settings, the shared blocks, the files, the steps and the other
     lists, the applications and the engine, each part after a banner line."""
@@ -453,7 +449,7 @@ def bundle_body(b, ui_text):
     rel = q('https://raw.githubusercontent.com/' + APP['repo'] + '/main/rade-release.json')
     parts = [
         ('Settings', ['$goUrl = %s' % go, '$releaseUrl = %s' % rel, "$webAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) RADE'",
-                      "$logoPng = '%s'" % logo, "$appLogoPng = '%s'" % app_logo, '$ownPatterns = @(' + ', '.join(q(p) for p in APP['own']) + ')', '$round = %s' % q(b['round']),
+                      "$logoPng = '%s'" % logo, '$scriptExts = @(' + ', '.join(q(x) for x in SCRIPT_EXTS) + ')', "$appLogoPng = '%s'" % app_logo, '$ownPatterns = @(' + ', '.join(q(p) for p in APP['own']) + ')', '$round = %s' % q(b['round']),
                       '$appFolder = %s' % q(APP['folder']), "$usersRoot = 'C:\\Users'"]),
         ('Shared blocks (%d): each is written back into the files that name it' % len(shared), ['$shared = @{}'] + shared),
         ('Files written to this computer (%d)' % len(b['files']), ['$files = @()'] + files),
@@ -491,6 +487,9 @@ def part_lines():
 def build(b):
     """Return the whole bundle text for one manifest bundle: the hash line (engine/rade_hash.py), the header (what it is, how to
     run it, its sources), the contents list and the body. The build id is the first 8 hex of the body's SHA-256."""
+    bad = collect_problems(b)
+    if bad:
+        sys.exit('\n'.join(bad))
     ui_text = UI_FILE.read_text(encoding='ascii')
     body = bundle_body(b, ui_text)
     build_id = hashlib.sha256(body.encode('ascii')).hexdigest()[:8]
@@ -589,10 +588,10 @@ def main():
 # own, and a bundle's header names each file with its own hash (part_lines); this one value is what --sha prints.
 ENGINE_SHA = hashlib.sha256(b''.join(rel.encode() + b'\0' + (ENGINE_ROOT / rel).read_bytes() + b'\0' for rel in
                                      ['engine/rade_build.py', 'engine/rade_hash.py'] + ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS]
-                                     + ['engine/rade_ui.ps1', 'engine/window.json', 'assets/logo/logo-rho-128.png'])).hexdigest()
+                                     + ['engine/rade_ui.ps1', 'engine/window.json', 'assets/logo/rho-fulcrum-128.png'])).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
-ENGINE_RELEASE = 27
+ENGINE_RELEASE = 28
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':

@@ -67,7 +67,7 @@ $ui.OnStatus = { param($i, $count, $name, $estimate)
 # step number and its result line.
 $ui.OnStep = { param($k, $line)
   $nm = [string]$steps[$k].Name + ': '; $rest = [string]$line; if ($rest.StartsWith($nm, [System.StringComparison]::Ordinal)) { $rest = $rest.Substring($nm.Length) }
-  $st = 'DONE'; foreach ($w in 'NEEDS REVIEW', 'FAILED', 'SKIPPED', 'PASSED') { if ($rest.StartsWith($w, [System.StringComparison]::Ordinal)) { $st = $w; break } }
+  $st = 'DONE'; foreach ($w in 'NEEDS REVIEW', 'INTERRUPTED', 'FAILED', 'SKIPPED', 'PASSED') { if ($rest.StartsWith($w, [System.StringComparison]::Ordinal)) { $st = $w; break } }
   $ui.StepState[[int]$k] = $st; $null = & $ui.Paint }
 # Gives the "Window: OK" or "Window: NOT OK" line for the report, with the layout self-check when it is on. Takes
 # nothing; gives back the text.
@@ -86,17 +86,19 @@ $ui.Run = {
   $ui.LinkDir = ''; $ui.FieldAsked = $false
   if ($ui.View -eq 'ready' -and $ui.FieldRow.Visible -and $ui.FieldL.Text -eq 'RADE shortcut in') {   # R29 N8: the folder for the RADE shortcut
     $d = $ui.Field.Text.Trim().Trim('"')
-    if ($d -and -not (Test-Path -LiteralPath $d -PathType Container)) { & $ui.Say1 'That folder was not found. Select "Browse" to choose a folder, or empty the box for no shortcut.'; return }
+    if ($d -and -not (Test-Path -LiteralPath $d -PathType Container)) { & $ui.Say1 'That folder was not found. Select "Browse" to choose a folder, or empty the box for no shortcut.'; $script:resume = $null; return }
     $ui.LinkDir = $d; $ui.FieldAsked = $true; if ($d) { Save-ShortcutDir $d } }
   $dep = Test-Deploy; $ui.Running = $true; $ui.Asked = $false; $ui.StepAt = $null; $ui.Summary = @(); $ui.Log.Clear(); $ui.StepState = @{}; $ui.StepI = 0; $ui.StepNow = ''; $ui.Edit = $false
   $to = ''; if (-not $dep) { $to = [string](Get-MailTo (Get-BasePath)); $ui.ToBox.Text = $to }
   $sel = @(); $ui.Guides = @()
   for ($k = 0; $k -lt $steps.Count; $k++) { $on = [bool]($script:appSteps -contains $k -and $ui.Sel[[int]$k]); $sel += $on; if ($on -and $steps[$k].Kind -eq 'guide') { $ui.Guides += [string]$steps[$k].Name } }
-  # A step that needs a folder asks for it now (a Windows dialog); Cancel skips that step.
+  # A step that needs a folder asks for it now (a Windows dialog); Cancel skips that step. A resume does not ask again
+  # for a step it keeps.
+  $kept = $(if ($script:resume) { Get-ResumeKept $script:resume } else { @{} })
   $answers = @()
   for ($k = 0; $k -lt $steps.Count; $k++) {
     $a = ''
-    if ($sel[$k] -and $steps[$k].AskParam) {
+    if ($sel[$k] -and $steps[$k].AskParam -and -not $kept.ContainsKey([string]$steps[$k].Name)) {
       $pick = New-Object System.Windows.Forms.FolderBrowserDialog
       $pick.Description = $steps[$k].AskPrompt; $pick.ShowNewFolderButton = $false
       if ([string]$pick.ShowDialog($ui.Form) -eq 'OK') { $a = [string]$pick.SelectedPath } else { $sel[$k] = $false; $ui.Guides = @($ui.Guides | Where-Object { $_ -ne [string]$steps[$k].Name }); $ui.Log.Add($steps[$k].Name + ': skipped (no folder picked)') }
@@ -119,6 +121,15 @@ $ui.Run = {
     $what = [string](Get-WhatToDo $msg); if ($what) { & $ui.Say $what }
     & $ui.VStopped $msg.Substring(9) $what
   } finally { $ui.Running = $false; try { $ui.TimeT.Stop() } catch { $null = $_ }; $sv = $ui.StepState; & $ui.InitSel; $ui.StepState = $sv } }
+# Pause and resume (the PFM, 2026-11-20; docs/engine.md "Pause and resume"): runs the round again from its saved state.
+# The steps that passed stay done; the step that was running and the steps after it run. Takes nothing.
+$ui.ResumeRun = {
+  $st = Read-RoundState (Get-BasePath)
+  if ($st.State -ne 'ok') { $null = Clear-RoundState (Get-BasePath); & $ui.VReady; & $ui.Say1 'The saved progress could not be read, so the round starts over. Select the main button to start.'; return }
+  $sel = Get-ResumeSelection $st.Doc; for ($k = 0; $k -lt $steps.Count; $k++) { if ($script:appSteps -contains $k) { $ui.Sel[[int]$k] = [bool]$sel[$k] } }
+  $script:resume = $st.Doc; & $ui.Run }
+# Start over: the saved state goes to the Recycle Bin, then the round runs from its first step. Takes nothing.
+$ui.StartOver = { $why = Clear-RoundState (Get-BasePath); if ($why) { & $ui.Say1 ('The saved progress could not be moved to the Recycle Bin (' + $why + ').'); return }; $script:resume = $null; & $ui.Run }
 $ui.MadeText = {
   # Deploy: how many things the installs of this application made, by kind (the list is in the Record).
   $c = [ordered]@{}; $e = (Read-Installed (Get-InstalledKey $script:app))
@@ -163,11 +174,21 @@ $ui.VDone = {
   }
   if (-not $dep) { & $ui.Copy; if (-not $script:draftMade) { & $ui.Open } }   # a test round: the summary is on the clipboard, and with no draft the folder opens
   & $ui.ToFront }
+# Shows the Paused card (the PFM, 2026-11-20): the sign-in failed in a step (the CAC is out), so the round paused at that
+# step; Resume runs it again. Takes the reason ("INTERRUPTED: ..."); does nothing when the window is closing.
+$ui.VPaused = { param([string]$Why)
+  if ($script:closing -or $ui.Form.IsDisposed) { return }
+  $p1 = (($Why.Substring(13) -replace '\. Insert your CAC, then select Resume$', '') -replace '^t', 'T') + '.'
+  & $ui.SetCard @{ View = 'stopped'; Kicker = 'Paused'; Right = 'Paused'; Sentence = 'Insert your CAC, then select Resume.'
+    P = @($p1, 'The steps that passed stay done. Resume runs this step again.'); Back = { & $ui.VReady }
+    Buttons = @(@{ Text = 'Resume'; Kind = 'primary'; Act = { & $ui.ResumeRun } }, @{ Text = 'Copy the log'; Act = { & $ui.Copy } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } }) }
+  & $ui.ToFront }
 # Shows the Stopped card with why the run stopped and what to do. Takes the reason and the help text; does nothing when
 # the window is closing.
 $ui.VStopped = { param([string]$Why, [string]$What)
   if ($script:closing -or $ui.Form.IsDisposed) { return }
   $dep = Test-Deploy
+  if ($Why -match '^INTERRUPTED: ') { & $ui.VPaused $Why; return }   # the sign-in failed (CAC out): Paused, not Stopped
   & $ui.SetCard @{ View = 'stopped'; Light = 'bad'; Kicker = 'Stopped'; Right = 'Stopped'; Sentence = $(if ($dep) { 'The install stopped.' } else { 'The round stopped.' })
     P = @(($Why.Substring(0, 1).ToUpperInvariant() + $Why.Substring(1)), $What, 'The report in the results folder says STOPPED.'); Help = $(if ($dep) { Get-HelpLine } else { '' })
     Buttons = @(@{ Text = 'Copy the log'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Try again'; Act = { & $ui.VReady } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } }); Back = { & $ui.VReady } }

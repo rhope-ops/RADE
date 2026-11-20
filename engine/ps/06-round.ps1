@@ -19,6 +19,7 @@ function Initialize-RoundRun([bool]$Clean, [bool[]]$Selected, [scriptblock]$Say,
   # A step that is off still counts when the record says it PASSED at this version (safe second run).
   $run.Whole = $true; foreach ($k in $script:appSteps) { if (-not [bool]$steps[$k].Optional -and -not $Selected[$k] -and $run.Prior[[string]$steps[$k].Name] -ne 'PASSED') { $run.Whole = $false } }   # an optional step ("default": false) is not needed for "installed"
   $run.StepRecs = @{}; $run.RunState = @{}   # RunState: every step this run reached (the "after" check); StepRecs: what goes to the record
+  $run.Done = @(); $run.Sel = $Selected; $run.Resumed = $false; $run.Kept = @{}   # Done: each finished step, for the round state (12-resume.ps1)
   $run.ModeLine = ''; if ($run.Deploy) { $run.ModeLine = 'Mode: deploy, ' + (Get-InstalledText $script:app); $run.Summary += $run.ModeLine }
   if ($CheckLines) { $run.Summary += $CheckLines }
   $run.Units = 0
@@ -65,6 +66,7 @@ function Invoke-RoundSetup($run, [bool]$Clean, [string]$To, [scriptblock]$OnStat
       & $OnStatus $run.N $run.Units 'Clean-up' 0; & $speak ''; $run.Summary += (Invoke-Cleanup $base $speak)
       $script:prog.Done += 10; $script:prog.Cur = 0
     }
+    elseif ($run.Resumed) { $run.Summary += 'Clean-up: not run again (the round resumed)' }   # it could recycle what the kept steps made
     else { $run.Summary += 'Clean-up: SKIPPED by you' }
   }
 }
@@ -109,13 +111,17 @@ function Invoke-RoundStepAt($run, [int]$K, [string]$Ans, [scriptblock]$Tick, [sc
   $run.RunState[[string]$step.Name] = $state
   if (-not $need) { $run.StepRecs[[string]$step.Name] = @{ state = $state; made = $made } }   # a step skipped for a missing dependency keeps its older record
   $line = Get-StepLine $step $r $secs
-  $run.Summary += $line
-  foreach ($al in @($r.Answers | Where-Object { $_ })) { $run.Summary += [string]$al }   # a hand step's answers, under its line
+  $lines = @($line) + @($r.Answers | Where-Object { $_ } | ForEach-Object { [string]$_ })   # a hand step's answers, under its line
   & $speak ('  Result: ' + ($line.Substring($step.Name.Length + 2)))
-  if ($state -eq 'NEEDS REVIEW' -and $step.Help) { $hl = '  What to do: ' + $step.Help; & $speak $hl; $run.Summary += $hl }   # the step's own help text (manifest "help")
+  if ($state -eq 'NEEDS REVIEW' -and $step.Help) { $hl = '  What to do: ' + $step.Help; & $speak $hl; $lines += $hl }   # the step's own help text (manifest "help")
+  $run.Summary += $lines
+  $run.Done += @{ Name = [string]$step.Name; State = $state; Lines = $lines; Made = $made }
   $script:prog.Done += $script:prog.Cur; $script:prog.Cur = 0; $script:prog.Frac = -1
   & $OnStep $K $line
   Add-RoundHistory $run.Base $step.Name $(if ($state -eq 'PASSED') { 'OK' } else { 'CHECK' }) ([int]$secs)
+  Save-RoundState $run $run.Sel   # pause and resume: the state after each step that ends (12-resume.ps1)
+  if ($state -eq 'INTERRUPTED') {   # the CAC is out: stop here; the state above lets Resume run this step again
+    throw ('INTERRUPTED: the sign-in failed in step "' + (Get-StepTitle $step) + '". Insert your CAC, then select Resume') }
 }
 
 # L4 (the Administrator, 2026-11-19), test rounds only: asks the last question "Anything else about this round or the app?"
@@ -195,7 +201,10 @@ function Complete-TestRun($run, $Z, [string]$To, [scriptblock]$WindowLine, [bool
 # do" line after a known problem). Takes the window's choices and callbacks; returns the summary lines (line 1 = the
 # subject). A run that stops writes its report first, then throws again.
 function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock]$Say, [scriptblock]$Tick, [scriptblock]$OnStep, [scriptblock]$OnStatus, [scriptblock]$WindowLine, [string[]]$Answers, [string[]]$CheckLines) {
+  $resume = $script:resume; $script:resume = $null   # the round state to resume from (window or text mode), once
+  if ($resume) { $Clean = $false; $Selected = Get-ResumeSelection $resume }
   $run = Initialize-RoundRun $Clean $Selected $Say $CheckLines
+  if ($resume) { Initialize-RoundResume $run $resume }
   $sayRaw = $Say
   # Logs a line, then a "what to do" line when the line names a known problem. Not a closure (GetNewClosure would hide
   # the bundle's own functions): the Round functions are called from here, so they find $sayRaw in this scope.
@@ -206,6 +215,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     for ($k = 0; $k -lt $steps.Count; $k++) {
       if ($script:closing) { throw 'the window was closed (Exit) while the round ran; the steps after it did not run' }
       if (-not $Selected[$k]) { if ($script:appSteps -contains $k) { $run.Summary += ($steps[$k].Name + $(if ($run.Prior[[string]$steps[$k].Name] -eq 'PASSED') { ': already done for version ' + $script:app.Version + ', not run again' } else { ': not selected' })) }; continue }
+      if ($run.Kept.ContainsKey([string]$steps[$k].Name)) { Restore-RoundStep $run $k $OnStep; continue }   # resume: a passed step stays done
       $ans = ''; if ($Answers -and $Answers.Count -gt $k) { $ans = [string]$Answers[$k] }
       Invoke-RoundStepAt $run $k $ans $Tick $OnStep $OnStatus
     }
@@ -226,6 +236,9 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
   [void](Export-RoundResult $run.Base $run.Summary)   # rewrite so the report holds the RESULTS line and the subject
   Add-RoundHistory $run.Base 'ROUND' $(if ($bad) { 'CHECK' } else { 'OK' }) ([int]((Get-Date) - $run.Started).TotalSeconds)
   $script:resultsDir = $z.Dir
+  # The round ended: nothing to resume, so its state file goes.
+  try { $sp = Get-RoundStatePath $run.Base; if (Test-Path -LiteralPath $sp -PathType Leaf) { Remove-Item -LiteralPath $sp -Force -ErrorAction Stop } }
+  catch { & $speak ('NOTE: the round state could not be removed: ' + (ConvertTo-Masked $_.Exception.Message)) }
   & $speak ''
   if ($run.Deploy) { Complete-DeployRun $run $state $bad; return ,$run.Summary }
   Complete-TestRun $run $z $To $WindowLine $bad

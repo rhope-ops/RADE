@@ -40,6 +40,15 @@ try {
     Write-Host 'Fix each one, then paste the round again.'
     return
   }
+  # Pause and resume (the PFM, 2026-11-20; docs/engine.md "Pause and resume"): R (or Enter) resumes, S starts over.
+  $rs = Read-RoundState (Get-BasePath)
+  if ($rs.State -eq 'bad') { $null = Clear-RoundState (Get-BasePath); Write-Host ('The saved progress of this round could not be read (' + $rs.Why + '), so the round starts over.') }
+  elseif ($rs.State -eq 'other') { $null = Clear-RoundState (Get-BasePath); Write-Host 'Saved progress of another build of this round was not used. The round starts over.' }
+  elseif ($rs.State -eq 'ok') {
+    $ra = ([string](Read-Host ('Type R and press Enter to resume at step ' + $rs.Next + ' of ' + $rs.Total + ', or type S and press Enter to start over'))).Trim()
+    if ($ra -match '^[Ss]') { $why = Clear-RoundState (Get-BasePath); Write-Host $(if ($why) { 'The saved progress could not be moved to the Recycle Bin (' + $why + ').' } else { 'Start over: the saved progress is in the Recycle Bin.' }) }
+    else { $script:resume = $rs.Doc; Write-Host ('Resume at step ' + $rs.Next + ' of ' + $rs.Total + '.') }
+  }
   foreach ($l in (Get-RoundPlan).Lines) { Write-Host $l }
   if (Test-WordOpen) { Write-Host 'Word is open. Save your documents and close Word before you run (renders use Word).' }
   $to = $(if (Test-Deploy) { '' } else { Get-MailTo (Get-BasePath) })
@@ -59,4 +68,5 @@ try {
   $m = 'STOPPED: ' + (ConvertTo-Masked ([string]$_))
   Write-Host $m
   $w = Get-WhatToDo $m; if ($w) { Write-Host $w }
+  if ($m -match '^STOPPED: INTERRUPTED: ') { Write-Host 'In text mode: insert your CAC, run RADE again and type R to resume at that step.' }
 }
