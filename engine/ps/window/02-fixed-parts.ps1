@@ -11,7 +11,7 @@ $ui.Light.Add_Paint({ try { $pn = New-Object System.Drawing.Pen($ui.C.Navy, [sin
 # Both logos are 64 px, the baseline size. The block is as tall as its rows (R28 N9: no fixed heights).
 $ui.Top = New-Object System.Windows.Forms.FlowLayoutPanel
 $ui.Top.Dock = 'Top'; $ui.Top.AutoSize = $true; $ui.Top.AutoSizeMode = 'GrowAndShrink'; $ui.Top.FlowDirection = 'TopDown'; $ui.Top.WrapContents = $false
-$ui.Top.Padding = (& $ui.Pad $ui.Z.Inset $ui.Z.G3 $ui.Z.Inset 0)   # UI standard v1: one side inset, 24; $ui.Top.BackColor = $ui.C.White
+$ui.Top.Padding = (& $ui.Pad $ui.Z.Inset $ui.Z.G3 $ui.Z.Inset 0); $ui.Top.BackColor = $ui.C.White   # UI standard v1: one side inset, 24
 # Makes one row of the logo block: a left-to-right flow panel as tall as its parts. Takes nothing; gives back the panel.
 $ui.LogoRow = { $r = New-Object System.Windows.Forms.FlowLayoutPanel; $r.AutoSize = $true; $r.AutoSizeMode = 'GrowAndShrink'; $r.WrapContents = $false
   $r.Margin = (& $ui.Pad 0 0 0 0); $r.Padding = (& $ui.Pad 0 0 0 0); $r.BackColor = $ui.C.White; $r }

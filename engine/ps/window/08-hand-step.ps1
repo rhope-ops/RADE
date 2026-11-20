@@ -105,8 +105,8 @@ $script:feedbackUi = {
 # ---- Feedback on every card (UI standard v1, B13; the Administrator, 2026-11-20). In a test round the bottom line has the
 # link "Feedback" ($ui.FeedB) on every card. It takes a picture of the window as it is (Control.DrawToBitmap of the form),
 # then shows a card with a comment box; Save writes the comment (masked as a text answer is) and the picture as
-# feedback-NN.txt and feedback-NN.png into Rounds\<round>\Feedback, then shows the card it came from again. The folder is
-# under the round's results folder, not in it: the e-mail draft attaches only the files of the results folder itself, and
+# feedback-NN.txt and feedback-NN.png into Rounds\<round>\Feedback, then shows the card it came from again. Feedback is a
+# subfolder of the round's results folder: the e-mail draft attaches only the files at the top of the results folder, and
 # the picture shows the real profile path (DoD365 boundary, AGENTS.md "Project rules"), so it stays on this computer.
 # Gives back $true when the bundle's chosen (or only) application is a test one: the link shows then. Takes nothing.
 $ui.NoteOn = { try { if ($ui.Picked) { return [bool](-not (Test-Deploy)) }; return [bool](@($apps | Where-Object { [string]$_.Mode -ne 'deploy' }).Count) } catch { return $false } }   # no answer: no link
@@ -122,7 +122,8 @@ $ui.VNote = {
   Nothing.
   #>
   if ($ui.Busy -or $ui.Running -or $ui.RecOn -or -not $ui.CardNow -or [string]$ui.View -in $ui.NoNoteViews) { return }
-  $ui.NoteFor = $ui.CardNow; $ui.NoteShot = $null
+  try { if ($ui.NoteShot) { $ui.NoteShot.Dispose() } } catch { $null = $_ }   # an old picture (the card was left by F1, F2 or Close)
+  $ui.NoteFor = $ui.CardNow; $ui.NoteShot = $null; $ui.NoteKeep = @{ Field = [string]$ui.Field.Text; Err = [string]$ui.ErrBox.Text }   # typed text comes back
   try { $w = [int]$ui.Form.Width; $h = [int]$ui.Form.Height; $bm = New-Object System.Drawing.Bitmap($w, $h)
     $ui.Form.DrawToBitmap($bm, (New-Object System.Drawing.Rectangle(0, 0, $w, $h))); $ui.NoteShot = $bm } catch { $null = $_ }   # no picture: the comment alone
   & $ui.SetCard @{ View = 'note'; Kicker = 'Feedback'; Sentence = 'What do you want to tell us about this card?'
@@ -155,4 +156,4 @@ $ui.SaveNote = {
 # is cleared then).
 $ui.NoteBack = { param([bool]$Cancel)
   $say = [string]$ui.Note.Text; try { if ($ui.NoteShot) { $ui.NoteShot.Dispose() } } catch { $null = $_ }; $ui.NoteShot = $null   # a picture that is gone: nothing to free
-  if ($ui.NoteFor) { & $ui.SetCard $ui.NoteFor; if (-not $Cancel) { & $ui.Say1 $say } } }
+  if ($ui.NoteFor) { & $ui.SetCard $ui.NoteFor; if ($ui.NoteKeep) { $ui.Field.Text = $ui.NoteKeep.Field; $ui.ErrBox.Text = $ui.NoteKeep.Err }; if (-not $Cancel) { & $ui.Say1 $say } } }

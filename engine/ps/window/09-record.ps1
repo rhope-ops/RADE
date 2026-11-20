@@ -123,5 +123,5 @@ $ui.RecB.Add_Click({ & $ui.VRecord })
 $ui.FeedB.Add_Click({ if (& $ui.Settled) { & $ui.VNote } })   # B13: the feedback card for the card on screen
 $ui.RecClose.Add_Click({ & $ui.CloseRecord })
 $ui.RecCopy.Add_Click({ & $ui.RecCopyAll })
-$ui.BackB.Add_Click({ if ($ui.Back -and -not $ui.RecOn -and -not $ui.Busy -and -not $ui.Running) { & $ui.Back } })
+$ui.BackB.Add_Click({ if ((& $ui.Settled) -and $ui.Back -and -not $ui.RecOn -and -not $ui.Busy -and -not $ui.Running) { & $ui.Back } })
 

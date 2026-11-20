@@ -32,8 +32,8 @@ $ui.Z = @{ ActionW = 160; WideW = 240; ActionH = 40; CompactW = 96; CompactH = 3
 $ui.Faces = @{ title = @('Sofia Sans Condensed SemiBold', '', 'Segoe UI Semibold'); text = @('Sofia Sans', '', 'Segoe UI'); strong = @('Sofia Sans SemiBold', '', 'Segoe UI Semibold'); mono = @('Consolas', '', 'Consolas') }
 # Text styles: name = @(face, size in points at 100 %, font style ('' = regular)); uses: the file.
 $ui.Styles = [ordered]@{}
-$ui.Styles.Sent = @('title', 22, ''); $ui.Styles.Word = @('title', 15, ''); $ui.Styles.Body = @('text', 12, ''); $ui.Styles.Small = @('text', 10, '')
-$ui.Styles.SmallB = @('strong', 10, ''); $ui.Styles.Link = @('strong', 10, 'Underline'); $ui.Styles.Turn = @('strong', 12, ''); $ui.Styles.Mono = @('mono', 9, '')
+$ui.Styles.Sent = @('title', 22, ''); $ui.Styles.Word = @('title', 15, 'Bold'); $ui.Styles.Body = @('text', 12, ''); $ui.Styles.Small = @('text', 10, '')
+$ui.Styles.SmallB = @('strong', 10, ''); $ui.Styles.Link = @('strong', 10, 'Underline'); $ui.Styles.Turn = @('text', 12, 'Bold'); $ui.Styles.Mono = @('mono', 9, '')
 # ---- End of the UI tokens
 # ---- Colors and Windows contrast themes (UI standard v1, the Administrator, 2026-11-20; docs/ui-standard.md B10, B11)
 # One meaning each (the "use" of each token above): navy = card text, Air Force blue = the action and progress, yellow =
@@ -110,8 +110,7 @@ $ui.StyleFont = { param([string]$Name)
 # button, key numbers, the Record's heads and result words; Link = SmallB underlined (a link is marked by more than
 # color); Word = RADE in the logo line; Mono = the Record's text box only; Turn = "Your turn" (in the accent color).
 $ui.F = @{}; foreach ($k in @($ui.Styles.Keys)) { $ui.F[$k] = & $ui.StyleFont $k }; $ui.F.Small = $ui.Form.Font
-# Sizes (the UI tokens above; docs/ui-standard.md): gaps are 4, 8, 12, 16 and 24 only; a button or link has a 4 px
-# margin (room for the 2 px focus ring), so two of them are 8 px apart. The button sizes: $ui.Btn below.
+# Sizes: the UI tokens above (gaps 4, 8, 12, 16, 24; a 4 px margin around a button or link for its focus ring).
 $ui.Pad = { param([int]$L, [int]$T, [int]$R, [int]$B) New-Object System.Windows.Forms.Padding($L, $T, $R, $B) }
 $ui.Label = { param($Font, $Color, [int]$Top) $l = New-Object System.Windows.Forms.Label; $l.AutoSize = $true; $l.Font = $Font; $l.ForeColor = $Color; $l.BackColor = $ui.C.White; $l.UseMnemonic = $false; $l.Margin = (& $ui.Pad 0 $Top 0 0); $l.Visible = $false; $l }
 # ---- Card text that can be selected (R28, the Administrator, 2026-11-17)
@@ -273,12 +272,13 @@ $ui.Recolor = {
     $todo = New-Object System.Collections.Stack; $todo.Push($ui.Form); $all = @()
     while ($todo.Count) { $c = $todo.Pop(); $all += $c; foreach ($k in @($c.Controls)) { $todo.Push($k) } }
     foreach ($c in $all) { if (-not $ui.Roles.ContainsKey($c)) { $ui.Roles[$c] = @{} }; $r = $ui.Roles[$c]
-      foreach ($pp in 'ForeColor', 'BackColor') { try { $t = $rev[$c.$pp.ToArgb()]; if ($t) { $r[$pp] = $t } } catch { $null = $_ } } }   # a color that is no token stays as it is
+      foreach ($pp in 'ForeColor', 'BackColor') { try { $a = $c.$pp.ToArgb(); $t0 = [string]$r[$pp]   # the token it had keeps its place while its color is still on the control
+          if (-not ($t0 -and $ui.C[$t0].ToArgb() -eq $a)) { $t = $rev[$a]; if ($t) { $r[$pp] = $t } } } catch { $null = $_ } } }   # a color that is no token stays as it is
     & $ui.UseColors $hi
     foreach ($c in $all) { $r = $ui.Roles[$c]; foreach ($pp in @($r.Keys)) { try { $c.$pp = $ui.C[[string]$r[$pp]] } catch { $null = $_ } } }   # a property that cannot be set keeps its color
     foreach ($b in @($ui.Kinds.Keys)) { try { $en = $b.Enabled; & $ui.Style $b ([string]$ui.Kinds[$b]); if ([string]$ui.Kinds[$b] -notin 'off', 'dangeroff') { $b.Enabled = $en } } catch { $null = $_ } }   # a button that is gone: nothing to paint
     foreach ($b in @($ui.Links)) { try { $b.BackColor = $ui.C.White; $b.ForeColor = $ui.C.Link; $b.FlatAppearance.MouseOverBackColor = $ui.C.White; $b.FlatAppearance.MouseDownBackColor = $ui.C.Hair } catch { $null = $_ } }   # same: a link that is gone
-    $ui.Form.Invalidate($true) } catch { $null = $_ } }   # colors never stop the window
+    if ($ui.CardNow -and -not $ui.RecOn -and -not $ui.Busy -and -not $ui.Running) { & $ui.SetCard $ui.CardNow }; $ui.Form.Invalidate($true) } catch { $null = $_ } }   # the card's own colors; never stops the window
 # ---- Where ink starts
 $ui.Inks = @{}
 $ui.Ink = { param($C)

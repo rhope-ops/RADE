@@ -55,12 +55,12 @@
   },
   "styles": {
     "Sent": { "face": "title", "pt": 22, "style": "", "use": "the headline of a card" },
-    "Word": { "face": "title", "pt": 15, "style": "", "use": "the word RADE in the logo block" },
+    "Word": { "face": "title", "pt": 15, "style": "Bold", "use": "the word RADE in the logo block" },
     "Body": { "face": "text", "pt": 12, "style": "", "use": "paragraphs, step lines, the help line" },
     "Small": { "face": "text", "pt": 10, "style": "", "use": "second lines, notes, box text" },
     "SmallB": { "face": "strong", "pt": 10, "style": "", "use": "the line in capitals, labels, every button" },
     "Link": { "face": "strong", "pt": 10, "style": "Underline", "use": "links (underlined: not color alone)" },
-    "Turn": { "face": "strong", "pt": 12, "style": "", "use": "Your turn" },
+    "Turn": { "face": "text", "pt": 12, "style": "Bold", "use": "Your turn (bold: R35)" },
     "Mono": { "face": "mono", "pt": 9, "style": "", "use": "the Record's text box" }
   }
 }
