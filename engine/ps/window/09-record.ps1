@@ -116,7 +116,7 @@ $ui.VRecord = {
 # Closes the Record and shows the card again; redraws the ready card when a step box was changed. Takes nothing.
 $ui.CloseRecord = {
   & $ui.Check
-  $ui.RecOn = $false; $ui.Rec.Visible = $false; $ui.Card.Visible = $true; $ui.RecB.Visible = $true; $ui.TourB.Visible = ($ui.HelpViews -contains [string]$ui.View); $ui.BackB.Visible = [bool]$ui.Back; $ui.FeedB.Visible = [bool]((& $ui.NoteOn) -and [string]$ui.View -notin $ui.NoNoteViews)
+  $ui.RecOn = $false; $ui.Rec.Visible = $false; $ui.Card.Visible = $true; $ui.RecB.Visible = $true; $ui.TourB.Visible = ($ui.HelpViews -contains [string]$ui.View); $ui.BackOn = [bool]$ui.Back; $ui.BackB.Visible = $ui.BackOn; $ui.BtnRow.Visible = [bool](@($ui.BOn | Where-Object { $_ }).Count -or $ui.BackOn); & $ui.Apart; $ui.FeedB.Visible = [bool]((& $ui.NoteOn) -and [string]$ui.View -notin $ui.NoNoteViews)
   if ($ui.Edit) { $ui.Edit = $false; if ($ui.View -eq 'ready') { & $ui.VReady } }   # the plan line follows the boxes
   try { [void]$ui.RecB.Focus() } catch { $null = $_ } }
 $ui.RecB.Add_Click({ & $ui.VRecord })
