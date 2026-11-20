@@ -141,7 +141,10 @@ $ui.Apart = {
     for ($k = 0; $k -lt $n; $k++) { if ($ui.BOn[$k]) { $prev = $k; $used += $ui.B[$k].Width + 2 * $mm } }
     if ($prev -eq -1) { $used = 0 }
     $left = $ui.ContentW + $mm - $used - $ui.B[$n].Width
-    if ($left -ge $mm) { $ui.B[$n].Margin = (& $ui.Pad ([int]$left) $mm $mm $mm) } elseif ($prev -ge 0) { $ui.BtnRow.SetFlowBreak($ui.B[$prev], $true) } elseif ($prev -eq -2) { $ui.BtnRow.SetFlowBreak($ui.BackB, $true) }
+    if ($left -lt $mm) {   # too narrow: the primary starts its own row, still at the right end (B3)
+      if ($prev -ge 0) { $ui.BtnRow.SetFlowBreak($ui.B[$prev], $true) } elseif ($prev -eq -2) { $ui.BtnRow.SetFlowBreak($ui.BackB, $true) }
+      $left = $ui.ContentW + $mm - $ui.B[$n].Width }
+    $ui.B[$n].Margin = (& $ui.Pad ([int][math]::Max($mm, $left)) $mm $mm $mm)
     $ui.BtnRow.PerformLayout()   # the row's height is right before the frame is placed ($ui.Squeeze)
   } catch { $null = $_ } }
 # Places the card frame (L1) and lets the card's text scroll when the card is taller than the window (the help below).

@@ -46,7 +46,7 @@ One place: the `sizes`, `gaps` and `fields` of [engine/ui-tokens.json](../engine
 | Buttons and links | [ui-standard.md](ui-standard.md) B1 (fixed sizes; values in engine/ui-tokens.json). A link draws its text at the left, so it starts on the card edge (the "Kick" defect of R25) |
 | Choice (Choose) | 66 high, or as tall as its lines |
 | Between two buttons or two links | 8 |
-| The action row | "Back (Esc)" at the left end, the primary button alone at the right end (B3, B6); when the row is too narrow, the primary starts its own row |
+| The action row | "Back (Esc)" at the left end, the primary button alone at the right end (B3, B6); when the row is too narrow, the primary starts its own row, still at the right end |
 | Gaps above a card part | 4 (sentence, second paragraph, the file path under its label), 8 (last log line, box row, error box, note), 12 (first paragraph, the lines of a hand step, the label "File path", step line, the unnumbered lines after the numbered ones), 4 (between two numbered lines), 16 (help line, buttons), 24 (choices, last gray line, test extras) |
 | Page only | button corners 3 px |
 
