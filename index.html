@@ -4,7 +4,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png" media="(prefers-color-scheme:light)">
-<link rel="icon" href="assets/logo/rho-usaf-32.png" media="(prefers-color-scheme:dark)">
+<link rel="icon" href="assets/logo/rho-fulcrum-32.png" media="(prefers-color-scheme:dark)">
 <style>
 /* Layout: the RADE window as a page ("One thing", docs/window-design.md): the band
    (the header of the 90-161.Z page: navy to blue, a yellow line under it; the logo, RADE with the tagline under it, and
@@ -32,10 +32,7 @@ body{margin:0;background:var(--bg);color:var(--text);font:1rem/1.5 var(--ui)}
 .band-in,.stage,.bottom{width:100%;max-width:860px;margin-inline:auto}
 .band-in{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:1fr auto auto 1fr;column-gap:14px;align-items:center;padding-block:18px}
 .band img{grid-row:1/-1;grid-column:1;width:64px;height:64px}
-/* Logo (the Administrator, 19 Nov 26): Rho Fulcrum in the light theme, Rho USAF in the dark theme. The same selectors as the theme tokens, so data-theme wins over the system setting. */
-.logo.usaf{display:none}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .logo.fulcrum{display:none}:root:not([data-theme="light"]) .logo.usaf{display:block}}
-:root[data-theme="dark"] .logo.fulcrum{display:none}:root[data-theme="dark"] .logo.usaf{display:block}
+/* Logo (the PFM, 20 Nov 26: "Fulcrum everywhere for now, as this is not an endorsed product"): Rho Fulcrum in the light and the dark theme; the band keeps its fixed colors in both. */
 /* Right side: TEAMS in the style and on the row of RADE, the channel name in the style and on the row of the tagline (the Administrator, 18 Nov 26). */
 .band .name,.band .team{grid-row:2;margin:0;font-size:1.375rem;line-height:1.2;font-weight:650;color:#fff}
 .band .sub,.band .chan{grid-row:3;margin:2px 0 0;color:#dde8f3;font-size:.875rem}
@@ -98,7 +95,7 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 :focus-visible{outline:3px solid Highlight}}
 </style></head><body>
 <div class="win" id="win">
-<header class="band"><div class="row band-in"><img class="logo fulcrum" src="assets/logo/rho-fulcrum-64.png" srcset="assets/logo/rho-fulcrum-64.png 1x, assets/logo/rho-fulcrum-128.png 2x" alt=""><img class="logo usaf" src="assets/logo/rho-usaf-64.png" srcset="assets/logo/rho-usaf-64.png 1x, assets/logo/rho-usaf-128.png 2x" alt=""><p class="name">RADE</p><p class="sub">Test, deploy, enjoy</p><p class="team" id="team" hidden>TEAMS</p><p class="chan" id="chan"></p></div></header>
+<header class="band"><div class="row band-in"><img class="logo" src="assets/logo/rho-fulcrum-64.png" srcset="assets/logo/rho-fulcrum-64.png 1x, assets/logo/rho-fulcrum-128.png 2x" alt=""><p class="name">RADE</p><p class="sub">Test, deploy, enjoy</p><p class="team" id="team" hidden>TEAMS</p><p class="chan" id="chan"></p></div></header>
 <main class="row stage"><div class="card" id="card" aria-live="polite"><p class="caps">RADE</p><h1>Getting the newest script.</h1></div></main>
 <footer class="row bottom"><a href="https://github.com/rhope-ops/RADE">Repository</a><a id="back" href="#" hidden>Back</a><span class="state" id="state"></span></footer>
 <div class="bar" aria-hidden="true"><i id="bar"></i></div>

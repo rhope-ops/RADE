@@ -57,7 +57,7 @@ function Add-StepLine([string]$Line, $Step, $R, [string]$Site, [scriptblock]$Say
   if ($Step.ScreenOnly -and $line -match $Step.ScreenOnly) { $line = ($line -replace '^(\S+).*$', '$1') + ' (detail hidden: it may hold a name; run the step script by hand to see it)' }
   if ($line -match '(^|\s)PASS(\s|$)') { $R.Pass++ }
   if ($line -cmatch '(^|\s)SKIP(\s|$)') { $R.Skip++ }   # upper case only: prose such as "skip this" is not a result
-  if ($line -match '(^|\s)(FAIL|FORMAT-FAIL|RENDER-ERROR|MEASURE-ERROR|STOPPED:)(\s|$)') { $R.Fail++ }
+  if ($line -match '(^|\s)(FAIL|FORMAT-FAIL|RENDER-ERROR|MEASURE-ERROR|STOPPED:)(\s|$)') { $R.Fail++; if ($line -match $signInLost) { $R.SignIn = $true } }   # a failed sign-in: the CAC may be out (12-resume.ps1)
   if ($line.Trim()) { & $Say ('    ' + $line) }   # step output, indented under its step heading
   if ($script:nowUi) { $now = Get-NowText $line; if ($now) { & $script:nowUi $now } }
 }
@@ -75,7 +75,7 @@ function Get-NowText([string]$Line) {
 # the step, the log and tick callbacks and the person's answer; returns @{ Pass; Fail; Skip; Exit; Made; Fallback }.
 function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]$Tick, [string]$Answer) {
   $psi = Get-StepStartInfo $Base $Step $Answer $Say
-  $r = @{ Pass = 0; Fail = 0; Skip = 0; Exit = $null; Made = @(); Fallback = '' }
+  $r = @{ Pass = 0; Fail = 0; Skip = 0; Exit = $null; Made = @(); Fallback = ''; SignIn = $false }
   $siteNow = [string](Get-SiteUrl $Base)
   $p = [System.Diagnostics.Process]::Start($psi)
   $script:child = $p
@@ -96,14 +96,14 @@ function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]
   }
   $p.WaitForExit()
   $script:child = $null
-  foreach ($e in @(([string]$errTask.Result) -split "`r?`n" | Where-Object { $_ })) { $r.Fail++; & $Say ('    Error output: ' + (ConvertTo-Masked $e)) }
+  foreach ($e in @(([string]$errTask.Result) -split "`r?`n" | Where-Object { $_ })) { $r.Fail++; if ($e -match $signInLost) { $r.SignIn = $true }; & $Say ('    Error output: ' + (ConvertTo-Masked $e)) }
   $r.Exit = $p.ExitCode
   return $r
 }
-# Gives the state word for a step result: SKIPPED, NEEDS REVIEW or PASSED. Takes the result table; gives back the word.
+# Gives the state word for a step result: SKIPPED, INTERRUPTED, NEEDS REVIEW or PASSED. Takes the result table; gives back the word.
 function Get-StepState($R) {
   if ($R.Skipped) { return 'SKIPPED' }
-  if ($R.Fail -gt 0 -or $R.Exit -ne 0) { return 'NEEDS REVIEW' }
+  if ($R.Fail -gt 0 -or $R.Exit -ne 0) { if ($R.SignIn) { return 'INTERRUPTED' }; return 'NEEDS REVIEW' }   # a failed sign-in (CAC out): resume re-runs it (the PFM, 2026-11-20)
   if ($R.Pass -eq 0 -and $R.Skip -gt 0) { return 'SKIPPED' }   # the step found nothing to do (R18: was PASSED with 0 passed)
   return 'PASSED'
 }
@@ -215,6 +215,19 @@ function Get-GuideAnswerText($Q) {
 }
 # Adds one line to the run log, when a log exists. Takes the line; gives back nothing.
 function Add-RunLog([string]$T) { if ($null -ne $script:runLog) { $script:runLog.Add($T) } }
+# No scripts in results (the PFM, 2026-11-20): says whether a file name has a script extension ($scriptExts, from the
+# build's SCRIPT_EXTS). The first time a name is refused, one line goes to the run log. Takes the file name; gives back
+# $true for a script file.
+function Test-ScriptResult([string]$Name) {
+  $ext = [System.IO.Path]::GetExtension($Name).ToLowerInvariant()
+  if (@($scriptExts) -notcontains $ext) { return $false }
+  if ($null -eq $script:scriptsSkipped) { $script:scriptsSkipped = @{} }
+  if (-not $script:scriptsSkipped.ContainsKey($Name)) { $script:scriptsSkipped[$Name] = $true; Add-RunLog ('SKIPPED script file ' + $Name + ' (scripts never go in results)') }
+  return $true
+}
+# Fills the results folder Rounds\<round>: a copy of each collect file (never a script file), then the report (the
+# summary and the full log). Takes the RADE app folder and the summary; gives back the folder, the file count and the
+# expected files that are missing.
 function Export-RoundResult([string]$Base, [string[]]$Summary) {
   # One folder of plain files to attach to one e-mail (zips do not cross the boundary, PFM 13 Nov).
   $out = Join-Path (Join-Path $Base 'Rounds') $round
@@ -229,7 +242,7 @@ function Export-RoundResult([string]$Base, [string[]]$Summary) {
       # Windows -Filter '*.htm' also matches '.html': keep each file once. Copies carry the task prefix (T09-..., T12-...) so
       # two tasks never overwrite each other, and older copies of that task are removed first (review R10).
       $hits = @(); if (Test-Path -LiteralPath $src -PathType Container) { foreach ($pat in ($c.Name -split ';')) { $hits += @(Get-ChildItem -LiteralPath $src -File -Filter $pat -ErrorAction SilentlyContinue) } }
-      $hits = @($hits | Sort-Object FullName -Unique)
+      $hits = @($hits | Sort-Object FullName -Unique | Where-Object { -not (Test-ScriptResult $_.Name) })   # a script never goes in results
       Get-ChildItem -LiteralPath $out -File -Filter ($c.Dir + '-*') -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
       foreach ($h in $hits) { Copy-Item -LiteralPath $h.FullName -Destination (Join-Path $out ($c.Dir + '-' + $h.Name)) -Force; $count++ }
       if (-not $hits.Count) { $missing += ($c.Dir + '\' + $c.Name) }
@@ -238,6 +251,7 @@ function Export-RoundResult([string]$Base, [string[]]$Summary) {
     $old = Join-Path $out $c.Name
     if (Test-Path -LiteralPath $old -PathType Leaf) { Remove-Item -LiteralPath $old -Force }   # an older copy of the same name must not be sent again
     $p = Join-Path $src $c.Name
+    if (Test-ScriptResult $c.Name) { continue }   # the build refuses such a name; this is the second guard
     if (Test-Path -LiteralPath $p -PathType Leaf) { Copy-Item -LiteralPath $p -Destination (Join-Path $out $c.Name) -Force; $count++ } else { $missing += ($c.Dir + '\' + $c.Name) }
   }
   if ($missing.Count) { $script:roundBad = $true }
@@ -291,7 +305,7 @@ function Save-RoundDraft([string]$Dir, [string[]]$Summary, [string]$To, [string]
     $m.Subject = $Summary[0]
     if ($To) { $m.To = $To }
     $m.Body = ((@($Summary | Select-Object -Skip 1) + @('', $WindowLine)) -join "`r`n")
-    foreach ($f in @(Get-ChildItem -LiteralPath $Dir -File)) { [void]$m.Attachments.Add($f.FullName) }
+    foreach ($f in @(Get-ChildItem -LiteralPath $Dir -File)) { if ($f.Name -ne $stateName -and -not (Test-ScriptResult $f.Name)) { [void]$m.Attachments.Add($f.FullName) } }   # never a script, never the resume state
     $m.Display()   # first: if it fails, nothing is left in Drafts
     $m.Save()
     return ''
