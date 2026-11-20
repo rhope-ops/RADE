@@ -51,7 +51,7 @@ $ui.VChoose = {
   & $ui.SetCard @{ View = 'choose'; Sentence = $(if ($dep) { 'Which application do you want to install?' } else { 'Which application do you want to run?' })
     P = @($(if ($nr) { 'A newer round, ' + $nr + ', is in the repository. Close this window and run ' + $nr + ' instead.' } else { '' })); Options = $list; OnOption = { param($j) & $ui.Pick $j }
     PageLink = [bool](@($ui.Newer.Values | Where-Object { $_ }).Count)
-    Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Act = { & $ui.Boot } } } else { $null })); Foot = $(if ($dep) { '' } else { Get-LastRoundText $ui.Hist }) } }
+    Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Kind = 'primary'; Act = { & $ui.Boot } } } else { $null })); Foot = $(if ($dep) { '' } else { Get-LastRoundText $ui.Hist }) } }
 # Shows "Checking this computer", runs the base checks and then shows Choose; shows the error card when they stop. Takes
 # nothing.
 $ui.Boot = {
@@ -69,14 +69,15 @@ $ui.TourCards = @(
   @{ S = 'The results stay on this computer.'; P = @('RADE writes a report into its results folder. RADE sends nothing.', 'After a test round RADE makes an e-mail draft with the results. You read it, and you send it.') },
   @{ S = 'The Record shows everything.'; P = @('Select "Record" or press F2 to see all checks, steps, files and the log.', 'Select "Help" or press F1 to see this tour again.') })
 # The cards that "Help (F1)" can leave and show again: no step or check runs on them, and none waits inside the engine.
-$ui.HelpViews = @('choose', 'maint', 'site', 'fail', 'need', 'ready', 'nodrive', 'done', 'review', 'stopped', 'noapps', 'booterr')
+$ui.HelpViews = @('choose', 'maint', 'tools', 'site', 'fail', 'need', 'ready', 'nodrive', 'done', 'review', 'stopped', 'noapps', 'booterr')
 # Shows card $I of the tour (0 = the first). "Next" and "Back" move; "Skip the tour" and the last card's button end it.
 # Takes the card number.
 $ui.VTour = { param([int]$I)
   $n = $ui.TourCards.Count; $ui.TourI = [math]::Max(0, [math]::Min($n - 1, $I)); $tc = $ui.TourCards[$ui.TourI]; $last = ($ui.TourI -eq $n - 1)
   & $ui.SetCard @{ View = 'tour'; Kicker = ('RADE tour' + $dot + ($ui.TourI + 1) + ' of ' + $n); Sentence = [string]$tc.S; P = @($tc.P)
     Buttons = @(@{ Text = $(if ($last) { 'Close the tour' } else { 'Next' }); Kind = 'primary'; Act = { if ($ui.TourI -ge $ui.TourCards.Count - 1) { & $ui.EndTour } else { & $ui.VTour ($ui.TourI + 1) } } },
-      $(if ($ui.TourI) { @{ Text = 'Back'; Act = { & $ui.VTour ($ui.TourI - 1) } } } else { $null }), $(if ($last) { $null } else { @{ Text = 'Skip the tour'; Act = { & $ui.EndTour } } })) } }
+      $(if ($last) { $null } else { @{ Text = 'Skip the tour'; Act = { & $ui.EndTour } } }))
+    Back = $(if ($ui.TourI) { { & $ui.VTour ($ui.TourI - 1) } } else { $null }) } }   # B6: the one Back pattern
 # Ends the tour: remembers that it was shown (Save-TourSeen) and shows the card it came from (Choose on the first run).
 # Takes nothing.
 $ui.EndTour = { Save-TourSeen; $from = $ui.TourFrom; $ui.TourFrom = $null; if ($from) { & $ui.SetCard $from } else { & $ui.VChoose } }
@@ -110,10 +111,12 @@ $ui.Pick = { param([int]$J)
   & $ui.InitSel
   $e = $null; if (Test-Deploy) { $e = (Read-Installed (Get-InstalledKey $script:app)) }
   if ($e -and $e.installed) { & $ui.VMaint $e.installed } else { & $ui.Checks $false } }
+# Shows the Maintenance card of an installed application. Takes its install record (version and date).
 $ui.VMaint = { param($Inst)
+  $ui.MaintInst = $Inst   # Back on the Maintenance screen shows this card again
   # Maintenance (the Administrator, 2026-11-14; docs/engine.md "Maintenance run types"): shown for an application that is
-  # installed. Install works ("Update to <version>" or "Repair"). Diagnose, Back up, Restore and Uninstall have no engine
-  # function yet: they are shown off, Uninstall set apart.
+  # installed. UI standard v1 (the Administrator, 2026-11-20): the card has Start, "Maintenance" (its own screen,
+  # $ui.VTools: Update or Repair, Diagnose, Back up, Restore) and Uninstall set apart; Uninstall has no engine function yet.
   $on = ''; try { $on = $dot + 'installed ' + ([datetime][string]$Inst.at).ToString('d MMM yy', [System.Globalization.CultureInfo]::InvariantCulture) } catch { $null = $_ }
   $verb = 'Install ' + $script:app.Version
   try { $c = ([version][string]$script:app.Version).CompareTo([version][string]$Inst.version); if ($c -gt 0) { $verb = 'Update to ' + $script:app.Version } elseif ($c -eq 0) { $verb = 'Repair' } } catch { $null = $_ }
@@ -121,11 +124,25 @@ $ui.VMaint = { param($Inst)
   # It runs the checks first (Start comes only after they pass: AGENTS.md "RADE and the app"), then starts the application.
   $ui.StartAfter = $false; $startB = $null; $startMain = $false
   if ([string]$script:app.Start -and (Get-StartPath)) { $startMain = ([string]$Inst.version -eq [string]$script:app.Version); $startB = @{ Text = 'Start ' + $script:app.Name; Kind = $(if ($startMain) { 'primary' } else { '' }); Act = { $ui.StartAfter = $true; & $ui.Checks $false } } }
+  $ui.MaintVerb = $verb   # read when the button is clicked (a scriptblock does not keep this card's local variables)
   & $ui.SetCard @{ View = 'maint'; Kicker = ($script:app.Name + ' ' + $Inst.version + $on); Sentence = 'Maintenance'
-    P = @($(if ($verb -eq 'Repair') { 'Repair adds what is missing and keeps your data.' } else { $verb + ' adds what is missing and keeps your data.' }), $(if ($startB) { 'Start runs the checks, then opens ' + $script:app.Name + '.' } else { '' }))
-    Note = 'Diagnose, Back up, Restore and Uninstall are not in this version of RADE yet.'
-    Buttons = @($startB, @{ Text = $verb; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.Checks $false } }, @{ Text = 'Diagnose'; Kind = 'off' }, @{ Text = 'Back up'; Kind = 'off' }, @{ Text = 'Restore'; Kind = 'off' }, @{ Text = 'Uninstall'; Kind = 'dangeroff'; Apart = $true })
+    P = @(('Maintenance holds ' + $verb + ', Diagnose, Back up and Restore.'), $(if ($startB) { 'Start runs the checks, then opens ' + $script:app.Name + '.' } else { '' }))
+    Note = 'Uninstall is not in this version of RADE yet.'
+    Buttons = @(@{ Text = 'Uninstall'; Kind = 'dangeroff' }, $startB, @{ Text = 'Maintenance'; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.VTools $ui.MaintVerb } })   # Uninstall first: away from the primary   # B5: 1 primary + 3 others at most
     Back = { & $ui.VChoose } } }
+# The Maintenance screen (the Administrator, 2026-11-20): Update or Repair (works: the checks, then the install run),
+# and the list of Diagnose, Back up and Restore, shown not available until they are built (docs/engine.md "Maintenance run types").
+# Takes the install verb ("Update to <version>" or "Repair").
+$ui.VTools = { param([string]$Verb)
+  & $ui.SetCard @{ View = 'tools'; Kicker = [string]$ui.Kick.Text; Sentence = 'Maintenance'
+    # The tools are a list (the Administrator, 2026-11-20: Repair must not stand alone on a row): one row each, as on Choose,
+    # with what it does; shown not available until it is built. The action row is Back (Esc) and the install verb.
+    P = @(($Verb + ' adds what is missing and keeps your data.'))
+    Options = @(@{ Off = $true; Index = 0; Name = 'Diagnose'; Ver = ''; Sub = 'Checks the install and the site. Changes nothing.'; R1 = 'Not available yet'; Soon = $true },
+      @{ Off = $true; Index = 1; Name = 'Back up'; Ver = ''; Sub = "Saves the app's lists to this computer."; R1 = 'Not available yet'; Soon = $true },
+      @{ Off = $true; Index = 2; Name = 'Restore'; Ver = ''; Sub = 'Puts saved rows back on the site, after a dry run.'; R1 = 'Not available yet'; Soon = $true })
+    Buttons = @(@{ Text = $Verb; Kind = 'primary'; Act = { & $ui.Checks $false } })
+    Back = { & $ui.VMaint $ui.MaintInst } } }
 # Says whether the chosen application has a check that needs the site address. Takes nothing; gives back $true or
 # $false.
 $ui.NeedSite = { [bool](@($script:appChecks | Where-Object { $_ -in 'net-site', 'site-rights' }).Count) }
@@ -249,13 +266,14 @@ $ui.VReady = {
   $hasWork = [bool]($n -or ($cleanup.Count -and $ui.Clean))
   $runB = @{ Text = $(if ($dep) { 'Install' } else { 'Run' }); Kind = $(if ($hasWork -and -not $startPrimary) { 'primary' } elseif ($hasWork) { '' } else { 'off' }); Act = { & $ui.Run } }
   if ($resB) { $runB = @{ Text = 'Start over'; Act = { & $ui.StartOver } } }   # in the place of Install or Run
+  if ($resB -and $startB) { $startB.Kind = '' }   # B4 (UI standard v1): one primary; Resume wins
   & $ui.SetCard @{ View = 'ready'
     Kicker = $(if ($warn.Count) { [string]($ids.Count - $warn.Count) + ' checks passed' + $dot + $warn.Count + $(if ($warn.Count -eq 1) { ' warning' } else { ' warnings' }) } else { 'All ' + $ids.Count + ' checks passed' })
     Sentence = $(if ($dep) { 'Ready to install ' + $script:app.Name + ' ' + $script:app.Version + '.' } else { 'Ready to run round ' + $round + '.' })
     P = @(('Writes to ' + $plan.Shown + ': ' + $new + ' new files, ' + $rep + ' replaced, ' + $rec + ' moved to the Recycle Bin.'),
       ([string]$n + $(if ($n -eq 1) { ' step' } else { ' steps' }) + ', about ' + [math]::Max(1, [int][math]::Round($est / 60)) + ' min. ' + $you + $(if ($done) { ' ' + $done + ' already done for this version and off.' } else { '' })),
       $(if (Test-WordOpen) { 'Word is open. Save your documents and close Word before you start.' } else { '' }), $w1, $rsNote)
-    Buttons = @($resB, $startB, $runB, @{ Text = 'Record'; Act = { $ui.Edit = $true; & $ui.VRecord } },
+    Buttons = @($resB, $startB, $runB,   # B7: the Record is the link "Record (F2)"; B4: one primary (Resume when it shows)
       $(if ($siteName) { @{ Text = 'Change the site address'; Act = { & $ui.VSite } } } else { $null }))
     Foot = $(if ($siteName) { 'Site: ' + $siteName } else { '' })
     Field = $(if ($dep -and -not (Test-ShortcutMade)) { @{ Label = 'RADE shortcut in'; Text = (Get-ShortcutDir); Name = 'Folder for the RADE shortcut'; Button = 'Browse'; Act = { & $ui.BrowseDir } } } else { $null })

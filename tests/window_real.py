@@ -42,9 +42,24 @@ RUNS = [
     # 1920 x 1080 screen (956 x 1081 real pixels). The job's screen draws at 100 %, so the test copy of the bundle makes the
     # form scale by 1.5 and reports 144 dpi (DEVICE_150 below); the fonts then grow by 1.5 as they do on that computer.
     ("device150-half", 0, "done", "0", "956x1081", False),
+    # UI standard v1 (the Administrator, 2026-11-20; docs/ui-standard.md "Proof"): the same test round at 125 % and 200 %
+    # (scaled as the 150 % run is: device()), and once with a Windows contrast theme on (CONTRAST: the window takes the
+    # system colors from its first frame; the job's theme itself stays as it is).
+    ("device125-full", 0, "done", "0", "", False),
+    ("device200-full", 0, "done", "0", "", False),
+    ("contrast-full", 0, "done", "0", "", False),
 ]
 # Swaps for a "device150-" run: the form's sizes are given at 64 dpi, so Windows Forms scales it by 1.5 on a 96 dpi screen,
 # and the form's dpi reads 144 (the engine's $ui.Sc and its font factor follow it), as on a screen with 150 % scaling.
+def device(k):
+    """The swaps that make the form scale by k on a 96 dpi screen and report 96 * k dpi (as DEVICE_150 does for 1.5)."""
+    return [(DEVICE_150[0][0], "$ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(%s, %s)" % (96 / k, 96 / k)),
+            (DEVICE_150[1][0], "if ($d -gt 0) { $ui.Dpi = $d * %s }" % k)]
+
+
+# The swap of the contrast run: the window reads a contrast theme as on ($ui.HighOn), so every color is a system color.
+CONTRAST = [(r"\$ui\.HighOn = \{ try \{ return \[bool\]\[System\.Windows\.Forms\.SystemInformation\]::HighContrast \} catch \{ return \$false \} \}",
+             "$ui.HighOn = { return $true }")]
 DEVICE_150 = [
     (r"\$ui\.Form\.AutoScaleDimensions = New-Object System\.Drawing\.SizeF\(96, 96\)", "$ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(64, 64)"),
     (r"if \(\$d -gt 0\) \{ \$ui\.Dpi = \$d \}", "if ($d -gt 0) { $ui.Dpi = $d * 1.5 }"),
@@ -201,6 +216,35 @@ def r31_why(lines, app, fresh):
     return why
 
 
+def swaps_for(name):
+    """The swaps of a run's test copy, by the start of its name: device150-, device125-, device200- (the scale) or contrast-.
+    200 % on the job's 1920 x 1080 screen is 960 x 540 at 100 %, smaller than 1020 x 616, so its text may scroll too (main)."""
+    for k, v in (("device150-", DEVICE_150), ("device125-", device(1.25)), ("device200-", device(2)), ("contrast-", CONTRAST)):
+        if name.startswith(k):
+            return v
+    return ()
+
+
+def ui_why(lines, d, name):
+    """Say what a run misses of UI standard v1 (docs/ui-standard.md "Proof"): its inventory, and the contrast run's colors.
+
+    Args:
+        lines: the output lines of the run.
+        d: the run's output folder (inventory.jsonl is there).
+        name: the name of the run ("contrast-" runs must take the system colors).
+
+    Returns:
+        A list of reasons (empty = nothing is missing). Prints the INVENTORY line.
+    """
+    why, inv = [], d / "inventory.jsonl"
+    print("   INVENTORY lines=%d" % (len(inv.read_text(encoding="utf-8-sig").splitlines()) if inv.exists() else 0))
+    if not inv.exists():
+        why.append("no inventory (RADE_INVENTORY)")
+    if name.startswith("contrast-") and not any(l.startswith("WIN high=True") for l in lines):
+        why.append("the contrast run did not take the system colors (no WIN high=True line)")
+    return why
+
+
 def screen():
     """Ask for a screen of 1920 x 1080, so the window of the "device150-" run fits (the job's screen is smaller).
     A job that cannot set it goes on. Returns the SCREEN line to print (what the screen is now)."""
@@ -216,10 +260,10 @@ def main():
     maint = 0
     for name, app, hand, tour, size, long in RUNS:
         t = pathlib.Path(tempfile.mkdtemp())
-        users = bundle(t, long, home if name.startswith("deploy-") else None, DEVICE_150 if name.startswith("device150-") else ())
+        users = bundle(t, long, home if name.startswith("deploy-") else None, swaps_for(name))
         d = out / name
         d.mkdir(parents=True, exist_ok=True)
-        env = dict(os.environ, RADE_T_OUT=str(d), RADE_T_APP=str(app), RADE_T_HAND=hand, RADE_T_TOUR=tour, RADE_T_SIZE=size, USERPROFILE=str(users / "test1234"))
+        env = dict(os.environ, RADE_T_OUT=str(d), RADE_T_APP=str(app), RADE_T_HAND=hand, RADE_T_TOUR=tour, RADE_T_SIZE=size, USERPROFILE=str(users / "test1234"), RADE_INVENTORY=str(d / "inventory.jsonl"))
         try:
             r = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(t / "w.ps1")], env=env, capture_output=True, text=True, timeout=420, stdin=subprocess.DEVNULL, errors="replace")
             text = r.stdout + r.stderr
@@ -246,8 +290,8 @@ def main():
             why.append("the window did not reach its end")
         if layout:
             why.append("%d layout defects" % len(layout))
-        if scrolls and size != SMALLEST:
-            why.append("a card scrolls at a size where none may: " + scrolls[0][12:])
+        why += ui_why(lines, d, name)
+        why += ["a card scrolls at a size where none may: " + scrolls[0][12:]] if scrolls and size != SMALLEST and not name.startswith("device200-") else []
         if not any(l.startswith("WIN line Layout self-check: ") for l in lines):
             why.append("no line of the layout self-check")
         if not any(l.startswith("WIN SCALE ") for l in lines):

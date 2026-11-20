@@ -12,7 +12,8 @@ $ui.Say = { param($t) Add-RunLog $t; $ui.Log.Add([string]$t); if ($ui.RecOn) { t
 $ui.ShowNow = { param([string]$Text) try { if ($ui.View -eq 'run') { $x = $Text.Trim() -replace '[\s.,;:!?\u2026]+$', ''; $ui.NowRaw = $(if ($x) { $x + '...' } else { '' }); & $ui.CutNow; $ui.Now.Visible = $true } } catch { $null = $_ } }   # a line that cannot show never stops a step
 # Shows the whole now-doing text ($ui.NowRaw) cut to $ui.NowLines lines at the line's wrap width; runs again after a resize
 # ($ui.BreakAll), so a narrower window cuts it again from the whole text. Takes nothing; a failure is ignored.
-$ui.CutNow = { try { $w = [int](& $ui.GetWrap $ui.Now); $x = [string]$ui.NowRaw; if ($x) { $x = & $ui.FitLines (& $ui.BreakLong $x $ui.Now.Font $w) $ui.Now.Font $w $ui.NowLines }; if ([string]$ui.Now.Text -cne $x) { $ui.Now.Text = $x } } catch { $null = $_ } }   # a line that cannot show never stops a step
+$ui.CutNow = { try { $w = [int](& $ui.GetWrap $ui.Now); $x = [string]$ui.NowRaw; if ($x) { $x = & $ui.FitLines (& $ui.BreakLong $x $ui.Now.Font $w) $ui.Now.Font $w $ui.NowLines }; if ([string]$ui.Now.Text -cne $x) { $ui.Now.Text = $x
+    if ($x -and $null -ne $ui.EdgeX) { & $ui.SetLeft $ui.Now ([int]$ui.EdgeX - (& $ui.Ink $ui.Now)) } } } catch { $null = $_ } }   # its ink on the card edge for each new text (200 % run: 3 px off)   # a line that cannot show never stops a step
 # The engine's callback for the now-doing line (Add-StepLine): shows the text and emits nothing. Takes the text.
 $script:nowUi = { param($t) $null = & $ui.ShowNow ([string]$t) }
 # L8 (the Administrator, 2026-11-19): a step stays on the Run card for $ui.Layout.StepMs (engine/window.json) at least, so a
@@ -150,7 +151,6 @@ $ui.VDone = {
   $took = Format-Duration ((Get-Date) - $script:roundStart).TotalSeconds
   $ui.Bars['all'].Fill = $(if ($bad) { $ui.C.Blue } else { $ui.C.Green }); & $ui.SetBar 'all' $(if ($bad) { $ui.Bars['all'].Target } else { 1 }) $true
   $mail = $(if ($script:draftMade) { 'An Outlook draft is open with the summary and all result files. Review it, then select Send.' } else { 'The results folder is open and the summary is on the clipboard. Paste it into an e-mail and attach the files.' })
-  $bMade = $(if ($made) { @{ Text = 'Record'; Act = { & $ui.VRecord } } } else { $null })
   $iconNote = ''; if ($dep -and -not $bad) { $null = Save-RunnerCopy; $iconNote = $(if ($ui.FieldAsked -and -not $ui.LinkDir -and (Get-DesktopDir)) { 'The shortcut folder box was empty, so RADE made no shortcut. Open RADE from the RADE page instead.' } else { [string](Add-DesktopIcon ([string]$ui.LinkDir)) }) }   # R28: the runner copy and the desktop shortcut (a deploy that passed)
   if (-not $bad) {
     $inst = ($dep -and (Get-InstalledText $script:app) -match 'is installed$')
@@ -159,7 +159,7 @@ $ui.VDone = {
     & $ui.SetCard @{ View = 'done'; Tick = $true; Kicker = $(if ($dep -and -not $inst) { 'Passed' } else { 'All steps passed' }); Right = $took
       Sentence = $(if (-not $dep) { 'Round ' + $round + ' is done.' } elseif ($inst) { $script:app.Name + ' ' + $script:app.Version + ' is installed.' } else { 'The run passed, but version ' + $script:app.Version + ' is not recorded as installed.' })
       P = @($(if ($dep -and -not $inst) { 'Some steps were off or skipped. Run again with every step on.' } else { '' }), $(if ($dep) { 'Nothing was sent. The report stays on this computer.' } else { $mail }), $made, $iconNote)
-      Buttons = @($startB, @{ Text = 'Close'; Kind = $(if ($startB) { '' } else { 'primary' }); Act = { $ui.Form.Close() } }, $bMade, @{ Text = 'Open results folder'; Act = { & $ui.Open } }, @{ Text = 'Copy summary'; Act = { & $ui.Copy } })
+      Buttons = @($startB, @{ Text = 'Close'; Kind = $(if ($startB) { '' } else { 'primary' }); Act = { $ui.Form.Close() } }, @{ Text = 'Open results folder'; Act = { & $ui.Open } }, @{ Text = 'Copy summary'; Act = { & $ui.Copy } })
       Test = (-not $dep); Back = { & $ui.VReady } }
   } else {
     # The first step that needs review, with its help line from the manifest; the rest is in the Record.
@@ -169,7 +169,7 @@ $ui.VDone = {
     & $ui.SetCard @{ View = 'review'; Light = 'bad'; Kicker = 'Needs review'; Right = 'Needs review'; Sentence = $(if ($dep) { 'The install is not complete.' } else { 'The round needs review.' })
       P = @(($one + $(if ($more) { ' (and ' + $more + ' more in the Record)' } else { '' })), $what, $(if ($dep) { 'Steps that passed stay done. If you paste the block again, RADE runs only what is left.' } else { $mail }))
       Help = $(if ($dep) { Get-HelpLine } else { '' }); Note = $(if ($dep) { '"Copy summary" puts the report on the clipboard. Paste it in the channel. Nothing was sent.' } else { '' })
-      Buttons = @(@{ Text = 'Copy summary'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Open results folder'; Act = { & $ui.Open } }, $bMade, @{ Text = 'Close'; Act = { $ui.Form.Close() } })
+      Buttons = @(@{ Text = 'Copy summary'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Open results folder'; Act = { & $ui.Open } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } })
       Test = (-not $dep); Back = { & $ui.VReady } }
   }
   if (-not $dep) { & $ui.Copy; if (-not $script:draftMade) { & $ui.Open } }   # a test round: the summary is on the clipboard, and with no draft the folder opens

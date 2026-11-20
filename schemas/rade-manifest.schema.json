@@ -384,7 +384,7 @@
                 "items": {
                   "type": "string",
                   "minLength": 1,
-                  "maxLength": 40
+                  "maxLength": 33
                 },
                 "description": "The words of the buttons of a pick, each different; only a pick has them."
               },
@@ -396,7 +396,7 @@
                 "items": {
                   "type": "string",
                   "minLength": 1,
-                  "maxLength": 40
+                  "maxLength": 33
                 },
                 "description": "Only in a step with \"answersOnly\", for a yesno or pick question: the answers (button words) that mean the step failed. After such an answer the window asks \"What did the error say?\"; the step is FAILED (reported by you). The other questions are still asked."
               },
@@ -421,7 +421,7 @@
                     "items": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 40
+                      "maxLength": 33
                     },
                     "description": "The answers (button words) of that question that show this one."
                   }

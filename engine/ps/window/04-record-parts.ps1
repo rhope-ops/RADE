@@ -5,7 +5,7 @@
 # ---- The Record (F2): all checks by group with their result, the steps with a box each (they can be changed only
 # before the run), and one text box with the files (New, Replace, Recycle), what the installs made, and the log.
 $ui.Rec = New-Object System.Windows.Forms.TableLayoutPanel
-$ui.Rec.Dock = 'Fill'; $ui.Rec.ColumnCount = 3; $ui.Rec.RowCount = 2; $ui.Rec.Padding = (& $ui.Pad 28 0 28 8); $ui.Rec.BackColor = $ui.C.White; $ui.Rec.Visible = $false
+$ui.Rec.Dock = 'Fill'; $ui.Rec.ColumnCount = 3; $ui.Rec.RowCount = 2; $ui.Rec.Padding = (& $ui.Pad ($ui.Z.Inset + $ui.Z.M) 0 ($ui.Z.Inset + $ui.Z.M) $ui.Z.G2); $ui.Rec.BackColor = $ui.C.White; $ui.Rec.Visible = $false
 foreach ($w in @(36, 30, 34)) { [void]$ui.Rec.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle('Percent', $w))) }
 [void]$ui.Rec.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('AutoSize'))); [void]$ui.Rec.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent', 100)))
 $ui.RecHead = New-Object System.Windows.Forms.FlowLayoutPanel
@@ -119,9 +119,10 @@ $ui.Fit = {
   # Rows wrap at the card's width (a button or a box is never cut), and no box is wider than the card.
   $mm = & $ui.Sc $ui.Z.M
   foreach ($r in @($ui.BtnRow, $ui.LinkRow, $ui.TestRow, $ui.FieldRow, $ui.StepRow)) { $r.MaximumSize = New-Object System.Drawing.Size(($cw + 2 * $mm), 0) }
-  & $ui.SetWrap $ui.StepName ($cw - (& $ui.Sc 8)); $ui.ErrBox.Width = [math]::Min((& $ui.Sc 600), ($cw - 2 * $mm))
+  $ui.BtnRow.MinimumSize = New-Object System.Drawing.Size(($cw + 2 * $mm), 0)   # B3: the action row is as wide as the column, so the primary can stand at its right end (an auto-sized row wraps at its own width)
+  & $ui.SetWrap $ui.StepName ($cw - (& $ui.Sc 8)); $ui.ErrBox.Width = [math]::Min((& $ui.Sc $ui.Z.FieldL), ($cw - 2 * $mm))
   # The header's ink-tight texts get their size now that the window has its scale; a long name ends with "..." at the window's edge.
-  try { $ui.AppL.Tag.MaxW = [math]::Max((& $ui.Sc 60), ($ui.Top.ClientSize.Width - (& $ui.LeftIn $ui.AppL $ui.Top) - (& $ui.Sc 32))) } catch { $null = $_ }   # in the application row or the title column
+  try { $ui.AppL.Tag.MaxW = [math]::Max((& $ui.Sc 60), ($ui.Top.ClientSize.Width - (& $ui.LeftIn $ui.AppL $ui.Top) - (& $ui.Sc $ui.Z.Inset))) } catch { $null = $_ }   # in the application row or the title column
   & $ui.InkFit $ui.WordL; & $ui.InkFit $ui.AppL
   try { $lh = [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $ui.Kick.Font).Height + (& $ui.Sc 2); if ($ui.Head.MinimumSize.Height -ne $lh) { $ui.Head.MinimumSize = New-Object System.Drawing.Size(0, $lh) } } catch { $null = $_ }   # L1: the header row keeps its height on a card with no line
   foreach ($l in @($ui.RightL, $ui.StepTime, $ui.StepFrac)) { & $ui.FixW $l }   # labels of changing values: one size from their widest value
