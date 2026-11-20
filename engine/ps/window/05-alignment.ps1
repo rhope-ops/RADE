@@ -133,14 +133,16 @@ $ui.Apart = {
   # end of the action row ("Back (Esc)" at the left end, the others after it). When the row is too narrow for that, the
   # primary button starts its own row.
   try { $mm = & $ui.Sc $ui.Z.M; $n = -1; $prev = -1; $used = 0
-    for ($k = 0; $k -lt $ui.NB; $k++) { $ui.BtnRow.SetFlowBreak($ui.B[$k], $false); if ($ui.BOn[$k]) { $ui.B[$k].Margin = (& $ui.Pad $mm $mm $mm $mm); if ($ui.BMain[$k]) { $n = $k } } }
-    $ui.BtnRow.SetFlowBreak($ui.BackB, $false)
-    if ($n -lt 0) { return }
+    for ($k = 0; $k -lt $ui.NB; $k++) { $ui.BtnRow.SetFlowBreak($ui.B[$k], $false); $ui.B[$k].Margin = (& $ui.Pad $mm $mm $mm $mm); if ($ui.BOn[$k] -and $ui.BMain[$k]) { $n = $k } }   # every button: a hidden one keeps no old margin
+    $bt = $mm + $(if (@($ui.BOn | Where-Object { $_ }).Count) { [int][math]::Floor(((& $ui.Sc $ui.Z.ActionH) - $ui.BackB.Height) / 2) } else { 0 })   # Back (Esc) on the midpoint of the 40 px buttons
+    $ui.BackB.Margin = (& $ui.Pad $mm $bt $mm $mm); $ui.BtnRow.SetFlowBreak($ui.BackB, $false)
+    if ($n -lt 0) { try { $ui.BtnRow.PerformLayout() } catch { $null = $_ }; return }   # no layout yet: the card's layout does it
     if ($ui.BackB.Visible) { $prev = -2; $used += $ui.BackB.Width + 2 * $mm }
     for ($k = 0; $k -lt $n; $k++) { if ($ui.BOn[$k]) { $prev = $k; $used += $ui.B[$k].Width + 2 * $mm } }
     if ($prev -eq -1) { $used = 0 }
     $left = $ui.ContentW + $mm - $used - $ui.B[$n].Width
-    if ($left -ge (& $ui.Sc 32)) { $ui.B[$n].Margin = (& $ui.Pad ([int]$left) $mm $mm $mm) } elseif ($prev -ge 0) { $ui.BtnRow.SetFlowBreak($ui.B[$prev], $true) } elseif ($prev -eq -2) { $ui.BtnRow.SetFlowBreak($ui.BackB, $true) }
+    if ($left -ge $mm) { $ui.B[$n].Margin = (& $ui.Pad ([int]$left) $mm $mm $mm) } elseif ($prev -ge 0) { $ui.BtnRow.SetFlowBreak($ui.B[$prev], $true) } elseif ($prev -eq -2) { $ui.BtnRow.SetFlowBreak($ui.BackB, $true) }
+    $ui.BtnRow.PerformLayout()   # the row's height is right before the frame is placed ($ui.Squeeze)
   } catch { $null = $_ } }
 # Places the card frame (L1) and lets the card's text scroll when the card is taller than the window (the help below).
 $ui.Squeeze = {
@@ -270,7 +272,7 @@ $ui.Measure = { param([string]$Card)
     if ($ui.ErrBox.Visible) { $es += @{ N = 'ErrBox'; X = (& $sr $ui.ErrBox).Left } }
     $k1 = @($ui.LinkRow.Controls | Where-Object { $_.Visible })[0]; if ($k1) { $es += @{ N = (& $ui.NameOf $k1); X = (& $tx $k1); D = ('link ink ' + (& $ui.Ink $k1) + ', width ' + $k1.Width + ', margin ' + $k1.Margin.Left + ', row margin ' + $ui.LinkRow.Margin.Left) } }
     $o1 = @($ui.Opts.Controls | Where-Object { $_.Visible })[0]; if ($o1) { $es += @{ N = 'choice 1'; X = (& $sr $o1).Left } }
-    $b1 = @($ui.B | Where-Object { $_.Visible })[0]; if ($b1) { $es += @{ N = (& $ui.NameOf $b1); X = (& $tx $b1) } }
+    $b1 = @(@($ui.BackB) + @($ui.B | Where-Object { [string]$ui.Kinds[$_] -ne 'primary' }) | Where-Object { $_.Visible })[0]; if ($b1) { $es += @{ N = (& $ui.NameOf $b1); X = (& $tx $b1) } }   # B3: the primary stands at the right end
     $out += & $ui.EdgeBad $Card $es
   }
   return $out }
