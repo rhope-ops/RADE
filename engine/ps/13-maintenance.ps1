@@ -5,7 +5,7 @@
 # Uses parts 01 to 08 (Get-BasePath, Read-Installed, Get-InstalledKey, Get-StartPath, Invoke-Check, Invoke-ChildScript).
 # Network: Diagnose runs the app's own RADE checks (their fixed addresses only); Back up signs in to the saved site and
 # reads only the lists the manifest names (AGENTS.md "No reconnaissance"). Neither one writes to the site.
-# Writes: Diagnose: Rounds\<round>\diagnose-<time>.txt; Back up: Backups\<time>\<list>.json and .csv (the app folder).
+# Writes: Diagnose: Diagnose\diagnose-<time>.txt; Back up: Backups\<time>\<list>.json and .csv (the app folder).
 # Credentials: the interactive CAC sign-in of PnP (-UseWebLogin), for Back up only.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
@@ -72,7 +72,7 @@ function Get-DiagnoseCheck([string]$Base, [scriptblock]$Tick) {
 
 <#
 .SYNOPSIS
-Runs Diagnose and saves its report in the round's results folder.
+Runs Diagnose and saves its report in the app folder's Diagnose folder (never attached to the e-mail draft).
 .PARAMETER Base
 The RADE app folder.
 .PARAMETER Tick
@@ -89,7 +89,7 @@ function Invoke-Diagnose([string]$Base, [scriptblock]$Tick) {
   foreach ($f in $all) { $lines += ($f.State + ': ' + $f.Text + $(if ($f.Fix) { '. What to do: ' + $f.Fix } else { '' })) }
   $lines = @($lines | ForEach-Object { ConvertTo-Masked $_ })
   $p = ''
-  try { $dir = Join-Path (Join-Path $Base 'Rounds') $round
+  try { $dir = Join-Path $Base 'Diagnose'   # not Rounds\<round>: the e-mail draft attaches every file there (review of PR 143)
     if (-not (Test-Path -LiteralPath $dir)) { $null = New-Item -ItemType Directory -Path $dir -Force }
     $p = Join-Path $dir ('diagnose-' + (Get-ToolStamp) + '.txt'); Write-FileWhole $p (($lines -join "`r`n") + "`r`n") } catch { $p = '' }
   return @{ Lines = $lines; Path = $p; Findings = $n }
@@ -100,6 +100,21 @@ function Invoke-Diagnose([string]$Base, [scriptblock]$Tick) {
 $backupScript = @'
 param([string]$Site, [string]$Folder, [string]$Lists)
 # RADE Back up (reads the site, writes this computer only): signs in with the CAC and saves each named list.
+# Windows PowerShell 5.1 writes an array as {value, Count} while this type data is loaded: take it out first.
+Remove-TypeData -TypeName System.Array -ErrorAction SilentlyContinue
+# Turns one SharePoint field value into plain text or a number: lookup and person "id;#text", link "url;#text", managed
+# metadata "label|guid", place "POINT(lon lat)", several values joined with ";#", a date in ISO form (UTC). Takes the value.
+function ConvertTo-PlainValue($V) {
+  if ($V -is [datetime]) { return $V.ToUniversalTime().ToString('o') }
+  if (($null -eq $V) -or ($V -is [string]) -or ($V -is [ValueType])) { return $V }
+  $p = $V.PSObject.Properties
+  if ($p['LookupId']) { return ([string]$V.LookupId + ';#' + [string]$V.LookupValue) }
+  if ($p['Url']) { return ([string]$V.Url + ';#' + [string]$V.Description) }
+  if ($p['TermGuid']) { return ([string]$V.Label + '|' + [string]$V.TermGuid) }
+  if ($p['Latitude']) { return ('POINT(' + [string]$V.Longitude + ' ' + [string]$V.Latitude + ')') }
+  if ($V -is [System.Collections.IEnumerable]) { return ((@(foreach ($x in $V) { ConvertTo-PlainValue $x }) | ForEach-Object { [string]$_ }) -join ';#') }
+  return [string]$V
+}
 try {
   $mod = @(Get-Module -ListAvailable -Name PnP.PowerShell | Sort-Object Version -Descending)
   if (-not $mod.Count) { 'RESULT no-pnp'; exit 3 }
@@ -113,13 +128,7 @@ try {
       $script:items = @()
       $null = & { $script:items = @(Get-PnPListItem -List $name -PageSize 500 -ErrorAction Stop) } *>&1
       $rows = @(foreach ($it in $script:items) { $o = [ordered]@{}
-        foreach ($k in @($it.FieldValues.Keys)) { $v = $it.FieldValues[$k]
-          if ($null -ne $v -and $v.PSObject.Properties['LookupId']) { $v = [string]$v.LookupId + ';#' + [string]$v.LookupValue }
-          elseif ($v -is [System.Array]) {
-            $v = (@($v | ForEach-Object { if ($null -ne $_ -and $_.PSObject.Properties['LookupId']) { [string]$_.LookupId + ';#' + [string]$_.LookupValue } else { [string]$_ } }) -join ';#') }
-          elseif ($v -is [datetime]) { $v = $v.ToUniversalTime().ToString('o') }
-          elseif ($null -ne $v -and -not ($v -is [string] -or $v -is [ValueType])) { $v = [string]$v }
-          $o[$k] = $v }
+        foreach ($k in @($it.FieldValues.Keys)) { $o[$k] = ConvertTo-PlainValue $it.FieldValues[$k] }
         [pscustomobject]$o })
       $j = Join-Path $Folder ([string]$i + '.json'); $c = Join-Path $Folder ([string]$i + '.csv')
       [System.IO.File]::WriteAllText($j, (ConvertTo-Json -InputObject @($rows) -Depth 4), (New-Object System.Text.UTF8Encoding $true))
@@ -133,6 +142,15 @@ try {
 
 # Gives the folder of a backup, Backups\<time> in the app folder. Takes the RADE app folder and the time stamp.
 function Get-BackupDir([string]$Base, [string]$Stamp) { return (Join-Path (Join-Path $Base 'Backups') $Stamp) }
+# Removes the folder of a backup that saved nothing (only the new folder this run made). Takes the folder; gives back
+# $true when it is gone.
+function Clear-BackupDir([string]$Dir) {
+  try { Remove-Item -LiteralPath $Dir -Recurse -Force -ErrorAction Stop; return $true } catch { return (-not (Test-Path -LiteralPath $Dir)) } }
+# Gives a saved list its name: <n>.json and <n>.csv become <list>.json and <list>.csv; both must be there. Takes the
+# folder, the list number and the file name; gives back $true when both files have their name.
+function Rename-BackupFile([string]$Dir, [int]$I, [string]$Name) {
+  try { foreach ($x in '.json', '.csv') { Move-Item -LiteralPath (Join-Path $Dir ([string]$I + $x)) -Destination (Join-Path $Dir ($Name + $x)) -Force -ErrorAction Stop }
+    return ((Test-Path -LiteralPath (Join-Path $Dir ($Name + '.json')) -PathType Leaf) -and (Test-Path -LiteralPath (Join-Path $Dir ($Name + '.csv')) -PathType Leaf)) } catch { return $false } }
 
 <#
 .SYNOPSIS
@@ -161,16 +179,16 @@ function Invoke-Backup([string]$Base, [scriptblock]$Tick) {
   $got = @{}; $res = ''
   foreach ($l in $r.Lines) { if ($l -match '^LIST (\d+) (.+)$') { $got[[int]$Matches[1]] = $Matches[2] } elseif ($l -match '^RESULT (\S+)') { $res = $Matches[1] } }
   if ($res -ne 'done') { $why = $(switch ($res) { 'no-pnp' { 'the SharePoint tool is not installed' } 'not-connected' { 'the sign-in did not finish' } default { 'it stopped: ' + $r.Why } })
-    return @{ State = 'failed'; Path = $dir; Lines = @(('Back up saved nothing: ' + $why + '.'), 'Nothing on the site changed. Select "Back up" again.') } }
+    $gone = Clear-BackupDir $dir
+    $left = $(if ($gone) { 'Nothing on the site changed.' } else { 'Nothing on the site changed. Its unfinished folder stays: ' + (ConvertTo-Masked $dir) })
+    return @{ State = 'failed'; Path = ''; Lines = @(('Back up saved nothing: ' + $why + '.'), $left, 'Select "Back up" again.') } }
   $lines = @(); $bad = 0
   for ($i = 1; $i -le $lists.Count; $i++) {
-    $n = [string]$lists[$i - 1]; $v = [string]$got[$i]; $f = Join-Path $dir ([string]$i + '.json')
-    if ($v -match '^\d+$' -and (Test-Path -LiteralPath $f -PathType Leaf)) {
-      $safe = ($n -replace '[^A-Za-z0-9 _-]', '_'); Move-Item -LiteralPath $f -Destination (Join-Path $dir ($safe + '.json')) -Force
-      Move-Item -LiteralPath (Join-Path $dir ([string]$i + '.csv')) -Destination (Join-Path $dir ($safe + '.csv')) -Force
-      $lines += ('PASS: "' + $n + '": ' + $v + ' rows saved') }
-    else { $bad++; $ty = $(if ($v -match '^failed (\S+)') { ' (' + $Matches[1] + ')' } else { '' })
-      $lines += ('FINDING: "' + $n + '" was not saved' + $ty + '. What to do: check that the list exists and that you can read it') }
+    $n = [string]$lists[$i - 1]; $v = [string]$got[$i]; $ok = $false
+    if ($v -match '^\d+$') { $ok = Rename-BackupFile $dir $i ($n -replace '[^A-Za-z0-9 _-]', '_') }
+    if ($ok) { $lines += ('PASS: "' + $n + '": ' + $v + ' rows saved'); continue }
+    $bad++; $ty = $(if ($v -match '^failed (\S+)') { ' (' + $Matches[1] + ')' } elseif ($v) { ' (its files could not be named)' } else { '' })
+    $lines += ('FINDING: "' + $n + '" was not saved' + $ty + '. What to do: check that the list exists and that you can read it, then select "Back up" again')
   }
   $head = $(if ($bad) { [string]$bad + ' of ' + $lists.Count + ' lists were not saved.' } else { 'All ' + $lists.Count + ' lists were saved.' })
   return @{ State = $(if ($bad) { 'failed' } else { 'done' }); Path = $dir; Lines = @(@($head, 'Nothing on the site changed.') + $lines) }

@@ -8,7 +8,7 @@
 
 # The rows of the Maintenance screen. Diagnose and Back up work (engine-v30); Restore is not built yet.
 $ui.ToolRows = {
-  $n = @($script:app.Backup).Count; $lists = $(if ($n) { [string]$n + ' lists' } else { 'No lists named' })
+  $n = @($script:app.Backup).Count; $lists = $(if ($n -eq 1) { '1 list' } elseif ($n) { [string]$n + ' lists' } else { 'No lists named' })
   @(@{ Index = 0; Name = 'Diagnose'; Ver = ''; Sub = 'Checks the install and runs the checks again. Changes nothing.'; R1 = 'Report on this computer' },
     @{ Index = 1; Name = 'Back up'; Ver = ''; Sub = "Saves the app's lists to this computer. Changes nothing on the site."; R1 = $lists },
     @{ Off = $true; Index = 2; Name = 'Restore'; Ver = ''; Sub = 'Puts saved rows back on the site, after a dry run.'; R1 = 'Not available yet'; Soon = $true }) }
@@ -45,7 +45,8 @@ $ui.ToolResult = {
   param([string]$Name, $Res)
   $diag = ($Name -eq 'Diagnose'); $bad = $(if ($diag) { [int]$Res.Findings -gt 0 } else { [string]$Res.State -eq 'failed' })
   $sent = $(if ($diag -and $bad) { 'Diagnose found ' + $Res.Findings + ' thing(s) to fix.' } elseif ($diag) { 'Diagnose found nothing to fix.' }
-    elseif ($Res.State -eq 'done') { 'Back up saved the lists.' } elseif ($Res.State -eq 'none') { 'Back up has no lists to save.' } else { 'Back up did not save everything.' })
+    elseif ($Res.State -eq 'done') { 'Back up saved the lists.' } elseif ($Res.State -eq 'none') { 'Back up has no lists to save.' }
+    elseif ($Res.State -eq 'no-site') { 'Back up saved nothing.' } else { 'Back up did not save everything.' })
   $lines = @($Res.Lines); $path = $(if ($Res.Path) { [string]$Res.Path } else { $null })
   & $ui.SetCard @{ View = 'toolres'; Light = $(if ($bad) { 'bad' } else { '' }); Kicker = [string]$ui.Kick.Text; Sentence = $sent
     P = @($lines | Select-Object -First 2); Lines = @($lines | Select-Object -Skip 2); Path = $path

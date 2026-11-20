@@ -169,7 +169,7 @@ def app_lines(b):
         start = a.get('start', '')
         assert not start or START_RE.fullmatch(start), 'app %r: start must be a relative .ps1 path of plain names (letters, digits, space, ".", "_", "-"), for example App/Start-App.ps1' % a['name']
         backup = a.get('backup', [])   # (2026-11-20) the app's own lists Back up saves; plain names (a command line); RADE never finds lists
-        assert all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 _-]*', n) for n in backup) and len(set(backup)) == len(backup), 'app %r: backup: unique plain list titles' % a['name']
+        assert all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 _-]*', n) for n in backup) and len({n.lower() for n in backup}) == len(backup), 'app %r: backup: unique plain titles' % a['name']
         out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s; Marker = %s; Start = %s; Backup = @(%s) }'
                    % (q(a['name']), q(a['summary']), ', '.join(map(str, idx)), ', '.join(map(q, checks)), q(mode), q(version), marker, q(start), ', '.join(map(q, backup))))
     return out

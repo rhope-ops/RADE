@@ -13,9 +13,9 @@ The Maintenance card: Start, Maintenance, Uninstall (not available). The Mainten
 | D1 | The install record against this paste (version, last run state, each step's state), the start script and the runner copy | none |
 | D0 | The app's RADE checks again (a check that runs on its own runs now; a sign-in or look check shows its saved result) | none |
 | D2-D4 | Schema, permission and settings-row compare against the app's schema file | not built: needs the app's schema file (app work) |
-| Report | One report file, `Rounds\<round>\diagnose-<time>.txt`, each finding with its fix | the report file |
+| Report | One report file, `Diagnose\diagnose-<time>.txt` in the app folder (not the round's results folder: the e-mail draft never attaches it), each finding with its fix | the report file |
 
-Test round checks (R38): Diagnose on a good install shows "Diagnose found nothing to fix" or only check findings the Ready card also shows; with the start script removed by hand it names the file and says Repair; the report file is in the round's results folder; nothing on the site changes (the site's list counts before and after).
+Test round checks (R38): Diagnose on a good install shows "Diagnose found nothing to fix" or only check findings the Ready card also shows; with the start script removed by hand it names the file and says Repair; the report file is in the app folder's Diagnose folder, and the e-mail draft does not attach it; nothing on the site changes (the site's list counts before and after).
 
 ## Stage 2: Back up (reads the site, writes on the computer; built in engine-v30)
 

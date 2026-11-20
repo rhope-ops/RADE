@@ -190,8 +190,8 @@ Built in engine-v30 (the Administrator, 2026-11-20: Diagnose and Back up now; Re
 
 | Tool | Reads | Writes | Fails safely |
 |---|---|---|---|
-| Diagnose: D1 the install record (version against the paste, last run state, each step's state), the start script and the runner copy; D0 the app's RADE checks again (a check that needs the user shows its saved result) | RADE's own files; the checks' fixed addresses | One report: `Rounds\<round>\diagnose-<time>.txt` | Read-only; an error is one finding, nothing changes |
-| Back up: each list the manifest names (`backup`), every row, through PnP on the saved site | Only the named lists of the saved site | `Backups\<time>\<list>.json` and `.csv` in the app folder | No list named: says so, saves nothing. No site address: stops before the sign-in. A list it cannot read: named in the result, never skipped. Nothing on the site changes |
+| Diagnose: D1 the install record (version against the paste, last run state, each step's state), the start script and the runner copy; D0 the app's RADE checks again (a check that needs the user shows its saved result) | RADE's own files; the checks' fixed addresses | One report: `Diagnose\diagnose-<time>.txt` in the app folder (not the round's results folder: the e-mail draft never attaches it) | Read-only; an error is one finding, nothing changes |
+| Back up: each list the manifest names (`backup`), every row, through PnP on the saved site | Only the named lists of the saved site | `Backups\<time>\<list>.json` and `.csv` in the app folder | No list named: says so, saves nothing. No site address: stops before the sign-in. A run that saves nothing removes its new folder. A list it cannot read: named in the result, never skipped. Nothing on the site changes |
 
 Restore (later; the Administrator, 2026-11-20): only on a site the app's manifest lists as a test site; RADE refuses it on any other site.
 
