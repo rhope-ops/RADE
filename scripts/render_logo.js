@@ -6,7 +6,7 @@
 //   logo-rho  Rho Bold (USAF-B); its SVG comes from scripts/build_logo.py. The engine reads logo-rho-128.png (the window).
 //   rho-usaf     Rho, USAF version (Logo Studies canvas, the Administrator, 2026-11-19); its SVG is copied from the canvas,
 //                not built here. The RADE page uses it now; the engine moves to it in a later engine release.
-//   rho-fulcrum  Rho, Fulcrum version (same canvas and source): the RADE page in dark mode (the Administrator, 2026-11-19).
+//   rho-fulcrum  Rho, Fulcrum version (same canvas and source): the RADE page in light mode (the Administrator, 2026-11-19).
 // Sizes: 512 site logo and thumbnail; 128 the window (shown at 64 px) and the page at 2x; 64 the page at 1x; 32 and 16 icons.
 const {chromium} = require('playwright'); const fs = require('fs'); const path = require('path');
 const dir = path.join(__dirname, '..', 'assets', 'logo');
