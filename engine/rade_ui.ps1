@@ -92,7 +92,7 @@ $ui.LoadFonts = {
     foreach ($k in @($ttf.Keys | Sort-Object)) {
       $b = [Convert]::FromBase64String([string]$ttf[$k]); $p = [System.Runtime.InteropServices.Marshal]::AllocCoTaskMem($b.Length)
       [System.Runtime.InteropServices.Marshal]::Copy($b, 0, $p, $b.Length); $ui.FontMem += $p; $pfc.AddMemoryFont($p, $b.Length); $n++
-      if ($gdi) { $c = [uint32]0; $null = [Rade.Fonts]::AddFontMemResourceEx($p, [uint32]$b.Length, [IntPtr]::Zero, [ref]$c) } }
+      if ($gdi) { $c = [uint32]0; if ([Rade.Fonts]::AddFontMemResourceEx($p, [uint32]$b.Length, [IntPtr]::Zero, [ref]$c) -eq [IntPtr]::Zero) { $gdi = $false } } }   # a failed GDI load: the note says GDI+ only
     foreach ($fm in @($pfc.Families)) { $ui.FontFam[[string]$fm.Name] = $fm }
     $ui.Pfc = $pfc; $ui.FontNote = 'loaded ' + $n + ' files, ' + $ui.FontFam.Count + ' families' + $(if ($gdi) { '' } else { ' (GDI+ only)' })
   } catch { $ui.FontFam = @{}; $ui.FontNote = 'fallback (' + [string]$_.Exception.GetType().Name + ')' } }   # never stop the window for a font
