@@ -8,7 +8,8 @@
 3. The self-test: a known pair (black on white = 21:1, #777 on white = 4.48:1) proves the formula first.
 
 Usage: python3 scripts/ui_tokens.py [--write]   Pass = last line "UI-TOKENS pass pairs=N".
-Run target: Python 3. Network: none.
+Run target: Python 3.
+Network: none.
 Writes: index.html (--write only).
 Credentials: none.
 """
@@ -76,7 +77,11 @@ def spliced(text, blocks):
 
 
 def main(write):
-    """Prove the formula, check every pair, then check (or write) the page. Exits 1 on a failure."""
+    """Prove the formula, check every pair, then check (or write) the page. Exits 1 on a failure.
+
+    Args:
+        write: True to write the page's generated blocks (--write), False to check them.
+    """
     bad = []
     if round(ratio('#000000', '#FFFFFF'), 2) != 21.0 or round(ratio('#777777', '#FFFFFF'), 2) != 4.48:
         bad.append('the contrast formula fails its self-test')

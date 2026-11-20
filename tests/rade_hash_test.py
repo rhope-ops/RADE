@@ -3,7 +3,10 @@
 
 Pass = last line "RADE-HASH pass=N fail=0": a one-character change of the body flips the hash; a change of the header
 comment lines, of a revision token or of the line ends does not.
-Run target: Python 3. Network: none. Writes: none. Credentials: none.
+Run target: Python 3.
+Network: none.
+Writes: none.
+Credentials: none.
 """
 import pathlib
 import sys
