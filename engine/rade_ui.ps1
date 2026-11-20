@@ -12,13 +12,69 @@
 try { $gx = [System.Drawing.Graphics]::FromHwnd([IntPtr]::Zero); $ui.ScreenDpi = [double]$gx.DpiX; $gx.Dispose() } catch { $null = $_ }
 $ui.FormDpi = { try { $d = [double]$ui.Form.CurrentAutoScaleDimensions.Width; if ($d -gt 0) { $ui.Dpi = $d } } catch { $null = $_ } }
 $ui.Sc = { param([double]$Px) [int][math]::Round($Px * $ui.Dpi / 96.0) }   # a size at 100 % in screen pixels, for parts made or drawn after the form has scaled
-# Colors: one meaning each. Navy = text and focus; Air Force blue = the action and progress; yellow = your turn;
-# dark red = FAILED, NEEDS REVIEW and the one destructive action; green = passed. Contrast on white: ink 15.6, gray 5.9,
-# blue 7.7, red 9.3, green word 6.4, control edge 3.7 to 1. Non-text parts (R28) are at least 3 to 1 against white: the bar track and the edge of a button that is not available are Track (#7F93A8, 3.2 to 1), the status light has a 1 px navy line.
-$ui.C = @{ Navy = [System.Drawing.Color]::FromArgb(11, 37, 69); Blue = [System.Drawing.Color]::FromArgb(0, 83, 159); Yellow = [System.Drawing.Color]::FromArgb(255, 213, 32)
-  Green = [System.Drawing.Color]::FromArgb(46, 133, 64); GreenInk = [System.Drawing.Color]::FromArgb(31, 107, 49); Red = [System.Drawing.Color]::FromArgb(139, 26, 26)
-  Ink = [System.Drawing.Color]::FromArgb(27, 36, 48); Gray = [System.Drawing.Color]::FromArgb(90, 101, 115); Edge = [System.Drawing.Color]::FromArgb(122, 135, 148)
-  Hair = [System.Drawing.Color]::FromArgb(227, 232, 238); Track = [System.Drawing.Color]::FromArgb(127, 147, 168); Off = [System.Drawing.Color]::FromArgb(233, 236, 240); OffInk = [System.Drawing.Color]::FromArgb(85, 85, 85); White = [System.Drawing.Color]::White }
+# ---- UI tokens (UI standard v1, the Administrator, 2026-11-20; docs/ui-standard.md): written from engine/ui-tokens.json
+# by python3 engine/rade_tokens.py --write. Do not edit these lines: a build stops when they differ from that file.
+$ui.Standard = 'v1'
+# Colors: name = @(red, green, blue, the SystemColors role it takes while a Windows contrast theme is on).
+$ui.Tok = [ordered]@{}
+$ui.Tok.White = @(255, 255, 255, 'Window')   # surface: the window, the card, labels and text boxes
+$ui.Tok.Ink = @(27, 36, 48, 'WindowText')   # text in boxes
+$ui.Tok.Navy = @(11, 37, 69, 'WindowText')   # card text, the light's line
+$ui.Tok.Gray = @(90, 101, 115, 'GrayText')   # muted text: second lines, notes, labels
+$ui.Tok.Blue = @(0, 83, 159, 'Highlight')   # the primary button's fill, progress, Your turn
+$ui.Tok.OnBlue = @(255, 255, 255, 'HighlightText')   # text on the primary button
+$ui.Tok.Link = @(0, 83, 159, 'HotTrack')   # links
+$ui.Tok.Focus = @(11, 37, 69, 'HotTrack')   # the 2 px focus ring
+$ui.Tok.Face = @(255, 255, 255, 'ButtonFace')   # a button's fill
+$ui.Tok.FaceInk = @(11, 37, 69, 'ButtonText')   # a button's text
+$ui.Tok.Edge = @(122, 135, 148, 'ButtonText')   # a button's and a box's edge, the header line
+$ui.Tok.Hair = @(227, 232, 238, 'GrayText')   # a button under the pointer, thin lines
+$ui.Tok.Track = @(127, 147, 168, 'GrayText')   # the bar track, the edge of a button that is not available
+$ui.Tok.Off = @(233, 236, 240, 'ButtonFace')   # a button that is not available, a pressed button
+$ui.Tok.OffInk = @(85, 85, 85, 'GrayText')   # the text of a button that is not available
+$ui.Tok.Yellow = @(255, 213, 32, 'Highlight')   # the light: your turn
+$ui.Tok.Red = @(139, 26, 26, 'WindowText')   # FAILED, NEEDS REVIEW, the one destructive action
+$ui.Tok.Green = @(46, 133, 64, 'Highlight')   # the bar of a run that passed
+$ui.Tok.GreenInk = @(31, 107, 49, 'WindowText')   # the word PASSED
+# Sizes, gaps and field widths, in pixels at 100 % (every size set after the form has scaled goes through $ui.Sc).
+$ui.Z = @{ ActionW = 160; WideW = 240; ActionH = 40; CompactW = 96; CompactH = 30; LinkH = 28; BarTop = 11; M = 4; Inset = 24
+  G1 = 4; G2 = 8; G3 = 12; G4 = 16; G6 = 24
+  FieldS = 240; FieldM = 420; FieldL = 600 }
+# Faces: name = @(family, the font file's name in the bundle ('' = none), the family used when the font cannot be loaded).
+$ui.Faces = @{}
+$ui.Faces.title = @('Sofia Sans Condensed SemiBold', '', 'Segoe UI Semibold')
+$ui.Faces.text = @('Sofia Sans', '', 'Segoe UI')
+$ui.Faces.strong = @('Sofia Sans SemiBold', '', 'Segoe UI Semibold')
+$ui.Faces.mono = @('Consolas', '', 'Consolas')
+# Text styles: name = @(face, size in points at 100 %, font style ('' = regular)).
+$ui.Styles = [ordered]@{}
+$ui.Styles.Sent = @('title', 22, '')   # the headline of a card
+$ui.Styles.Word = @('title', 15, '')   # the word RADE in the logo block
+$ui.Styles.Body = @('text', 12, '')   # paragraphs, step lines, the help line
+$ui.Styles.Small = @('text', 10, '')   # second lines, notes, box text
+$ui.Styles.SmallB = @('strong', 10, '')   # the line in capitals, labels, every button
+$ui.Styles.Link = @('strong', 10, 'Underline')   # links (underlined: not color alone)
+$ui.Styles.Turn = @('strong', 12, '')   # Your turn
+$ui.Styles.Mono = @('mono', 9, '')   # the Record's text box
+# ---- End of the UI tokens
+# ---- Colors and Windows contrast themes (UI standard v1, the Administrator, 2026-11-20; docs/ui-standard.md B10, B11)
+# One meaning each (the "use" of each token above): navy = card text, Air Force blue = the action and progress, yellow =
+# your turn, dark red = FAILED, NEEDS REVIEW and the one destructive action, green = passed. Every text pair is at least
+# 4.5:1 and every non-text pair 3:1 (scripts/ui_tokens.py computes them from engine/ui-tokens.json). While a Windows
+# contrast theme is on (SystemInformation.HighContrast), each token is the system color of its role, so the window has
+# the theme's colors; $ui.Recolor follows a theme that changes while the window is open.
+$ui.HighOn = { try { return [bool][System.Windows.Forms.SystemInformation]::HighContrast } catch { return $false } }   # no answer (an old host): the own colors
+# The color of one token: its own color, or while $ui.High is on the system color of its role. Takes the token name; gives
+# back a Color (WindowText for a name that is not a token, so no text is ever lost).
+$ui.Color = { param([string]$Role)
+  $t = $ui.Tok[$Role]
+  if ($ui.High) { $r = $(if ($t) { [string]$t[3] } else { 'WindowText' }); try { return [System.Drawing.SystemColors]::$r } catch { return [System.Drawing.Color]::Black } }   # no system colors: black on white still reads
+  if (-not $t) { return [System.Drawing.Color]::Black }
+  return [System.Drawing.Color]::FromArgb([int]$t[0], [int]$t[1], [int]$t[2]) }
+# Puts the colors for a theme into $ui.C in place (every builder and paint handler reads them there). Takes $true for the
+# system colors of a contrast theme, $false for the own colors.
+$ui.UseColors = { param([bool]$High) $ui.High = $High; foreach ($k in @($ui.Tok.Keys)) { $ui.C[$k] = & $ui.Color $k } }
+$ui.C = @{}; & $ui.UseColors (& $ui.HighOn)
 # ---- Fonts, sizes and buttons
 # Cosmetics never stop the window (R06: Font('Segoe UI', 10, 'Bold') failed with "Multiple ambiguous overloads"): a typed
 # style and size, and the window font when a font cannot be made.
@@ -32,20 +88,54 @@ $ui.Font = { param([string]$Fam, [double]$Pt, $Style) try { $pk = [single]($Pt *
 $ui.FontScale = { $ui.FontK = 1.0; $ui.FontDpi = 96.0
   try { $pf = New-Object System.Drawing.Font('Segoe UI', [single]100); $r = [double]$pf.Height / 177.3; try { $pf.Dispose() } catch { $null = $_ }
     if ($r -gt 0.6 -and $r -lt 4) { $k = [math]::Round(($ui.Dpi / 96.0) / $r * 4) / 4; if ($k -ge 0.5 -and $k -le 4) { $ui.FontK = [double]$k }; $ui.FontDpi = 96.0 * [math]::Max(1.0, [math]::Round($r * 4) / 4) } } catch { $null = $_ } }
-& $ui.FormDpi; & $ui.FontScale; $ui.Form.Font = (& $ui.Font 'Segoe UI' 10 $null)
-# Text styles (the Administrator, 2026-11-17; docs/window-design.md "Fixed parts"): one typeface, four styles and the logo
-# word. Sent = headline (semibold 22); Body = paragraphs, step lines, help line (12); Small = second lines, notes, box text
-# (10); SmallB = semibold 10: the line in capitals, labels, every button, key numbers, the Record's heads and result words.
-# Link = SmallB underlined (a link is marked by more than color). Word = RADE in the logo line. Mono = the Record's text box only.
-# Turn = Body size, bold: the "Your turn" line of a card where RADE waits for the person.
-$ui.F = @{ Small = $ui.Form.Font; SmallB = (& $ui.Font 'Segoe UI Semibold' 10 $null); Body = (& $ui.Font 'Segoe UI' 12 $null); Sent = (& $ui.Font 'Segoe UI Semibold' 22 $null)
-  Link = (& $ui.Font 'Segoe UI Semibold' 10 ([Enum]::Parse(('System.Drawing.FontStyle' -as [type]), 'Underline'))); Word = (& $ui.Font 'Segoe UI' 15 $ui.Bold); Mono = (& $ui.Font 'Consolas' 9 $null)
-  Turn = (& $ui.Font 'Segoe UI' 12 $ui.Bold) }   # Turn: "Your turn" above the headline (the Administrator, 2026-11-19: bold, in the accent color)
-# Sizes, in pixels at 100 % (docs/window-design.md "Sizes"): one place for the button sizes and the gaps between the
-# parts of a card. Action = a card's buttons; compact = a button beside a box and the Record's "Back"; a link is 28 high.
-# Gaps are on the scale 4, 8, 12, 16, 24. A button or link has a 4 px margin (room for the 2 px focus ring), so two
-# of them are 8 px apart.
-$ui.Z = @{ ActionW = 132; ActionH = 40; CompactW = 110; CompactH = 30; LinkH = 28; BarTop = 11; M = 4; G1 = 4; G2 = 8; G3 = 12; G4 = 16; G6 = 24 }
+# ---- The RADE fonts (UI standard v1, the Administrator, 2026-11-20; docs/ui-standard.md B12): Sofia Sans Condensed for
+# titles and Sofia Sans for text, open fonts (engine/fonts/OFL.txt) that the bundle carries as base64 ($fontTtf). They are
+# loaded for this process only (no install, no administrator): GDI+ gets them in a PrivateFontCollection (the Font objects)
+# and GDI gets the same bytes as a memory font (AddFontMemResourceEx), because Windows Forms draws labels, boxes and
+# buttons with GDI, which knows no GDI+ private font. A font that cannot be loaded is replaced by its face's fallback
+# (Segoe UI), so the window always opens. $ui.FontNote says what was loaded (the SCALE line).
+$ui.FontFam = @{}; $ui.FontMem = @(); $ui.FontNote = 'fallback (no font files)'
+$ui.LoadFonts = {
+  <#
+  .SYNOPSIS
+  Loads the fonts of $fontTtf (the bundle's base64 font files) for this process.
+  .DESCRIPTION
+  Each file goes into one PrivateFontCollection (GDI+) and, when the native type can be made, into GDI as a memory font.
+  The memory of each file stays held while the process runs (GDI+ reads it when it draws). A bundle with no $fontTtf
+  (an app window that copies this file) and any failure leave $ui.FontFam empty: every style then uses its fallback.
+  .OUTPUTS
+  Nothing. Fills $ui.FontFam (family name = FontFamily) and sets $ui.FontNote.
+  #>
+  $ttf = $null; try { $ttf = $fontTtf } catch { $null = $_ }   # no font files (an app window that copies this file; strict mode): the fallback fonts
+  if (-not $ttf -or -not $ttf.Count) { return }
+  $gdi = $false
+  try { if (-not ('Rade.Fonts' -as [type])) { Add-Type -Namespace Rade -Name Fonts -MemberDefinition '[DllImport("gdi32.dll")] public static extern IntPtr AddFontMemResourceEx(IntPtr pbFont, uint cbFont, IntPtr pdv, ref uint pcFonts);' -ErrorAction Stop }; $gdi = $true } catch { $null = $_ }   # no GDI copy: GDI+ text still has the fonts
+  try { $pfc = New-Object System.Drawing.Text.PrivateFontCollection; $n = 0
+    foreach ($k in @($ttf.Keys | Sort-Object)) {
+      $b = [Convert]::FromBase64String([string]$ttf[$k]); $p = [System.Runtime.InteropServices.Marshal]::AllocCoTaskMem($b.Length)
+      [System.Runtime.InteropServices.Marshal]::Copy($b, 0, $p, $b.Length); $ui.FontMem += $p; $pfc.AddMemoryFont($p, $b.Length); $n++
+      if ($gdi) { $c = [uint32]0; $null = [Rade.Fonts]::AddFontMemResourceEx($p, [uint32]$b.Length, [IntPtr]::Zero, [ref]$c) } }
+    foreach ($fm in @($pfc.Families)) { $ui.FontFam[[string]$fm.Name] = $fm }
+    $ui.Pfc = $pfc; $ui.FontNote = 'loaded ' + $n + ' files, ' + $ui.FontFam.Count + ' families' + $(if ($gdi) { '' } else { ' (GDI+ only)' })
+  } catch { $ui.FontFam = @{}; $ui.FontNote = 'fallback (' + [string]$_.Exception.GetType().Name + ')' } }   # never stop the window for a font
+# The font of one text style ($ui.Styles): its face's font when it was loaded, else the face's fallback ($ui.Font). Takes
+# the style name; gives back a Font.
+$ui.StyleFont = { param([string]$Name)
+  $s = $ui.Styles[$Name]; $face = $ui.Faces[[string]$s[0]]; $pt = [double]$s[1]
+  $st = $(if ([string]$s[2]) { [Enum]::Parse(('System.Drawing.FontStyle' -as [type]), [string]$s[2]) } else { $null })
+  $fm = $ui.FontFam[[string]$face[0]]   # no System.Drawing type names in this block: on the test stand-ins they would stop it as it is read
+  if ($fm) { try { $fs = $(if ($null -ne $st) { $st } else { [Enum]::Parse(('System.Drawing.FontStyle' -as [type]), 'Regular') }); $gu = [Enum]::Parse(('System.Drawing.GraphicsUnit' -as [type]), 'Point'); return (New-Object System.Drawing.Font($fm, [single]($pt * $ui.FontK), $fs, $gu)) } catch { $null = $_ } }   # the fallback below
+  return (& $ui.Font ([string]$face[2]) $pt $st) }
+& $ui.FormDpi; & $ui.FontScale; & $ui.LoadFonts; $ui.Form.Font = (& $ui.StyleFont 'Small')
+# Text styles (the Administrator, 2026-11-17; faces and sizes from the UI tokens, UI standard v1): Sent = headline; Body =
+# paragraphs, step lines, help line; Small = second lines, notes, box text; SmallB = the line in capitals, labels, every
+# button, key numbers, the Record's heads and result words; Link = SmallB underlined (a link is marked by more than
+# color); Word = RADE in the logo line; Mono = the Record's text box only; Turn = "Your turn" (in the accent color).
+$ui.F = @{}; foreach ($k in @($ui.Styles.Keys)) { $ui.F[$k] = & $ui.StyleFont $k }; $ui.F.Small = $ui.Form.Font
+# Sizes (the UI tokens above, UI standard v1): action buttons 160 x 40 (wide 240 x 40 for a long label), compact 96 x 30
+# (a button beside a box, "Back (Esc)"), a link is as wide as its text and 28 high. Gaps are 4, 8, 12, 16 and 24 only;
+# the card's side inset is 24. A button or link has a 4 px margin (room for the 2 px focus ring), so two of them are 8 px
+# apart. Field widths: S 240, M 420, L 600.
 $ui.Pad = { param([int]$L, [int]$T, [int]$R, [int]$B) New-Object System.Windows.Forms.Padding($L, $T, $R, $B) }
 $ui.Label = { param($Font, $Color, [int]$Top) $l = New-Object System.Windows.Forms.Label; $l.AutoSize = $true; $l.Font = $Font; $l.ForeColor = $Color; $l.BackColor = $ui.C.White; $l.UseMnemonic = $false; $l.Margin = (& $ui.Pad 0 $Top 0 0); $l.Visible = $false; $l }
 # ---- Card text that can be selected (R28, the Administrator, 2026-11-17)
@@ -126,18 +216,19 @@ $ui.Flow = { param([int]$Top) $f = New-Object System.Windows.Forms.FlowLayoutPan
 # Focus is always visible: a 2 px navy ring around the control that has it, drawn by its parent ($ui.Ring), also after a
 # mouse click. Each focusable control tells its parent to repaint ($ui.Cue) and keeps a 4 px margin for the ring.
 $ui.Cue = { param($C) $C.Add_GotFocus({ try { $this.Parent.Invalidate() } catch { $null = $_ } }); $C.Add_LostFocus({ try { $this.Parent.Invalidate() } catch { $null = $_ } }) }
-$ui.Ring = { param($P) $P.Add_Paint({ try { foreach ($c in $this.Controls) { if (($c.Focused -or ($ui.Boxes -contains $c -and $c.ContainsFocus)) -and $c.Visible) { $pn = New-Object System.Drawing.Pen($ui.C.Navy, [single](& $ui.Sc 2)); $b = $c.Bounds; $o = & $ui.Sc 2; $_.Graphics.DrawRectangle($pn, ($b.Left - $o), ($b.Top - $o), ($b.Width + 2 * $o - 1), ($b.Height + 2 * $o - 1)); $pn.Dispose() } } } catch { $null = $_ } }) }
+$ui.Ring = { param($P) $P.Add_Paint({ try { foreach ($c in $this.Controls) { if (($c.Focused -or ($ui.Boxes -contains $c -and $c.ContainsFocus)) -and $c.Visible) {
+          $pn = New-Object System.Drawing.Pen($ui.C.Focus, [single](& $ui.Sc 2)); $b = $c.Bounds; $o = & $ui.Sc 2; $_.Graphics.DrawRectangle($pn, ($b.Left - $o), ($b.Top - $o), ($b.Width + 2 * $o - 1), ($b.Height + 2 * $o - 1)); $pn.Dispose() } } } catch { $null = $_ } }) }
 $ui.Style = { param($B, [string]$Kind)
   # primary = Air Force blue; danger = dark red; off = not available (gray, text 6.3:1); dangeroff = the destructive
   # action while it is not available (gray, dark red text and edge, 8:1); else white with a gray edge. The colors under
   # the pointer and while pressed are set here too (Windows picks its own otherwise): a white button goes to the hair
   # and the off gray, a blue or dark red button keeps its color.
-  $B.Enabled = ($Kind -notin 'off', 'dangeroff'); $B.FlatStyle = 'Flat'; $B.FlatAppearance.BorderSize = 1; $B.Font = $ui.F.SmallB; $over = $null; $down = $null
+  $ui.Kinds[$B] = $Kind; $B.Enabled = ($Kind -notin 'off', 'dangeroff'); $B.FlatStyle = 'Flat'; $B.FlatAppearance.BorderSize = 1; $B.Font = $ui.F.SmallB; $over = $null; $down = $null
   if ($Kind -eq 'off') { $B.BackColor = $ui.C.Off; $B.ForeColor = $ui.C.OffInk; $B.FlatAppearance.BorderColor = $ui.C.Track }
   elseif ($Kind -eq 'dangeroff') { $B.BackColor = $ui.C.Off; $B.ForeColor = $ui.C.Red; $B.FlatAppearance.BorderColor = $ui.C.Red }
-  elseif ($Kind -eq 'primary') { $B.BackColor = $ui.C.Blue; $B.ForeColor = $ui.C.White; $B.FlatAppearance.BorderColor = $ui.C.Blue }
+  elseif ($Kind -eq 'primary') { $B.BackColor = $ui.C.Blue; $B.ForeColor = $ui.C.OnBlue; $B.FlatAppearance.BorderColor = $ui.C.Blue }
   elseif ($Kind -eq 'danger') { $B.BackColor = $ui.C.Red; $B.ForeColor = $ui.C.White; $B.FlatAppearance.BorderColor = $ui.C.Red }
-  else { $B.BackColor = $ui.C.White; $B.ForeColor = $ui.C.Navy; $B.FlatAppearance.BorderColor = $ui.C.Edge; $over = $ui.C.Hair; $down = $ui.C.Off }
+  else { $B.BackColor = $ui.C.Face; $B.ForeColor = $ui.C.FaceInk; $B.FlatAppearance.BorderColor = $ui.C.Edge; $over = $ui.C.Hair; $down = $ui.C.Off }
   if (-not $over) { $over = $B.BackColor; $down = $B.BackColor }
   try { $B.FlatAppearance.MouseOverBackColor = $over; $B.FlatAppearance.MouseDownBackColor = $down } catch { $null = $_ } }
 # Every button draws its own face, border and text in every state (normal, under the pointer, pressed, focused, default,
@@ -161,12 +252,60 @@ $ui.Own = { param($B) $B.UseVisualStyleBackColor = $false; $B.Add_Paint({ & $ui.
   $B.Add_MouseEnter({ $ui.Hot = $this; $this.Invalidate() }); $B.Add_MouseLeave({ if ([object]::ReferenceEquals($ui.Hot, $this)) { $ui.Hot = $null }; $this.Invalidate() })
   $B.Add_MouseDown({ if ([string]$_.Button -eq 'Left') { $ui.Down = $this; $this.Invalidate() } }); $B.Add_MouseUp({ $ui.Down = $null; $this.Invalidate() })
   $B.Add_VisibleChanged({ if ([object]::ReferenceEquals($ui.Hot, $this)) { $ui.Hot = $null }; if ([object]::ReferenceEquals($ui.Down, $this)) { $ui.Down = $null } }) }
-# $Kind: 'action' (a card's buttons) or 'compact' (beside a box; the Record's "Back"). Sizes: $ui.Z.
-$ui.Btn = { param([string]$Kind) $b = New-Object System.Windows.Forms.Button; $b.AutoSize = $true; $b.AutoSizeMode = 'GrowAndShrink'   # a button that showed a long text shrinks back for the next card
-  $b.MinimumSize = $(if ($Kind -eq 'compact') { New-Object System.Drawing.Size($ui.Z.CompactW, $ui.Z.CompactH) } else { New-Object System.Drawing.Size($ui.Z.ActionW, $ui.Z.ActionH) })
-  $b.Padding = (& $ui.Pad 12 0 12 0); $b.Margin = (& $ui.Pad $ui.Z.M $ui.Z.M $ui.Z.M $ui.Z.M); $b.UseMnemonic = $false; & $ui.Style $b ''; & $ui.Cue $b; & $ui.Own $b; $b }
+# Buttons have fixed sizes (UI standard v1, B1; the Administrator, 2026-11-20): no AutoSize, so a button never grows or
+# shrinks with its text. $Kind: 'action' (a card's buttons: 160 x 40, or 240 x 40 when its label needs more room) or
+# 'compact' (96 x 30: beside a box, "Back (Esc)", the Record's buttons; 160 x 30 when its label needs more room). A label
+# that needs more than the widest size is cut, and the self-check reports it (rule B1). Sizes: $ui.Z.
+$ui.BtnKind = @{}
+# The size a button of a kind takes for its text, in pixels: at 100 % before the window has its scale (Windows Forms
+# scales it then), else scaled. Takes the button; gives back a Size.
+$ui.BtnSize = { param($B)
+  $k = [string]$ui.BtnKind[$B]; $s = $(if ($ui.Scaled) { $ui.Sc } else { { param([double]$Px) [int]$Px } })
+  $h = $(if ($k -eq 'compact') { $ui.Z.CompactH } else { $ui.Z.ActionH }); $ws = $(if ($k -eq 'compact') { @($ui.Z.CompactW, $ui.Z.ActionW) } else { @($ui.Z.ActionW, $ui.Z.WideW) })
+  $need = 0; try { if ($B.Text) { $need = [int][System.Windows.Forms.TextRenderer]::MeasureText([string]$B.Text, $B.Font).Width + (& $ui.Sc (2 * $ui.Z.G2)) } } catch { $null = $_ }   # no measure: the first width
+  $w = $(if ($need -le (& $ui.Sc $ws[0])) { $ws[0] } else { $ws[1] })
+  return (New-Object System.Drawing.Size((& $s $w), (& $s $h))) }
+# Gives a button the size of its kind for its text ($ui.BtnSize). Takes the button.
+$ui.FitBtn = { param($B) try { $ns = & $ui.BtnSize $B; if ($B.Width -ne $ns.Width -or $B.Height -ne $ns.Height) { $B.Size = $ns } } catch { $null = $_ } }   # no size now: the next text sets it
+# Makes a button of a kind ('action' or 'compact'), styled, with its focus ring and own face. Takes the kind; gives back the button.
+$ui.Btn = { param([string]$Kind) $b = New-Object System.Windows.Forms.Button; $b.AutoSize = $false; $ui.BtnKind[$b] = $(if ($Kind -eq 'compact') { 'compact' } else { 'action' })
+  $b.Padding = (& $ui.Pad $ui.Z.G2 0 $ui.Z.G2 0); $b.Margin = (& $ui.Pad $ui.Z.M $ui.Z.M $ui.Z.M $ui.Z.M); $b.UseMnemonic = $false; & $ui.Style $b ''; & $ui.Cue $b; & $ui.Own $b
+  & $ui.FitBtn $b; $b.Add_TextChanged({ & $ui.FitBtn $this }); $b }   # gives back the button
 $ui.LinkBtn = { param([string]$Text) $b = New-Object System.Windows.Forms.Button; $b.Text = $Text; $b.AutoSize = $true; $b.AutoSizeMode = 'GrowAndShrink'; $b.MinimumSize = New-Object System.Drawing.Size(0, $ui.Z.LinkH); $b.Margin = (& $ui.Pad $ui.Z.M $ui.Z.M $ui.Z.M $ui.Z.M); $b.UseMnemonic = $false
-  $b.FlatStyle = 'Flat'; $b.FlatAppearance.BorderSize = 0; $b.BackColor = $ui.C.White; $b.ForeColor = $ui.C.Blue; $b.Font = $ui.F.Link; try { $b.FlatAppearance.MouseOverBackColor = $ui.C.White; $b.FlatAppearance.MouseDownBackColor = $ui.C.Hair } catch { $null = $_ }; & $ui.Cue $b; & $ui.Own $b; $b }   # a link: Air Force blue, semibold and underlined (not color alone), 28 high
+  $b.FlatStyle = 'Flat'; $b.FlatAppearance.BorderSize = 0; $b.BackColor = $ui.C.White; $b.ForeColor = $ui.C.Link; $b.Font = $ui.F.Link; $ui.Links += $b; try { $b.FlatAppearance.MouseOverBackColor = $ui.C.White; $b.FlatAppearance.MouseDownBackColor = $ui.C.Hair } catch { $null = $_ }; & $ui.Cue $b; & $ui.Own $b; $b }   # a link: Air Force blue, semibold and underlined (not color alone), 28 high
+$ui.Kinds = @{}; $ui.Links = @()   # the kind each button was last styled with; every link ($ui.Recolor styles them again)
+# ---- A contrast theme that changes while the window is open (UI standard v1, B11; backlog item 24)
+# The form's SystemColorsChanged event (Windows sends WM_SYSCOLORCHANGE when a contrast theme comes on or goes off) calls
+# $ui.Recolor on the window's own thread: PowerShell code cannot run on the thread of SystemEvents, and the event goes with
+# the form when it closes, so nothing is left to detach. $ui.Roles keeps, for each control and color property, the token
+# it was painted with (found from the colors it had), so a switch back gives each part its own color again.
+$ui.Roles = @{}
+$ui.Recolor = {
+  <#
+  .SYNOPSIS
+  Paints the window again in the colors of the current Windows theme (its own colors, or a contrast theme's system colors).
+  .DESCRIPTION
+  Does nothing when the theme did not change, unless Force is set. Finds each control's token for its ForeColor, BackColor
+  and button colors from the colors in use before the change (the first token of that color, in the order of
+  engine/ui-tokens.json), puts the new colors in $ui.C ($ui.UseColors), sets each property from its token, styles each
+  button again by its kind and each link as a link, and repaints the form (paint handlers read $ui.C).
+  .PARAMETER Force
+  $true to paint again also when the theme did not change (the Windows job's contrast run).
+  .OUTPUTS
+  Nothing.
+  #>
+  param([bool]$Force)
+  $hi = [bool](& $ui.HighOn); if ($hi -eq [bool]$ui.High -and -not $Force) { return }
+  try { $rev = @{}; foreach ($k in @($ui.Tok.Keys)) { $a = $ui.C[$k].ToArgb(); if (-not $rev.ContainsKey($a)) { $rev[$a] = $k } }   # the colors before the change: color -> token
+    $todo = New-Object System.Collections.Stack; $todo.Push($ui.Form); $all = @()
+    while ($todo.Count) { $c = $todo.Pop(); $all += $c; foreach ($k in @($c.Controls)) { $todo.Push($k) } }
+    foreach ($c in $all) { if (-not $ui.Roles.ContainsKey($c)) { $ui.Roles[$c] = @{} }; $r = $ui.Roles[$c]
+      foreach ($pp in 'ForeColor', 'BackColor') { try { $t = $rev[$c.$pp.ToArgb()]; if ($t) { $r[$pp] = $t } } catch { $null = $_ } } }   # a color that is no token stays as it is
+    & $ui.UseColors $hi
+    foreach ($c in $all) { $r = $ui.Roles[$c]; foreach ($pp in @($r.Keys)) { try { $c.$pp = $ui.C[[string]$r[$pp]] } catch { $null = $_ } } }   # a property that cannot be set keeps its color
+    foreach ($b in @($ui.Kinds.Keys)) { try { $en = $b.Enabled; & $ui.Style $b ([string]$ui.Kinds[$b]); if ([string]$ui.Kinds[$b] -notin 'off', 'dangeroff') { $b.Enabled = $en } } catch { $null = $_ } }   # a button that is gone: nothing to paint
+    foreach ($b in @($ui.Links)) { try { $b.BackColor = $ui.C.White; $b.ForeColor = $ui.C.Link; $b.FlatAppearance.MouseOverBackColor = $ui.C.White; $b.FlatAppearance.MouseDownBackColor = $ui.C.Hair } catch { $null = $_ } }   # same: a link that is gone
+    $ui.Form.Invalidate($true) } catch { $null = $_ } }   # colors never stop the window
 # ---- Where ink starts
 $ui.Inks = @{}
 $ui.Ink = { param($C)

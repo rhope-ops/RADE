@@ -49,7 +49,7 @@ Usage: python3 engine/rade_build.py --app-root DIR [--manifest scripts/paste_bun
 """
 import base64, hashlib, json, re, sys, textwrap
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent)); import rade_hash   # the bundle hash, beside this file (found also when this file is run by another script)
+sys.path.insert(0, str(Path(__file__).resolve().parent)); import rade_hash, rade_tokens   # the bundle hash; the UI tokens and fonts (UI standard v1); both beside this file
 
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
 WINDOW_FILE = ENGINE_ROOT / 'engine/window.json'   # the window's layout values (the Administrator, 2026-11-18; docs/window-design.md)
@@ -57,7 +57,6 @@ LOGO = ENGINE_ROOT / 'assets/logo/logo-rho-128.png'   # RADE's own logo (top lef
 UI_FILE = ENGINE_ROOT / 'engine/rade_ui.ps1'   # the shared UI file: theme tokens, builders and the layout self-check (R28; docs/engine.md "How an app gets the engine")
 ROOT = None   # the application repo root (--app-root)
 TEXT = {'.ps1', '.json', '.txt', '.md', '.csv'}
-
 
 
 def step_default(s):
@@ -407,6 +406,7 @@ def engine_for_app(ui_text):
         app's facts (home page, file prefix, folder) in their placeholders.
     """
     assert '@@' not in ui_text, 'engine/rade_ui.ps1 must not hold a placeholder'
+    rade_tokens.check_tokens(ui_text)
     assert ENGINE.count('    # @@UI@@') == 1, 'the UI slot (# @@UI@@) must be in the engine once'
     engine = ENGINE.replace('    # @@UI@@', '\n'.join(('    ' + x) if x else x for x in ui_text.rstrip('\n').split('\n')))
     for k, v in window_values().items():
@@ -453,7 +453,7 @@ def bundle_body(b, ui_text):
     rel = q('https://raw.githubusercontent.com/' + APP['repo'] + '/main/rade-release.json')
     parts = [
         ('Settings', ['$goUrl = %s' % go, '$releaseUrl = %s' % rel, "$webAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) RADE'",
-                      "$logoPng = '%s'" % logo, "$appLogoPng = '%s'" % app_logo, '$ownPatterns = @(' + ', '.join(q(p) for p in APP['own']) + ')', '$round = %s' % q(b['round']),
+                      "$logoPng = '%s'" % logo, "$appLogoPng = '%s'" % app_logo, rade_tokens.font_lines(), '$ownPatterns = @(' + ', '.join(q(p) for p in APP['own']) + ')', '$round = %s' % q(b['round']),
                       '$appFolder = %s' % q(APP['folder']), "$usersRoot = 'C:\\Users'"]),
         ('Shared blocks (%d): each is written back into the files that name it' % len(shared), ['$shared = @{}'] + shared),
         ('Files written to this computer (%d)' % len(b['files']), ['$files = @()'] + files),
@@ -589,7 +589,7 @@ def main():
 # own, and a bundle's header names each file with its own hash (part_lines); this one value is what --sha prints.
 ENGINE_SHA = hashlib.sha256(b''.join(rel.encode() + b'\0' + (ENGINE_ROOT / rel).read_bytes() + b'\0' for rel in
                                      ['engine/rade_build.py', 'engine/rade_hash.py'] + ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS]
-                                     + ['engine/rade_ui.ps1', 'engine/window.json', 'assets/logo/logo-rho-128.png'])).hexdigest()
+                                     + ['engine/rade_ui.ps1', 'engine/window.json', 'assets/logo/logo-rho-128.png'] + rade_tokens.FILES)).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
 ENGINE_RELEASE = 27

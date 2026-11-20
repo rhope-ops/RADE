@@ -24,7 +24,7 @@ $ui.VHand = {
 # nothing.
 $ui.VHandFail = {
   & $ui.SetCard @{ View = 'handfail'; Light = 'you'; Kicker = 'It failed'; Sentence = 'What did the error say?'; P = @('Paste the error message here. Do not include names or a site address.'); Err = $true
-    Buttons = @(@{ Text = 'Report the failure'; Kind = 'primary'; Act = { $script:guideError = [string]$ui.ErrBox.Text; $ui.Answer = 'Abort' } }, @{ Text = 'Back'; Act = { & $ui.VHand } }); NoAccept = $true; Focus = 'err' } }
+    Buttons = @(@{ Text = 'Report the failure'; Kind = 'primary'; Act = { $script:guideError = [string]$ui.ErrBox.Text; $ui.Answer = 'Abort' } }); Back = { & $ui.VHand }; NoAccept = $true; Focus = 'err' } }
 # A question of a hand step (manifest "answers"), after Done: the prompt is the sentence; yes/no and pick answer with
 # one button per word, a text with one line (10,000 characters at most; empty is allowed; R28: kept whole) and "Continue". No Back.
 $ui.ReplyActs = @({ $ui.Reply = [string]$ui.B[0].Text }, { $ui.Reply = [string]$ui.B[1].Text }, { $ui.Reply = [string]$ui.B[2].Text }, { $ui.Reply = [string]$ui.B[3].Text })
@@ -102,3 +102,57 @@ $script:feedbackUi = {
   $ui.Busy = $was; $text = [string]$ui.Reply
   if ($ui.Running -and -not $script:closing) { $null = & $ui.ShowRun }
   return $text }
+# ---- Feedback on every card (UI standard v1, B13; the Administrator, 2026-11-20). In a test round the bottom line has the
+# link "Feedback" ($ui.FeedB) on every card. It takes a picture of the window as it is (Control.DrawToBitmap of the form),
+# then shows a card with a comment box; Save writes the comment (masked as a text answer is) and the picture as
+# feedback-NN.txt and feedback-NN.png into Rounds\<round>\Feedback, then shows the card it came from again. The folder is
+# under the round's results folder, not in it: the e-mail draft attaches only the files of the results folder itself, and
+# the picture shows the real profile path (DoD365 boundary, AGENTS.md "Project rules"), so it stays on this computer.
+# Gives back $true when the bundle's chosen (or only) application is a test one: the link shows then. Takes nothing.
+$ui.NoteOn = { try { if ($ui.Picked) { return [bool](-not (Test-Deploy)) }; return [bool](@($apps | Where-Object { [string]$_.Mode -ne 'deploy' }).Count) } catch { return $false } }   # no answer: no link
+$ui.NoNoteViews = @('note')
+$ui.VNote = {
+  <#
+  .SYNOPSIS
+  Shows the feedback card for the card on screen, with a picture of the window taken first.
+  .DESCRIPTION
+  Does nothing while RADE is busy or a run is on (the Run card keeps updating), in the Record and on the feedback card
+  itself. The picture is kept in $ui.NoteShot until Save or Back; no picture (a host that cannot draw the form) is allowed.
+  .OUTPUTS
+  Nothing.
+  #>
+  if ($ui.Busy -or $ui.Running -or $ui.RecOn -or -not $ui.CardNow -or [string]$ui.View -in $ui.NoNoteViews) { return }
+  $ui.NoteFor = $ui.CardNow; $ui.NoteShot = $null
+  try { $w = [int]$ui.Form.Width; $h = [int]$ui.Form.Height; $bm = New-Object System.Drawing.Bitmap($w, $h)
+    $ui.Form.DrawToBitmap($bm, (New-Object System.Drawing.Rectangle(0, 0, $w, $h))); $ui.NoteShot = $bm } catch { $null = $_ }   # no picture: the comment alone
+  & $ui.SetCard @{ View = 'note'; Kicker = 'Feedback'; Sentence = 'What do you want to tell us about this card?'
+    P = @('RADE saves your comment and a picture of the window in the Feedback folder of this round. They stay on this computer and are not attached to the results e-mail.', 'Do not type names or addresses.'); Err = $true
+    Buttons = @(@{ Text = 'Save'; Kind = 'primary'; Act = { & $ui.Say1 (& $ui.SaveNote ([string]$ui.ErrBox.Text)); & $ui.NoteBack $false } }); Back = { & $ui.NoteBack $true }; NoAccept = $true; Focus = 'err' } }
+$ui.SaveNote = {
+  <#
+  .SYNOPSIS
+  Writes one feedback comment and the picture of $ui.NoteShot into Rounds\<round>\Feedback (UI standard v1, B13).
+  .DESCRIPTION
+  The files are feedback-NN.txt (the card, the time, the window size and scale, then the comment, masked as a text answer
+  is) and feedback-NN.png; NN is the first number not yet used. A picture that cannot be saved leaves the comment saved.
+  .PARAMETER Text
+  The comment as typed.
+  .OUTPUTS
+  The line the card shows: what was saved, or why nothing could be saved (masked).
+  #>
+  param([string]$Text)
+  try { $dir = Join-Path (Join-Path (Join-Path (Get-BasePath) 'Rounds') $round) 'Feedback'
+    if (-not (Test-Path -LiteralPath $dir -PathType Container)) { $null = New-Item -ItemType Directory -Path $dir -Force -ErrorAction Stop }
+    $n = 1; while (Test-Path -LiteralPath (Join-Path $dir ('feedback-{0:D2}.txt' -f $n))) { $n++ }; $stem = 'feedback-{0:D2}' -f $n
+    $win = [string]$ui.Form.ClientSize.Width + ' x ' + $ui.Form.ClientSize.Height + ' at ' + [int][math]::Round($ui.Dpi / 96.0 * 100) + ' %' + $(if ($ui.High) { ', contrast theme' } else { '' })
+    $lines = @(('Card: ' + [string]$ui.NoteFor.View), ('Time: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm')), ('Window: ' + $win), '', (ConvertTo-UserText $Text))
+    [System.IO.File]::WriteAllText((Join-Path $dir ($stem + '.txt')), (($lines -join "`r`n") + "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+    $pic = ''; $png = ('System.Drawing.Imaging.ImageFormat' -as [type])
+    if ($ui.NoteShot) { try { $ui.NoteShot.Save((Join-Path $dir ($stem + '.png')), $png::Png); $pic = ' and its picture' } catch { $null = $_ } }   # no picture file: the comment is saved
+    return ('Feedback saved: ' + $stem + $pic + ' in the Feedback folder of round ' + $round + '.')
+  } catch { return ('The feedback could not be saved: ' + (ConvertTo-Masked ([string]$_.Exception.Message))) } }
+# Shows the card the feedback came from again and lets the picture go. Takes $true when Back was selected (the note line
+# is cleared then).
+$ui.NoteBack = { param([bool]$Cancel)
+  $say = [string]$ui.Note.Text; try { if ($ui.NoteShot) { $ui.NoteShot.Dispose() } } catch { $null = $_ }; $ui.NoteShot = $null   # a picture that is gone: nothing to free
+  if ($ui.NoteFor) { & $ui.SetCard $ui.NoteFor; if (-not $Cancel) { & $ui.Say1 $say } } }

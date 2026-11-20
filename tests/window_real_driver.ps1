@@ -51,8 +51,10 @@ function global:Save-RadeCard([string]$Tag) {
 function global:Step-RadeR31([string]$V) {
   if ($V -eq 'answerfail') { $ui.ErrBox.Text = 'The page said: error 42' } elseif ($V -eq 'feedback') { $ui.Field.Text = 'Sample feedback' }
   $fb = @($ui.B | Where-Object { $_.Visible -and $_.Text -like 'An error*' })[0]
-  if ($V -eq 'answer' -and $fb) { $fb.PerformClick() } else { $ui.B[0].PerformClick() }
+  if ($V -eq 'answer' -and $fb) { $fb.PerformClick() } else { (Get-RadeMain).PerformClick() }
 }
+# The primary button of the card on screen (UI standard v1: the last one), or the first shown button when it has none.
+function global:Get-RadeMain { $m = @($ui.B | Where-Object { $_.Visible -and [string]$ui.Kinds[$_] -eq 'primary' }); if ($m.Count) { return $m[0] }; return @($ui.B | Where-Object { $_.Visible })[0] }
 function global:Step-Rade {
   if (((Get-Date) - $global:RadeT.T0).TotalSeconds -gt 240) { Write-Host ('WIN TIMEOUT view=' + $ui.View + ' sent=' + $ui.Sent.Text); [Environment]::Exit(3) }
   if (-not $ui -or -not $ui.Form -or $ui.Form.IsDisposed -or -not $ui.Form.Visible -or -not $ui.View) { return }
@@ -99,8 +101,8 @@ function global:Step-Rade {
       $global:RadeT.NoAddr = $true; $g0 = $ui.GUrl; $s0 = $ui.G.Step; $ui.GUrl = ''; $ui.G.Step = $s0.Clone(); $ui.G.Step.UrlConfig = ''
       & $ui.VHand; Save-RadeCard 'noaddress-hand'; Write-Host ('WIN no-address field=' + $ui.FieldRow.Visible + ' guide=' + $ui.Guide.Visible + ' path=' + $ui.PathT.Visible)
       $ui.GUrl = $g0; $ui.G.Step = $s0; & $ui.VHand }
-    if ($ui.B[1].Text -ne 'It failed') { $ui.B[0].PerformClick() }
-    elseif ($global:RadeT.Hand -eq 'fail') { $ui.B[1].PerformClick() } else { $ui.B[0].PerformClick() }
+    $hf = @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'It failed' })[0]   # B3: Done (primary) is the last button
+    if (-not $hf) { (Get-RadeMain).PerformClick() } elseif ($global:RadeT.Hand -eq 'fail') { $hf.PerformClick() } else { (Get-RadeMain).PerformClick() }
   }
   elseif ($v -eq 'answer') {
     if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }; Step-RadeR31 $v }

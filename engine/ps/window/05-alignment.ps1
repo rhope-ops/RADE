@@ -89,7 +89,7 @@ $ui.AlignRow = { param($Parts, [int]$Base)
 # Returns the controls of one aligned row (Top, FieldRow, ...). Takes the row name.
 $ui.RowParts = { param([string]$Row) switch ($Row) { 'Top' { @(@($ui.Logo, $ui.TitleCol) | Where-Object { $_ }) } 'AppRow' { @(@($ui.AppLogo, $ui.AppL) | Where-Object { $_ }) } 'FieldRow' { @($ui.FieldL, $ui.FieldBox) + @($(if ($ui.FieldBOn) { $ui.FieldB })) } 'TestRow' { @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox) } } }
 # Lines up every fixed row: box heights, the text box in its frame, then each row on one center line.
-$ui.AlignRows = { try { $bh = [int]$ui.FieldB.PreferredSize.Height; if ($bh -gt 0) { foreach ($p in $ui.Boxes) { if ($p.Height -ne $bh) { $p.Height = $bh } } } } catch { $null = $_ }   # a box is as tall as the compact button, measured
+$ui.AlignRows = { try { $bh = [int]$ui.FieldB.Height; if ($bh -gt 0) { foreach ($p in $ui.Boxes) { if ($p.Height -ne $bh) { $p.Height = $bh } } } } catch { $null = $_ }   # a box is as tall as the compact button, measured
   foreach ($p in $ui.Boxes) { & $ui.BoxFit $p }   # the text box fills its frame (R24 job: a frame whose size never changed kept a 100 px text box at its top)
   & $ui.AlignRow (& $ui.RowParts 'Top') 0; if (-not $ui.AppUnder) { & $ui.AlignRow (& $ui.RowParts 'AppRow') 0 };   # no application logo: the name is in the title column with its own 4 px gap (review of PR 106: a row of one part set it to 0)
   $mm = & $ui.Sc $ui.Z.M; & $ui.AlignRow (& $ui.RowParts 'TestRow') $mm; & $ui.AlignTick
@@ -126,18 +126,21 @@ $ui.FitRow = {
   try { $cw = $ui.ContentW
     if ($ui.FieldAbove) { $ui.FieldBox.Width = [math]::Max((& $ui.Sc 160), ($cw - (& $ui.Sc 10))); return }
     $left = $cw - $ui.FieldL.PreferredSize.Width - (& $ui.Sc 20)
-    if ($ui.FieldBOn) { $left -= ($ui.FieldB.PreferredSize.Width + (& $ui.Sc 8)) }
-    $ui.FieldBox.Width = [math]::Max((& $ui.Sc 160), [math]::Min((& $ui.Sc 420), [int]$left)) } catch { $null = $_ } }
+    if ($ui.FieldBOn) { $left -= ($ui.FieldB.Width + (& $ui.Sc 8)) }
+    $ui.FieldBox.Width = [math]::Max((& $ui.Sc 160), [math]::Min((& $ui.Sc $ui.Z.FieldM), [int]$left)) } catch { $null = $_ } }
 $ui.Apart = {
-  # The destructive button (Buttons: Apart) is alone at the right end of the row. When the row is too narrow for
-  # that, it starts its own row at the left edge.
+  # UI standard v1 (B3, the Administrator, 2026-11-20): the primary button is the last one and stands alone at the right
+  # end of the action row ("Back (Esc)" at the left end, the others after it). When the row is too narrow for that, the
+  # primary button starts its own row.
   try { $mm = & $ui.Sc $ui.Z.M; $n = -1; $prev = -1; $used = 0
-    for ($k = 0; $k -lt $ui.NB; $k++) { $ui.BtnRow.SetFlowBreak($ui.B[$k], $false); if ($ui.BOn[$k]) { $ui.B[$k].Margin = (& $ui.Pad $mm $mm $mm $mm); if ($ui.BApart[$k]) { $n = $k } } }
-    if ($n -lt 1) { return }
-    for ($k = 0; $k -lt $n; $k++) { if ($ui.BOn[$k]) { $prev = $k; $used += $ui.B[$k].PreferredSize.Width + 2 * $mm } }
-    $left = $ui.ContentW + $mm - $used - $ui.B[$n].PreferredSize.Width
-    if ($prev -lt 0) { return }
-    if ($left -ge (& $ui.Sc 32)) { $ui.B[$n].Margin = (& $ui.Pad ([int]$left) $mm $mm $mm) } else { $ui.BtnRow.SetFlowBreak($ui.B[$prev], $true) }
+    for ($k = 0; $k -lt $ui.NB; $k++) { $ui.BtnRow.SetFlowBreak($ui.B[$k], $false); if ($ui.BOn[$k]) { $ui.B[$k].Margin = (& $ui.Pad $mm $mm $mm $mm); if ($ui.BMain[$k]) { $n = $k } } }
+    $ui.BtnRow.SetFlowBreak($ui.BackB, $false)
+    if ($n -lt 0) { return }
+    if ($ui.BackB.Visible) { $prev = -2; $used += $ui.BackB.Width + 2 * $mm }
+    for ($k = 0; $k -lt $n; $k++) { if ($ui.BOn[$k]) { $prev = $k; $used += $ui.B[$k].Width + 2 * $mm } }
+    if ($prev -eq -1) { $used = 0 }
+    $left = $ui.ContentW + $mm - $used - $ui.B[$n].Width
+    if ($left -ge (& $ui.Sc 32)) { $ui.B[$n].Margin = (& $ui.Pad ([int]$left) $mm $mm $mm) } elseif ($prev -ge 0) { $ui.BtnRow.SetFlowBreak($ui.B[$prev], $true) } elseif ($prev -eq -2) { $ui.BtnRow.SetFlowBreak($ui.BackB, $true) }
   } catch { $null = $_ } }
 # Places the card frame (L1) and lets the card's text scroll when the card is taller than the window (the help below).
 $ui.Squeeze = {
@@ -335,20 +338,23 @@ $ui.SetCard = { param($c)
   & $ui.Show $ui.Note ([string]$c.Note); & $ui.Show $ui.Help ([string]$c.Help); & $ui.Show $ui.Foot ([string]$c.Foot); & $ui.Show $ui.Close ([string]$c.Close)
   & $ui.ScriptWarn $c   # the script's hash does not match: a red last line on the boot, Choose and Ready cards
   $bm = & $ui.Sc $(if ($c.Close) { $ui.Z.G2 - $ui.Z.M } else { $ui.Z.G4 - $ui.Z.M }); $bn = $ui.BtnRow.Margin; if ($bn.Top -ne $bm) { $ui.BtnRow.Margin = New-Object System.Windows.Forms.Padding($bn.Left, $bm, $bn.Right, $bn.Bottom) }   # 8 under the closing line, else 16
-  $bs = @($c.Buttons | Where-Object { $_ }); $ui.Acts = @(); $first = $null; $accept = $null; $ui.BOn = @($false) * $ui.NB; $ui.BApart = @($false) * $ui.NB; $ui.Always = @($false) * $ui.NB
+  # UI standard v1 (B3, B4): the primary button goes last (Enter selects it); the others keep their order.
+  $bs = @(@($c.Buttons | Where-Object { $_ -and [string]$_.Kind -ne 'primary' }) + @($c.Buttons | Where-Object { $_ -and [string]$_.Kind -eq 'primary' }))
+  $ui.Acts = @(); $first = $null; $accept = $null; $ui.BOn = @($false) * $ui.NB; $ui.BMain = @($false) * $ui.NB; $ui.Always = @($false) * $ui.NB
+  $ui.Back = $c.Back; $ui.BackB.Visible = ([bool]$c.Back -and -not $ui.RecOn)   # B6: Back (Esc) at the left end of the action row
   for ($k = 0; $k -lt $ui.NB; $k++) {
     $b = $ui.B[$k]
     if ($k -lt $bs.Count) {
-      $b.Text = [string]$bs[$k].Text; & $ui.Style $b ([string]$bs[$k].Kind); $b.Visible = $true; $ui.Acts += $bs[$k].Act; $ui.BOn[$k] = $true; $ui.BApart[$k] = [bool]$bs[$k].Apart; $ui.Always[$k] = [bool]$bs[$k].Always
+      $b.Text = [string]$bs[$k].Text; & $ui.Style $b ([string]$bs[$k].Kind); $b.Visible = $true; $ui.Acts += $bs[$k].Act; $ui.BOn[$k] = $true; $ui.BMain[$k] = ([string]$bs[$k].Kind -eq 'primary'); $ui.Always[$k] = [bool]$bs[$k].Always
       if ($b.Enabled -and -not $first) { $first = $b }; if ($b.Enabled -and -not $accept -and $bs[$k].Kind -eq 'primary') { $accept = $b }
     } else { $b.Visible = $false; $ui.Acts += $null }
   }
   & $ui.Apart
-  $ui.BtnRow.Visible = [bool]$bs.Count
+  $ui.BtnRow.Visible = [bool]($bs.Count -or $ui.BackB.Visible)
   $ui.TestRow.Visible = [bool]$c.Test
   $ui.Form.AcceptButton = $(if ($c.NoAccept) { $null } else { $accept })   # Enter = the primary button, except on a hand step
   $ui.CardNow = $c; $ui.TourB.Visible = ($ui.HelpViews -contains [string]$c.View -and -not $ui.RecOn)   # L6: Help on a card that can be shown again
-  $ui.Back = $c.Back; $ui.BackB.Visible = ([bool]$c.Back -and -not $ui.RecOn); $ui.RightL.Text = $(if ($c.Right) { [string]$c.Right } else { '' })   # R-top-bar (2026-11-19): no state words; only the percent, the time or a result word
+  $ui.FeedB.Visible = [bool]((& $ui.NoteOn) -and -not $ui.RecOn -and [string]$c.View -notin $ui.NoNoteViews); $ui.RightL.Text = $(if ($c.Right) { [string]$c.Right } else { '' })   # R-top-bar (2026-11-19): no state words; only the percent, the time or a result word
   & $ui.FitSent; & $ui.FitEdges; & $ui.FitBar; & $ui.AlignRows   # the step bar's width for this card's step row before it is drawn (R35 job: the first Run card wrapped the time under the title)
   $ui.Card.ResumeLayout(); try { $ui.Card.PerformLayout() } catch { $null = $_ }
   if ($ui.Guide.Visible) { try { $ui.Guide.Refresh() } catch { $null = $_ }; & $ui.GuideFit; & $ui.FitEdges }   # the rich text box finishes its layout when it paints: paint it (no message pump), then measure its edge again (R28 job: 4 to 13 px off on the first hand card)

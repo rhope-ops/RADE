@@ -139,7 +139,6 @@ $ui.VDone = {
   $took = Format-Duration ((Get-Date) - $script:roundStart).TotalSeconds
   $ui.Bars['all'].Fill = $(if ($bad) { $ui.C.Blue } else { $ui.C.Green }); & $ui.SetBar 'all' $(if ($bad) { $ui.Bars['all'].Target } else { 1 }) $true
   $mail = $(if ($script:draftMade) { 'An Outlook draft is open with the summary and all result files. Review it, then select Send.' } else { 'The results folder is open and the summary is on the clipboard. Paste it into an e-mail and attach the files.' })
-  $bMade = $(if ($made) { @{ Text = 'Record'; Act = { & $ui.VRecord } } } else { $null })
   $iconNote = ''; if ($dep -and -not $bad) { $null = Save-RunnerCopy; $iconNote = $(if ($ui.FieldAsked -and -not $ui.LinkDir -and (Get-DesktopDir)) { 'The shortcut folder box was empty, so RADE made no shortcut. Open RADE from the RADE page instead.' } else { [string](Add-DesktopIcon ([string]$ui.LinkDir)) }) }   # R28: the runner copy and the desktop shortcut (a deploy that passed)
   if (-not $bad) {
     $inst = ($dep -and (Get-InstalledText $script:app) -match 'is installed$')
@@ -148,7 +147,7 @@ $ui.VDone = {
     & $ui.SetCard @{ View = 'done'; Tick = $true; Kicker = $(if ($dep -and -not $inst) { 'Passed' } else { 'All steps passed' }); Right = $took
       Sentence = $(if (-not $dep) { 'Round ' + $round + ' is done.' } elseif ($inst) { $script:app.Name + ' ' + $script:app.Version + ' is installed.' } else { 'The run passed, but version ' + $script:app.Version + ' is not recorded as installed.' })
       P = @($(if ($dep -and -not $inst) { 'Some steps were off or skipped. Run again with every step on.' } else { '' }), $(if ($dep) { 'Nothing was sent. The report stays on this computer.' } else { $mail }), $made, $iconNote)
-      Buttons = @($startB, @{ Text = 'Close'; Kind = $(if ($startB) { '' } else { 'primary' }); Act = { $ui.Form.Close() } }, $bMade, @{ Text = 'Open results folder'; Act = { & $ui.Open } }, @{ Text = 'Copy summary'; Act = { & $ui.Copy } })
+      Buttons = @($startB, @{ Text = 'Close'; Kind = $(if ($startB) { '' } else { 'primary' }); Act = { $ui.Form.Close() } }, @{ Text = 'Open results folder'; Act = { & $ui.Open } }, @{ Text = 'Copy summary'; Act = { & $ui.Copy } })
       Test = (-not $dep); Back = { & $ui.VReady } }
   } else {
     # The first step that needs review, with its help line from the manifest; the rest is in the Record.
@@ -158,7 +157,7 @@ $ui.VDone = {
     & $ui.SetCard @{ View = 'review'; Light = 'bad'; Kicker = 'Needs review'; Right = 'Needs review'; Sentence = $(if ($dep) { 'The install is not complete.' } else { 'The round needs review.' })
       P = @(($one + $(if ($more) { ' (and ' + $more + ' more in the Record)' } else { '' })), $what, $(if ($dep) { 'Steps that passed stay done. If you paste the block again, RADE runs only what is left.' } else { $mail }))
       Help = $(if ($dep) { Get-HelpLine } else { '' }); Note = $(if ($dep) { '"Copy summary" puts the report on the clipboard. Paste it in the channel. Nothing was sent.' } else { '' })
-      Buttons = @(@{ Text = 'Copy summary'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Open results folder'; Act = { & $ui.Open } }, $bMade, @{ Text = 'Close'; Act = { $ui.Form.Close() } })
+      Buttons = @(@{ Text = 'Copy summary'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Open results folder'; Act = { & $ui.Open } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } })
       Test = (-not $dep); Back = { & $ui.VReady } }
   }
   if (-not $dep) { & $ui.Copy; if (-not $script:draftMade) { & $ui.Open } }   # a test round: the summary is on the clipboard, and with no draft the folder opens

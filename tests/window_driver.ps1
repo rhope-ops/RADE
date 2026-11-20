@@ -121,10 +121,13 @@ function global:Show-RadeCard {
     $(if ($ui.Guide.Shown -and @($ui.GuideNums).Count) { ' steps=' + ((@(for ($i = 0; $i -lt @($ui.GuideNums).Count; $i++) { $ui.GuideNums[$i] + ' ' + $ui.GuideTexts[$i] })) -join ' ~ ') } else { '' }) + $(if ($ui.Guide.Shown -and @($ui.GuideRest).Count) { ' rest=' + (@($ui.GuideRest) -join ' ~ ') } else { '' }) + $(if ($ui.Close.Shown) { ' close=' + $ui.Close.Text } else { '' }) + $(if ($ui.Note.Shown) { ' note=' + $ui.Note.Text } else { '' }) + $(if ($ui.Help.Shown) { ' help=' + $ui.Help.Text } else { '' }) + ' btn=' + $bs + $(if ($ui.Foot.Shown) { ' foot=' + $ui.Foot.Text } else { '' }) + $(if ($ui.StepRow.Shown) { ' step=' + $ui.StepName.Text + ' now-font=' + $ui.Now.Font.Name + $ui.Now.Font.SizeInPoints } else { '' }) +
     $(if ($ui.TestRow.Shown) { ' test=shown' } else { '' }) + ' back=' + [bool]$ui.BackB.Shown + ' right=' + $ui.RightL.Text + ' app=' + $ui.AppL.Text +
     $(if ($ui.FieldRow.Shown) { ' field=' + $ui.FieldL.Text + ':' + $ui.Field.Text } else { '' }) + $(if ($ui.PathT.Shown) { ' path=' + ($ui.PathT.Text -replace "`n", '') } else { '' }) + $(if ($ui.StepRow.Shown) { ' time=' + $ui.StepTime.Text } else { '' }) + ' help=' + [bool]$ui.TourB.Shown + ' turn=' + $(if ($ui.Turn.Shown) { $ui.Turn.Text } else { 'hidden' }))
-  # The stand-ins have no layout: a button keeps the width of its longest text unless it can shrink (Windows Forms GrowOnly).
-  for ($k = 0; $k -lt @($ui.B).Count; $k++) { $b = $ui.B[$k]; if (-not $b.Shown) { continue }; $was = [int]$global:RadeT.Long[$k]
-    if ($was -gt $b.Text.Length -and [string]$b.Values['AutoSizeMode'] -ne 'GrowAndShrink') { Write-Host ('WIN BAD button ' + $k + ' "' + $b.Text + '" keeps the width of a ' + $was + '-character text in view ' + $ui.View) }
-    if ($b.Text.Length -gt $was) { $global:RadeT.Long[$k] = $b.Text.Length } }
+  # UI standard v1 (B1, B3, B4, B5): every button has a size of the fixed set and no AutoSize, at most one primary button,
+  # which is the last one, and at most 3 others ("Back (Esc)" is not counted: it is the Back pattern, B6).
+  $kz = $ui.Dpi / 96.0; $ws = @(96, 160, 240 | ForEach-Object { [int][math]::Round($_ * $kz) }); $hs = @(30, 40 | ForEach-Object { [int][math]::Round($_ * $kz) })
+  foreach ($b in @(@($ui.B) + @($ui.BackB, $ui.FieldB, $ui.RecClose, $ui.RecCopy) | Where-Object { $_ -and $_.Shown })) {
+    if ($b.Values['AutoSize'] -or $ws -notcontains $b.Width -or $hs -notcontains $b.Height) { Write-Host ('WIN BAD button "' + $b.Text + '" is ' + $b.Width + 'x' + $b.Height + ' (autosize ' + [bool]$b.Values['AutoSize'] + ') in view ' + $ui.View) } }
+  $shown = @($ui.B | Where-Object { $_.Shown }); $main = @(for ($k = 0; $k -lt $shown.Count; $k++) { if ([string]$ui.Kinds[$shown[$k]] -eq 'primary') { $k } })
+  if ($main.Count -gt 1 -or ($main.Count -eq 1 -and $main[0] -ne $shown.Count - 1) -or ($shown.Count - $main.Count) -gt 3) { Write-Host ('WIN BAD buttons in view ' + $ui.View + ': ' + $shown.Count + ' shown, primary at ' + ($main -join ',')) }
   $ui.Form.Repaint()
   $all = New-Object 'System.Collections.Generic.List[System.Windows.Forms.Control]'; $ui.Form.Walk($all)
   foreach ($c in $all) {
@@ -240,7 +243,11 @@ function global:Step-RadeR31([string]$V) {
     if (-not $global:RadeT.Helped) { $global:RadeT.Helped = $true; $global:RadeT.HelpSent = $ui.Sent.Text; $global:RadeT.HelpLink = [bool]$ui.TourB.Shown; $ui.Form.Key('F1'); return $true } }
   return $false
 }
+# The primary button of the card on screen (UI standard v1: the last one), or the first shown button when it has none.
+function global:Get-RadeMain { $m = @($ui.B | Where-Object { $_.Shown -and [string]$ui.Kinds[$_] -eq 'primary' }); if ($m.Count) { return $m[0] }; return @($ui.B | Where-Object { $_.Shown })[0] }
 function global:Push-RadeButton([string]$Text) {
+  if ($Text -eq 'Record' -and $ui.RecB.Shown) { $ui.RecB.PerformClick(); return }   # B7: the Record is the link "Record (F2)"
+  if ($Text -in 'Back', 'Back (Esc)' -and $ui.BackB.Shown) { $ui.BackB.PerformClick(); return }   # B6: the one Back pattern
   foreach ($b in $ui.B) { if ($b.Shown -and $b.Text -eq $Text) { $b.PerformClick(); return } }
   throw ('the test user found no button "' + $Text + '" in view ' + $ui.View)
 }
@@ -284,8 +291,8 @@ function global:Push-RadeButton([string]$Text) {
     if ($v -eq 'need' -and (Get-CheckDef $id).Kind -eq 'signin' -and -not $global:RadeT.SignIn) {   # a sign-in that failed: its card must offer the sign-in again
       $global:RadeT.SignIn = $true; $script:checkResults[$id] = @{ State = 'FAILED'; Detail = 'Sign-in was not finished'; Fix = 'Select "Sign in and check site rights"' }; & $ui.Next; return
     }
-    if ($v -eq 'fail' -and $ui.B[0].Text -eq 'Run checks again' -and -not $global:RadeT.Again) {   # the check runs again and fails again
-      $global:RadeT.Again = $true; Write-Host 'WIN again'; $ui.B[0].PerformClick(); return   # the cards that follow are answered by the calls inside this click
+    if ($v -eq 'fail' -and (Get-RadeMain).Text -eq 'Run checks again' -and -not $global:RadeT.Again) {   # the check runs again and fails again
+      $global:RadeT.Again = $true; Write-Host 'WIN again'; (Get-RadeMain).PerformClick(); return   # the cards that follow are answered by the calls inside this click
     }
     $script:checkResults[$id] = @{ State = 'PASSED'; Detail = 'Set by the test'; Fix = '' }
     & $ui.Next
@@ -324,7 +331,7 @@ function global:Push-RadeButton([string]$Text) {
   }
   elseif ($v -eq 'hand') {
     $m = { param($C) $(if ($C.AutoSize) { $C.Margin.Top + $C.PreferredSize.Height / 2.0 } else { $C.Margin.Top + $C.Height / 2.0 }) }
-    Write-Host ('WIN mid hand label=' + (& $m $ui.FieldL) + ' box=' + (& $m $ui.FieldBox) + ' button=' + (& $m $ui.FieldB) + ' box-h=' + $ui.FieldBox.Height + ' button-h=' + $ui.FieldB.PreferredSize.Height + ' gaps=' + ($ui.FieldL.Margin.Right + $ui.FieldBox.Margin.Left) + ',' + ($ui.FieldBox.Margin.Right + $ui.FieldB.Margin.Left) + ' inner=' + $ui.Field.Width + '/' + $ui.FieldBox.Width + ' tick=' + $ui.TickP.Margin.Left)
+    Write-Host ('WIN mid hand label=' + (& $m $ui.FieldL) + ' box=' + (& $m $ui.FieldBox) + ' button=' + (& $m $ui.FieldB) + ' box-h=' + $ui.FieldBox.Height + ' button-h=' + $ui.FieldB.Height + ' gaps=' + ($ui.FieldL.Margin.Right + $ui.FieldBox.Margin.Left) + ',' + ($ui.FieldBox.Margin.Right + $ui.FieldB.Margin.Left) + ' inner=' + $ui.Field.Width + '/' + $ui.FieldBox.Width + ' tick=' + $ui.TickP.Margin.Left)
     Write-Host ('WIN mid header logo=' + ($ui.Logo.Margin.Top + $ui.Logo.Height / 2.0) + ' title=' + (& $m $ui.TitleCol) + ' word-in-title=' + [object]::ReferenceEquals($ui.WordL.Parent, $ui.TitleCol) + ' ink-left=' + ($ui.WordL.Margin.Left + (& $ui.Ink $ui.WordL)) + ',' + ($ui.AppL.Margin.Left + (& $ui.Ink $ui.AppL)) + "`n" + 'WIN mid approw shown=' + $ui.AppRow.Shown + ' link=' + $ui.LinkLine.Shown + ' applogo=' + $(if ($ui.AppLogo) { $ui.AppLogo.Margin.Top + $ui.AppLogo.Height / 2.0 } else { 'none' }) + ' app=' + (& $m $ui.AppL) + ' name=' + $ui.AppL.Text + ' logoname=' + $(if ($ui.AppLogo) { $ui.AppLogo.AccessibleName } else { 'none' })); Show-RadeTick
     $bc = @($ui.Body.Controls); $tc = @($ui.Tail.Controls)
     Write-Host ('WIN hand-order address-above-lines=' + ($bc.IndexOf($ui.FieldRow) -lt $bc.IndexOf($ui.Guide)) + ' lines-above-path=' + ($bc.IndexOf($ui.Guide) -lt $bc.IndexOf($ui.PathL) -and $bc.IndexOf($ui.PathL) + 1 -eq $bc.IndexOf($ui.PathT)) + ' path-above-links=' + ($bc.IndexOf($ui.PathT) -lt $bc.IndexOf($ui.LinkRow)) + ' closing-above-buttons=' + ($tc.IndexOf($ui.Close) + 1 -eq $tc.IndexOf($ui.BtnRow)) + ' closing-gap=' + $ui.BtnRow.Margin.Top)
@@ -341,8 +348,8 @@ function global:Push-RadeButton([string]$Text) {
       Write-Host ('WIN no-address field=' + $ui.FieldRow.Shown + ' close=' + $ui.Close.Text + ' focus-text=' + $ui.Guide.Focused + ' accept=' + [bool]$ui.Form.Values['AcceptButton'])
       $ui.GUrl = $g0; $ui.G.Step = $s0; & $ui.VHand
     }
-    if ($ui.B[1].Text -ne 'It failed') { $ui.B[0].PerformClick() }   # a look-and-answer check: Yes
-    elseif ($global:RadeT.Hand -eq 'fail') { Push-RadeButton 'It failed' } elseif ($global:RadeT.Hand -eq 'skip') { $ui.B[2].PerformClick() } else { $ui.B[0].PerformClick() }
+    $hb = @($ui.B | Where-Object { $_.Shown }); $hm = (Get-RadeMain); if (-not @($hb | Where-Object { $_.Text -eq 'It failed' }).Count) { $hm.PerformClick() }   # B3: Done last; a look-and-answer check: Yes
+    elseif ($global:RadeT.Hand -eq 'fail') { Push-RadeButton 'It failed' } elseif ($global:RadeT.Hand -eq 'skip') { @($hb | Where-Object { $_.Text -ne 'It failed' -and -not [object]::ReferenceEquals($_, $hm) })[0].PerformClick() } else { $hm.PerformClick() }
   }
   elseif ($v -eq 'answer') {
     Write-Host ('WIN sent-pt=' + $ui.Sent.Font.SizeInPoints + ' for "' + $ui.Sent.Text + '"')
@@ -365,7 +372,7 @@ function global:Push-RadeButton([string]$Text) {
   elseif ($v -eq 'handfail') { $ui.ErrBox.Text = 'Import failed: flow https://usaf.dps.mil/sites/fake/x not found'; $ui.B[0].PerformClick() }
   elseif ($v -in 'done', 'review', 'stopped') {
     [RadeStub.Driver]::Clip = ''
-    foreach ($b in $ui.B) { if ($b.Shown -and $b.Text -eq 'Record') { $b.PerformClick(); Write-Host ('WIN made=' + [bool]($ui.RecText.Text -match "Made by this app's installs") + ' log=' + [bool]($ui.RecText.Text -match '(?m)^LOG') + ' locked=' + (-not @($ui.RecSteps.Controls | Where-Object { $_ -is [System.Windows.Forms.CheckBox] })[0].Enabled)); $ui.RecClose.PerformClick() } }
+    foreach ($b in @($ui.RecB)) { if ($b.Shown -and (Test-Deploy)) { $b.PerformClick(); Write-Host ('WIN made=' + [bool]($ui.RecText.Text -match "Made by this app's installs") + ' log=' + [bool]($ui.RecText.Text -match '(?m)^LOG') + ' locked=' + (-not @($ui.RecSteps.Controls | Where-Object { $_ -is [System.Windows.Forms.CheckBox] })[0].Enabled)); $ui.RecClose.PerformClick() } }
     $ui.Form.Key('F2'); $ui.Form.Repaint(); $ui.Form.Key('F2')
     Write-Host ('WIN layline=' + ((& $ui.LayLine) -replace "`r`n", ' ~ '))
     $ok = @(& $ui.RowBad 'fixture' 'FieldRow' @(@{ N = 'FieldL'; Top = 10; H = 18; Kind = 'other' }, @{ N = 'FieldBox'; Top = 4; H = 30; Kind = 'box' }, @{ N = 'FieldB'; Top = 4; H = 30; Kind = 'button' })) + @(& $ui.EdgeBad 'fixture' @(@{ N = 'Kick'; X = 125 }, @{ N = 'Sent'; X = 126 }, @{ N = 'P0'; X = 125 }, @{ N = 'B0'; X = 125 }))

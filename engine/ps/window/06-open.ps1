@@ -51,7 +51,7 @@ $ui.VChoose = {
   & $ui.SetCard @{ View = 'choose'; Sentence = $(if ($dep) { 'Which application do you want to install?' } else { 'Which application do you want to run?' })
     P = @($(if ($nr) { 'A newer round, ' + $nr + ', is in the repository. Close this window and run ' + $nr + ' instead.' } else { '' })); Options = $list; OnOption = { param($j) & $ui.Pick $j }
     PageLink = [bool](@($ui.Newer.Values | Where-Object { $_ }).Count)
-    Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Act = { & $ui.Boot } } } else { $null })); Foot = $(if ($dep) { '' } else { Get-LastRoundText $ui.Hist }) } }
+    Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Kind = 'primary'; Act = { & $ui.Boot } } } else { $null })); Foot = $(if ($dep) { '' } else { Get-LastRoundText $ui.Hist }) } }
 # Shows "Checking this computer", runs the base checks and then shows Choose; shows the error card when they stop. Takes
 # nothing.
 $ui.Boot = {
@@ -76,7 +76,8 @@ $ui.VTour = { param([int]$I)
   $n = $ui.TourCards.Count; $ui.TourI = [math]::Max(0, [math]::Min($n - 1, $I)); $tc = $ui.TourCards[$ui.TourI]; $last = ($ui.TourI -eq $n - 1)
   & $ui.SetCard @{ View = 'tour'; Kicker = ('RADE tour' + $dot + ($ui.TourI + 1) + ' of ' + $n); Sentence = [string]$tc.S; P = @($tc.P)
     Buttons = @(@{ Text = $(if ($last) { 'Close the tour' } else { 'Next' }); Kind = 'primary'; Act = { if ($ui.TourI -ge $ui.TourCards.Count - 1) { & $ui.EndTour } else { & $ui.VTour ($ui.TourI + 1) } } },
-      $(if ($ui.TourI) { @{ Text = 'Back'; Act = { & $ui.VTour ($ui.TourI - 1) } } } else { $null }), $(if ($last) { $null } else { @{ Text = 'Skip the tour'; Act = { & $ui.EndTour } } })) } }
+      $(if ($last) { $null } else { @{ Text = 'Skip the tour'; Act = { & $ui.EndTour } } }))
+    Back = $(if ($ui.TourI) { { & $ui.VTour ($ui.TourI - 1) } } else { $null }) } }   # B6: the one Back pattern
 # Ends the tour: remembers that it was shown (Save-TourSeen) and shows the card it came from (Choose on the first run).
 # Takes nothing.
 $ui.EndTour = { Save-TourSeen; $from = $ui.TourFrom; $ui.TourFrom = $null; if ($from) { & $ui.SetCard $from } else { & $ui.VChoose } }
@@ -124,7 +125,7 @@ $ui.VMaint = { param($Inst)
   & $ui.SetCard @{ View = 'maint'; Kicker = ($script:app.Name + ' ' + $Inst.version + $on); Sentence = 'Maintenance'
     P = @($(if ($verb -eq 'Repair') { 'Repair adds what is missing and keeps your data.' } else { $verb + ' adds what is missing and keeps your data.' }), $(if ($startB) { 'Start runs the checks, then opens ' + $script:app.Name + '.' } else { '' }))
     Note = 'Diagnose, Back up, Restore and Uninstall are not in this version of RADE yet.'
-    Buttons = @($startB, @{ Text = $verb; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.Checks $false } }, @{ Text = 'Diagnose'; Kind = 'off' }, @{ Text = 'Back up'; Kind = 'off' }, @{ Text = 'Restore'; Kind = 'off' }, @{ Text = 'Uninstall'; Kind = 'dangeroff'; Apart = $true })
+    Buttons = @($startB, @{ Text = $verb; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.Checks $false } }, @{ Text = 'Uninstall'; Kind = 'dangeroff' })   # B5 (at most 4 buttons): no placeholders for Diagnose, Back up and Restore
     Back = { & $ui.VChoose } } }
 # Says whether the chosen application has a check that needs the site address. Takes nothing; gives back $true or
 # $false.
@@ -245,7 +246,7 @@ $ui.VReady = {
     P = @(('Writes to ' + $plan.Shown + ': ' + $new + ' new files, ' + $rep + ' replaced, ' + $rec + ' moved to the Recycle Bin.'),
       ([string]$n + $(if ($n -eq 1) { ' step' } else { ' steps' }) + ', about ' + [math]::Max(1, [int][math]::Round($est / 60)) + ' min. ' + $you + $(if ($done) { ' ' + $done + ' already done for this version and off.' } else { '' })),
       $(if (Test-WordOpen) { 'Word is open. Save your documents and close Word before you start.' } else { '' }), $w1)
-    Buttons = @($startB, @{ Text = $(if ($dep) { 'Install' } else { 'Run' }); Kind = $(if (($n -or ($cleanup.Count -and $ui.Clean)) -and -not $startPrimary) { 'primary' } elseif ($n -or ($cleanup.Count -and $ui.Clean)) { '' } else { 'off' }); Act = { & $ui.Run } }, @{ Text = 'Record'; Act = { $ui.Edit = $true; & $ui.VRecord } },
+    Buttons = @($startB, @{ Text = $(if ($dep) { 'Install' } else { 'Run' }); Kind = $(if (($n -or ($cleanup.Count -and $ui.Clean)) -and -not $startPrimary) { 'primary' } elseif ($n -or ($cleanup.Count -and $ui.Clean)) { '' } else { 'off' }); Act = { & $ui.Run } },
       $(if ($siteName) { @{ Text = 'Change the site address'; Act = { & $ui.VSite } } } else { $null }))
     Foot = $(if ($siteName) { 'Site: ' + $siteName } else { '' })
     Field = $(if ($dep -and -not (Test-ShortcutMade)) { @{ Label = 'RADE shortcut in'; Text = (Get-ShortcutDir); Name = 'Folder for the RADE shortcut'; Button = 'Browse'; Act = { & $ui.BrowseDir } } } else { $null })
