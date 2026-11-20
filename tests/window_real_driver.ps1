@@ -55,6 +55,9 @@ function global:Step-RadeR31([string]$V) {
 }
 # The primary button of the card on screen (UI standard v1: the last one), or the first shown button when it has none.
 function global:Get-RadeMain { $m = @($ui.B | Where-Object { $_.Visible -and [string]$ui.Kinds[$_] -eq 'primary' }); if ($m.Count) { return $m[0] }; return @($ui.B | Where-Object { $_.Visible })[0] }
+# Prints the action row of the card on screen: its wrap width, the text column, and each button's place and left margin.
+function global:Write-RadeRow { Write-Host ('WIN row max=' + $ui.BtnRow.MaximumSize.Width + ' cw=' + $ui.ContentW + ' w=' + $ui.BtnRow.Width + ' ' + ((@(@($ui.BackB) + @($ui.B)) | Where-Object { $_.Visible } |
+    ForEach-Object { $_.Text + ':' + $_.Left + '/' + $_.Top + '/' + $_.Width + '/m' + $_.Margin.Left }) -join ' ')) }
 function global:Step-Rade {
   if (((Get-Date) - $global:RadeT.T0).TotalSeconds -gt 240) { Write-Host ('WIN TIMEOUT view=' + $ui.View + ' sent=' + $ui.Sent.Text); [Environment]::Exit(3) }
   if (-not $ui -or -not $ui.Form -or $ui.Form.IsDisposed -or -not $ui.Form.Visible -or -not $ui.View) { return }
@@ -81,7 +84,7 @@ function global:Step-Rade {
     foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Index -eq $global:RadeT.App) { $o.PerformClick(); return } }
     Write-Host 'WIN BAD no choice for the application'; [Environment]::Exit(4)
   }
-  elseif ($v -eq 'maint') { Write-Host ('WIN row max=' + $ui.BtnRow.MaximumSize.Width + ' cw=' + $ui.ContentW + ' w=' + $ui.BtnRow.Width + ' ' + ((@(@($ui.BackB) + @($ui.B)) | Where-Object { $_.Visible } | ForEach-Object { $_.Text + ':' + $_.Left + '/' + $_.Top + '/' + $_.Width + '/m' + $_.Margin.Left }) -join ' ')); @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Maintenance' })[0].PerformClick() } elseif ($v -eq 'tools') { (Get-RadeMain).PerformClick() }   # the Maintenance screen, then Repair or Update (Start would start the application)
+  elseif ($v -eq 'maint') { Write-RadeRow; @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Maintenance' })[0].PerformClick() } elseif ($v -eq 'tools') { (Get-RadeMain).PerformClick() }   # the Maintenance screen, then Repair or Update (Start would start the application)
   elseif ($v -eq 'site') { $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }
   elseif ($v -in 'fail', 'need') {
     $id = [string]@($script:appChecks)[([int]($ui.Kick.Text -replace '^CHECK (\d+) OF .*$', '$1')) - 1]
