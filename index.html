@@ -71,8 +71,8 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
 /* Contrast modes (the Administrator, 19 Nov 26: "ensure the html site supports contrast modes").
    1. More contrast (prefers-contrast:more): second lines, edges and links move toward the text color; the band is one solid
-      navy with white text; the focus ring is 3 px. The bar's track is the page color with an edge line above it, and its fill
-      is at least 3:1 against the page (dark: the link blue). Light and dark each have their own values (same selectors as the themes).
+      navy with white text; the focus ring is 3 px. The bar has an edge line above it; light: its track is the page color;
+      dark: the track stays and the fill is a lighter blue (#8db4ec); fill against track and page is 3:1 or more. Light and dark each have their own values (same selectors as the themes).
    2. Forced colors (Windows contrast themes): the browser takes the system colors. Parts that only a background color shows
       (the band, the bar and its fill, the main button) get a system-color border or fill, so they stay visible. The logo is an
       image and keeps its own colors (its disc carries it on any background). */
@@ -89,7 +89,7 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 .btn,.btn.primary{border:1px solid ButtonText}
 .btn.primary{border-width:2px}
 .bar{background:Canvas;border-top:1px solid CanvasText}
-.bar i{forced-color-adjust:none;background:Highlight}
+.bar i,.win[data-done] .bar i{forced-color-adjust:none;background:Highlight}
 :focus-visible{outline:3px solid Highlight}}
 </style></head><body>
 <div class="win" id="win">
