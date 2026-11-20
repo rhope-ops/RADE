@@ -81,8 +81,7 @@ function global:Step-Rade {
     foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Index -eq $global:RadeT.App) { $o.PerformClick(); return } }
     Write-Host 'WIN BAD no choice for the application'; [Environment]::Exit(4)
   }
-  elseif ($v -eq 'maint') { @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Maintenance' })[0].PerformClick() }   # the Maintenance screen (Start would start the application)
-  elseif ($v -eq 'tools') { (Get-RadeMain).PerformClick() }   # Repair or Update
+  elseif ($v -eq 'maint') { @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Maintenance' })[0].PerformClick() } elseif ($v -eq 'tools') { (Get-RadeMain).PerformClick() }   # the Maintenance screen, then Repair or Update (Start would start the application)
   elseif ($v -eq 'site') { $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }
   elseif ($v -in 'fail', 'need') {
     $id = [string]@($script:appChecks)[([int]($ui.Kick.Text -replace '^CHECK (\d+) OF .*$', '$1')) - 1]

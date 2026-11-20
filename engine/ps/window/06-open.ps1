@@ -111,6 +111,7 @@ $ui.Pick = { param([int]$J)
   & $ui.InitSel
   $e = $null; if (Test-Deploy) { $e = (Read-Installed (Get-InstalledKey $script:app)) }
   if ($e -and $e.installed) { & $ui.VMaint $e.installed } else { & $ui.Checks $false } }
+# Shows the Maintenance card of an installed application. Takes its install record (version and date).
 $ui.VMaint = { param($Inst)
   $ui.MaintInst = $Inst   # Back on the Maintenance screen shows this card again
   # Maintenance (the Administrator, 2026-11-14; docs/engine.md "Maintenance run types"): shown for an application that is
