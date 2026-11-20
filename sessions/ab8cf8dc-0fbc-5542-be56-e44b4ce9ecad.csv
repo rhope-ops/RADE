@@ -1,0 +1,11 @@
+message_id,timestamp,turn,session_id,repo,model,source,input_tokens,cache_creation_input_tokens,cache_read_input_tokens,output_tokens
+msg_011ChEy8Z5eEz3Nr2W5unVvo,2026-11-20T22:28:11.771Z,1,ab8cf8dc-0fbc-5542-be56-e44b4ce9ecad,RADE,claude-opus-5-5,main,2,31855,64426,273
+msg_011ChEy93vyAbJeRgMocVUi3,2026-11-20T22:28:18.226Z,1,ab8cf8dc-0fbc-5542-be56-e44b4ce9ecad,RADE,claude-opus-5-5,main,2,1258,96281,305
+msg_011ChEy9U6mmN5AP6gMuUpgt,2026-11-20T22:28:23.999Z,1,ab8cf8dc-0fbc-5542-be56-e44b4ce9ecad,RADE,claude-opus-5-5,main,2,1498,97539,427
+msg_011ChEy9t9dswouPbeQBBKDy,2026-11-20T22:28:33.553Z,1,ab8cf8dc-0fbc-5542-be56-e44b4ce9ecad,RADE,claude-opus-5-5,main,2,8427,99037,687
+msg_011ChEyATDihUjvgb5qAu3sq,2026-11-20T22:28:36.527Z,1,ab8cf8dc-0fbc-5542-be56-e44b4ce9ecad,RADE,claude-opus-5-5,main,2,7724,107464,198
+msg_011ChEyAiq58LGYV2wTXtMKV,2026-11-20T22:28:40.668Z,1,ab8cf8dc-0fbc-5542-be56-e44b4ce9ecad,RADE,claude-opus-5-5,main,2,3200,115188,132
+msg_011ChEyAyFEvPpsnmUub6Qid,2026-11-20T22:28:55.981Z,1,ab8cf8dc-0fbc-5542-be56-e44b4ce9ecad,RADE,claude-opus-5-5,main,2,2958,118388,2167
+msg_011ChEyFyy3F8pf94ZtnCyjn,2026-11-20T22:29:54.798Z,1,ab8cf8dc-0fbc-5542-be56-e44b4ce9ecad,RADE,claude-opus-5-5,main,1,2603,121346,606
+msg_011ChEyHCGVdTKmMgQ53Q6vy,2026-11-20T22:30:07.809Z,1,ab8cf8dc-0fbc-5542-be56-e44b4ce9ecad,RADE,claude-opus-5-5,main,2,670,123949,165
+msg_011ChEyHTq8MmpcFC16RiRje,2026-11-20T22:30:12.887Z,1,ab8cf8dc-0fbc-5542-be56-e44b4ce9ecad,RADE,claude-opus-5-5,main,2,189,124619,231
