@@ -65,7 +65,7 @@ $all = $r.Lines -join ' '
 $named = $all -like '*FINDING: "Sample Missing" was not saved*'
 Assert-Case 'backup: a list that cannot be read is reported, not skipped' ($r.State -eq 'failed' -and $named -and $all -like '*PASS: "Sample Tasks": 2 rows saved*')
 Assert-Case 'backup: the lines say nothing on the site changed' (($r.Lines -join ' ') -like '*Nothing on the site changed*')
-Assert-Case 'backup: no file is left under its number' (@(Get-ChildItem -LiteralPath $r.Path -Filter '[0-9]*').Count -eq 0)
+Assert-Case 'backup: no file is left under its number' (@(Get-ChildItem -LiteralPath $r.Path -Filter '~*').Count -eq 0)
 # A second backup makes a new folder (the time stamp has seconds).
 Start-Sleep -Seconds 1; $script:app.Backup = @('Sample Tasks'); $r2 = Invoke-Backup $base $null
 Assert-Case 'backup: a second backup makes a new folder' ($r2.State -eq 'done' -and $r2.Path -ne $r.Path -and @(Get-ChildItem -LiteralPath (Join-Path $base 'Backups') -Directory).Count -eq 2)
@@ -77,7 +77,8 @@ $keep = $env:PSModulePath; $env:PSModulePath = ($env:PSModulePath -split [System
 $r3 = Invoke-Backup $base $null; $env:PSModulePath = $keep
 $n3 = @(Get-ChildItem -LiteralPath (Join-Path $base 'Backups') -Directory).Count
 Assert-Case 'backup: a run that saved nothing leaves no folder' ($r3.State -eq 'failed' -and -not $r3.Path -and $n3 -eq 2 -and ($r3.Lines[0] -like 'Back up saved nothing:*'))
-# A folder of the same time stamp is there already: a new one is made (-2), and a failed run never removes the old one.
+# A folder of the same time stamp is there already: a new one is made (-2), so the old one is never the folder a failed
+# run removes (Clear-BackupDir gets only the folder Get-NewBackupDir made).
 $old = Join-Path (Join-Path $base 'Backups') '20991231-235959'; $null = New-Item -ItemType Directory -Path $old; Set-Content -LiteralPath (Join-Path $old 'keep.json') -Value '[]'
 $nd = Get-NewBackupDir $base '20991231-235959'
 Assert-Case 'backup: a folder of the same time is never reused' ($nd -eq ($old + '-2') -and (Test-Path -LiteralPath (Join-Path $old 'keep.json')))

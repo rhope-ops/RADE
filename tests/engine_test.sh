@@ -105,6 +105,11 @@ assert r.returncode != 0 and 'a marker needs mode deploy and a step that needs s
 b['steps'][0]['needs'] = ['ps', 'site-rights']; p.write_text(json.dumps(m))
 r = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'mk/app')], capture_output=True, text=True)
 assert r.returncode == 0, r.stdout + r.stderr
+for bad in (['CON'], ['Tasks', 'tasks'], ['Tasks ']):   # backup: a name Windows reserves, a clash in letter case, a trailing space
+    b['apps'][1]['backup'] = bad; p.write_text(json.dumps(m))
+    r = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'mk/app')], capture_output=True, text=True)
+    assert r.returncode != 0 and 'backup: unique plain titles' in (r.stdout + r.stderr), (bad, r.stdout + r.stderr)
+del b['apps'][1]['backup']; p.write_text(json.dumps(m))
 r = subprocess.run([sys.executable, 'scripts/check_manifest.py', str(p)], capture_output=True, text=True)
 assert r.returncode == 0, r.stdout + r.stderr
 P

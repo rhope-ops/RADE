@@ -263,8 +263,7 @@ def main():
     maint = 0
     for name, app, hand, tour, size, long in RUNS:
         t = pathlib.Path(tempfile.mkdtemp())
-        shared = name.startswith("deploy-") or name.endswith("-maint")   # the "-maint" runs open the application the deploy runs installed
-        users = bundle(t, long, home if shared else None, swaps_for(name))
+        users = bundle(t, long, home if (shared := name.startswith("deploy-") or name.endswith("-maint")) else None, swaps_for(name))   # -maint: the installed app
         d = out / name
         d.mkdir(parents=True, exist_ok=True)
         env = dict(os.environ, RADE_T_OUT=str(d), RADE_T_APP=str(app), RADE_T_HAND=hand, RADE_T_TOUR=tour, RADE_T_SIZE=size, USERPROFILE=str(users / "test1234"), RADE_INVENTORY=str(d / "inventory.jsonl"))
