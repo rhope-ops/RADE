@@ -34,6 +34,9 @@ RUNS = [
     # Maintenance card shows, with "Uninstall" at the right end (1020 wide) and on its own row (811 wide)
     ("deploy-616", 1, "done", "1", "1020x616", False),
     ("deploy-tour-small", 1, "fail", "1", "811x469", False),
+    # the Maintenance card and its tools screen at 150 % and with a contrast theme (the PFM's preview, 2026-11-20)
+    ("device150-maint", 1, "done", "0", "956x1081", False),
+    ("contrast-maint", 1, "done", "0", "", False),
     ("test-small", 0, "done", "0", "811x469", False),
     # the same bundle with every text at its limit (docs/window-design.md "Text lengths")
     ("long-616", 1, "fail", "1", "1020x616", True),
@@ -256,11 +259,11 @@ def screen():
 def main():
     out = pathlib.Path(sys.argv[1]).resolve()
     bad = 0
-    home = pathlib.Path(tempfile.mkdtemp())   # the user folder the three "deploy" runs share
+    home = pathlib.Path(tempfile.mkdtemp())   # the user folder the "deploy" and "-maint" runs share
     maint = 0
     for name, app, hand, tour, size, long in RUNS:
         t = pathlib.Path(tempfile.mkdtemp())
-        users = bundle(t, long, home if name.startswith("deploy-") else None, swaps_for(name))
+        users = bundle(t, long, home if (shared := name.startswith("deploy-") or name.endswith("-maint")) else None, swaps_for(name))   # -maint: the installed app
         d = out / name
         d.mkdir(parents=True, exist_ok=True)
         env = dict(os.environ, RADE_T_OUT=str(d), RADE_T_APP=str(app), RADE_T_HAND=hand, RADE_T_TOUR=tour, RADE_T_SIZE=size, USERPROFILE=str(users / "test1234"), RADE_INVENTORY=str(d / "inventory.jsonl"))
@@ -285,7 +288,7 @@ def main():
                 print("   " + l[:300])
         # a hand card ("Your turn") may scroll at any size (the Administrator, 2026-11-17); every other card only at the smallest
         scrolls = [l for l in lines if l.startswith("WIN scrolls ") and not l.rstrip().endswith("-hand")]
-        why = r31_why(lines, app, name == RUNS[0][0] or not name.startswith("deploy-")) + r32_why(lines, name)   # R31: tour and test-round cards; R32: wheel, step row
+        why = r31_why(lines, app, name == RUNS[0][0] or not shared) + r32_why(lines, name)   # R31: tour and test-round cards; R32: wheel, step row
         if not closed:
             why.append("the window did not reach its end")
         if layout:
