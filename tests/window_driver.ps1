@@ -243,6 +243,15 @@ function global:Step-RadeR31([string]$V) {
     if (-not $global:RadeT.Helped) { $global:RadeT.Helped = $true; $global:RadeT.HelpSent = $ui.Sent.Text; $global:RadeT.HelpLink = [bool]$ui.TourB.Shown; $ui.Form.Key('F1'); return $true } }
   return $false
 }
+# B13 (UI standard v1): on the first Ready card of a test round, the link "Feedback", then on its card a comment and Save;
+# prints the WIN note line (the comment file in the round's Feedback folder, masked). Takes the view; gives back $true when it acted.
+function global:Step-RadeNote([string]$V) {
+  if ($V -eq 'note') { $ui.ErrBox.Text = 'Sample comment from someone@example.com'; $global:RadeT.Seen = ''; Push-RadeButton 'Save'; return $true }
+  if ($V -ne 'ready' -or $global:RadeT.App -ne 0 -or $global:RadeT.Noted) { return $false }
+  $global:RadeT.Noted = $true; $link = [bool]$ui.FeedB.Shown; $global:RadeT.Seen = ''; $ui.FeedB.PerformClick()
+  $nf = Join-Path (Join-Path (Join-Path (Join-Path (Get-BasePath) 'Rounds') $round) 'Feedback') 'feedback-01.txt'; $nt = $(if (Test-Path -LiteralPath $nf) { [System.IO.File]::ReadAllText($nf) } else { '' })
+  Write-Host ('WIN note link=' + $link + ' saved=' + [bool]$nt + ' card=' + ($nt -match 'Card: ready') + ' masked=' + ($nt -match '<EMAIL>') + ' back=' + $ui.View); return $true
+}
 # The primary button of the card on screen (UI standard v1: the last one), or the first shown button when it has none.
 function global:Get-RadeMain { $m = @($ui.B | Where-Object { $_.Shown -and [string]$ui.Kinds[$_] -eq 'primary' }); if ($m.Count) { return $m[0] }; return @($ui.B | Where-Object { $_.Shown })[0] }
 function global:Push-RadeButton([string]$Text) {
@@ -258,7 +267,7 @@ function global:Push-RadeButton([string]$Text) {
   if ($key -eq $global:RadeT.Seen) { return }
   $global:RadeT.Seen = $key
   Show-RadeCard
-  $v = [string]$ui.View; if (Step-RadeR31 $v) { return }
+  $v = [string]$ui.View; if (Step-RadeR31 $v) { return }; if (Step-RadeNote $v) { return }
   if ($v -eq 'choose') {
     if ($env:RADE_T_FAULT -eq 'noapps' -and -not $global:RadeT.FaultDone) { $global:RadeT.FaultDone = $true; $global:RadeT.Apps = $script:apps; $script:apps = @(); & $ui.VChoose; return }
     if ($ui.Blocked.Count -and -not $global:RadeT.Forced) {

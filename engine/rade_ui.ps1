@@ -20,7 +20,7 @@ $ui.Tok = [ordered]@{}
 $ui.Tok.White = @(255, 255, 255, 'Window'); $ui.Tok.Ink = @(27, 36, 48, 'WindowText'); $ui.Tok.Navy = @(11, 37, 69, 'WindowText')
 $ui.Tok.Gray = @(90, 101, 115, 'GrayText'); $ui.Tok.Blue = @(0, 83, 159, 'Highlight'); $ui.Tok.OnBlue = @(255, 255, 255, 'HighlightText')
 $ui.Tok.Link = @(0, 83, 159, 'HotTrack'); $ui.Tok.Focus = @(11, 37, 69, 'HotTrack'); $ui.Tok.Face = @(255, 255, 255, 'ButtonFace')
-$ui.Tok.FaceInk = @(11, 37, 69, 'ButtonText'); $ui.Tok.Edge = @(122, 135, 148, 'ButtonText'); $ui.Tok.Hair = @(227, 232, 238, 'GrayText')
+$ui.Tok.FaceInk = @(11, 37, 69, 'ControlText'); $ui.Tok.Edge = @(122, 135, 148, 'ControlText'); $ui.Tok.Hair = @(227, 232, 238, 'GrayText')
 $ui.Tok.Track = @(127, 147, 168, 'GrayText'); $ui.Tok.Off = @(233, 236, 240, 'ButtonFace'); $ui.Tok.OffInk = @(85, 85, 85, 'GrayText')
 $ui.Tok.Yellow = @(255, 213, 32, 'Highlight'); $ui.Tok.Red = @(139, 26, 26, 'WindowText'); $ui.Tok.Green = @(46, 133, 64, 'Highlight')
 $ui.Tok.GreenInk = @(31, 107, 49, 'WindowText')
@@ -46,7 +46,7 @@ $ui.HighOn = { try { return [bool][System.Windows.Forms.SystemInformation]::High
 # back a Color (WindowText for a name that is not a token, so no text is ever lost).
 $ui.Color = { param([string]$Role)
   $t = $ui.Tok[$Role]
-  if ($ui.High) { $r = $(if ($t) { [string]$t[3] } else { 'WindowText' }); try { return [System.Drawing.SystemColors]::$r } catch { return [System.Drawing.Color]::Black } }   # no system colors: black on white still reads
+  if ($ui.High) { $r = $(if ($t) { [string]$t[3] } else { 'WindowText' }); try { $sc = [System.Drawing.SystemColors]::$r; if ($null -eq $sc) { $sc = [System.Drawing.SystemColors]::WindowText }; return $sc } catch { return [System.Drawing.Color]::Black } }   # a role with no color: WindowText; no system colors: black
   if (-not $t) { return [System.Drawing.Color]::Black }
   return [System.Drawing.Color]::FromArgb([int]$t[0], [int]$t[1], [int]$t[2]) }
 # Puts the colors for a theme into $ui.C in place (every builder and paint handler reads them there). Takes $true for the

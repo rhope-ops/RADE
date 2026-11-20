@@ -12,7 +12,8 @@ $ui.Say = { param($t) Add-RunLog $t; $ui.Log.Add([string]$t); if ($ui.RecOn) { t
 $ui.ShowNow = { param([string]$Text) try { if ($ui.View -eq 'run') { $x = $Text.Trim() -replace '[\s.,;:!?\u2026]+$', ''; $ui.NowRaw = $(if ($x) { $x + '...' } else { '' }); & $ui.CutNow; $ui.Now.Visible = $true } } catch { $null = $_ } }   # a line that cannot show never stops a step
 # Shows the whole now-doing text ($ui.NowRaw) cut to $ui.NowLines lines at the line's wrap width; runs again after a resize
 # ($ui.BreakAll), so a narrower window cuts it again from the whole text. Takes nothing; a failure is ignored.
-$ui.CutNow = { try { $w = [int](& $ui.GetWrap $ui.Now); $x = [string]$ui.NowRaw; if ($x) { $x = & $ui.FitLines (& $ui.BreakLong $x $ui.Now.Font $w) $ui.Now.Font $w $ui.NowLines }; if ([string]$ui.Now.Text -cne $x) { $ui.Now.Text = $x } } catch { $null = $_ } }   # a line that cannot show never stops a step
+$ui.CutNow = { try { $w = [int](& $ui.GetWrap $ui.Now); $x = [string]$ui.NowRaw; if ($x) { $x = & $ui.FitLines (& $ui.BreakLong $x $ui.Now.Font $w) $ui.Now.Font $w $ui.NowLines }; if ([string]$ui.Now.Text -cne $x) { $ui.Now.Text = $x
+    if ($x -and $null -ne $ui.EdgeX) { & $ui.SetLeft $ui.Now ([int]$ui.EdgeX - (& $ui.Ink $ui.Now)) } } } catch { $null = $_ } }   # its ink on the card edge for each new text (200 % run: 3 px off)   # a line that cannot show never stops a step
 # The engine's callback for the now-doing line (Add-StepLine): shows the text and emits nothing. Takes the text.
 $script:nowUi = { param($t) $null = & $ui.ShowNow ([string]$t) }
 # L8 (the Administrator, 2026-11-19): a step stays on the Run card for $ui.Layout.StepMs (engine/window.json) at least, so a

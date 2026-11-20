@@ -138,7 +138,7 @@ has "view=noapps light=failed kick=NOTHING TO CHOOSE sent=No application is list
 # 3. A test round: the owner's test extras show on Done; a deploy never shows them (1 and 2 have no "test=shown").
 # Here Application.Run fails as when a message loop already runs on the thread: the window opens with ShowDialog.
 loop=1 win 0 done 0 0
-has "shown-by=ShowDialog" "sent=Ready to run round R01." "view=done light=off kick=ALL STEPS PASSED sent=Round R01 is done." "test=shown" "WIN draft-note=The Outlook draft could not be created" && ! grep -q "Sample app (deploy).*test=shown" "$wd/win.txt" && ok || { bad "window 3: test round"; tail -5 "$wd/win.txt" | cut -c1-300; }
+has "shown-by=ShowDialog" "sent=Ready to run round R01." "view=done light=off kick=ALL STEPS PASSED sent=Round R01 is done." "test=shown" "WIN draft-note=The Outlook draft could not be created" "WIN note link=True saved=True card=True masked=True" && ! grep -q "Sample app (deploy).*test=shown" "$wd/win.txt" && ok || { bad "window 3: test round"; tail -5 "$wd/win.txt" | cut -c1-300; }
 # 4. A deploy whose download fails: stopped, with the help line.
 sed "s#file://$t/app/flow/SAMPLE-data#file://$t/app/flow/NOPE#" "$wd/wb.ps1" > "$wd/wf.ps1"
 win 1 done 0 0 "$wd/wf.ps1"

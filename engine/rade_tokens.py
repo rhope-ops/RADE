@@ -30,7 +30,8 @@ def q(s):
 TOKENS_FILE = ENGINE_ROOT / 'engine/ui-tokens.json'
 TOKENS_BEGIN = '# ---- UI tokens (UI standard v1, the Administrator, 2026-11-20; docs/ui-standard.md): written from engine/ui-tokens.json'
 TOKENS_END = '# ---- End of the UI tokens'
-SYSTEM_ROLES = {'Window', 'WindowText', 'GrayText', 'Highlight', 'HighlightText', 'HotTrack', 'ButtonFace', 'ButtonText', 'Control', 'ControlText'}
+# The properties of System.Drawing.SystemColors a token may name (it has no ButtonText: a button's text is ControlText).
+SYSTEM_ROLES = {'Window', 'WindowText', 'GrayText', 'Highlight', 'HighlightText', 'HotTrack', 'ButtonFace', 'Control', 'ControlText'}
 FONT_STYLES = {'', 'Bold', 'Italic', 'Underline'}
 
 

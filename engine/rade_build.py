@@ -515,7 +515,7 @@ def build(b):
 # failure; a later release makes it a failure. This table is the one source: tests/engine_test.sh checks that the
 # document has the same numbers.
 TEXT_LIMITS = {'application name': 48, 'version': 14, 'summary': 150, 'step name': 56, 'step note': 200,
-               'step title': 56, 'guide line': 100, 'guide lines': 10, 'doneText': 24, 'step doing': 80, 'step help': 160, 'answer prompt': 120, 'answer choice': 40}
+               'step title': 56, 'guide line': 100, 'guide lines': 10, 'doneText': 24, 'step doing': 80, 'step help': 160, 'answer prompt': 120, 'answer choice': 33}
 
 
 def text_lengths(b):
