@@ -1,17 +1,18 @@
 // Render RADE's logo SVGs in assets/logo to PNG (headless Chromium via Playwright).
-//   node scripts/render_logo.js            renders the marks the engine does not read (today: rho-usaf, rho-fulcrum)
+//   node scripts/render_logo.js            renders the marks the engine does not read (today: logo-rho, rho-usaf)
 //   node scripts/render_logo.js logo-rho   renders a named mark; name the engine's mark only when you change it on purpose:
-//                                          the render is not byte-stable, and the engine checks logo-rho-128.png by SHA-256
+//                                          the render is not byte-stable, and the engine checks rho-fulcrum-128.png by SHA-256
 // Marks:
-//   logo-rho  Rho Bold (USAF-B); its SVG comes from scripts/build_logo.py. The engine reads logo-rho-128.png (the window).
+//   logo-rho  Rho Bold (USAF-B); its SVG comes from scripts/build_logo.py. Not used from engine-v28 (kept as a master).
 //   rho-usaf     Rho, USAF version (Logo Studies canvas, the Administrator, 2026-11-19); its SVG is copied from the canvas,
-//                not built here. The RADE page uses it now; the engine moves to it in a later engine release.
-//   rho-fulcrum  Rho, Fulcrum version (same canvas and source): the RADE page in light mode (the Administrator, 2026-11-19).
+//                not built here. Not used from 2026-11-20 (kept as a master).
+//   rho-fulcrum  Rho, Fulcrum version (same canvas and source): the RADE page in both themes, the window and its icon
+//                ("Fulcrum everywhere for now, as this is not an endorsed product", the PFM, 2026-11-20).
 // Sizes: 512 site logo and thumbnail; 128 the window (shown at 64 px) and the page at 2x; 64 the page at 1x; 32 and 16 icons.
 const {chromium} = require('playwright'); const fs = require('fs'); const path = require('path');
 const dir = path.join(__dirname, '..', 'assets', 'logo');
 const MARKS = ['logo-rho', 'rho-usaf', 'rho-fulcrum'];
-const ENGINE_MARKS = ['logo-rho'];   // read by the engine (engine/rade_build.py LOGO): rendered only when named
+const ENGINE_MARKS = ['rho-fulcrum'];   // read by the engine (engine/rade_build.py LOGO, from engine-v28): rendered only when named
 const SIZES = [512, 128, 64, 32, 16];
 
 /**

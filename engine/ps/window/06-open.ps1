@@ -235,17 +235,27 @@ $ui.VReady = {
   # checks pass. It is the main button when the installed version is this paste's version; when this paste is newer, Install stays
   # the main button.
   $startB = $null; $startPrimary = $false
+  # Pause and resume (the PFM, 2026-11-20): a saved state of this round and build offers "Resume at step N of M" (main
+  # button) and "Start over". A state that cannot be read, or of another build, goes to the Recycle Bin with a plain line.
+  $rs = Read-RoundState (Get-BasePath); $rsNote = ''
+  if ($rs.State -eq 'bad') { $null = Clear-RoundState (Get-BasePath); $rsNote = 'The saved progress of this round could not be read (' + $rs.Why + '), so the round starts over.' }
+  elseif ($rs.State -eq 'other') { $null = Clear-RoundState (Get-BasePath); $rsNote = 'Saved progress of another build of this round was not used. The round starts over.' }
+  $resB = $(if ($rs.State -eq 'ok') { @{ Text = 'Resume at step ' + $rs.Next + ' of ' + $rs.Total; Kind = 'primary'; Act = { & $ui.ResumeRun } } } else { $null })
   if ($dep -and [string]$script:app.Start) {
     $inst = Read-Installed (Get-InstalledKey $script:app)
     if ($inst -and $inst.installed -and (Get-StartPath)) { $startPrimary = ([string]$inst.installed.version -eq [string]$script:app.Version); $startB = @{ Text = 'Start ' + $script:app.Name; Kind = $(if ($startPrimary) { 'primary' } else { '' }); Act = { & $ui.StartApp } } }
   }
+  if ($resB -and $startB) { $startB.Kind = '' }   # Resume is the one main button
+  $hasWork = [bool]($n -or ($cleanup.Count -and $ui.Clean))
+  $runB = @{ Text = $(if ($dep) { 'Install' } else { 'Run' }); Kind = $(if ($hasWork -and -not $startPrimary) { 'primary' } elseif ($hasWork) { '' } else { 'off' }); Act = { & $ui.Run } }
+  if ($resB) { $runB = @{ Text = 'Start over'; Act = { & $ui.StartOver } } }   # in the place of Install or Run
   & $ui.SetCard @{ View = 'ready'
     Kicker = $(if ($warn.Count) { [string]($ids.Count - $warn.Count) + ' checks passed' + $dot + $warn.Count + $(if ($warn.Count -eq 1) { ' warning' } else { ' warnings' }) } else { 'All ' + $ids.Count + ' checks passed' })
     Sentence = $(if ($dep) { 'Ready to install ' + $script:app.Name + ' ' + $script:app.Version + '.' } else { 'Ready to run round ' + $round + '.' })
     P = @(('Writes to ' + $plan.Shown + ': ' + $new + ' new files, ' + $rep + ' replaced, ' + $rec + ' moved to the Recycle Bin.'),
       ([string]$n + $(if ($n -eq 1) { ' step' } else { ' steps' }) + ', about ' + [math]::Max(1, [int][math]::Round($est / 60)) + ' min. ' + $you + $(if ($done) { ' ' + $done + ' already done for this version and off.' } else { '' })),
-      $(if (Test-WordOpen) { 'Word is open. Save your documents and close Word before you start.' } else { '' }), $w1)
-    Buttons = @($startB, @{ Text = $(if ($dep) { 'Install' } else { 'Run' }); Kind = $(if (($n -or ($cleanup.Count -and $ui.Clean)) -and -not $startPrimary) { 'primary' } elseif ($n -or ($cleanup.Count -and $ui.Clean)) { '' } else { 'off' }); Act = { & $ui.Run } }, @{ Text = 'Record'; Act = { $ui.Edit = $true; & $ui.VRecord } },
+      $(if (Test-WordOpen) { 'Word is open. Save your documents and close Word before you start.' } else { '' }), $w1, $rsNote)
+    Buttons = @($resB, $startB, $runB, @{ Text = 'Record'; Act = { $ui.Edit = $true; & $ui.VRecord } },
       $(if ($siteName) { @{ Text = 'Change the site address'; Act = { & $ui.VSite } } } else { $null }))
     Foot = $(if ($siteName) { 'Site: ' + $siteName } else { '' })
     Field = $(if ($dep -and -not (Test-ShortcutMade)) { @{ Label = 'RADE shortcut in'; Text = (Get-ShortcutDir); Name = 'Folder for the RADE shortcut'; Button = 'Browse'; Act = { & $ui.BrowseDir } } } else { $null })

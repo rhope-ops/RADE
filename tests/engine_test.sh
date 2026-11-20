@@ -89,6 +89,8 @@ grep "Name = 'Sample app'" "$b" | grep -q "'outlook'.*Mode = 'test'; Version = '
 # 2026-11-17): the window (W, W2, W3), the install record on the site (MA, MC, MD, MG) and the cross-version runs (X).
 # ---- window: the window runs, in groups W, W2 and W3 (tests/engine_window.sh).
 . tests/engine_window.sh
+# ---- pause and resume, no scripts in results (tests/resume_test.sh; the PFM, 2026-11-20).
+. tests/resume_test.sh
 # ---- Guardrails 3 and 4 (the Administrator, 14 Nov 26; docs/engine.md "Guardrails"; 1 and 2 are below).
 # 3 and 4. Site rights with the admin flag (shown only), and the install record on the site (fake PnP: tests/fake-pnp).
 # The marker app is the sample at version 1.2.0, as the text-mode deploys below leave it (it was built after them until 2026-11-17).
