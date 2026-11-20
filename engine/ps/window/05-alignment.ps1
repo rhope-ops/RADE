@@ -140,11 +140,12 @@ $ui.Apart = {
     if ($ui.BackB.Visible) { $prev = -2; $used += $ui.BackB.Width + 2 * $mm }
     for ($k = 0; $k -lt $n; $k++) { if ($ui.BOn[$k]) { $prev = $k; $used += $ui.B[$k].Width + 2 * $mm } }
     if ($prev -eq -1) { $used = 0 }
-    $left = $ui.ContentW + $mm - $used - $ui.B[$n].Width - (& $ui.Sc 2)   # 2 px slack: a row filled to the pixel wraps (preview, Maintenance card at 1020)
-    if ($left -lt $mm) {   # too narrow: the primary starts its own row, still at the right end (B3)
-      if ($prev -ge 0) { $ui.BtnRow.SetFlowBreak($ui.B[$prev], $true) } elseif ($prev -eq -2) { $ui.BtnRow.SetFlowBreak($ui.BackB, $true) }
-      $left = $ui.ContentW + $mm - $ui.B[$n].Width }
-    $ui.B[$n].Margin = (& $ui.Pad ([int][math]::Max($mm, $left)) $mm $mm $mm)
+    $room = $(if ($ui.BtnRow.MaximumSize.Width -gt 0) { [int]$ui.BtnRow.MaximumSize.Width } else { $ui.ContentW + 2 * $mm }) - (& $ui.Sc 2)   # the width the row really wraps at, 2 px slack
+    $left = $room - $used - $ui.B[$n].Width - $mm
+    if ($left -lt $mm) { if ($prev -ge 0) { $ui.BtnRow.SetFlowBreak($ui.B[$prev], $true) } elseif ($prev -eq -2) { $ui.BtnRow.SetFlowBreak($ui.BackB, $true) }; $left = $room - $ui.B[$n].Width - $mm }   # too narrow: its own row
+    $ui.B[$n].Margin = (& $ui.Pad ([int][math]::Max($mm, $left)) $mm $mm $mm); $ui.BtnRow.PerformLayout()
+    $f = @(@($ui.BackB) + @($ui.B) | Where-Object { $_.Visible })[0]   # the row still wrapped (preview at 1020 px): the primary at the right end of its own row
+    if ($f -and -not [object]::ReferenceEquals($f, $ui.B[$n]) -and $ui.B[$n].Top -gt $f.Top + $f.Height) { $ui.B[$n].Margin = (& $ui.Pad ([int][math]::Max($mm, $room - $ui.B[$n].Width - $mm)) $mm $mm $mm) }
     $ui.BtnRow.PerformLayout()   # the row's height is right before the frame is placed ($ui.Squeeze)
   } catch { $null = $_ } }
 # Places the card frame (L1) and lets the card's text scroll when the card is taller than the window (the help below).
