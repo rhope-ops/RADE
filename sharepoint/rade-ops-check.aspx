@@ -6,7 +6,7 @@
   What it is: a plain HTML page saved with the .aspx extension. Upload it to a SharePoint Online library and open it.
   It answers one question: can a RADE-style page (HTML, CSS and inline script) run from SharePoint Online on this site?
 
-  What it does: it shows 9 checks, all inside the browser only: 8 pass or fail, and row 9 is information only.
+  What it does: it shows 8 checks and 1 information row (row 9), all inside the browser only.
   What it never does: no network request of any kind (no fetch, no XHR, no image or script from another place), no
   read of SharePoint lists or files, no write, no cookie, and it does not show the page address (the address names the
   site). RADE project rule "No reconnaissance": every check reads only this browser's own features.
@@ -82,7 +82,7 @@ CHECKS.forEach(function(c){
 html+='<tr><td>'+esc(INFO[0])+'</td><td class="r wait">Info<br><span class="second">'+esc(INFO[1])+'</span></td><td>'+esc(INFO[2])+'</td></tr>';
 rows.insertAdjacentHTML('beforeend',html);
 pass++;   // row 1 (the page opens) passed: you can read it
-document.getElementById('sum').textContent=fail?pass+' of '+(pass+fail)+' checks passed. '+fail+' failed: see the rows marked Fail.':'All '+pass+' checks passed. A RADE page can run on this site.'   // 8 checks: rows 1 to 8;
+document.getElementById('sum').textContent=fail?pass+' of '+(pass+fail)+' checks passed. '+fail+' failed: see the rows marked Fail.':'All '+pass+' checks passed. A RADE page can run on this site.';   // 8 checks: rows 1 to 8
 var t=new Date();document.getElementById('when').textContent='Checked at '+('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)+' on this computer. Nothing was sent anywhere.';
 })();
 </script>

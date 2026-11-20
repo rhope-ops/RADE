@@ -106,7 +106,7 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 'use strict';
 var KEY='rade-page-app-v1';
 var win=document.getElementById('win'),card=document.getElementById('card'),state=document.getElementById('state'),bar=document.getElementById('bar'),back=document.getElementById('back');
-var HELP='',APPS=[],cur=null,load=0,ready0=false;   // ready0: apps.json has loaded once (HELP is set); load: a counter for each load, so a late answer of an older load is dropped
+var HELP='',APPS=[],cur=null,load=0,ready0=false;   // ready0: start() has answered once (apps.json loaded or failed); load: a counter for each load, so a late answer of an older load is dropped
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function num(n){return Number(n).toLocaleString('en-US')}
 function recall(){try{return localStorage.getItem(KEY)}catch(e){return null}}
