@@ -119,6 +119,7 @@ $ui.Fit = {
   # Rows wrap at the card's width (a button or a box is never cut), and no box is wider than the card.
   $mm = & $ui.Sc $ui.Z.M
   foreach ($r in @($ui.BtnRow, $ui.LinkRow, $ui.TestRow, $ui.FieldRow, $ui.StepRow)) { $r.MaximumSize = New-Object System.Drawing.Size(($cw + 2 * $mm), 0) }
+  $ui.BtnRow.MinimumSize = New-Object System.Drawing.Size(($cw + 2 * $mm), 0)   # B3: the action row is as wide as the column, so the primary can stand at its right end (an auto-sized row wraps at its own width)
   & $ui.SetWrap $ui.StepName ($cw - (& $ui.Sc 8)); $ui.ErrBox.Width = [math]::Min((& $ui.Sc $ui.Z.FieldL), ($cw - 2 * $mm))
   # The header's ink-tight texts get their size now that the window has its scale; a long name ends with "..." at the window's edge.
   try { $ui.AppL.Tag.MaxW = [math]::Max((& $ui.Sc 60), ($ui.Top.ClientSize.Width - (& $ui.LeftIn $ui.AppL $ui.Top) - (& $ui.Sc $ui.Z.Inset))) } catch { $null = $_ }   # in the application row or the title column
