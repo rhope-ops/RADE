@@ -98,7 +98,7 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 <div class="win" id="win">
 <header class="band"><div class="row band-in"><img class="logo" src="assets/logo/rho-fulcrum-64.png" srcset="assets/logo/rho-fulcrum-64.png 1x, assets/logo/rho-fulcrum-128.png 2x" alt=""><p class="name">RADE</p><p class="sub">Test, deploy, enjoy</p><p class="team" id="team" hidden>TEAMS</p><p class="chan" id="chan"></p></div></header>
 <main class="row stage"><div class="card" id="card" aria-live="polite"><p class="caps">RADE</p><h1>Getting the newest script.</h1></div></main>
-<footer class="row bottom"><a href="https://github.com/rhope-ops/RADE">Repository</a><a id="back" href="#" hidden>Back</a><span class="state" id="state"></span></footer>
+<footer class="row bottom"><a href="https://github.com/rhope-ops/RADE">Repository</a><a id="spo" href="#sharepoint">SharePoint check</a><a id="back" href="#" hidden>Back</a><span class="state" id="state"></span></footer>
 <div class="bar" aria-hidden="true"><i id="bar"></i></div>
 </div>
 <script>
@@ -106,7 +106,7 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 'use strict';
 var KEY='rade-page-app-v1';
 var win=document.getElementById('win'),card=document.getElementById('card'),state=document.getElementById('state'),bar=document.getElementById('bar'),back=document.getElementById('back');
-var HELP='',APPS=[],cur=null,load=0;   // load: a counter for each load, so a late answer of an older load is dropped
+var HELP='',APPS=[],cur=null,load=0,ready0=false;   // ready0: apps.json has loaded once (HELP is set)   // load: a counter for each load, so a late answer of an older load is dropped
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function num(n){return Number(n).toLocaleString('en-US')}
 function recall(){try{return localStorage.getItem(KEY)}catch(e){return null}}
@@ -150,7 +150,7 @@ function show(o){
   if(o.done){win.setAttribute('data-done','')}else{win.removeAttribute('data-done')}
   bar.style.width=(o.bar==null?0:o.bar)+'%';
   state.textContent=o.state||'';
-  back.hidden=!(APPS.length>1&&cur);
+  back.hidden=!(cur&&(cur.sp||APPS.length>1));   // from the SharePoint check, Back goes to the applications
   card.innerHTML=o.html;
   var f=card.querySelector('[data-focus]');if(f){f.focus()}
 }
@@ -163,10 +163,11 @@ function start(){
   cur=null;load++;
   show({bar:10,state:'Loading',html:'<p class="caps">RADE</p><h1>Getting the list of applications.</h1>'});
   get('apps.json',true).then(function(c){
-    HELP=c.help||'';
+    HELP=c.help||'';ready0=true;
     document.getElementById('team').hidden=!HELP;document.getElementById('chan').textContent=HELP;   // the band shows the channel name (one place: apps.json)
     APPS=(c.apps||[]).map(function(a){return {repo:a.repo,base:a.base||('https://raw.githubusercontent.com/'+a.repo+'/main/'),manifest:a.manifest}});
     if(!APPS.length){show({state:'No applications',html:'<p class="caps">RADE</p><h1>No application is available yet.</h1>'+helpLine()});return}
+    if(location.hash==='#sharepoint'){spOpen();return}   // a link straight to the SharePoint check
     var last=recall(),pick=APPS.length===1?APPS[0]:APPS.filter(function(a){return a.repo===last})[0];
     if(pick){open(pick)}else{choose()}
   }).catch(function(e){
@@ -216,7 +217,7 @@ function open(a){
 }
 function facts(a){
   var bytes=(window.TextEncoder?new TextEncoder().encode(a.text).length:a.text.length);
-  return '<p class="second"><span class="file">'+esc(a.file)+'</span><br>'+num(bytes)+' bytes, '+num(a.text.split('\n').length)+' lines'+checkLine(a)+'</p>';
+  return '<p class="second"><span class="file">'+esc(a.file)+'</span><br>'+num(bytes)+' bytes, '+num(a.text.split('\n').length)+' lines'+(a.sp?'':checkLine(a))+'</p>';
 }
 var STEPS='<ol><li>Start menu: type ISE and open Windows PowerShell ISE as yourself (not "Run as administrator").</li>'+
   '<li>File &gt; New. Click in the white script pane. Press Ctrl+V, then F5.</li><li>The RADE window opens. Do what it says.</li></ol>';
@@ -239,12 +240,51 @@ function ready(a,copied){
 }
 function viaArea(t){var x=document.createElement('textarea');x.value=t;x.setAttribute('aria-hidden','true');x.style.position='fixed';x.style.opacity='0';document.body.appendChild(x);x.select();var r=false;try{r=document.execCommand('copy')}catch(e){}document.body.removeChild(x);return r}
 function copy(a){
-  var ok=function(){ready(a,true)};
-  var no=function(){failCard('The browser blocked the copy.','the clipboard is not available to this page','Select "View as .txt". On that page press Ctrl+A, then Ctrl+C. Then do the steps for PowerShell ISE.',
+  var ok=function(){(a.sp?spReady:ready)(a,true)};
+  var no=function(){failCard('The browser blocked the copy.','the clipboard is not available to this page','Select "View as .txt". On that page press Ctrl+A, then Ctrl+C. '+(a.sp?'Then paste it in Notepad and save it as rade-ops-check.aspx.':'Then do the steps for PowerShell ISE.'),
     '<a class="btn primary" href="'+txtUrl(a)+'" target="_blank" rel="noopener" data-focus>View as .txt<span class="sr"> (opens in a new tab)</span></a><button type="button" class="btn" data-act="copy">Try again</button>')};
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(a.text).then(ok,function(){viaArea(a.text)?ok():no()})}
   else{viaArea(a.text)?ok():no()}
 }
+// SharePoint ops check (the Administrator, 20 Nov 26: "add another paste with a test .aspx along with directions on how to
+// implement on a sharepoint site. we use SPO"). A second paste, not an application: the test page sharepoint/rade-ops-check.aspx
+// from this same site (no other host), with Copy, View as .txt and Save as .aspx, and the SharePoint Online steps.
+// Why the steps say what they say: Microsoft, "Allow or prevent custom script" (learn.microsoft.com/sharepoint/allow-or-prevent-custom-script):
+// custom script is blocked by default; while it is blocked a library takes no .aspx file; a SharePoint Administrator can allow
+// it for one site, and it resets to blocked within 24 hours; files already in the library are not changed by the reset.
+var SP={sp:true,name:'SharePoint ops check',kind:'Ops check',file:'rade-ops-check.aspx',url:'sharepoint/rade-ops-check.aspx'};
+var SP_STEPS='<p><b>Before you start:</b> use a test SharePoint Online site where you can add files (Member or Owner), not a live team site.</p>'+
+  '<ol><li>Select "Save as .aspx". If the download is blocked: select "Copy page", open Notepad, press Ctrl+V, then File &gt; Save as: name <span class="file">rade-ops-check.aspx</span>, "Save as type" All files, Encoding UTF-8.</li>'+
+  '<li>On the SharePoint site: Settings (gear) &gt; Site contents &gt; Site Assets (if there is none: Documents). Select Upload &gt; Files and choose <span class="file">rade-ops-check.aspx</span>.</li>'+
+  '<li>If SharePoint does not take the file, custom script is blocked on this site (the SharePoint Online default). Stop here. Ask your SharePoint Administrator to allow custom script on this one site (<span class="file">Set-SPOSite &lt;site address&gt; -DenyAddAndCustomizePages 0</span>, or the admin center: Active sites &gt; the site &gt; Settings &gt; Custom scripts). It stays allowed for 24 hours only, so do step 2 again in that time.</li>'+
+  '<li>Select the file name to open it. If the browser downloads it and does not show it, that is a fail: write down "downloads".</li>'+
+  '<li>Read the page: it shows 9 checks and how many passed. Open it again the next day, after the 24 hours: the result then shows if a hosted RADE page keeps working.</li>'+
+  '<li>Say the result in the Teams channel: the count and the names of the rows that failed. Do not send the page address.</li>'+
+  '<li>When you are done, delete the file from Site Assets.</li></ol>'+
+  '<p class="second">The test page sends nothing and reads no SharePoint data: it checks only the browser features a RADE page uses.</p>';
+function spOpen(){
+  if(cur&&cur.blob){URL.revokeObjectURL(cur.blob);cur.blob=''}
+  cur=SP;var my=++load;
+  show({bar:40,state:'Loading',html:'<p class="caps">Ops check</p><h1>Getting the SharePoint test page.</h1>'});
+  get(SP.url,false).then(function(t){
+    if(my!==load){return}
+    SP.text=t;SP.loaded=new Date();spReady(SP,false);
+  }).catch(function(e){
+    if(my!==load){return}
+    failCard('The SharePoint test page did not load.',e.message||'no answer','Check the network connection, then select "Try again".','<button type="button" class="btn primary" data-act="sp" data-focus>Try again</button>');
+  });
+}
+function spReady(a,copied){
+  var t=a.loaded,hm=('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2);
+  show({light:'turn',done:copied,bar:100,state:(copied?'Copied':'Ready')+' · loaded '+hm,html:
+    '<p class="caps">'+esc(a.kind)+'</p><h1>'+(copied?'Copied. Now save it as an .aspx file.':'Test a RADE page on SharePoint Online.')+'</h1>'+
+    (copied?'':'<p>A plain web page saved as .aspx. Upload it to a SharePoint Online site and open it: it shows if a RADE page can run there.</p>')+facts(a)+
+    '<div class="btns"><a class="btn primary" href="'+txtUrl(a)+'" download="'+esc(a.file)+'" data-focus>Save as .aspx</a>'+
+    '<button type="button" class="btn" data-act="copy">'+(copied?'Copy again':'Copy page')+'</button>'+
+    '<a class="btn" href="'+txtUrl(a)+'" target="_blank" rel="noopener">View as .txt<span class="sr"> (opens in a new tab)</span></a></div>'+
+    SP_STEPS+helpLine()});
+}
+window.addEventListener('hashchange',function(){if(location.hash==='#sharepoint'&&ready0){spOpen()}else{start()}});
 card.addEventListener('click',function(e){
   var b=e.target.closest('[data-act],[data-app]');if(!b){return}
   var act=b.getAttribute('data-act');
@@ -252,8 +292,9 @@ card.addEventListener('click',function(e){
   else if(act==='start'){start()}
   else if(act==='open'&&cur){open(cur)}
   else if(act==='copy'&&cur){copy(cur)}
+  else if(act==='sp'){spOpen()}
 });
-back.addEventListener('click',function(e){e.preventDefault();choose()});
+back.addEventListener('click',function(e){e.preventDefault();if(cur&&cur.sp){location.hash=''}else{choose()}});
 start();
 })();
 </script>
