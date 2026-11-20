@@ -60,6 +60,7 @@ ol{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:6px;max-wi
 a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-offset:3px}
 :focus-visible{outline:2px solid var(--navy);outline-offset:2px}
 .help{font-size:1.0625rem}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}   /* for screen readers only */
 .bottom{display:flex;flex-wrap:wrap;gap:6px 20px;align-items:center;padding-block:10px;font-size:.875rem}
 .bottom a{display:inline-flex;align-items:center;min-height:24px}
 .bottom .state{margin-left:auto;color:var(--gray);font-variant-numeric:tabular-nums}
@@ -173,11 +174,13 @@ function start(){
   });
 }
 function choose(){
+  if(cur&&cur.blob){URL.revokeObjectURL(cur.blob);cur.blob=''}   // free the .txt of the application the user left
   cur=null;load++;
   show({light:'turn',state:num(APPS.length)+' applications',html:'<p class="caps">Choose</p><h1>Which application?</h1><div class="btns">'+
     APPS.map(function(a,i){return '<button type="button" class="btn app" data-app="'+i+'"'+(i?'':' data-focus')+'><b>'+esc(a.name||a.repo)+'</b></button>'}).join('')+'</div>'+helpLine()});
 }
 function open(a){
+  if(a.blob){URL.revokeObjectURL(a.blob);a.blob=''}
   cur=a;a.url='';a.none=false;remember(a.repo);var my=++load;
   show({bar:30,state:'Loading',html:'<p class="caps">RADE</p><h1>Getting the newest script.</h1><p class="second">'+esc(a.repo)+'</p>'});
   get(a.base+a.manifest,true).then(function(m){
@@ -205,8 +208,9 @@ function open(a){
     });
   }).catch(function(e){
     if(my!==load){return}
-    var link=a.url?'<a class="btn" href="'+esc(a.url)+'">Open the script</a>':'<a class="btn" href="https://github.com/'+esc(a.repo)+'">Open the repository</a>';
-    failCard('The script did not load.',e.message||'no answer',a.url?'Select "Open the script". On that page press Ctrl+A, then Ctrl+C. Then do the steps for PowerShell ISE.':a.none?'No script is published for this application yet. Ask in the Teams channel.':'Check the network connection, then select "Try again".',
+    // No link to the raw .ps1 file (the Administrator, 20 Nov 26): only the checked text is offered, as .txt, on the Ready card.
+    var link=a.url?'':'<a class="btn" href="https://github.com/'+esc(a.repo)+'">Open the repository</a>';
+    failCard('The script did not load.',e.message||'no answer',a.none?'No script is published for this application yet. Ask in the Teams channel.':'Check the network connection, then select "Try again".',
       '<button type="button" class="btn primary" data-act="open" data-focus>Try again</button>'+link);
   });
 }
@@ -216,20 +220,28 @@ function facts(a){
 }
 var STEPS='<ol><li>Start menu: type ISE and open Windows PowerShell ISE as yourself (not "Run as administrator").</li>'+
   '<li>File &gt; New. Click in the white script pane. Press Ctrl+V, then F5.</li><li>The RADE window opens. Do what it says.</li></ol>';
+// Read before you paste (the Administrator, 20 Nov 26): "View as .txt" and "Save as .txt" give the text the page already
+// fetched and checked, the same text "Copy script" copies, as a plain-text file (a blob URL, made in the browser, no new
+// download). One blob at a time: open() and choose() free the one of the last load.
+function txtUrl(a){
+  if(!a.blob){a.blob=URL.createObjectURL(new Blob([a.text],{type:'text/plain;charset=utf-8'}))}
+  return a.blob;
+}
 function ready(a,copied){
   var t=a.loaded,hm=('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2);
   show({light:'turn',done:copied,bar:100,state:(copied?'Copied':'Ready')+' · loaded '+hm,html:
     '<p class="caps">'+esc(a.kind)+'</p><h1>'+(copied?'Copied. Now paste it in PowerShell ISE.':'Copy the script for '+esc(a.name).replace(/-/g,'\u2011')+'.')+'</h1>'+
     (copied?'':(a.summary?'<p>'+esc(a.summary)+'</p>':''))+facts(a)+
     '<div class="btns"><button type="button" class="btn primary" data-act="copy" data-focus>'+(copied?'Copy again':'Copy script')+'</button>'+
-    '<a class="btn" href="'+esc(a.url)+'">Open the script</a>'+(a.home?'<a class="btn" href="'+esc(a.home)+'">Tasks for this application</a>':'')+'</div>'+
+    '<a class="btn" href="'+txtUrl(a)+'" target="_blank" rel="noopener">View as .txt<span class="sr"> (opens in a new tab)</span></a>'+
+    '<a class="btn" href="'+txtUrl(a)+'" download="'+esc(a.file.replace(/\.ps1$/i,''))+'.txt">Save as .txt</a>'+(a.home?'<a class="btn" href="'+esc(a.home)+'">Tasks for this application</a>':'')+'</div>'+
     STEPS+helpLine()});
 }
 function viaArea(t){var x=document.createElement('textarea');x.value=t;x.setAttribute('aria-hidden','true');x.style.position='fixed';x.style.opacity='0';document.body.appendChild(x);x.select();var r=false;try{r=document.execCommand('copy')}catch(e){}document.body.removeChild(x);return r}
 function copy(a){
   var ok=function(){ready(a,true)};
-  var no=function(){failCard('The browser blocked the copy.','the clipboard is not available to this page','Select "Open the script". On that page press Ctrl+A, then Ctrl+C. Then do the steps for PowerShell ISE.',
-    '<a class="btn primary" href="'+esc(a.url)+'" data-focus>Open the script</a><button type="button" class="btn" data-act="copy">Try again</button>')};
+  var no=function(){failCard('The browser blocked the copy.','the clipboard is not available to this page','Select "View as .txt". On that page press Ctrl+A, then Ctrl+C. Then do the steps for PowerShell ISE.',
+    '<a class="btn primary" href="'+txtUrl(a)+'" target="_blank" rel="noopener" data-focus>View as .txt<span class="sr"> (opens in a new tab)</span></a><button type="button" class="btn" data-act="copy">Try again</button>')};
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(a.text).then(ok,function(){viaArea(a.text)?ok():no()})}
   else{viaArea(a.text)?ok():no()}
 }
