@@ -131,12 +131,17 @@ $ui.VMaint = { param($Inst)
     Buttons = @(@{ Text = 'Uninstall'; Kind = 'dangeroff' }, $startB, @{ Text = 'Maintenance'; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.VTools $ui.MaintVerb } })   # Uninstall first: away from the primary   # B5: 1 primary + 3 others at most
     Back = { & $ui.VChoose } } }
 # The Maintenance screen (the Administrator, 2026-11-20): Update or Repair (works: the checks, then the install run),
-# and Diagnose, Back up and Restore, shown not available until they are built (docs/engine.md "Maintenance run types").
+# and the list of Diagnose, Back up and Restore, shown not available until they are built (docs/engine.md "Maintenance run types").
 # Takes the install verb ("Update to <version>" or "Repair").
 $ui.VTools = { param([string]$Verb)
   & $ui.SetCard @{ View = 'tools'; Kicker = [string]$ui.Kick.Text; Sentence = 'Maintenance'
-    P = @(($Verb + ' adds what is missing and keeps your data.'), 'Diagnose, Back up and Restore are planned. They are not in this version of RADE yet.')
-    Buttons = @(@{ Text = 'Diagnose'; Kind = 'off' }, @{ Text = 'Back up'; Kind = 'off' }, @{ Text = 'Restore'; Kind = 'off' }, @{ Text = $Verb; Kind = 'primary'; Act = { & $ui.Checks $false } })
+    # The tools are a list (the Administrator, 2026-11-20: Repair must not stand alone on a row): one row each, as on Choose,
+    # with what it does; shown not available until it is built. The action row is Back (Esc) and the install verb.
+    P = @(($Verb + ' adds what is missing and keeps your data.'))
+    Options = @(@{ Off = $true; Index = 0; Name = 'Diagnose'; Ver = ''; Sub = 'Checks the install and the site. Changes nothing.'; R1 = 'Not available yet' },
+      @{ Off = $true; Index = 1; Name = 'Back up'; Ver = ''; Sub = "Saves the app's lists to this computer."; R1 = 'Not available yet' },
+      @{ Off = $true; Index = 2; Name = 'Restore'; Ver = ''; Sub = 'Puts saved rows back on the site, after a dry run.'; R1 = 'Not available yet' })
+    Buttons = @(@{ Text = $Verb; Kind = 'primary'; Act = { & $ui.Checks $false } })
     Back = { & $ui.VMaint $ui.MaintInst } } }
 # Says whether the chosen application has a check that needs the site address. Takes nothing; gives back $true or
 # $false.
