@@ -109,7 +109,19 @@ for bad in (['CON'], ['Tasks', 'tasks'], ['Tasks ']):   # backup: a name Windows
     b['apps'][1]['backup'] = bad; p.write_text(json.dumps(m))
     r = subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'mk/app')], capture_output=True, text=True)
     assert r.returncode != 0 and 'backup: unique plain titles' in (r.stdout + r.stderr), (bad, r.stdout + r.stderr)
-del b['apps'][1]['backup']; p.write_text(json.dumps(m))
+# (engine-v31) a title with parentheses builds (R39); restore needs backup and plain test-site names; a good one is in the bundle.
+def build(): return subprocess.run([sys.executable, 'engine/rade_build.py', '--app-root', str(t / 'mk/app')], capture_output=True, text=True)
+b['apps'][1]['backup'] = ['Tasks', 'Recs (Form 1)']; p.write_text(json.dumps(m)); r = build(); assert r.returncode == 0, r.stdout + r.stderr
+b['apps'][1]['restore'] = {'testSites': ['https://x']}; p.write_text(json.dumps(m)); r = build()
+assert r.returncode != 0 and 'restore.testSites' in (r.stdout + r.stderr), r.stdout + r.stderr
+b['apps'][1]['restore'] = {'testSites': ['sample-test'], 'pause': {'list': 'Sample Settings', 'title': 'RestorePause', 'field': 'SettingValue', 'on': 'On'}}
+p.write_text(json.dumps(m)); r = build(); assert r.returncode == 0, r.stdout + r.stderr
+assert subprocess.run([sys.executable, 'scripts/check_manifest.py', str(p)], capture_output=True, text=True).returncode == 0
+bun = ''.join(x.read_text(encoding='utf-8-sig') for x in (t / 'mk/app').rglob('*.ps1') if 'Restore = @{ TestSites' in x.read_text(encoding='utf-8-sig'))
+assert "Backup = @('Tasks', 'Recs (Form 1)'); Restore = @{ TestSites = @('sample-test'); Pause = @{ List = 'Sample Settings'; Title = 'RestorePause'; Field = 'SettingValue'; On = 'On' } }" in bun, 'restore: not in the bundle'
+del b['apps'][1]['backup']; p.write_text(json.dumps(m)); r = build()
+assert r.returncode != 0 and 'restore needs backup' in (r.stdout + r.stderr), r.stdout + r.stderr
+del b['apps'][1]['restore']; p.write_text(json.dumps(m))
 r = subprocess.run([sys.executable, 'scripts/check_manifest.py', str(p)], capture_output=True, text=True)
 assert r.returncode == 0, r.stdout + r.stderr
 P

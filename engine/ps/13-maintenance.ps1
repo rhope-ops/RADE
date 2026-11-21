@@ -1,13 +1,17 @@
 # RADE engine part 13, the Maintenance tools (the Administrator, 2026-11-20; docs/engine.md "Maintenance run types").
 # Diagnose: read-only; the install record, the app's local files and the app's RADE checks again; one report file.
 # Back up: reads only the lists the app's manifest names ("backup") and saves each as JSON plus a CSV copy.
-# Restore is not built yet (engine-v31 at the earliest; test sites only).
+# Restore (engine-v31) is part 14, engine/ps/14-restore.ps1; it uses Invoke-Backup and Get-BackupFileName from here.
 # Uses parts 01 to 08 (Get-BasePath, Read-Installed, Get-InstalledKey, Get-StartPath, Invoke-Check, Invoke-ChildScript).
 # Network: Diagnose runs the app's own RADE checks (their fixed addresses only); Back up signs in to the saved site and
 # reads only the lists the manifest names (AGENTS.md "No reconnaissance"). Neither one writes to the site.
 # Writes: Diagnose: Diagnose\diagnose-<time>.txt; Back up: Backups\<time>\<list>.json and .csv (the app folder).
 # Credentials: the interactive CAC sign-in of PnP (-UseWebLogin), for Back up only.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
+# Time limit of a child script that signs in and reads every named list, in seconds (Back up and the Restore dry run;
+# the Administrator's lists are small, so it is generous).
+$toolReadSeconds = 1800
 
 # Gives the time stamp of a report or a backup folder (sortable, no colons). Takes nothing.
 function Get-ToolStamp { return (Get-Date).ToString('yyyyMMdd-HHmmss', [System.Globalization.CultureInfo]::InvariantCulture) }
@@ -140,6 +144,9 @@ try {
 } catch { 'RESULT not-connected ' + $_.Exception.GetType().Name; exit 2 }
 '@
 
+# Gives the file name (no extension) of a saved list: its title with any sign a file name cannot hold made "_" (the
+# build allows letters, digits, space, "_", "-", "(" and ")", so this changes nothing today). Takes the list title.
+function Get-BackupFileName([string]$Name) { return ($Name -replace '[^A-Za-z0-9 _()-]', '_') }
 # Makes the new folder of a backup, Backups\<time> in the app folder; a folder of that name that is there already (the
 # same second, or the hour that repeats when daylight saving ends) is never reused: -2, -3 and so on follow. Takes the
 # RADE app folder and the time stamp; gives back the new folder, or '' when none could be made.
@@ -183,7 +190,7 @@ function Invoke-Backup([string]$Base, [scriptblock]$Tick) {
     return @{ State = 'no-site'; Path = ''; Lines = @('No site address is saved, so Back up did not sign in.', 'Select "Repair": its checks ask for the site address.') } }
   $dir = Get-NewBackupDir $Base (Get-ToolStamp)   # always a new folder: a failed run removes only this one
   if (-not $dir) { return @{ State = 'failed'; Path = ''; Lines = @('Back up could not make its folder on this computer.') } }
-  $r = Invoke-ChildScript $backupScript ('-Site "' + $site + '" -Folder "' + $dir + '" -Lists "' + ($lists -join '|') + '"') 1800 $Tick
+  $r = Invoke-ChildScript $backupScript ('-Site "' + $site + '" -Folder "' + $dir + '" -Lists "' + ($lists -join '|') + '"') $toolReadSeconds $Tick
   $got = @{}; $res = ''
   foreach ($l in $r.Lines) { if ($l -match '^LIST (\d+) (.+)$') { $got[[int]$Matches[1]] = $Matches[2] } elseif ($l -match '^RESULT (\S+)') { $res = $Matches[1] } }
   if ($res -ne 'done') { $why = $(switch ($res) { 'no-pnp' { 'the SharePoint tool is not installed' } 'not-connected' { 'the sign-in did not finish' } default { 'it stopped: ' + $r.Why } })
@@ -193,7 +200,7 @@ function Invoke-Backup([string]$Base, [scriptblock]$Tick) {
   $lines = @(); $bad = 0
   for ($i = 1; $i -le $lists.Count; $i++) {
     $n = [string]$lists[$i - 1]; $v = [string]$got[$i]; $ok = $false
-    if ($v -match '^\d+$') { $ok = Rename-BackupFile $dir $i ($n -replace '[^A-Za-z0-9 _-]', '_') }
+    if ($v -match '^\d+$') { $ok = Rename-BackupFile $dir $i (Get-BackupFileName $n) }
     if ($ok) { $lines += ('PASS: "' + $n + '": ' + $v + ' rows saved'); continue }
     $bad++; $ty = $(if ($v -match '^failed (\S+)') { ' (' + $Matches[1] + ')' } elseif ($v) { ' (its files could not be named)' } else { '' })
     $lines += ('FINDING: "' + $n + '" was not saved' + $ty + '. What to do: check that the list exists and that you can read it, then select "Back up" again')

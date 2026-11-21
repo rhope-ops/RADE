@@ -721,10 +721,38 @@
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "pattern": "^[A-Za-z0-9]([A-Za-z0-9 _-]*[A-Za-z0-9_-])?$",
+            "pattern": "^[A-Za-z0-9]([A-Za-z0-9 _()-]*[A-Za-z0-9_)-])?$",
             "maxLength": 120
           },
-          "description": "Optional (the Administrator, 2026-11-20). The titles of the app's own SharePoint lists that the Maintenance tool \"Back up\" saves (JSON plus a CSV copy, on this computer). RADE never finds lists itself; an app that names none gets \"names no lists to back up\"."
+          "description": "Optional (the Administrator, 2026-11-20). The titles of the app's own SharePoint lists that the Maintenance tool \"Back up\" saves (JSON plus a CSV copy, on this computer). RADE never finds lists itself; an app that names none gets \"names no lists to back up\". From engine-v31 a title may hold parentheses."
+        },
+        "restore": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["testSites"],
+          "properties": {
+            "testSites": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 10,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$", "maxLength": 80 },
+              "description": "The site names (the part after the site prefix) where Restore may write. RADE refuses Restore on any other site (the Administrator, 2026-11-20)."
+            },
+            "pause": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["list", "title", "field", "on"],
+              "properties": {
+                "list": { "type": "string", "pattern": "^[A-Za-z0-9]([A-Za-z0-9 _()-]*[A-Za-z0-9_)-])?$", "maxLength": 120 },
+                "title": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9 _-]*$", "maxLength": 120 },
+                "field": { "type": "string", "pattern": "^[A-Za-z0-9_]+$", "maxLength": 64 },
+                "on": { "type": "string", "pattern": "^[A-Za-z0-9 _-]{1,40}$" }
+              },
+              "description": "Optional. The app's pause-switch row: Restore sets its field to the on value before it writes and puts the earlier value back after; the app's flows skip while it is on (plan R2, the Administrator, 2026-11-21)."
+            }
+          },
+          "description": "Optional (engine-v31). Restore of the lists in backup: missing rows only, Recycle Bin first, on a test site only. Needs backup."
         }
       },
       "if": {
