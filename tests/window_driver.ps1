@@ -4,7 +4,7 @@
 # Set by the test: RADE_T_STUB (path of the stub: its C# source or a DLL made from it), RADE_T_APP (index of the application), RADE_T_HAND (done, fail or
 # skip), RADE_T_RECORD (1 = open "Record" and clear the Clean-up box before the run), RADE_T_TOUR (1 = the
 # application also gets the site, sign-in and Power Automate checks, and a base check of the test application is FAILED),
-# RADE_T_LOOP (1 = Application.Run fails as when a message loop already runs: the window must open with ShowDialog),
+# RADE_T_STEADY (1 = print the WIN steady lines: Test-RadeSteady), RADE_T_LOOP (1 = Application.Run fails as when a message loop already runs: the window must open with ShowDialog),
 # RADE_T_FAULT (boot = the boot checks throw; noapps = the paste lists no application), RADE_T_CANCEL (1 = select Cancel on the first checking card), RADE_T_START (1 = select the Start button when the Ready card has it; maint = select Start on the Maintenance card), RADE_T_LINK (a folder: the Ready card's shortcut box first gets a folder that does not exist, then this one), RADE_T_SCALE (150 = the form scales to 144 dpi while the screen dpi says 96, as on the R24 device). It prints "WIN measure"
 # lines: sizes RADE sets after the form has scaled (a choice on Choose, the Record's step boxes and labels, made then).
 # A button that showed a longer text on an earlier card must be able to shrink (AutoSize GrowAndShrink): else WIN BAD.
@@ -140,7 +140,7 @@ function global:Show-RadeCard {
     # Focus is always visible: the parent draws the ring ($ui.Ring), or the control is a choice, which draws its own.
     if ($t -in 'Button', 'TextBox', 'CheckBox' -and -not ($c.Parent -and $c.Parent.Events.ContainsKey('Paint')) -and -not ($c.Tag -is [hashtable]) -and -not ($c.Values.ContainsKey('TabStop') -and $c.Values['TabStop'] -eq $false)) { Write-Host ('WIN NOFOCUS ' + $t + ' "' + $c.Text + '" in view ' + $ui.View) }
   }
-  Test-RadeSteady ([string]$ui.View)
+  if ($env:RADE_T_STEADY -eq '1') { Test-RadeSteady ([string]$ui.View) }   # one run asks for it: about 12 s of CPU a run (speed audit, 2026-11-21)
 }
 <#
 .SYNOPSIS
