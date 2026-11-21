@@ -27,7 +27,7 @@ Later decisions (the Administrator, 2026-11-21, question dialogs):
 |---|---|---|---|---|
 | 1 | kit | Attach the kit repo. Make build_site.py general (README marked sections into index.html; --check fails on drift). Release the kit. | C (check.sh) | done: #96 merged a15b34b; tag pending |
 | 2 | RADE | rade_build.py writes a .txt next to each bundle, with tests. Release engine-v34 (engine-v33 was taken by another session's release, 2026-11-21). | B | done: #157 merged fd944c2; release run started |
-| 3 (now, R41 safe) | 90-161.Z | Take engine-v34 and the kit release; rebuild the bundles; tasks to TASKS.md; new README; page preview, then the page. | B, then C | open |
+| 3 (done: 90-161.Z PR 211, merge 04de695; live page = main) | 90-161.Z | Take engine-v34 and the kit release; rebuild the bundles; tasks to TASKS.md; new README; page preview, then the page. | B, then C | done |
 | 4 (done: PR 161, merge 2289131; live page = main) | RADE | Take the kit release; the apps block links only the .txt; new README; page preview, then the page. | B, then C | done |
 | 5 | all | Confirm that main has each commit; report the tags and links. | — | open |
 
@@ -42,3 +42,5 @@ Hold (the Administrator, 2026-11-21: "I don't want my existing round jeopardized
 Effort: authored by the session; one fresh reviewer per pull request (5). Estimate 4 to 6 hours.
 
 Start now (the Administrator, 2026-11-21, question dialog "Start now, R41 safe"): steps 3 and 4 run now; R41's bundle, hash, script links and copy steps do not change; the .txt link starts with the next round.
+
+Open after this plan: RADE takes kit 8.0.0 (10-minute checks job limit; a lane C sync with a changed kit rule text); the next 90-161.Z round takes engine-v34, so its TASKS.md link becomes "Open the script" to the .txt; follow-up wording in the 90-161.Z README (MINOR findings of the last sweep: the window mark, the R41 answer test, office symbols in ref/).
