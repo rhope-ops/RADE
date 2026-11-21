@@ -5,6 +5,7 @@
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png" media="(prefers-color-scheme:light)">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png" media="(prefers-color-scheme:dark)">
+<link rel="stylesheet" href="docs/brand/fulcrum.css">
 <style>
 /* Layout: the RADE window as a page ("One thing", docs/window-design.md): the band
    (the header of the 90-161.Z page: navy to blue, a yellow line under it; the logo, RADE with the tagline under it, and
@@ -68,6 +69,26 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 .bar i{display:block;height:100%;width:0;background:var(--fill,var(--action));transition:width .25s linear}
 .win[data-done] .bar i{background:var(--pass)}
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+/* Page palette: Fulcrum Minimal (the Administrator, 2026-11-21: "the color palettes need to match Fulcrum"), the kit roles in
+   docs/brand/fulcrum.css; the window keeps engine/ui-tokens.json. Done shows in Fulcrum gold (the Administrator, 2026-11-21). */
+/* Off in forced colours (the system colours win); in more contrast, muted text, edges and the track move to the text
+   colour, as the contrast block below does for the old palette. */
+@media not (forced-colors:active){:root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--bg:var(--fm-page);--navy:var(--fm-page-fg);--text:var(--fm-page-fg);--gray:var(--fm-page-muted);--action:var(--fm-accent);--action-fg:var(--fm-on-accent);--link:var(--fm-page-link);--turn:var(--fm-rule);--fail:var(--fm-page-error);--edge:var(--fm-slate);--track:var(--fm-page-line);--btn:var(--fm-page);--pass:var(--fm-gold)}
+@media (prefers-contrast:more){:root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--gray:var(--fm-page-fg);--edge:var(--fm-page-fg);--track:var(--bg)}}}
+.band{background:var(--fm-band);border-bottom-color:var(--fm-rule)}
+.band .sub,.band .chan{color:var(--fm-band-muted)}
+.about{width:100%;max-width:860px;margin-inline:auto;padding-block:8px 28px}
+/* The README's intro and Summary (scripts/build_site.py writes them from README.md) in a Fulcrum disc: an ink card with a ring, as the logo. */
+.about .disc{background:var(--fm-disc);color:var(--fm-disc-fg);border-radius:14px;padding:22px;box-shadow:inset 0 0 0 5px var(--fm-disc),inset 0 0 0 6px var(--fm-disc-ring)}
+.about .disc p{margin:0 0 14px;max-width:65ch}
+.about .disc p:last-child{margin-bottom:0}
+.facts{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 16px;margin:0 0 14px;max-width:65ch}
+.facts dt{font-weight:700;color:var(--fm-disc-fg)}
+.facts dd{margin:0}
+.about .small{font-size:.875rem}
+.about .mut{color:var(--fm-disc-muted)}
+@media (max-width:520px){.facts{grid-template-columns:1fr;gap:0}.facts dd{margin-bottom:8px}}
+@media (forced-colors:active){.about .disc{box-shadow:none;border:1px solid CanvasText}}
 /* >>> ui-tokens-contrast: generated from engine/ui-tokens.json by scripts/ui_tokens.py --write (do not edit) */
 @media (prefers-contrast:more){:root{--gray:#1b2430;--edge:#0b2545;--track:#7f93a8}}
 @media (forced-colors:active){:root,:root[data-theme]{--bg:Canvas;--navy:CanvasText;--text:CanvasText;--gray:GrayText;--action:Highlight;--action-fg:HighlightText;--link:LinkText;--turn:Highlight;--fail:CanvasText;--pass:Highlight;--edge:ButtonText;--track:GrayText;--btn:ButtonFace}}
@@ -98,6 +119,25 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 <div class="win" id="win">
 <header class="band"><div class="row band-in"><img class="logo" src="assets/logo/rho-fulcrum-64.png" srcset="assets/logo/rho-fulcrum-64.png 1x, assets/logo/rho-fulcrum-128.png 2x" alt=""><p class="name">RADE</p><p class="sub">Test, deploy, enjoy</p><p class="team" id="team" hidden>TEAMS</p><p class="chan" id="chan"></p></div></header>
 <main class="row stage"><div class="card" id="card" aria-live="polite"><p class="caps">RADE</p><h1>Getting the newest script.</h1></div></main>
+<section class="row about" aria-label="About"><div class="disc">
+    <!-- >>> site:intro: generated from README.md by scripts/build_site.py --write (do not edit) -->
+    <p>Deploy and test applications on a locked-down work computer from one pasted PowerShell window: checks, files, steps and a results e-mail. RADE checks the computer first, saves the application's files, guides you through each step, and keeps a record of the install. After the install, the application works without RADE.</p>
+    <!-- <<< site:intro -->
+    <!-- >>> site:key-facts: generated from README.md by scripts/build_site.py --write (do not edit) -->
+    <dl class="facts">
+      <dt>Checks first:</dt><dd>checks the computer and your site rights before any step; a failed check stops the install.</dd>
+      <dt>NIPR only:</dt><dd>runs only where the computer's full name holds the NIPR domain; elsewhere it stops before it writes a file.</dd>
+      <dt>Credentials:</dt><dd>CAC sign-on in a browser window for each run; nothing is stored.</dd>
+      <dt>Access:</dt><dd>only sees what your account can see; only accepts a DAF SharePoint address.</dd>
+      <dt>Boundary:</dt><dd>nothing leaves DoD365, except the test-round results e-mail (masked counts, sent by hand) until the test rounds end.</dd>
+      <dt>Verifiable:</dt><dd>read the commented code as plain text before you paste it; the window warns when the script does not match its hash.</dd>
+      <dt>Accessible:</dt><dd>paste and run via ISE; no code download, no admin rights, no policy change.</dd>
+      <dt>Maintenance:</dt><dd>Diagnose, Back up and Restore from the application's card.</dd>
+      <dt>Independent:</dt><dd>delete RADE and the application still works.</dd>
+    </dl>
+    <p class="small mut">Need help? Ask in the Teams channel <strong>RHOPE-OPS</strong>.</p>
+    <!-- <<< site:key-facts -->
+</div></section>
 <footer class="row bottom"><a href="https://github.com/rhope-ops/RADE">Repository</a><a id="back" href="#" hidden>Back</a><span class="state" id="state"></span></footer>
 <div class="bar" aria-hidden="true"><i id="bar"></i></div>
 </div>

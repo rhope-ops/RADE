@@ -59,3 +59,8 @@ Header of the handoff before the move: logo 64 px baseline and app row, PRs 98 a
 ## Do not
 
 - None yet.
+
+## Moved from docs/NEXT_PROMPT.md on 2026-11-21 (session load cap, kit 7.0.0 sync)
+
+- Plan (approved 2026-11-18): [proof and hardening](reviews/2026-11-18-plan-proof-and-hardening.md). Released: stage 0 (v19), 2.2 bundle hash (v21), the R32 answers (v22). Next: the round on v23, the Decide rows.
+- R31 (v20): [review](reviews/2026-11-19-r31-review.md), 2 MINOR open.
