@@ -346,13 +346,16 @@ function Test-RestoreSite([string]$Base) {
   $restoreDef = $script:app.Restore
   if (-not $restoreDef) { return @{ Ok = $false; Site = ''; Name = ''; NeedMark = $false; Lines = @(($script:app.Name + ' does not use Restore in this version.'), 'Nothing was changed.') } }
   $site = Get-SiteUrl $Base
-  if (-not (Test-SiteUrl $site)) { return @{ Ok = $false; Site = ''; Name = ''; NeedMark = $false; Lines = @('No site address is saved, so Restore did not sign in.', 'Select "Repair": its checks ask for the site address.') } }
+  if (-not (Test-SiteUrl $site)) { $why = @('No site address is saved, so Restore did not sign in.', 'Select "Repair": its checks ask for the site address.')
+    return @{ Ok = $false; Site = ''; Name = ''; NeedMark = $false; Lines = $why } }
   $name = $site.Substring($sitePrefix.Length).TrimEnd('/')
   if ($restoreDef.Local) {
     if ((Get-RestoreMark $Base) -eq $name) { return @{ Ok = $true; Site = $site; Name = $name; NeedMark = $false; Lines = @() } }
-    return @{ Ok = $false; Site = $site; Name = $name; NeedMark = $true; Lines = @('Restore runs only on a site marked as a test site on this computer. The saved site is not marked.', 'Nothing was changed.') } }
+    $why = 'Restore runs only on a site marked as a test site on this computer. The saved site is not marked.'
+    return @{ Ok = $false; Site = $site; Name = $name; NeedMark = $true; Lines = @($why, 'Nothing was changed.') } }
   if (@($restoreDef.TestSites | Where-Object { [string]$_ -eq $name }).Count) { return @{ Ok = $true; Site = $site; Name = $name; NeedMark = $false; Lines = @() } }
-  return @{ Ok = $false; Site = $site; Name = $name; NeedMark = $false; Lines = @('Restore runs only on a test site that the app names. The saved site is not one.', 'Nothing was changed.') }
+  $why = 'Restore runs only on a test site that the app names. The saved site is not one.'
+  return @{ Ok = $false; Site = $site; Name = $name; NeedMark = $false; Lines = @($why, 'Nothing was changed.') }
 }
 
 # Reads the PLAN lines of the Restore child script: one table for each list number. Takes the output lines; gives

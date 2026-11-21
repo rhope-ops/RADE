@@ -61,10 +61,15 @@ $ui.ToolResult = {
     Buttons = @(@{ Text = 'Done'; Kind = 'primary'; Act = { & $ui.VTools $ui.MaintVerb } }); Back = { & $ui.VTools $ui.MaintVerb } }
   & $ui.ToFront }
 
-# Restore, card 1 (view restpick): the backups on this computer, newest first, one row each. A site that only lacks the
-# local test-site mark goes to the mark card; a site that is not a test site, or no backup, goes straight to the result
-# card. Takes nothing.
 $ui.VRestorePick = {
+  <#
+  .SYNOPSIS
+  Restore, card 1 (view restpick): the backups on this computer, newest first, one row each.
+  .DESCRIPTION
+  A site that only lacks the local test-site mark (engine-v32) goes to the mark card ($ui.VRestoreMark); a site that is
+  not a test site, or no backup, goes straight to the result card. Keeps the site name for the "Test site:" line of the
+  dry-run and confirm cards ($ui.RestoreSite). Takes no parameter.
+  #>
   $appPath = Get-BasePath; $siteCheck = Test-RestoreSite $appPath
   if ($siteCheck.NeedMark) { & $ui.VRestoreMark; return }
   if (-not $siteCheck.Ok) { & $ui.ToolResult 'Restore' @{ State = 'refused'; Path = ''; Lines = $siteCheck.Lines }; return }
