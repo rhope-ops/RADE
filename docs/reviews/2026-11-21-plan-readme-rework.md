@@ -26,8 +26,8 @@ Later decisions (the Administrator, 2026-11-21, question dialogs):
 |---|---|---|---|---|
 | 1 | kit | Attach the kit repo. Make build_site.py general (README marked sections into index.html; --check fails on drift). Release the kit. | C (check.sh) | done: #96 merged a15b34b; tag pending |
 | 2 | RADE | rade_build.py writes a .txt next to each bundle, with tests. Release engine-v34 (engine-v33 was taken by another session's release, 2026-11-21). | B | done: #157 merged fd944c2; release run started |
-| 3 (held) | 90-161.Z | Take engine-v34 and the kit release; rebuild the bundles; tasks to TASKS.md; new README; page preview, then the page. | B, then C | open |
-| 4 (held) | RADE | Take the kit release; the apps block links only the .txt; new README; page preview, then the page. | B, then C | open |
+| 3 (now, R41 safe) | 90-161.Z | Take engine-v34 and the kit release; rebuild the bundles; tasks to TASKS.md; new README; page preview, then the page. | B, then C | open |
+| 4 (now, R41 safe) | RADE | Take the kit release; the apps block links only the .txt; new README; page preview, then the page. | B, then C | open |
 | 5 | all | Confirm that main has each commit; report the tags and links. | — | open |
 
 Hold (the Administrator, 2026-11-21: "I don't want my existing round jeopardized by your changes. this is for the next one"): steps 3 and 4 change R41's files, the 90-161.Z page, the RADE page and the RADE README links, so they wait until R41 ends. Step 3's code is kept as a patch in rhope-ops/90-161.Z pull request 211 (docs/reviews/2026-11-21-readme-rework-held.patch). Previews: README v4 and pages v2 (Fulcrum), approved; rebuild them from this plan and the decisions above. Review findings to carry into step 4: none open.
@@ -39,3 +39,5 @@ Hold (the Administrator, 2026-11-21: "I don't want my existing round jeopardized
 - Kit first makes the work slower: step 1 must merge before steps 3 and 4.
 
 Effort: authored by the session; one fresh reviewer per pull request (5). Estimate 4 to 6 hours.
+
+Start now (the Administrator, 2026-11-21, question dialog "Start now, R41 safe"): steps 3 and 4 run now; R41's bundle, hash, script links and copy steps do not change; the .txt link starts with the next round.

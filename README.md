@@ -1,12 +1,35 @@
 ![RADE: Test, deploy, enjoy](https://repository-images.githubusercontent.com/1457939479/f568bdbc-a8b6-4c15-b151-da1b3b9bffc3)
 
-<!-- Sync: this top part mirrors the RADE page (index.html, Ready card). The part between the "apps" marks is written by
-     scripts/build_readme.py --write from apps.json, each app's manifest and the page's steps; the full check fails when it is old. -->
 # RADE
+<p><b>Redacted Application Deployment Engine</b></p>
 
-Test, deploy, enjoy · Teams: **RHOPE-OPS**
+<!-- site:intro -->
+Deploy and test applications on a locked-down work computer from one pasted PowerShell window: checks, files, steps and a results e-mail. RADE checks the computer first, saves the application's files, guides you through each step, and keeps a record of the install. After the install, the application works without RADE.
+<!-- /site:intro -->
 
-For a computer that cannot open the RADE page (https://rhope-ops.github.io/RADE): the same content, with links on github.com.
+---
+
+### 🔺 Summary
+
+<!-- site:key-facts -->
+<table>
+<tr><td><b>Checks first:</b></td><td>checks the computer and your site rights before any step; a failed check stops the install.</td></tr> <!-- source: docs/engine.md "Check stages" and "Results" -->
+<tr><td><b>NIPR only:</b></td><td>on any other network it stops before it writes a file.</td></tr> <!-- source: docs/engine.md "Guardrails", NIPR only -->
+<tr><td><b>Credentials:</b></td><td>CAC sign-on in a browser window for each run; nothing is stored.</td></tr> <!-- source: engine/ps/07-checks.ps1, Connect-PnPOnline -UseWebLogin -->
+<tr><td><b>Access:</b></td><td>only sees what your account can see; only accepts a DAF SharePoint address.</td></tr> <!-- source: docs/engine.md "Guardrails", Site address -->
+<tr><td><b>Boundary:</b></td><td>nothing leaves DoD365.</td></tr> <!-- source: AGENTS.md "DoD365 boundary" -->
+<tr><td><b>Verifiable:</b></td><td>inspect the commented code yourself within a .txt before execution; the window shows the script's hash in its title bar.</td></tr> <!-- source: docs/engine.md "Bundle layout", the .txt copy from engine-v34 -->
+<tr><td><b>Accessible:</b></td><td>paste and run via ISE; no download, no admin rights, no policy change.</td></tr> <!-- source: AGENTS.md "No code fetch at run time"; 90-161.Z ISSM ruling 2026-11-13 -->
+<tr><td><b>Maintenance:</b></td><td>Diagnose, Back up and Restore from the application's card.</td></tr> <!-- source: docs/engine.md "Maintenance run types" -->
+<tr><td><b>Independent:</b></td><td>delete RADE and the application still works.</td></tr> <!-- source: docs/engine.md "RADE and the app", After the install -->
+</table>
+
+> Need help? Ask in the Teams channel **RHOPE-OPS**.
+<!-- /site:key-facts -->
+
+---
+
+### 🔺 Applications
 
 <!-- >>> apps: generated from apps.json by scripts/build_readme.py --write (do not edit) -->
 ## 90\-161.Z
@@ -36,25 +59,59 @@ If one link is blocked on your network, try the other.
 For help, ask in the Teams channel **RHOPE-OPS**.
 <!-- <<< apps -->
 
-[Repository](https://github.com/rhope-ops/RADE)
+---
 
-# Details
+### 🔺 How it works
 
-Deploy and test applications on a locked-down work computer from one pasted PowerShell window: checks, files, steps and a results e-mail.
+<kbd>Paste in ISE</kbd> → <kbd>Check the computer</kbd> → <kbd>Choose an application</kbd> → <kbd>Check what it needs</kbd> → <kbd>Install, step by step</kbd> → <kbd><b>Start</b></kbd>
 
-The RADE page (the work bookmark): https://rhope-ops.github.io/RADE ([index.html](index.html), applications in [apps.json](apps.json)).
+#### Check results
 
-Engine requirements, and how an application gets the engine (by commit, with no RADE checkout): [docs/engine.md](docs/engine.md). Make an application for RADE: [docs/make-an-app.md](docs/make-an-app.md). Manifest contract: [schemas/rade-manifest.schema.json](schemas/rade-manifest.schema.json).
+| Result | Means |
+|---|---|
+| PASSED | The check passed. |
+| PASSED (fallback) | Passed with the documented route for wings with less access. |
+| WARNING | You can go on; read the note. |
+| FAILED | The install cannot start. The window says what to fix. |
+| NOT RUN | The check could not run. This also stops the install. |
 
-Agents: read [AGENTS.md](AGENTS.md) first. Status: [docs/NEXT_PROMPT.md](docs/NEXT_PROMPT.md). Decisions: [docs/DECISIONS.md](docs/DECISIONS.md). Log: a private document (AGENTS.md "Project rules").
+#### Maintenance
 
-New to working with AI agents? Read [docs/WORKING_WITH_AGENTS.md](docs/WORKING_WITH_AGENTS.md).
+| Button | Does | Asks first |
+|---|---|---|
+| Install / Update / Repair | Adds what is missing, keeps your data | No |
+| Diagnose | Read-only checks; each finding names its fix | No |
+| Back up | Saves each of the application's lists to your computer | No |
+| Restore | Puts missing rows back, from the Recycle Bin or a backup | Yes: a dry run with counts, then you type the application name |
+| Uninstall | Not built yet | — |
 
-## Build and test
+---
 
-- Build, test and lint commands: [AGENTS.md](AGENTS.md) "Commands".
-- How the engine is built and released: [docs/engine.md](docs/engine.md).
-- Make an application for RADE: [docs/make-an-app.md](docs/make-an-app.md).
-- Code standard: [docs/code-standard.md](docs/code-standard.md) and its RADE extras, [docs/code-standard-rade.md](docs/code-standard-rade.md). Review guide: [docs/review-guide.md](docs/review-guide.md).
-- Threat model: [docs/threat-model.md](docs/threat-model.md). Proposed bundle hash display: [docs/specs/bundle-hash.md](docs/specs/bundle-hash.md).
-- Report a vulnerability: [SECURITY.md](SECURITY.md).
+### 🔺 Limitations
+
+| RADE cannot | What to do |
+|---|---|
+| See an install on another site | A search across sites is network reconnaissance, so RADE never does it. Ask the site owner. |
+| Update an application that another account installed | Install with the same account, or ask a site owner to clear the install record. |
+| Do a step that the platform does not let a script do (for example a Power Automate import) | RADE shows numbered steps; do them, then select Done or It failed. |
+| Restore on a site that is not a test site | Restore runs only on the application's test sites. |
+| Restore a person who is not on the site | That field stays empty; fill it in by hand. |
+| Uninstall | Not built yet. Ask in the Teams channel. |
+
+---
+
+### 🔺 Safety
+
+- **No reconnaissance:** never looks for hosts, pings, checks ports or probes network boundaries.
+- **One host:** signs in only to an address with the DAF SharePoint prefix.
+- **No code fetch at run time:** the paste is the whole program; data files are checked by SHA-256.
+- **No stored credentials:** you sign in with your CAC each run; no password or token is saved.
+- **No scripts in results:** the results never contain a script or program file.
+- **Asks before a write that cannot be undone:** a dry run with counts, then you type the application name.
+- **One install per site:** an install record on the site stops a second install by mistake.
+
+---
+
+### 🔺 Build an application with RADE
+
+To deploy your own application with RADE, start with [docs/make-an-app.md](docs/make-an-app.md). To report a vulnerability, see [SECURITY.md](SECURITY.md).
