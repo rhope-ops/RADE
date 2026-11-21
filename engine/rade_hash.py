@@ -12,7 +12,7 @@ FILE...` prints the content hash of each file (content_hash: UI standard v1 brie
 the same value for two revisions of a test that differ only in their revision tokens and their header comment lines,
 so an app can tell that a test did not change and retire its old revision.
 Network: none
-Writes: the bundle file and its stored hash file, in the application's folder (write only; --content writes nothing)
+Writes: the bundle file, its .txt copy and its stored hash file, in the application's folder (write only; --content writes nothing)
 Credentials: none
 """
 import hashlib
@@ -51,6 +51,27 @@ def stored(out):
     return out.with_name(out.name + '.sha256.json')
 
 
+def text_copy(out):
+    """The path of the plain-text copy of the bundle at `out`: the same name with .txt in place of .ps1.
+
+    A person opens the .txt from a README or a page link to read or copy the script: a link to a .ps1 causes problems on
+    a gov computer (33-332.Z, 2026-11-21; the Administrator, 2026-11-21: the engine writes it for every app). The bytes
+    are the bundle's own, so its hash line and stored hash file hold for the copy too.
+
+    Args:
+        out: the bundle's path (a .ps1).
+
+    Returns:
+        The path of the copy.
+
+    Raises:
+        ValueError: when out is not a .ps1 path (the copy would replace another file, or be the bundle itself).
+    """
+    if Path(out).suffix.lower() != '.ps1':
+        raise ValueError('a bundle path must end in .ps1: %s' % out)
+    return out.with_suffix('.txt')
+
+
 def stale(out, text, release, label):
     """Tell whether a built bundle on disk is out of date, and print a STALE line when it is.
 
@@ -61,20 +82,31 @@ def stale(out, text, release, label):
         label: the bundle's path as the manifest gives it, for the STALE line.
 
     Returns:
-        1 when the bundle file or its stored hash file is missing or differs (bytes), else 0.
+        1 when the bundle file, its .txt copy or its stored hash file is missing or differs (bytes), else 0.
     """
-    rec = stored(out)
-    old = (not out.exists() or out.read_bytes() != text.encode('ascii')
-           or not rec.exists() or rec.read_bytes() != record(out, text, release).encode('ascii'))
+    rec, data = stored(out), text.encode('ascii')
+    old = any(not f.exists() or f.read_bytes() != want for f, want in
+              ((out, data), (text_copy(out), data), (rec, record(out, text, release).encode('ascii'))))
     if old:
         print('STALE ' + label)
     return int(old)
 
 
 def write(out, text, release):
-    """Write the bundle and its stored hash file (as bytes: the same files on every platform). Returns the HASH line to print."""
+    """Write the bundle, its .txt copy and its stored hash file (as bytes: the same files on every platform).
+
+    Args:
+        out: the bundle's path.
+        text: the whole bundle, hash line first.
+        release: the engine release number.
+
+    Returns:
+        The HASH line to print.
+    """
+    copy = text_copy(out)   # first: a path that is not .ps1 is refused before any file is written
     rec = record(out, text, release)
     out.write_bytes(text.encode('ascii'))
+    copy.write_bytes(text.encode('ascii'))
     stored(out).write_bytes(rec.encode('ascii'))
     sha = json.loads(rec)
     return 'HASH %s %s (%s)' % (out.name, sha['sha256'], sha['short'])
