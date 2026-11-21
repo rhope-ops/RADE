@@ -7,11 +7,11 @@ Test, deploy, enjoy · Teams: **RHOPE-OPS**
 For a computer that cannot open the RADE page (https://rhope-ops.github.io/RADE): the same content, with links on github.com.
 
 <!-- >>> apps: generated from apps.json by scripts/build_readme.py --write (do not edit) -->
-## 90-161.Z
+## 90\-161.Z
 
 **Test round R40**
 
-### Copy the script for 90-161.Z.
+### Copy the script for 90\-161.Z.
 
 Round R40 r1: window r13 with 4 checks, the reopen check on the screen you closed it on, and the look questions. Fake data.
 
@@ -23,7 +23,7 @@ Script check: `da516687bfa9...509e`, the stored hash ([.sha256.json](https://git
 | --- | --- |
 | **[Copy script](https://github.com/rhope-ops/90-161.Z/blob/main/scripts/gov/paste/90161Z-R40-round-r1.ps1)** | Select "Copy raw file" (the copy button at the top right of the code). Then do the steps below. |
 | **[Open as .txt](https://raw.githubusercontent.com/rhope-ops/90-161.Z/main/scripts/gov/paste/90161Z-R40-round-r1.ps1)** | The script as plain text, to read before you paste. Ctrl+S saves it as a .txt file; Ctrl+A, then Ctrl+C copies it. |
-| **[Tasks for this application](https://github.com/rhope-ops/90-161.Z)** | The 90-161.Z repository: its tasks and round scripts. |
+| **[Tasks for this application](https://github.com/rhope-ops/90-161.Z)** | The 90\-161.Z repository: its tasks and round scripts. |
 
 If one link is blocked on your network, try the other.
 

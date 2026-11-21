@@ -46,8 +46,15 @@ def fetch(url):
 
 
 def md(s):
-    """Return text from an app's manifest as plain Markdown text: no HTML, link, table or code markup (as the page's esc())."""
-    return re.sub(r'([\\`*_\[\]|<>#])', r'\\\1', str(s))
+    """Return text from an app's manifest as one line of plain Markdown text (as the page's esc() shows it).
+
+    Every run of white space (line ends too) becomes one space, so the text cannot leave its heading, paragraph or table
+    cell; each Markdown punctuation character is escaped, and so is a number at the start that would begin a list.
+    A bare web address can still show as a link on GitHub: a backslash cannot stop that.
+    """
+    s = re.sub(r'\s+', ' ', str(s)).strip()
+    s = re.sub(r'([\\`*_\[\]|<>#\-+=~&!])', r'\\\1', s)
+    return re.sub(r'^(\d+)([.)])', r'\1\\\2', s)
 
 
 def short(h):
@@ -114,12 +121,15 @@ def app_section(app, steps, help_name):
     if not bundles or not bundles[-1].get('out'):
         raise RuntimeError('%s lists no script' % repo)
     b = bundles[-1]
+    if not re.fullmatch(r'[\w.-]+(/[\w.-]+)*\.ps1', str(b['out'])) or '..' in str(b['out']):
+        raise RuntimeError('%s: the script path is not a plain .ps1 path' % repo)
     cat = (b.get('apps') or [{}])[0]
     name = md((m.get('application') or {}).get('name') or repo)
-    mode, ver = cat.get('mode') or b.get('mode'), cat.get('version') or b.get('version')
+    mode = cat.get('mode') or b.get('mode')
+    ver = md(cat.get('version') or b.get('version') or '')
     # The same kind line as index.html open(): Version / Install / Drift check / Test round.
     kind = ('Version ' + ver if ver else 'Install') if mode == 'deploy' else 'Drift check' if mode == 'drift' else \
-        ('Test round ' + str(b.get('round') or '')).strip()
+        ('Test round ' + md(b.get('round') or '')).strip()
     raw = base + b['out']
     blob = 'https://github.com/%s/blob/main/%s' % (repo, b['out'])
     size, lines, code = script_facts(fetch(raw), json.loads(fetch(raw + '.sha256.json')))

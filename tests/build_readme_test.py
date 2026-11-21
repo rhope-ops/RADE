@@ -9,6 +9,7 @@ Credentials: none.
 Run by scripts/check.local.sh.
 """
 import hashlib
+import re
 import sys
 from pathlib import Path
 
@@ -38,6 +39,10 @@ assert b.script_facts('\ufeff' + text, {'sha256': h}) == (size, lines, code)
 # 2c. Text from a manifest cannot add Markdown or HTML: markup characters are escaped.
 assert b.md('a|b <i>[x](y) `c`') == 'a\\|b \\<i\\>\\[x\\](y) \\`c\\`', b.md('a|b <i>[x](y) `c`')
 assert b.md('Round R40 r1: window r13, fake data.') == 'Round R40 r1: window r13, fake data.'
+for bad in ['- fake', '1. x', '2) y', '---', '    code', 'A\n---', '~~x~~', '+ z', '= h', '![i](u)']:
+    out = b.md(bad)   # one line, and no character left that starts a list, rule, code block, strike or image
+    assert '\n' not in out and not re.match(r'(\d+[.)]|[-+=~!*]|\s)', out), (bad, out)
+assert b.md('a\n\n  b') == 'a b'
 
 # 3. Refused: no hash line, a changed text, a stored hash that differs or cannot be read.
 for t, stored in [(body, {'sha256': h}), (text + 'x', {'sha256': h}), (text, {'sha256': '0' * 64}), (text, {})]:
