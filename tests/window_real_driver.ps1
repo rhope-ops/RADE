@@ -70,6 +70,19 @@ function global:Save-RadeRestore {
   Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force -ErrorAction SilentlyContinue; $script:app.Backup = $keep.B; $script:app.Restore = $keep.R
   & $ui.VTools $ui.MaintVerb }
 
+function global:Save-RadeTools {
+  <#
+  .SYNOPSIS
+  The Maintenance screen: draws the Restore cards once, then selects Repair or Update.
+  .DESCRIPTION
+  The timer stops while the Restore cards are drawn: their DoEvents could run a tick inside this one, which selected
+  Repair and ran the whole install; this tick then selected the primary button of the Done card ("Start", which
+  closes RADE). Repair is selected only while the Maintenance screen is still shown. Takes no parameter.
+  #>
+  $global:RadeTimer.Stop()
+  try { Save-RadeRestore } finally { $global:RadeTimer.Start() }
+  if ($ui.View -eq 'tools') { (Get-RadeMain).PerformClick() } }
+
 function global:Save-RadeCard([string]$Tag) {
   $global:RadeT.N++; $card = ('{0:00}-{1}' -f $global:RadeT.N, $Tag)
   try { $ui.Form.Refresh() } catch { $null = $_ }
@@ -138,7 +151,7 @@ function global:Step-Rade {
     foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Index -eq $global:RadeT.App) { $o.PerformClick(); return } }
     Write-Host 'WIN BAD no choice for the application'; [Environment]::Exit(4)
   }
-  elseif ($v -eq 'maint') { Write-RadeRow; @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Maintenance' })[0].PerformClick() } elseif ($v -eq 'tools') { Save-RadeRestore; (Get-RadeMain).PerformClick() }   # the Maintenance screen (and the Restore cards once), then Repair or Update (Start would start the application)
+  elseif ($v -eq 'maint') { Write-RadeRow; @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Maintenance' })[0].PerformClick() } elseif ($v -eq 'tools') { Save-RadeTools }   # the Maintenance screen (and the Restore cards once), then Repair or Update (Start would start the application)
   elseif ($v -eq 'site') { $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }
   elseif ($v -in 'fail', 'need') {
     $id = [string]@($script:appChecks)[([int]($ui.Kick.Text -replace '^CHECK (\d+) OF .*$', '$1')) - 1]
