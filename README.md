@@ -1,4 +1,4 @@
-![RADE](https://repository-images.githubusercontent.com/1457939479/f568bdbc-a8b6-4c15-b151-da1b3b9bffc3)
+![RADE: Test, deploy, enjoy](https://repository-images.githubusercontent.com/1457939479/f568bdbc-a8b6-4c15-b151-da1b3b9bffc3)
 
 <!-- Sync: this top part mirrors the RADE page (index.html, Ready card). The part between the "apps" marks is written by
      scripts/build_readme.py --write from apps.json, each app's manifest and the page's steps; the full check fails when it is old. -->
