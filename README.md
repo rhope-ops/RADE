@@ -22,7 +22,7 @@ Script check: `da516687bfa9...509e`, the stored hash ([.sha256.json](https://git
 | --- | --- |
 | **[Copy script](https://github.com/rhope-ops/90-161.Z/blob/main/scripts/gov/paste/90161Z-R40-round-r1.ps1)** | Select "Copy raw file" (the copy button at the top right of the code). Then do the steps below. |
 | **[Open as .txt](https://raw.githubusercontent.com/rhope-ops/90-161.Z/main/scripts/gov/paste/90161Z-R40-round-r1.ps1)** | The script as plain text, to read before you paste. Ctrl+S saves it as a .txt file; Ctrl+A, then Ctrl+C copies it. |
-| **[Tasks for this application](https://github.com/rhope-ops/90-161.Z#open-tasks)** | The 90-161.Z tasks and round scripts. |
+| **[Tasks for this application](https://github.com/rhope-ops/90-161.Z)** | The 90-161.Z repository: its tasks and round scripts. |
 
 If one link is blocked on your network, try the other.
 
