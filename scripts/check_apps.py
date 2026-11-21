@@ -171,16 +171,19 @@ def stage_fonts(app_dir, manifest, read_font):
             data = read_font(m.group(1))
             if data is None:
                 continue
+            tmp_name = None
             try:   # a file where a folder should be (a broken app), or a write that stops: left to the build, which names it
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                part = dst.with_name(dst.name + '.part')
-                part.write_bytes(data)
-                os.replace(part, dst)   # whole or not there: never a cut font
+                fd, tmp_name = tempfile.mkstemp(prefix='.rade-font-', dir=str(dst.parent))   # a new name: no app file is touched
+                with os.fdopen(fd, 'wb') as fh:
+                    fh.write(data)
+                os.replace(tmp_name, dst)   # whole or not there: never a cut font
             except OSError:
-                try:
-                    part.unlink()
-                except (OSError, NameError):
-                    pass
+                if tmp_name:
+                    try:
+                        os.unlink(tmp_name)
+                    except OSError:
+                        pass
                 continue
             copied.append(src)
     return copied

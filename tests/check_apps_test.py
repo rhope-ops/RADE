@@ -69,6 +69,18 @@ with tempfile.TemporaryDirectory() as t:
     finally:
         c.git_type = real
     assert c.git_type(head, 'engine/fonts') == 'tree' and c.git_type(head, 'engine/fonts/OFL.txt') == 'blob'
-    assert not list((t / 'assets/fonts/build').glob('*.part'))   # no part file left after a copy
+    assert not list((t / 'assets/fonts/build').glob('.rade-font-*'))   # no temporary file left after a copy
+    # A move that fails: no font and no temporary file stay; an app file with a similar name is not touched.
+    (t / 'assets/fonts/build/90161Z-OFL.txt').unlink(); (t / 'assets/fonts/build/90161Z-OFL.txt.part').write_bytes(b'APPFILE')
+    real_replace = c.os.replace
+    def no_replace(a, b):
+        raise OSError('disk full')
+    c.os.replace = no_replace
+    try:
+        assert c.stage_fonts(t, fm, fake.get) == []
+    finally:
+        c.os.replace = real_replace
+    assert not (t / 'assets/fonts/build/90161Z-OFL.txt').exists() and not list((t / 'assets/fonts/build').glob('.rade-font-*'))
+    assert (t / 'assets/fonts/build/90161Z-OFL.txt.part').read_bytes() == b'APPFILE'
 
 print('CANARY rules ok: %d bad manifest paths, %d bad locks, 1 symbolic link, 1 no-reconnaissance note, 1 font put in' % (len(muts), len(bads)))
