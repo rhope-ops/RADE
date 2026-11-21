@@ -236,13 +236,14 @@ The list's state.
 None; sets Made, Failed and Unlinked on the state.
 #>
 function Add-MissingRows($State) {
-  $State.Made = 0; $State.Failed = 0; $script:unlinked = 0
+  $State.Made = 0; $State.Failed = 0; $State.Skipped = 0; $script:unlinked = 0
   foreach ($row in @($State.Missing | Sort-Object { [int]$_.ID })) {
     if ($null -ne (Get-OnList $State ([int]$row.ID))) { continue }   # back from the Recycle Bin, or another saved ID of the same row was made
     $values = @{}
+    $unlinkedBefore = $script:unlinked   # a row that is not written does not add to the empty-lookup count
     try { foreach ($field in $State.Fields) { $prop = $row.PSObject.Properties[$field.InternalName]; if (-not $prop) { continue }
         $value = ConvertTo-WriteValue $field $prop.Value $info; if ($null -ne $value) { $values[$field.InternalName] = $value } } }
-    catch { $State.Failed++; continue }   # a saved value that cannot be read (a bad date): this row is not written, no mark, the next rows go on
+    catch { $State.Skipped++; $script:unlinked = $unlinkedBefore; continue }   # a saved value that cannot be read (a bad date): not written, no mark; the next rows go on
     $mark = 'p' + [int]$row.ID
     try { $State.Links += $mark; Save-RestoreRecord } catch { $script:mapStop = $true; break }
     try { $script:made = $null; $null = & { $script:made = Add-PnPListItem -List $State.Name -Values $values -ErrorAction Stop } *>&1; $newId = [int]$script:made.Id
@@ -279,7 +280,7 @@ try {
   # R7 (counts only): the rows on each list after the write.
   foreach ($k in $keys) { $state = $info.Lists[$k]; $count = -1; try { $count = (Read-ListIds $state.Name).Count } catch { $count = -1 }   # -1: not read
     'DONE ' + $k + ' before=' + $state.Before + ' bin=' + $state.FromBin + ' made=' + $state.Made +
-      ' failed=' + $state.Failed + ' binfailed=' + $state.BinFailed + ' unlinked=' + $state.Unlinked + ' now=' + $count }
+      ' failed=' + $state.Failed + ' skipped=' + $state.Skipped + ' binfailed=' + $state.BinFailed + ' unlinked=' + $state.Unlinked + ' now=' + $count }
 } finally {
   if ($pauseSwitch) { $back = @{ $pauseSwitch.Field = $pauseSwitch.Old }
     try { $null = & { Set-PnPListItem -List $pauseSwitch.List -Identity $pauseSwitch.Row.Id -Values $back -ErrorAction Stop } *>&1; 'RESUME ok' }
@@ -433,15 +434,17 @@ function Invoke-Restore([string]$Base, [string]$Dir, $Plan, [scriptblock]$Tick) 
   for ($i = 1; $i -le $lists.Count; $i++) {
     $listName = [string]$lists[$i - 1]; $doneText = [string]$done[$i]; $item = $Plan.Plan[$i]
     if (-not $item -or $item.Error) { continue }
-    if ($doneText -notmatch '^before=(\d+) bin=(\d+) made=(\d+) failed=(\d+) binfailed=(\d+) unlinked=(\d+) now=(-?\d+)$') {
+    if ($doneText -notmatch '^before=(\d+) bin=(\d+) made=(\d+) failed=(\d+) skipped=(\d+) binfailed=(\d+) unlinked=(\d+) now=(-?\d+)$') {
       $bad++; $lines += ('FINDING: "' + $listName + '": no result. What to do: compare the list with the backup'); continue }
-    $before = [int]$Matches[1]; $fromBin = [int]$Matches[2]; $made = [int]$Matches[3]; $notConfirmed = [int]$Matches[4]; $unlinkedCount = [int]$Matches[6]; $now = [int]$Matches[7]
+    $before = [int]$Matches[1]; $fromBin = [int]$Matches[2]; $made = [int]$Matches[3]; $notConfirmed = [int]$Matches[4]; $skipped = [int]$Matches[5]
+    $unlinkedCount = [int]$Matches[7]; $now = [int]$Matches[8]
     $back += $fromBin + $made
-    $want = $before + $fromBin + $made; $ok = ($notConfirmed -eq 0 -and $now -eq $want)
+    $want = $before + $fromBin + $made; $ok = ($notConfirmed -eq 0 -and $skipped -eq 0 -and $now -eq $want)
     $txt = '"' + $listName + '": ' + $fromBin + ' back from the Recycle Bin, ' + $made + ' made new; ' + $now + ' rows on the list now'
     if ($unlinkedCount) { $txt += '; ' + $unlinkedCount + ' lookup value(s) left empty (the row they pointed to is not there)' }
     if ($ok) { $lines += ('PASS: ' + $txt); continue }
     $notConfirmedText = $(if ($notConfirmed) { '; ' + $notConfirmed + ' row(s) not confirmed (they may be on the list; Restore never makes them again)' } else { '' })
+    if ($skipped) { $notConfirmedText += '; ' + $skipped + ' row(s) not written: a saved value could not be read (the next dry run offers them again)' }
     $bad++; $lines += ('FINDING: ' + $txt + $notConfirmedText + '. What to do: compare the list with the backup') }
   if ($res -ne 'done') { $bad++
     $lines += ('FINDING: Restore stopped before the end: ' + (Get-ChildStopText $res $child.Why) + '. What to do: run Restore again (it puts back only what is still missing)') }
