@@ -62,12 +62,12 @@ $ui.ToolResult = {
 # Restore, card 1 (view restpick): the backups on this computer, newest first, one row each. A site that is not a test
 # site, or no backup, goes straight to the result card. Takes nothing.
 $ui.VRestorePick = {
-  $bp = Get-BasePath; $t = Test-RestoreSite $bp
-  if (-not $t.Ok) { & $ui.ToolResult 'Restore' @{ State = 'refused'; Path = ''; Lines = $t.Lines }; return }
+  $bp = Get-BasePath; $siteCheck = Test-RestoreSite $bp
+  if (-not $siteCheck.Ok) { & $ui.ToolResult 'Restore' @{ State = 'refused'; Path = ''; Lines = $siteCheck.Lines }; return }
   $ui.RestoreSets = @(Get-BackupSet $bp)
   if (-not $ui.RestoreSets.Count) { & $ui.ToolResult 'Restore' @{ State = 'none'; Path = ''; Lines = @('There is no backup of this app on this computer.', 'Select "Back up" first.') }; return }
-  $rows = @(for ($k = 0; $k -lt $ui.RestoreSets.Count; $k++) { $b = $ui.RestoreSets[$k]
-      @{ Index = $k; Name = $b.Name; Ver = ''; Sub = ([string]$b.Lists + ' of ' + @($script:app.Backup).Count + ' lists'); R1 = $(if ($k -eq 0) { 'Newest' } else { '' }) } })
+  $rows = @(for ($k = 0; $k -lt $ui.RestoreSets.Count; $k++) { $set = $ui.RestoreSets[$k]
+      @{ Index = $k; Name = $set.Name; Ver = ''; Sub = ([string]$set.Lists + ' of ' + @($script:app.Backup).Count + ' lists'); R1 = $(if ($k -eq 0) { 'Newest' } else { '' }) } })
   & $ui.SetCard @{ View = 'restpick'; Kicker = [string]$ui.Kick.Text; Sentence = 'Which backup does Restore use?'
     P = @('Restore first runs a dry run on the site and shows what it would put back. Nothing is written before you confirm.')
     Options = $rows; OnOption = { param($j) & $ui.RestorePlan $j }; Back = { & $ui.VTools $ui.MaintVerb } } }
@@ -76,20 +76,20 @@ $ui.RestorePlan = {
   <#
   .SYNOPSIS
   Restore, card 2: runs the dry run of the backup picked (reads the site only), then shows the confirm card.
-  .PARAMETER J
+  .PARAMETER Row
   The backup's row number on the restpick card.
   #>
-  param([int]$J)
-  if ($ui.Busy -or $J -ge @($ui.RestoreSets).Count) { return }
-  $ui.RestoreDir = [string]$ui.RestoreSets[$J].Path
+  param([int]$Row)
+  if ($ui.Busy -or $Row -ge @($ui.RestoreSets).Count) { return }
+  $ui.RestoreDir = [string]$ui.RestoreSets[$Row].Path
   & $ui.SetCard @{ View = 'toolrun'; Kicker = [string]$ui.Kick.Text; Sentence = 'The Restore dry run is running.'; P = @('Reads the site. Nothing is written. A sign-in window may open.') }
-  $ui.Busy = $true; [System.Windows.Forms.Application]::DoEvents(); $p = $null
-  try { $p = Invoke-RestorePlan (Get-BasePath) $ui.RestoreDir { [System.Windows.Forms.Application]::DoEvents() } }
-  catch { $p = @{ State = 'failed'; Lines = @(('The dry run stopped with an error [' + $_.Exception.GetType().Name + '].'), 'Nothing was changed.') } }
+  $ui.Busy = $true; [System.Windows.Forms.Application]::DoEvents(); $dry = $null
+  try { $dry = Invoke-RestorePlan (Get-BasePath) $ui.RestoreDir { [System.Windows.Forms.Application]::DoEvents() } }
+  catch { $dry = @{ State = 'failed'; Lines = @(('The dry run stopped with an error [' + $_.Exception.GetType().Name + '].'), 'Nothing was changed.') } }
   finally { $ui.Busy = $false }
   if ($ui.Form.IsDisposed -or $script:closing) { return }
-  if ($p.State -ne 'plan') { & $ui.ToolResult 'Restore' $p; return }
-  $ui.RestoreDry = $p; & $ui.VRestoreConfirm }
+  if ($dry.State -ne 'plan') { & $ui.ToolResult 'Restore' $dry; return }
+  $ui.RestoreDry = $dry; & $ui.VRestoreConfirm }
 
 $ui.VRestoreConfirm = {
   <#
@@ -100,13 +100,13 @@ $ui.VRestoreConfirm = {
   The Administrator, 2026-11-21: the user types the app name, then RADE saves a fresh backup, then writes. With nothing
   to put back the card has Done only. Reads $ui.RestoreDry (Invoke-RestorePlan); takes no parameter.
   #>
-  $p = $ui.RestoreDry; $lines = @($p.Lines)
-  if (-not $p.Missing) { & $ui.SetCard @{ View = 'restconfirm'; Kicker = [string]$ui.Kick.Text; Sentence = 'Nothing to restore.'
+  $dry = $ui.RestoreDry; $lines = @($dry.Lines)
+  if (-not $dry.Missing) { & $ui.SetCard @{ View = 'restconfirm'; Kicker = [string]$ui.Kick.Text; Sentence = 'Nothing to restore.'
       P = @($lines | Select-Object -First 1); Lines = @($lines | Select-Object -Skip 1)
       Buttons = @(@{ Text = 'Done'; Kind = 'primary'; Act = { & $ui.VTools $ui.MaintVerb } }); Back = { & $ui.VRestorePick } }; return }
   $pz = $script:app.Restore.Pause
   $flow = $(if ($pz) { "RADE turns the app's pause switch on while it writes, then puts it back." } else { 'This app names no pause switch: its flows keep running while rows come back.' })
-  & $ui.SetCard @{ View = 'restconfirm'; Light = 'you'; Kicker = [string]$ui.Kick.Text; Sentence = ('Put back ' + $p.Missing + ' rows on the site?')
+  & $ui.SetCard @{ View = 'restconfirm'; Light = 'you'; Kicker = [string]$ui.Kick.Text; Sentence = ('Put back ' + $dry.Missing + ' rows on the site?')
     P = @($lines[0], ('RADE first saves a fresh backup. Rows on the lists now are not changed. ' + $flow)); Lines = @($lines | Select-Object -Skip 1)
     Field = @{ Label = ('Type ' + $script:app.Name + ' to confirm'); Text = ''; Name = 'The app name, to confirm Restore' }; Focus = 'field'
     Buttons = @(@{ Text = 'Restore'; Kind = 'primary'; Act = { & $ui.RestoreGo } }); Back = { & $ui.VRestorePick } } }

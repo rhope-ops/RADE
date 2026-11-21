@@ -9,7 +9,7 @@
 param([Parameter(Mandatory = $true)][string]$Dir)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-foreach ($p in '01-base', '02-config', '03-files', '04-steps', '05-installed', '07-checks', '08-saved-checks', '13-maintenance') { . (Join-Path $root ('engine/ps/' + $p + '.ps1')) }
+foreach ($p in '01-base', '02-config', '03-files', '04-steps', '05-installed', '07-checks', '08-saved-checks', '13-maintenance', '14-restore') { . (Join-Path $root ('engine/ps/' + $p + '.ps1')) }
 # What a bundle sets before the engine: fake data only.
 $round = 'R01'; $buildId = 'abcd1234'; $engineRelease = 30; $appFolder = 'SampleApp'; $sitePrefix = 'https://usaf.dps.mil/sites/'
 $script:appChecks = @(); $script:runLog = New-Object System.Collections.Generic.List[string]
@@ -270,4 +270,8 @@ Assert-Case 'diagnose: a good install says PASS' ($ok -and $all -like '*PASS: Th
 # D0: the app's checks run again; a check that runs on its own gives one line with its state.
 $script:appChecks = @('ps'); $d = Invoke-Diagnose $base $null; $all = $d.Lines -join ' '
 Assert-Case 'diagnose: D0 runs the app checks again' ($all -match '(PASS|FINDING): [^:]+: (PASSED|WARNING|FAILED|NOT RUN)')
+# The child scripts are PowerShell in here-strings: the parser reads each one (code standard C10 and X2).
+foreach ($c in @(@{ N = 'Back up'; T = $backupScript }, @{ N = 'Restore'; T = $restoreScript })) { $perr = $null
+  $null = [System.Management.Automation.Language.Parser]::ParseInput($c.T, [ref]$null, [ref]$perr)
+  Assert-Case ('child script parses: ' + $c.N) (@($perr).Count -eq 0) }
 Write-Host ('TOOLS-UNIT pass=' + $script:pass + ' fail=' + $script:fail)

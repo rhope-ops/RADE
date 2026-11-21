@@ -7,7 +7,7 @@ For round R41 of 90-161.Z (test site only). Decisions: [plan](2026-11-21-plan-re
 - Maintenance > Restore: pick a backup, a dry run with counts per list (nothing written), type the app name, then a fresh backup, the pause switch on, the Recycle Bin (same IDs), new rows for the rest (lookups to re-made rows re-pointed), the pause switch back, and a count check. Missing rows only: a row on the list is never changed; a row made after the backup stays.
 - Restore runs only on a site in the manifest's `restore.testSites`; on any other site the card says so and nothing changes.
 - Back up: a list title may hold parentheses (the R39 open item: "... (DAF Form 847)" style titles).
-- Engine files: 36 (new `engine/rade_fields.py`).
+- Engine files: 37 (new `engine/rade_fields.py` and `engine/ps/14-restore.ps1`).
 
 ## Before R41: app work in 90-161.Z (a session of that app; RADE does not edit it)
 
