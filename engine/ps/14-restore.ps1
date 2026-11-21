@@ -233,7 +233,7 @@ cannot be saved stops new rows ($script:mapStop). A row whose group is on the li
 .PARAMETER State
 The list's state.
 .OUTPUTS
-None; sets Made, Failed and Unlinked on the state.
+None; sets Made, Failed, Skipped and Unlinked on the state.
 #>
 function Add-MissingRows($State) {
   $State.Made = 0; $State.Failed = 0; $State.Skipped = 0; $script:unlinked = 0
@@ -275,7 +275,7 @@ $pauseSwitch = Set-PauseOn; if ($pauseSwitch) { 'PAUSE on' }   # the function gi
 $script:stopMake = $false; $script:mapStop = $false
 try {
   Restore-BinRows
-  foreach ($k in (Get-ListOrder)) { $state = $info.Lists[$k]; $state.Made = 0; $state.Failed = 0; $state.Unlinked = 0
+  foreach ($k in (Get-ListOrder)) { $state = $info.Lists[$k]; $state.Made = 0; $state.Failed = 0; $state.Skipped = 0; $state.Unlinked = 0
     if (-not ($script:stopMake -or $script:mapStop)) { Add-MissingRows $state } }   # a list not read again, or a record not saved: no new row
   # R7 (counts only): the rows on each list after the write.
   foreach ($k in $keys) { $state = $info.Lists[$k]; $count = -1; try { $count = (Read-ListIds $state.Name).Count } catch { $count = -1 }   # -1: not read

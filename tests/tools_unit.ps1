@@ -242,6 +242,8 @@ $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
 $mf = @(Get-ChildItem -LiteralPath (Join-Path $base 'Backups') -Filter '~restore-map-*.json')[0].FullName; $blk = $mf + '.new'; $null = New-Item -ItemType Directory -Path $blk
 $pl = Invoke-RestorePlan $base $b.Path $null; Start-Sleep -Seconds 1; $w = Invoke-Restore $base $b.Path $pl $null
 $p1 = @((Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json).items.'Sample Pubs' | Where-Object { $_.Title -eq 'P1' })
+Assert-Case 'restore: the lists after a stop keep their count lines' (@($w.Lines | Where-Object { $_ -like '*: no result*' }).Count -eq 0 -and
+  @($w.Lines | Where-Object { $_ -like 'PASS: "Sample Endorse":*' }).Count -eq 1)
 Assert-Case 'restore: a record that cannot be saved stops before the row' ($pl.Missing -eq 1 -and $w.State -eq 'failed' -and $p1.Count -eq 0 -and
   ($w.Lines -join ' ') -like '*record of re-made rows could not be saved*')
 Remove-Item -LiteralPath $blk -Recurse -Force
