@@ -82,12 +82,12 @@ $ui.VRestorePick = {
   $ui.RestoreSets = @(Get-BackupSet $appPath)
   $noSet = @('There is no backup of this app on this computer.', 'Select "Back up" first.')
   if (-not $ui.RestoreSets.Count) { & $ui.ToolResult 'Restore' @{ State = 'none'; Path = ''; Unmark = $marked; Lines = $noSet }; return }
-  $buttons = $(if ($marked) { @(& $ui.UnmarkButton) } else { $null })   # the focus stays on the text: Enter never removes the mark
+  $buttons = $(if ($marked) { @(& $ui.UnmarkButton) } else { $null })   # the focus is on the newest backup row (SetCard), never on this button
   $rows = @(for ($k = 0; $k -lt $ui.RestoreSets.Count; $k++) { $set = $ui.RestoreSets[$k]
       @{ Index = $k; Name = $set.Name; Ver = ''; Sub = ([string]$set.Lists + ' of ' + @($script:app.Backup).Count + ' lists'); R1 = $(if ($k -eq 0) { 'Newest' } else { '' }) } })
   & $ui.SetCard @{ View = 'restpick'; Kicker = [string]$ui.Kick.Text; Sentence = 'Which backup does Restore use?'
     P = @('Restore first runs a dry run on the site and shows what it would put back. Nothing is written before you confirm.')
-    Options = $rows; OnOption = { param($j) & $ui.RestorePlan $j }; Buttons = $buttons; Focus = 'text'; Back = { & $ui.VTools $ui.MaintVerb } } }
+    Options = $rows; OnOption = { param($j) & $ui.RestorePlan $j }; Buttons = $buttons; Back = { & $ui.VTools $ui.MaintVerb } } }
 
 # The "Remove test-site mark" button (engine-v33; the Administrator, 2026-11-21): a secondary button on the backup card
 # and on the no-backup result card of a marked site. Takes nothing; gives back the button table.

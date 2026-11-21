@@ -237,8 +237,8 @@ def restore_why(lines):
         return ["the Restore mark card did not save the mark and go on to the backup list"]
     if drawn and not any(" view=restpick " in l and "[Remove test-site mark]" in l for l in cards):
         return ["the Restore backup card of a marked site did not show \"Remove test-site mark\""]
-    if drawn and "WIN restore-unmark-button shown=True focused=False" not in lines:
-        return ["\"Remove test-site mark\" was not on the backup card, or it had the focus (Enter would remove the mark)"]
+    if drawn and "WIN restore-unmark-button shown=True focused=False row-focused=True" not in lines:
+        return ["\"Remove test-site mark\" was not on the backup card, or the focus was not on the newest backup row"]
     if drawn and not ("WIN restore-unmarked-site view=restmark" in lines and "WIN restore-nobackup-button view=toolres shown=True" in lines):
         return ["after the removal the mark card did not show, or the no-backup card of a marked site had no button"]
     if drawn and "WIN restore-unmark gone=True view=toolres" not in lines:

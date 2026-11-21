@@ -56,12 +56,13 @@ function global:Save-RadeRestore {
   Save-RadeCard 'toolres-restore'
   # engine-v33: the backup card of a marked site has "Remove test-site mark"; the focus is not on it; a click removes the mark.
   & $ui.VRestorePick; $ub = @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Remove test-site mark' })[0]
-  Write-Host ('WIN restore-unmark-button shown=' + [bool]$ub + ' focused=' + $(if ($ub) { $ub.Focused } else { 'n/a' }))
+  $row0 = @($ui.Opts.Controls)[0]   # the newest backup: it has the focus, so Enter opens its dry run and never removes the mark
+  Write-Host ('WIN restore-unmark-button shown=' + [bool]$ub + ' focused=' + $(if ($ub) { $ub.Focused } else { 'n/a' }) + ' row-focused=' + $(if ($row0) { $row0.Focused } else { 'n/a' }))
   if ($ub) { $ub.PerformClick() }; Save-RadeCard 'toolres-unmark'
   Write-Host ('WIN restore-unmark gone=' + (-not (Test-Path -LiteralPath $mk)) + ' view=' + $ui.View)
   & $ui.VRestorePick; Write-Host ('WIN restore-unmarked-site view=' + $ui.View)   # no mark: the mark card again, no button
   # A marked site with no backup: the result card has the button too.
-  Save-RestoreMark $bp $nm; Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force
+  Save-RestoreMark $bp $nm; Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force -ErrorAction Stop   # a failure stops the run with its error
   & $ui.VRestorePick; Save-RadeCard 'toolres-nobackup-marked'
   Write-Host ('WIN restore-nobackup-button view=' + $ui.View + ' shown=' + [bool]@($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Remove test-site mark' }).Count)
   Get-ChildItem -LiteralPath $cfg -Filter '*-site.txt' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notin $had } | Remove-Item -Force
