@@ -215,15 +215,25 @@ function Get-GuideAnswerText($Q) {
 }
 # Adds one line to the run log, when a log exists. Takes the line; gives back nothing.
 function Add-RunLog([string]$T) { if ($null -ne $script:runLog) { $script:runLog.Add($T) } }
-# No scripts in results (the PFM, 2026-11-20): says whether a file name has a script extension ($scriptExts, from the
-# build's SCRIPT_EXTS). The first time a name is refused, one line goes to the run log. Takes the file name; gives back
-# $true for a script file.
-function Test-ScriptResult([string]$Name) {
+# No scripts in results (the PFM, 2026-11-20): says whether a file is a script: a script extension ($scriptExts, from
+# the build's SCRIPT_EXTS), or (engine-v33) a saved copy of a bundle under any name, which starts with the line
+# "# @@BUNDLE-HASH" (the .txt copy a person can save from a link). The first time a name is refused, one line goes to
+# the run log. Takes the file name and, when there is one, its full path; gives back $true for a script file.
+function Test-ScriptResult([string]$Name, [string]$Path = '') {
   $ext = [System.IO.Path]::GetExtension($Name).ToLowerInvariant()
-  if (@($scriptExts) -notcontains $ext) { return $false }
+  if ((@($scriptExts) -notcontains $ext) -and -not (Test-BundleCopy $Path)) { return $false }
   if ($null -eq $script:scriptsSkipped) { $script:scriptsSkipped = @{} }
   if (-not $script:scriptsSkipped.ContainsKey($Name)) { $script:scriptsSkipped[$Name] = $true; Add-RunLog ('SKIPPED script file ' + $Name + ' (scripts never go in results)') }
   return $true
+}
+# Says whether a file starts with the bundle hash line, so it is a copy of a bundle (a whole script) whatever its name.
+# Reads only the first line; a file it cannot read counts as no copy (the extension check still holds). Takes the full
+# path ('' for none); gives back $true for a bundle copy.
+function Test-BundleCopy([string]$Path) {
+  if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
+  $reader = $null
+  try { $reader = New-Object System.IO.StreamReader($Path); $first = [string]$reader.ReadLine() } catch { return $false } finally { if ($reader) { $reader.Dispose() } }
+  return $first.TrimStart([char]0xFEFF).StartsWith('# @@BUNDLE-HASH ')
 }
 # Fills the results folder Rounds\<round>: a copy of each collect file (never a script file), then the report (the
 # summary and the full log). Takes the RADE app folder and the summary; gives back the folder, the file count and the
@@ -242,7 +252,7 @@ function Export-RoundResult([string]$Base, [string[]]$Summary) {
       # Windows -Filter '*.htm' also matches '.html': keep each file once. Copies carry the task prefix (T09-..., T12-...) so
       # two tasks never overwrite each other, and older copies of that task are removed first (review R10).
       $hits = @(); if (Test-Path -LiteralPath $src -PathType Container) { foreach ($pat in ($c.Name -split ';')) { $hits += @(Get-ChildItem -LiteralPath $src -File -Filter $pat -ErrorAction SilentlyContinue) } }
-      $hits = @($hits | Sort-Object FullName -Unique | Where-Object { -not (Test-ScriptResult $_.Name) })   # a script never goes in results
+      $hits = @($hits | Sort-Object FullName -Unique | Where-Object { -not (Test-ScriptResult $_.Name $_.FullName) })   # a script never goes in results
       Get-ChildItem -LiteralPath $out -File -Filter ($c.Dir + '-*') -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
       foreach ($h in $hits) { Copy-Item -LiteralPath $h.FullName -Destination (Join-Path $out ($c.Dir + '-' + $h.Name)) -Force; $count++ }
       if (-not $hits.Count) { $missing += ($c.Dir + '\' + $c.Name) }
@@ -251,7 +261,7 @@ function Export-RoundResult([string]$Base, [string[]]$Summary) {
     $old = Join-Path $out $c.Name
     if (Test-Path -LiteralPath $old -PathType Leaf) { Remove-Item -LiteralPath $old -Force }   # an older copy of the same name must not be sent again
     $p = Join-Path $src $c.Name
-    if (Test-ScriptResult $c.Name) { continue }   # the build refuses such a name; this is the second guard
+    if (Test-ScriptResult $c.Name $p) { continue }   # the build refuses such a name; this is the second guard
     if (Test-Path -LiteralPath $p -PathType Leaf) { Copy-Item -LiteralPath $p -Destination (Join-Path $out $c.Name) -Force; $count++ } else { $missing += ($c.Dir + '\' + $c.Name) }
   }
   if ($missing.Count) { $script:roundBad = $true }
@@ -305,7 +315,7 @@ function Save-RoundDraft([string]$Dir, [string[]]$Summary, [string]$To, [string]
     $m.Subject = $Summary[0]
     if ($To) { $m.To = $To }
     $m.Body = ((@($Summary | Select-Object -Skip 1) + @('', $WindowLine)) -join "`r`n")
-    foreach ($f in @(Get-ChildItem -LiteralPath $Dir -File)) { if ($f.Name -ne $stateName -and -not (Test-ScriptResult $f.Name)) { [void]$m.Attachments.Add($f.FullName) } }   # never a script, never the resume state
+    foreach ($f in @(Get-ChildItem -LiteralPath $Dir -File)) { if ($f.Name -ne $stateName -and -not (Test-ScriptResult $f.Name $f.FullName)) { [void]$m.Attachments.Add($f.FullName) } }   # never a script, never the resume state
     $m.Display()   # first: if it fails, nothing is left in Drafts
     $m.Save()
     return ''

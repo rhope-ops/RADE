@@ -72,4 +72,13 @@ Assert-Case 'collect: the PDF is copied' ($got -contains 'T22-SAMPLE-T22-feedbac
 Assert-Case 'collect: no script file is copied' (-not @($got | Where-Object { $_ -match '\.(ps1|cmd)$' }).Count)
 $one = @($script:runLog | Where-Object { $_ -eq 'SKIPPED script file SAMPLE-T22-feedback-r1.ps1 (scripts never go in results)' }).Count
 Assert-Case 'collect: one SKIPPED line for each script file' ($one -eq 1 -and @($script:runLog | Where-Object { $_ -like 'SKIPPED script file *' }).Count -eq 2)
+# A saved bundle copy (engine-v33: the .txt a link opens) is a whole script under any name: the collect step refuses it by
+# its first line; a text file that only mentions the hash line later is still copied.
+Set-Content -LiteralPath (Join-Path $src 'SAMPLE-T22-feedback-r2.txt') -Value @('# @@BUNDLE-HASH 0123 @@', 'Write-Host x')
+Set-Content -LiteralPath (Join-Path $src 'SAMPLE-T22-feedback-r3.txt') -Value @('notes', '# @@BUNDLE-HASH 0123 @@')
+$z = Export-RoundResult $base @('subject', 'line')
+$got = @(Get-ChildItem -LiteralPath $z.Dir -File | ForEach-Object { $_.Name })
+Assert-Case 'collect: a saved bundle copy (.txt) is not copied' (-not ($got -contains 'T22-SAMPLE-T22-feedback-r2.txt'))
+Assert-Case 'collect: a plain .txt is still copied' ($got -contains 'T22-SAMPLE-T22-feedback-r3.txt')
+Assert-Case 'collect: the bundle copy has its SKIPPED line' (@($script:runLog | Where-Object { $_ -eq 'SKIPPED script file SAMPLE-T22-feedback-r2.txt (scripts never go in results)' }).Count -eq 1)
 Write-Host ('RESUME-UNIT pass=' + $script:pass + ' fail=' + $script:fail)

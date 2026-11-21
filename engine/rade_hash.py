@@ -63,7 +63,12 @@ def text_copy(out):
 
     Returns:
         The path of the copy.
+
+    Raises:
+        ValueError: when out is not a .ps1 path (the copy would replace another file, or be the bundle itself).
     """
+    if Path(out).suffix.lower() != '.ps1':
+        raise ValueError('a bundle path must end in .ps1: %s' % out)
     return out.with_suffix('.txt')
 
 
