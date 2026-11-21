@@ -106,10 +106,10 @@ $ui.VRestoreConfirm = {
       Buttons = @(@{ Text = 'Done'; Kind = 'primary'; Act = { & $ui.VTools $ui.MaintVerb } }); Back = { & $ui.VRestorePick } }; return }
   $pauseDef = $script:app.Restore.Pause
   $flow = $(if ($pauseDef) { "RADE turns the app's pause switch on while it writes, then puts it back." } else { 'This app names no pause switch: its flows keep running while rows come back.' })
+  # One operator (the Administrator, 2026-11-21): the record of re-made rows is in this RADE folder only.
+  $oneOperator = 'Only one person runs Restore for this site, from this RADE folder.'
   & $ui.SetCard @{ View = 'restconfirm'; Light = 'you'; Kicker = [string]$ui.Kick.Text; Sentence = ('Put back ' + $dry.Missing + ' rows on the site?')
-    # One operator (the Administrator, 2026-11-21): the record of re-made rows is in this RADE folder only.
-    $one = 'Only one person runs Restore for this site, from this RADE folder.'
-    P = @($lines[0], ('RADE first saves a fresh backup. Rows on the lists now are not changed. ' + $flow + ' ' + $one)); Lines = @($lines | Select-Object -Skip 1)
+    P = @($lines[0], ('RADE first saves a fresh backup. Rows on the lists now are not changed. ' + $flow + ' ' + $oneOperator)); Lines = @($lines | Select-Object -Skip 1)
     Field = @{ Label = ('Type ' + $script:app.Name + ' to confirm'); Text = ''; Name = 'The app name, to confirm Restore' }; Focus = 'field'
     Buttons = @(@{ Text = 'Restore'; Kind = 'primary'; Act = { & $ui.RestoreGo } }); Back = { & $ui.VRestorePick } } }
 
