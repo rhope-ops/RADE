@@ -11,7 +11,7 @@ is written from:
   - index.html: the paste steps (the page's STEPS list), so the steps have one home.
 A script whose text does not match its own hash line or its stored hash is not written to the README: FAIL.
 
-Usage: python3 scripts/build_readme.py [--write]   Pass = last line "README apps=N pass".
+Usage: python3 scripts/build_readme.py [--write]   Pass = last line "README PASS apps=N" (fail: "README FAIL apps=N").
 --write writes README.md; without it the check fails when README.md is not the current text.
 scripts/check.local.sh runs the check in the full lane only (it needs github.com), as the app canary does.
 Run target: Python 3.
@@ -161,20 +161,20 @@ def main(write):
     try:
         part = generated()
     except Exception as e:   # a fetch, a manifest or a hash problem: never written, never a pass
-        print('FAIL ' + str(e))
-        print('README apps=%d fail' % n)
+        print('README FAIL: ' + str(e))
+        print('README FAIL apps=%d' % n)
         sys.exit(1)
     old = README.read_text(encoding='utf-8')
     new = spliced(old, part)
     if new is None:
-        print('FAIL README.md lacks the marks of the generated part')
+        print('README FAIL: README.md: the marks of the generated part are missing')
     elif write and new != old:
         README.write_text(new, encoding='utf-8')
         print('README wrote README.md')
     elif new != old:
-        print('FAIL README.md is out of date: run python3 scripts/build_readme.py --write')
+        print('README FAIL: README.md: out of date; run: python3 scripts/build_readme.py --write')
     ok = new is not None and (write or new == old)
-    print('README apps=%d %s' % (n, 'pass' if ok else 'fail'))
+    print('README %s apps=%d' % ('PASS' if ok else 'FAIL', n))
     sys.exit(0 if ok else 1)
 
 
