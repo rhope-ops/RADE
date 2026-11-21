@@ -327,6 +327,31 @@ function Save-RestoreMark([string]$Base, [string]$Name) {
   $p = Get-RestoreMarkFile $Base; $dir = Split-Path -Parent $p
   if (-not (Test-Path -LiteralPath $dir -PathType Container)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
   [System.IO.File]::WriteAllText($p, ($Name.Trim() + "`r`n"), (New-Object System.Text.UTF8Encoding $true)) }
+# Removes the mark (engine-v33; the Administrator, 2026-11-21): Restore then asks for the site name again. Throws when
+# the file is there and cannot be removed. Takes the app folder.
+function Remove-RestoreMark([string]$Base) {
+  $p = Get-RestoreMarkFile $Base; if (Test-Path -LiteralPath $p -PathType Leaf) { Remove-Item -LiteralPath $p -Force -ErrorAction Stop } }
+<#
+.SYNOPSIS
+Diagnose's line about the local test-site mark (engine-v33; the Administrator, 2026-11-21: one NOTE line).
+.DESCRIPTION
+Only for an app with "testSites": "local". A NOTE, never a FINDING: no mark is a normal state. Names no site (the
+report is saved on the computer).
+.PARAMETER Base
+The RADE app folder.
+.OUTPUTS
+A ConvertTo-ToolLine table, or $null for an app without the local mark.
+#>
+function Get-RestoreMarkNote([string]$Base) {
+  if (-not ($script:app.Restore -and $script:app.Restore.Local)) { return $null }
+  $site = Get-SiteUrl $Base; $mark = Get-RestoreMark $Base
+  if (-not (Test-SiteUrl $site)) { return (ConvertTo-ToolLine 'NOTE' 'Restore test-site mark: no site address is saved' 'Select "Repair": its checks ask for the site address') }
+  $name = $site.Substring($sitePrefix.Length).TrimEnd('/')
+  if (-not $mark) { return (ConvertTo-ToolLine 'NOTE' 'Restore test-site mark: the saved site is not marked, so Restore asks for its name first' '') }
+  $off = 'To take the mark off, select Restore, then "Remove test-site mark"'
+  if ($mark -eq $name) { return (ConvertTo-ToolLine 'NOTE' 'Restore test-site mark: the saved site is marked as a test site on this computer' $off) }
+  return (ConvertTo-ToolLine 'NOTE' 'Restore test-site mark: the mark on this computer is for another site, so Restore asks for the name of the saved site first' '')
+}
 
 <#
 .SYNOPSIS

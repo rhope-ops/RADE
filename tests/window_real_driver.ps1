@@ -54,6 +54,8 @@ function global:Save-RadeRestore {
   & $ui.ToolResult 'Restore' @{ State = 'done'; Path = (Join-Path $bp 'Backups\20261121-091500'); Lines = @('Restore put back 3 of 3 rows. Rows on the lists were not changed.',
       'Fresh backup before Restore: Backups\20261121-091500', "The app's pause switch is back as it was.", 'PASS: "Sample Tasks": 1 back from the Recycle Bin, 2 made new; 12 rows on the list now') }
   Save-RadeCard 'toolres-restore'
+  & $ui.RestoreUnmark; Save-RadeCard 'toolres-unmark'   # engine-v33: the button of the backup card
+  Write-Host ('WIN restore-unmark gone=' + (-not (Test-Path -LiteralPath $mk)) + ' view=' + $ui.View)
   Get-ChildItem -LiteralPath $cfg -Filter '*-site.txt' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notin $had } | Remove-Item -Force
   if ($keepMark) { [System.IO.File]::WriteAllBytes($mk, $keepMark) } else { Remove-Item -LiteralPath $mk -Force -ErrorAction SilentlyContinue }
   Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force; $script:app.Backup = $keep.B; $script:app.Restore = $keep.R

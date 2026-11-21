@@ -141,9 +141,17 @@ $script:app.Restore = @{ TestSites = @(); Local = $true; Pause = $pause }; Save-
 Assert-Case 'restore: the mark of this site lets Restore run (without case)' ($t.Ok -and $t.Name -eq 'fake')
 Assert-Case 'restore: the mark is in Config next to the site address' ((Split-Path -Parent $mk) -eq (Split-Path -Parent (Get-ConfigFile $base '@@PREFIX@@-site.txt')) -and
   (Get-RestoreMark $base) -eq 'FAKE')
-Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake3'; $t = Test-RestoreSite $base; Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake'
+$n = Get-RestoreMarkNote $base
+Assert-Case 'restore: Diagnose notes a marked site, with no site name (engine-v33)' ($n.State -eq 'NOTE' -and $n.Text -like '*is marked as a test site*' -and $n.Text -notlike '*fake*')
+Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake3'; $t = Test-RestoreSite $base; $n = Get-RestoreMarkNote $base; Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake'
 Assert-Case 'restore: a new site address needs a new mark' (-not $t.Ok -and $t.NeedMark -and $t.Name -eq 'fake3')
-Remove-Item -LiteralPath $mk -Force
+Assert-Case 'restore: Diagnose notes a mark of another site' ($n.State -eq 'NOTE' -and $n.Text -like '*for another site*')
+Remove-RestoreMark $base; $t = Test-RestoreSite $base; $n = Get-RestoreMarkNote $base
+Assert-Case 'restore: a removed mark makes Restore ask again (engine-v33)' (-not (Test-Path -LiteralPath $mk) -and -not $t.Ok -and $t.NeedMark)
+Assert-Case 'restore: Diagnose notes a site with no mark' ($n.State -eq 'NOTE' -and $n.Text -like '*not marked*')
+Remove-RestoreMark $base   # no file: nothing to do, no error
+$script:app.Restore = @{ TestSites = @('fake'); Local = $false; Pause = $pause }
+Assert-Case 'restore: Diagnose has no mark line for a list of names' ($null -eq (Get-RestoreMarkNote $base))
 $script:app.Restore = @{ TestSites = @('Fake'); Pause = $pause }   # site names compare without case
 # The dry run: counts per list, nothing written.
 $pl = Invoke-RestorePlan $base $b.Path $null; $all = $pl.Lines -join ' '
@@ -307,6 +315,9 @@ $script:app.Version = '1.0.0'; $sp = Join-Path $base 'App'; $null = New-Item -It
 $d = Invoke-Diagnose $base $null; $all = $d.Lines -join ' '
 $ok = $all -like '*PASS: The installed version, 1.0.0, is the version in this paste*' -and $all -notlike '*FINDING: The start*'
 Assert-Case 'diagnose: a good install says PASS' ($ok -and $all -like '*PASS: The start script App/Start-App.ps1 is in the app folder*')
+# engine-v33: an app with "testSites": "local" gets one NOTE line about the mark; it is not a finding.
+$f0 = $d.Findings; $script:app.Restore = @{ TestSites = @(); Local = $true; Pause = $null }; $d = Invoke-Diagnose $base $null; $script:app.Restore = $null
+Assert-Case 'diagnose: the mark line is a NOTE, not a finding' ($d.Findings -eq $f0 -and @($d.Lines | Where-Object { $_ -like 'NOTE: Restore test-site mark:*' }).Count -eq 1)
 # D0: the app's checks run again; a check that runs on its own gives one line with its state.
 $script:appChecks = @('ps'); $d = Invoke-Diagnose $base $null; $all = $d.Lines -join ' '
 Assert-Case 'diagnose: D0 runs the app checks again' ($all -match '(PASS|FINDING): [^:]+: (PASSED|WARNING|FAILED|NOT RUN)')
