@@ -32,6 +32,13 @@ text = '# @@BUNDLE-HASH %s @@\n%s' % (h, body)
 size, lines, code = b.script_facts(text, {'sha256': h})
 assert size == len(text.encode('utf-8')) and lines == 4 and code == h[:12] + '...' + h[-4:], (size, lines, code)
 
+# 2b. A byte-order mark is removed first, as the page's fetch().text() does: same facts as without it.
+assert b.script_facts('\ufeff' + text, {'sha256': h}) == (size, lines, code)
+
+# 2c. Text from a manifest cannot add Markdown or HTML: markup characters are escaped.
+assert b.md('a|b <i>[x](y) `c`') == 'a\\|b \\<i\\>\\[x\\](y) \\`c\\`', b.md('a|b <i>[x](y) `c`')
+assert b.md('Round R40 r1: window r13, fake data.') == 'Round R40 r1: window r13, fake data.'
+
 # 3. Refused: no hash line, a changed text, a stored hash that differs or cannot be read.
 for t, stored in [(body, {'sha256': h}), (text + 'x', {'sha256': h}), (text, {'sha256': '0' * 64}), (text, {})]:
     try:

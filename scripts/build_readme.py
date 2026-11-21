@@ -45,6 +45,11 @@ def fetch(url):
         raise RuntimeError('%s did not load: %s' % (url, e)) from e
 
 
+def md(s):
+    """Return text from an app's manifest as plain Markdown text: no HTML, link, table or code markup (as the page's esc())."""
+    return re.sub(r'([\\`*_\[\]|<>#])', r'\\\1', str(s))
+
+
 def short(h):
     """Return the short form of a SHA-256: the first 12 and the last 4 hex characters (as the page and the window)."""
     return h[:12] + '...' + h[-4:]
@@ -78,6 +83,7 @@ def script_facts(text, stored):
     Returns:
         (bytes, lines, short hash), counted as the RADE page counts them (UTF-8 bytes; lines = parts between LF).
     """
+    text = text[1:] if text.startswith('\ufeff') else text   # a byte-order mark, removed as fetch().text() does
     t = text.replace('\r\n', '\n')
     m = HASH_LINE.match(t)
     if not m:
@@ -109,7 +115,7 @@ def app_section(app, steps, help_name):
         raise RuntimeError('%s lists no script' % repo)
     b = bundles[-1]
     cat = (b.get('apps') or [{}])[0]
-    name = (m.get('application') or {}).get('name') or repo
+    name = md((m.get('application') or {}).get('name') or repo)
     mode, ver = cat.get('mode') or b.get('mode'), cat.get('version') or b.get('version')
     # The same kind line as index.html open(): Version / Install / Drift check / Test round.
     kind = ('Version ' + ver if ver else 'Install') if mode == 'deploy' else 'Drift check' if mode == 'drift' else \
@@ -117,7 +123,7 @@ def app_section(app, steps, help_name):
     raw = base + b['out']
     blob = 'https://github.com/%s/blob/main/%s' % (repo, b['out'])
     size, lines, code = script_facts(fetch(raw), json.loads(fetch(raw + '.sha256.json')))
-    summary = cat.get('summary') or b.get('summary') or ''
+    summary = md(cat.get('summary') or b.get('summary') or '')
     out = ['## ' + name, '', '**%s**' % kind, '', '### Copy the script for %s.' % name, '']
     if summary:
         out += [summary, '']
