@@ -16,7 +16,7 @@
   ".claude/skills/rule-change/SKILL.md": "e5204618298a2f1035e19b91a7e7cfa0c35cc0fbb1518d207c9163a3592cf15c",
   ".claude/skills/verify/SKILL.md": "ae2fb3427395fdb739dcace0d47158f18548f47a43b7946aba77290a8d56cbe6",
   ".claude/skills/verify/measure.mjs": "7558802e88715bd8624ff2252280ef6c088b70d995422be88d3d8829935eb102",
-  ".github/workflows/check.yml": "d89094fbdaad0554c08869f6dee7498a668d61a7a6b6edfecee8669f658fc9ca",
+  ".github/workflows/check.yml": "a8c3aff329b9d1217e0cd3293f944496e64f2673ab297a1325d804c6c503ba7c",
   "AGENTS.md (kit sections)": "346ff8821c2e37b8e283afdb7a88ca527bc798a4fab77a8475896429bcad00e6",
   "docs/code-standard.md": "709471aed38358e00eb12abb3eea656eb86bde15bf4f0a2c22e815e399480616",
   "scripts/bloat_check.py": "d394f97b505a1307cdd4e8128cae262dd1e1c33f78372d77eaec7c62867f426e",
@@ -51,6 +51,8 @@
   "scripts/worker_guard.py": "e60c3db620834d4d773f4612ec575ea26d20e6f2fd0258ee097a6c5d5fccb3ba"
  },
  "kit": "archimedes_lever",
- "overrides": [],
+ "overrides": [
+  ".github/workflows/check.yml"
+ ],
  "version": "6.0.0"
 }
