@@ -216,8 +216,8 @@ function Get-GuideAnswerText($Q) {
 # Adds one line to the run log, when a log exists. Takes the line; gives back nothing.
 function Add-RunLog([string]$T) { if ($null -ne $script:runLog) { $script:runLog.Add($T) } }
 # No scripts in results (the PFM, 2026-11-20): says whether a file is a script: a script extension ($scriptExts, from
-# the build's SCRIPT_EXTS), or (engine-v33) a saved copy of a bundle under any name, which starts with the line
-# "# @@BUNDLE-HASH" (the .txt copy a person can save from a link). The first time a name is refused, one line goes to
+# the build's SCRIPT_EXTS), or (engine-v34) a saved copy of a bundle under any name: its first line that is not blank is
+# "# @@BUNDLE-HASH ..." (the .txt copy a person can save from a link; Test-BundleCopy). The first time a name is refused, one line goes to
 # the run log. Takes the file name and, when there is one, its full path; gives back $true for a script file.
 function Test-ScriptResult([string]$Name, [string]$Path = '') {
   $ext = [System.IO.Path]::GetExtension($Name).ToLowerInvariant()

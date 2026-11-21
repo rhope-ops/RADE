@@ -54,10 +54,34 @@ function global:Save-RadeRestore {
   & $ui.ToolResult 'Restore' @{ State = 'done'; Path = (Join-Path $bp 'Backups\20261121-091500'); Lines = @('Restore put back 3 of 3 rows. Rows on the lists were not changed.',
       'Fresh backup before Restore: Backups\20261121-091500', "The app's pause switch is back as it was.", 'PASS: "Sample Tasks": 1 back from the Recycle Bin, 2 made new; 12 rows on the list now') }
   Save-RadeCard 'toolres-restore'
+  # engine-v33: the backup card of a marked site has "Remove test-site mark"; the focus is not on it; a click removes the mark.
+  & $ui.VRestorePick; $ub = @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Remove test-site mark' })[0]
+  $row0 = @($ui.Opts.Controls)[0]   # the newest backup: it has the focus, so Enter opens its dry run and never removes the mark
+  Write-Host ('WIN restore-unmark-button shown=' + [bool]$ub + ' focused=' + $(if ($ub) { $ub.Focused } else { 'n/a' }) + ' row-focused=' + $(if ($row0) { $row0.Focused } else { 'n/a' }))
+  if ($ub) { $ub.PerformClick() }; Save-RadeCard 'toolres-unmark'
+  Write-Host ('WIN restore-unmark gone=' + (-not (Test-Path -LiteralPath $mk)) + ' view=' + $ui.View)
+  & $ui.VRestorePick; Write-Host ('WIN restore-unmarked-site view=' + $ui.View)   # no mark: the mark card again, no button
+  # A marked site with no backup: the result card has the button too.
+  Save-RestoreMark $bp $nm; Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force -ErrorAction Stop   # a failure stops the run with its error
+  & $ui.VRestorePick; Save-RadeCard 'toolres-nobackup-marked'
+  Write-Host ('WIN restore-nobackup-button view=' + $ui.View + ' shown=' + [bool]@($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Remove test-site mark' }).Count)
   Get-ChildItem -LiteralPath $cfg -Filter '*-site.txt' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notin $had } | Remove-Item -Force
   if ($keepMark) { [System.IO.File]::WriteAllBytes($mk, $keepMark) } else { Remove-Item -LiteralPath $mk -Force -ErrorAction SilentlyContinue }
-  Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force; $script:app.Backup = $keep.B; $script:app.Restore = $keep.R
+  Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force -ErrorAction SilentlyContinue; $script:app.Backup = $keep.B; $script:app.Restore = $keep.R
   & $ui.VTools $ui.MaintVerb }
+
+function global:Save-RadeTools {
+  <#
+  .SYNOPSIS
+  The Maintenance screen: draws the Restore cards once, then selects Repair or Update.
+  .DESCRIPTION
+  The timer stops while the Restore cards are drawn: their DoEvents could run a tick inside this one, which selected
+  Repair and ran the whole install; this tick then selected the primary button of the Done card ("Start", which
+  closes RADE). Repair is selected only while the Maintenance screen is still shown. Takes no parameter.
+  #>
+  $global:RadeTimer.Stop()
+  try { Save-RadeRestore } finally { $global:RadeTimer.Start() }
+  if ($ui.View -eq 'tools') { (Get-RadeMain).PerformClick() } }
 
 function global:Save-RadeCard([string]$Tag) {
   $global:RadeT.N++; $card = ('{0:00}-{1}' -f $global:RadeT.N, $Tag)
@@ -127,7 +151,7 @@ function global:Step-Rade {
     foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Index -eq $global:RadeT.App) { $o.PerformClick(); return } }
     Write-Host 'WIN BAD no choice for the application'; [Environment]::Exit(4)
   }
-  elseif ($v -eq 'maint') { Write-RadeRow; @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Maintenance' })[0].PerformClick() } elseif ($v -eq 'tools') { Save-RadeRestore; (Get-RadeMain).PerformClick() }   # the Maintenance screen (and the Restore cards once), then Repair or Update (Start would start the application)
+  elseif ($v -eq 'maint') { Write-RadeRow; @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Maintenance' })[0].PerformClick() } elseif ($v -eq 'tools') { Save-RadeTools }   # the Maintenance screen (and the Restore cards once), then Repair or Update (Start would start the application)
   elseif ($v -eq 'site') { $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }
   elseif ($v -in 'fail', 'need') {
     $id = [string]@($script:appChecks)[([int]($ui.Kick.Text -replace '^CHECK (\d+) OF .*$', '$1')) - 1]
