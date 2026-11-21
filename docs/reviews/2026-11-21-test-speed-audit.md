@@ -27,10 +27,6 @@ The probe runs only when the test sets `RADE_T_STEADY=1`, and only window run 1 
 
 ## Not done (next costs)
 
-- The window groups W, W2 and W3 still end last (the critical path): 14 window runs of about 10 s CPU each.
+- The window groups still end last (the critical path): W, W2 and W3 at 124 to 129 s, W4 at 81 s, in the profile before the fix. Together they hold 14 window runs of about 10 s CPU each.
 - `tools_unit.ps1`: 40 s CPU in one run.
 - The lane baseline (51.1 s) is not recorded again: a new baseline from this machine is slower than it, so it waits for the Administrator (AGENTS.md "Caps and audit"; the audit skill "Record a baseline").
-</content>
-</invoke>
-<invoke name="Bash">
-<parameter name="command">cd /home/user/RADE && python3 scripts/code_standard.py 2>&1 | tail -2; git add -A && git diff --cached > /tmp/claude-0/-home-user-RADE/3b54f9bc-43b2-5853-85a1-287cab2386d8/scratchpad/speed.diff; git diff --cached --stat
