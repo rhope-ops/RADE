@@ -8,4 +8,5 @@ Date: 2026-11-21. Rule: AGENTS.md "Instructions people follow"; steps: .claude/s
 - Rewrite: "Click the row with your answer. The click saves it, and you see the next question."
 - Reader 2 (a new fresh `reviewer` subagent, Sonnet tier): usable, no blocker; marked that the line does not say the click is final (the card has no Back).
 - Fix (a caution before the action): "You cannot change the answer after the click. Click the row with your answer. You then see the next card." ("card", not "question": after the last question the next card is not a question.)
+- A planned exception to the step form: the line has no cue ("Go on."), because the click itself moves on and reader 1 read the cue as a second action.
 - Result: each marked step of the engine text is fixed. Open: the app's headline should say where the person saw the result (90-161.Z).
