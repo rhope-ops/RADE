@@ -487,6 +487,8 @@ assert j['sha256'] == sha and j['short'] == sha[:12] + '...' + sha[-4:] and j['f
 assert re.search(r"(?m)^\$buildId = '%s'$" % j['buildId'], t), j
 P
 python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && cp "$hb.sha256.json" "$t/hj" && echo x >> "$hb.sha256.json" && ! python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && rm "$hb.sha256.json" && ! python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && cp "$t/hj" "$hb.sha256.json" && ok || bad "bundle hash: --check must fail on a changed or missing stored file"
+# The .txt copy (engine-v33; the Administrator, 2026-11-21): the same bytes as the bundle, and --check sees a missing or changed copy.
+cmp -s "$hb" "${hb%.ps1}.txt" && cp "${hb%.ps1}.txt" "$t/ht" && echo x >> "${hb%.ps1}.txt" && ! python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && rm "${hb%.ps1}.txt" && ! python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && cp "$t/ht" "${hb%.ps1}.txt" && python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && ok || bad "bundle .txt copy: the same bytes, and --check must fail on a changed or missing copy"
 # The bundle checks itself. The test copy is a changed text (swap), so it must say so; with the first line made right again
 # it must say "checked", also when every line ends in CR LF (as a paste in ISE can make it) and with a blank line above.
 go H; {   # group H: runs in the background (see "go" above)
