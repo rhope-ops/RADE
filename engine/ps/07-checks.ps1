@@ -218,10 +218,15 @@ static System.Collections.Generic.HashSet<long> seen = new System.Collections.Ge
 public static void Start(int width, int height, int watchMs, int tickMs) {
   w = width; h = height; left = System.Math.Max(1, watchMs / System.Math.Max(1, tickMs));
   timer = new System.Threading.Timer(Tick, null, tickMs, tickMs); }
+static object gate = new object();
+// One tick: a tick that starts while the last one still runs is skipped (the timer can overlap), so seen has one writer.
 static void Tick(object state) {
+  if (!System.Threading.Monitor.TryEnter(gate)) { return; }
   try { if (--left < 0) { timer.Dispose(); return; }
-    foreach (System.Diagnostics.ProcessThread t in System.Diagnostics.Process.GetCurrentProcess().Threads) { EnumThreadWindows((uint)t.Id, each, System.IntPtr.Zero); } }
-  catch { } }
+    using (System.Diagnostics.Process me = System.Diagnostics.Process.GetCurrentProcess()) {
+      foreach (System.Diagnostics.ProcessThread t in me.Threads) { EnumThreadWindows((uint)t.Id, each, System.IntPtr.Zero); } } }
+  catch { }
+  finally { System.Threading.Monitor.Exit(gate); } }
 // One window of this process: a visible top-level window (no owner) not seen before is sized and centered once.
 static bool Each(System.IntPtr hw, System.IntPtr l) {
   long k = hw.ToInt64(); if (seen.Contains(k) || !IsWindowVisible(hw) || GetWindow(hw, 4) != System.IntPtr.Zero) { return true; }

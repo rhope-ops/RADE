@@ -210,12 +210,14 @@ function Set-PauseOn {
 # line gives its list and the first error type, so the result card says so (E2, R42; the Administrator, 2026-11-21).
 # Takes nothing; sets $script:stopMake when a list cannot be read again.
 function Restore-BinRows {
-  foreach ($k in $keys) { $state = $info.Lists[$k]; $state.FromBin = 0; $state.BinFailed = 0; $binErr = ''
+  foreach ($k in $keys) { $state = $info.Lists[$k]; $state.FromBin = 0; $state.BinFailed = 0; $binErr = ''; $failed = @()
     foreach ($id in @($state.Bin.Keys)) { $choice = $state.Bin[$id]
       try { $null = & { Restore-PnPRecycleBinItem -Identity $choice.Item -Force -ErrorAction Stop } *>&1; $state.Have[[int]$choice.Id] = $true; $state.FromBin++ }
-      catch { $state.Bin.Remove($id); $state.BinFailed++; if (-not $binErr) { $binErr = $_.Exception.GetType().Name } } }
-    if ($binErr) { 'BINERR ' + $k + ' ' + $binErr }   # an error type only: no site, name, ID or value
-    if ($state.BinFailed) { try { foreach ($id in @((Read-ListIds $state.Name).Keys)) { $state.Have[$id] = $true } } catch { $script:stopMake = $true } } } }
+      catch { $state.Bin.Remove($id); $failed += $choice; if (-not $binErr) { $binErr = $_.Exception.GetType().Name } } }
+    if ($failed.Count) { try { foreach ($id in @((Read-ListIds $state.Name).Keys)) { $state.Have[$id] = $true } } catch { $script:stopMake = $true } }
+    # A restore that reported an error but put the row back (it is on the list now, with its own ID) counts as back.
+    foreach ($choice in $failed) { if ($state.Have.ContainsKey([int]$choice.Id)) { $state.FromBin++ } else { $state.BinFailed++ } }
+    if ($state.BinFailed) { 'BINERR ' + $k + ' ' + $binErr } } }   # an error type only: no site, name, ID or value
 
 # R5: the lists in dependency order: a list whose lookup reads another restored list comes after it; a loop keeps the
 # manifest order for the lists left. Takes nothing; gives back the list numbers.

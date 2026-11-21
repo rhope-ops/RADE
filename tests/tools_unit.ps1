@@ -308,6 +308,15 @@ Assert-Case 'restore: a Recycle Bin row that fails is a FINDING with its error t
   $all -like '*1 row(s) did not come back from the Recycle Bin (InvalidOperationException), so Restore made them as new rows with new row numbers*' -and
   $p2.Count -eq 1 -and [int]$p2[0].ID -ne [int]$row.ID)
 $s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $s.binRestoreError = $false; $s.bin = @(); $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+# A restore that reports an error but worked (review of PR 166): the row is back with its own ID, counted as back, no BINERR.
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $row = @($s.items.'Sample Pubs' | Where-Object { $_.Title -eq 'P2' })[0]
+$s.items.'Sample Pubs' = @($s.items.'Sample Pubs' | Where-Object { $_.Title -ne 'P2' }); $s.bin = @(@{ list = 'Sample Pubs'; row = $row })
+$s | Add-Member -Force -NotePropertyName binRestoreLies -NotePropertyValue $true; $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+$pl = Invoke-RestorePlan $base $b.Path $null; Start-Sleep -Seconds 1; $w = Invoke-Restore $base $b.Path $pl $null; $all = $w.Lines -join ' '
+$p2 = @((Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json).items.'Sample Pubs' | Where-Object { $_.Title -eq 'P2' })
+Assert-Case 'restore: a Recycle Bin restore that throws but worked counts as back, not made new' ($all -like '*"Sample Pubs": 1 back from the Recycle Bin,*' -and
+  $all -notlike '*did not come back from the Recycle Bin*' -and $p2.Count -eq 1 -and [int]$p2[0].ID -eq [int]$row.ID)
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $s.binRestoreLies = $false; $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
 
 # Diagnose with no install record: one finding that names the fix, and the report file in Diagnose (not Rounds: the e-mail).
 $script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Backup = @(); Start = '' }

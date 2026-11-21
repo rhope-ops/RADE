@@ -55,8 +55,9 @@ function Get-PnPField { param($List) $m = Get-FakeMeta (Get-FakeState) ([string]
 function Get-PnPRecycleBinItem { param([int]$RowLimit) $s = Get-FakeState; if ($s.binError) { throw 'access denied' }; $k = 0
   return @(foreach ($b in @($s.bin)) { $k++; $m = Get-FakeMeta $s ([string]$b.list)
     [pscustomobject]@{ Id = $k; ItemType = 'ListItem'; LeafName = ([string]$b.row.ID + '_.000'); DirName = [string]$m.url; FakeList = [string]$b.list; FakeId = [int]$b.row.ID } }) }
-# Moves one row from the Recycle Bin back to its list, with its own ID (binRestoreError: it fails). Takes the bin item.
+# Moves one row from the Recycle Bin back to its list, with its own ID (binRestoreError: it fails; binRestoreLies: it works, then throws). Takes the bin item.
 function Restore-PnPRecycleBinItem { param($Identity, [switch]$Force) $s = Get-FakeState; if ($s.binRestoreError) { throw (New-Object System.InvalidOperationException 'the item cannot be restored') }
   $b = @($s.bin | Where-Object { $_.list -eq $Identity.FakeList -and [int]$_.row.ID -eq $Identity.FakeId })[0]; if (-not $b) { throw 'not in the bin' }
-  $s.items.([string]$b.list) = @($s.items.([string]$b.list)) + @($b.row); $s.bin = @($s.bin | Where-Object { $_ -ne $b }); Save-FakeState $s }
+  $s.items.([string]$b.list) = @($s.items.([string]$b.list)) + @($b.row); $s.bin = @($s.bin | Where-Object { $_ -ne $b }); Save-FakeState $s
+  if ($s.binRestoreLies) { throw (New-Object System.TimeoutException 'it worked, but the answer did not come back') } }
 function Set-PnPListItem { param($List, $Identity, [hashtable]$Values) Set-FakeRow $Values ([string]@((Get-FakeState).rows.PSObject.Properties)[[int]$Identity - 1].Name) }
