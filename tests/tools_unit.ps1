@@ -174,12 +174,30 @@ Assert-Case 'restore: the pause switch goes on, then back (R2)' ((@($s.log) -joi
 Assert-Case 'restore: each list gets its count line' (($w.Lines -join ' ') -like '*PASS: "Sample Pubs": 1 back from the Recycle Bin, 1 made new; 4 rows on the list now*' -and
   ($w.Lines -join ' ') -like '*PASS: "Sample Endorse": 0 back from the Recycle Bin, 1 made new; 2 rows on the list now*')
 # Another backup that holds the same rows (a copy of the first): it finds nothing missing either; the record of re-made
-# rows is one for the app (Backups\~restore-map.json), not one per backup (review of PR 151).
+# rows is one for each site (Backups\~restore-map-<site hash>.json), not one per backup (review of PR 151).
 $b2 = $b.Path + '-copy'; Copy-Item -LiteralPath $b.Path -Destination $b2 -Recurse
 $pl = Invoke-RestorePlan $base $b2 $null
 Assert-Case 'restore: another backup of the same rows does not make a re-made row again' ($pl.State -eq 'plan' -and $pl.Missing -eq 0 -and
-  (Test-Path -LiteralPath (Join-Path $base 'Backups\~restore-map.json')))
+  @(Get-ChildItem -LiteralPath (Join-Path $base 'Backups') -Filter '~restore-map-*.json').Count -eq 1)
 Remove-Item -LiteralPath $b2 -Recurse -Force
+Assert-Case 'restore: the record is one file for each site, not in a backup folder' (@(Get-ChildItem -LiteralPath $b.Path -Filter '~restore-map*').Count -eq 0 -and
+  @(Get-ChildItem -LiteralPath (Join-Path $base 'Backups') -Filter '~restore-map-*.json').Count -eq 1)
+# A chain (second review of PR 151): P3 (3) was made as 5; a new backup holds 5; 5 is deleted for good and made again as 6
+# from that backup; the first backup then finds P3 on the list (3 to 5 to 6) and makes nothing.
+Start-Sleep -Seconds 1; $bB = Invoke-Backup $base $null
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $s.items.'Sample Pubs' = @($s.items.'Sample Pubs' | Where-Object { $_.ID -ne 5 })
+$s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+$pl = Invoke-RestorePlan $base $bB.Path $null; Start-Sleep -Seconds 1; $w = Invoke-Restore $base $bB.Path $pl $null
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json
+$p3 = @($s.items.'Sample Pubs' | Where-Object { $_.Title -eq 'P3' })
+$pl = Invoke-RestorePlan $base $b.Path $null; $pubLine = @($pl.Lines | Where-Object { $_ -like '"Sample Pubs"*' })[0]
+Assert-Case 'restore: a row re-made twice is followed to its newest ID (no third copy)' ($w.State -eq 'done' -and $p3.Count -eq 1 -and $p3[0].ID -eq 6 -and
+  $pubLine -like '*Would put back 0*')
+# Another test site: the record of the first site does not count there (its IDs are not this site's).
+Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake2'; $script:app.Restore = @{ TestSites = @('fake', 'fake2'); Pause = $pause }
+$pl = Invoke-RestorePlan $base $b.Path $null
+Assert-Case "restore: another site does not use the first site's record" ($pl.State -eq 'plan' -and $pl.Missing -ge 1)
+Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake'
 # A second run has nothing to put back.
 $pl = Invoke-RestorePlan $base $b.Path $null
 Assert-Case 'restore: a second dry run finds nothing missing' ($pl.State -eq 'plan' -and $pl.Missing -eq 0)

@@ -22,3 +22,5 @@ Status: the Administrator (as PFM) answered the design questions on 2026-11-21 (
 ## Review of PR 151 (fresh reviewer, 2026-11-21)
 
 MAJOR fixed: the record of re-made rows was one per backup folder, so two backups could make the same row twice; it is now `Backups\~restore-map.json`, one for the app. MINOR fixed: the write checks a hash of the missing and Recycle Bin rows, not only their count; after a Recycle Bin error the list is read again; the typed name must match exactly. MINOR kept, in the release notes: closing RADE mid-run leaves the pause switch on; the Recycle Bin read stops at 5,000 items.
+
+Second review (fix c812037): MAJOR fixed: the record is one file for each site (`Backups\~restore-map-<site hash>.json`), and a chain of re-made rows is followed to its end. MINOR fixed: a list that cannot be read again after the Recycle Bin stops the new rows and the result says so; old wording; the Windows job's line check.

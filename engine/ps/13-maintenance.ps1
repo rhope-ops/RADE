@@ -253,8 +253,9 @@ try {
   $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1
 } catch { 'RESULT not-connected ' + $_.Exception.GetType().Name; exit 2 }
 $names = @($Lists -split '\|'); $info = @{ Lists = @{}; ById = @{} }
-# The rows an earlier Restore made new (old ID to new ID, per list title), from any backup of this app, so no run makes
-# them again: Backups\~restore-map.json ('~': no backup folder has it). The IDs are the site's, the same in every backup.
+# The rows an earlier Restore made new on this site (old ID to new ID, per list title), from any backup of this app, so
+# no run makes them again: Backups\~restore-map-<site hash>.json ('~': no backup folder has it; one file per site, as
+# IDs belong to a site). A row re-made twice is a chain (5 to 20, then 20 to 21): it is followed to its end.
 $mapFile = $MapFile; $old = @{}
 if (Test-Path -LiteralPath $mapFile -PathType Leaf) { try { $mj = [System.IO.File]::ReadAllText($mapFile) | ConvertFrom-Json
     foreach ($q in $mj.PSObject.Properties) { $h = @{}; foreach ($r in $q.Value.PSObject.Properties) { $h[[int]$r.Name] = [int]$r.Value }; $old[$q.Name] = $h } } catch { 'MAP failed'; exit 6 } }
@@ -276,7 +277,10 @@ for ($i = 1; $i -le $names.Count; $i++) {
       $g = ''; if ([string]$x.SchemaXml -match 'List="\{?([0-9a-fA-F-]{36})\}?"') { $g = $Matches[1].ToLowerInvariant() }
       [pscustomobject]@{ InternalName = [string]$x.InternalName; TypeAsString = [string]$x.TypeAsString; LookupGuid = $g } })
     # A saved row is on the list under its own ID, or under the new ID an earlier Restore gave it.
-    $map = @{}; if ($old.ContainsKey($n)) { foreach ($k in @($old[$n].Keys)) { if ($have.ContainsKey($old[$n][$k])) { $map[$k] = $old[$n][$k] } } }
+    $map = @{}
+    if ($old.ContainsKey($n)) { $om = $old[$n]
+      foreach ($k in @($om.Keys)) { $to = $om[$k]; $hop = 0; while ($om.ContainsKey($to) -and $hop -lt 100) { $to = $om[$to]; $hop++ }
+        if ($have.ContainsKey($to)) { $map[$k] = $to } } }
     $ids = @{}; foreach ($r in $saved) { $ids[[int]$r.ID] = $true; if ($map.ContainsKey([int]$r.ID)) { $ids[$map[[int]$r.ID]] = $true } }
     $missing = @($saved | Where-Object { -not $have.ContainsKey([int]$_.ID) -and -not $map.ContainsKey([int]$_.ID) })
     $after = @($have.Keys | Where-Object { -not $ids.ContainsKey($_) }).Count
@@ -295,7 +299,7 @@ try { $script:bin = @(); $null = & { $script:bin = @(Get-PnPRecycleBinItem -RowL
       if ($dir -eq $L.Url -and @($L.Missing | Where-Object { [int]$_.ID -eq $id }).Count -and -not $L.Bin.ContainsKey($id)) { $L.Bin[$id] = $b } } } }
 catch { $binOk = $false; 'BIN failed ' + $_.Exception.GetType().Name }
 $keys = @($info.Lists.Keys | Sort-Object)
-# Writes ~restore-map.json: every old-to-new ID pair this backup's Restore runs made, the earlier ones kept. Takes nothing.
+# Writes the map file: every old-to-new ID pair the Restore runs on this site made, the earlier ones kept. Takes nothing.
 function Save-RestoreMap {
   $o = [ordered]@{}
   foreach ($q in @($old.Keys)) { $o[$q] = [ordered]@{}; foreach ($k in @($old[$q].Keys)) { $o[$q][[string]$k] = $old[$q][$k] } }
@@ -305,7 +309,7 @@ function Save-RestoreMap {
 foreach ($k in $keys) { $L = $info.Lists[$k]
   # A short hash of the missing IDs and the bin IDs: the write checks the same rows, not only the same count (no ID is printed).
   $txt = (@($L.Missing | ForEach-Object { [int]$_.ID } | Sort-Object) -join ',') + '/' + (@($L.Bin.Keys | Sort-Object) -join ',')
-  $sha = [System.Security.Cryptography.SHA256]::Create(); $L.Sig = (-join ($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($txt))[0..5] | ForEach-Object { $_.ToString('x2') }))
+  $sha = [System.Security.Cryptography.SHA256]::Create(); $L.Sig = (-join ($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($txt))[0..5] | ForEach-Object { $_.ToString('x2') })); $sha.Dispose()
   'PLAN ' + $k + ' saved=' + $L.Saved + ' now=' + $L.Have.Count + ' missing=' + $L.Missing.Count + ' bin=' + $L.Bin.Count +
     ' new=' + ($L.Missing.Count - $L.Bin.Count) + ' after=' + $L.After + ' sig=' + $L.Sig }
 if ($Mode -ne 'write') { 'RESULT plan'; exit 0 }
@@ -324,6 +328,7 @@ if ($Pause) { $q = $Pause -split '\|'; $pz = @{ List = $q[0]; Title = $q[1]; Fie
     if ($pOld -eq $pz.On) { 'RESULT paused-already'; exit 5 }
     $null = & { Set-PnPListItem -List $pz.List -Identity $pRow.Id -Values @{ $pz.Field = $pz.On } -ErrorAction Stop } *>&1; 'PAUSE on' }
   catch { 'RESULT pause-failed ' + $_.Exception.GetType().Name; exit 5 } }
+$stopMake = $false
 try {
   # R1: the Recycle Bin first, every list; a row that does not come back is made new below.
   foreach ($k in $keys) { $L = $info.Lists[$k]; $L.FromBin = 0; $L.BinFailed = 0
@@ -332,7 +337,7 @@ try {
       catch { $L.Bin.Remove($id); $L.BinFailed++ } }
     # The IDs on the list again: a Recycle Bin restore that reported an error but worked is not made a second time.
     if ($L.BinFailed) { try { $script:now = @(); $null = & { $script:now = @(Get-PnPListItem -List $L.Name -PageSize 500 -Fields 'ID' -ErrorAction Stop) } *>&1
-        foreach ($it in $script:now) { $L.Have[[int]$it.Id] = $true } } catch { 'RESULT reread-failed'; exit 7 } } }
+        foreach ($it in $script:now) { $L.Have[[int]$it.Id] = $true } } catch { $stopMake = $true } } }
   # R5: lists in dependency order (a list whose lookup reads another restored list comes after it); a loop keeps the
   # manifest order for the lists left.
   $order = @(); $left = [System.Collections.Generic.List[int]]::new(); foreach ($k in $keys) { $left.Add($k) }
@@ -343,6 +348,7 @@ try {
     if ($null -eq $next) { $next = $left[0] }
     $order += $next; $null = $left.Remove($next) }
   foreach ($k in $order) { $L = $info.Lists[$k]; $L.Made = 0; $L.Failed = 0; $script:unlinked = 0
+    if ($stopMake) { continue }   # a list could not be read again after the Recycle Bin: no new row, so none is made twice
     foreach ($r in @($L.Missing | Where-Object { -not $L.Have.ContainsKey([int]$_.ID) } | Sort-Object { [int]$_.ID })) {
       $v = @{}
       foreach ($fd in $L.Fields) { $p = $r.PSObject.Properties[$fd.InternalName]; if (-not $p) { continue }
@@ -357,6 +363,7 @@ try {
     'DONE ' + $k + ' bin=' + $L.FromBin + ' made=' + $L.Made + ' failed=' + ($L.Failed + 0) + ' binfailed=' + $L.BinFailed + ' unlinked=' + ($L.Unlinked + 0) + ' now=' + $c }
 } finally {
   if ($pz) { try { $null = & { Set-PnPListItem -List $pz.List -Identity $pRow.Id -Values @{ $pz.Field = $pOld } -ErrorAction Stop } *>&1; 'RESUME ok' } catch { 'RESUME failed' } } }
+if ($stopMake) { 'RESULT reread-failed'; exit 7 }
 'RESULT done'; exit 0
 '@
 
@@ -412,13 +419,16 @@ function Read-RestorePlan([string[]]$Lines) {
     elseif ($l -match '^PLAN (\d+) (.+)$') { $p[[int]$Matches[1]] = @{ Error = $Matches[2] } } }
   return $p
 }
-# The -MapFile argument of the Restore child script: Backups\~restore-map.json in the app folder, one record for every
-# backup of this app (review of PR 151: a map per backup folder let two backups make the same row twice). Takes the app
-# folder.
-function Get-RestoreMapArg([string]$Base) { return (' -MapFile "' + (Join-Path (Join-Path $Base 'Backups') '~restore-map.json') + '"') }
+# The -MapFile argument of the Restore child script: Backups\~restore-map-<site hash>.json in the app folder, one record
+# for every backup of this app on that site (reviews of PR 151: a map per backup folder let two backups make the same row
+# twice; a map for every site would mix two sites' IDs). Takes the app folder and the site address.
+function Get-RestoreMapArg([string]$Base, [string]$Site) {
+  $h = Get-ShortHash $Site.Trim().TrimEnd('/').ToLowerInvariant()
+  return (' -MapFile "' + (Join-Path (Join-Path $Base 'Backups') ('~restore-map-' + $h + '.json')) + '"') }
 # The words for a sign-in or tool stop of a child script. Takes the RESULT word and the child's Why.
 function Get-ChildStopText([string]$Res, [string]$Why) {
   switch ($Res) { 'no-pnp' { return 'the SharePoint tool is not installed' } 'not-connected' { return 'the sign-in did not finish' }
+    'reread-failed' { return 'a list could not be read again after the Recycle Bin, so no new row was made' }
     default { return ('it stopped: ' + $(if ($Why) { $Why } else { 'no result' })) } } }
 
 <#
@@ -439,9 +449,9 @@ function Invoke-RestorePlan([string]$Base, [string]$Dir, [scriptblock]$Tick) {
   $t = Test-RestoreSite $Base
   if (-not $t.Ok) { return @{ State = 'refused'; Lines = $t.Lines; Plan = @{}; Expect = ''; Missing = 0 } }
   $lists = @($script:app.Backup | Where-Object { $_ })
-  $r = Invoke-ChildScript $restoreScript ('-Site "' + $t.Site + '" -Folder "' + $Dir + '" -Lists "' + ($lists -join '|') + '" -Mode plan' + (Get-RestoreMapArg $Base)) 1800 $Tick
+  $r = Invoke-ChildScript $restoreScript ('-Site "' + $t.Site + '" -Folder "' + $Dir + '" -Lists "' + ($lists -join '|') + '" -Mode plan' + (Get-RestoreMapArg $Base $t.Site)) 1800 $Tick
   $res = ''; foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $res = $Matches[1] } elseif ($l -eq 'MAP failed') { $res = 'map' } }
-  $stop = $(if ($res -eq 'map') { "this backup's record of an earlier Restore (~restore-map.json) could not be read" } else { Get-ChildStopText $res $r.Why })
+  $stop = $(if ($res -eq 'map') { "the record of an earlier Restore on this site (Backups\~restore-map-*.json) could not be read" } else { Get-ChildStopText $res $r.Why })
   if ($res -ne 'plan') { return @{ State = 'failed'; Plan = @{}; Expect = ''; Missing = 0; Lines = @(('The dry run did not finish: ' + $stop + '.'), 'Nothing was changed.') } }
   $plan = Read-RestorePlan $r.Lines; $lines = @(); $exp = @(); $tot = 0; $nb = 0; $nn = 0
   for ($i = 1; $i -le $lists.Count; $i++) {
@@ -486,15 +496,14 @@ function Invoke-Restore([string]$Base, [string]$Dir, $Plan, [scriptblock]$Tick) 
   $lists = @($script:app.Backup | Where-Object { $_ }); $pz = $script:app.Restore.Pause
   $pa = $(if ($pz) { ' -Pause "' + $pz.List + '|' + $pz.Title + '|' + $pz.Field + '|' + $pz.On + '"' } else { '' })
   $r = Invoke-ChildScript $restoreScript ('-Site "' + $t.Site + '" -Folder "' + $Dir + '" -Lists "' + ($lists -join '|') + '" -Mode write -Expect "' + $Plan.Expect + '"' + $pa +
-    (Get-RestoreMapArg $Base)) 3600 $Tick
+    (Get-RestoreMapArg $Base $t.Site)) 3600 $Tick
   $res = ''; $done = @{}; $resume = ''
   foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $res = $Matches[1] } elseif ($l -match '^DONE (\d+) (.+)$') { $done[[int]$Matches[1]] = $Matches[2] }
     elseif ($l -match '^RESUME (\S+)') { $resume = $Matches[1] } }
   $fl = 'Fresh backup before Restore: ' + (ConvertTo-Masked $fresh.Path)
   $stop = $(switch ($res) { 'changed' { 'the site changed after the dry run. Run Restore again for a new dry run' }
       'paused-already' { 'the pause switch is on already (another Restore, or it was left on). Check it, then run Restore again' }
-      'no-pause-row' { "the app's pause-switch row is not on the site" }
-      'reread-failed' { 'the lists could not be read again after the Recycle Bin' } 'pause-failed' { 'the pause switch could not be set' } default { '' } })
+      'no-pause-row' { "the app's pause-switch row is not on the site" } 'pause-failed' { 'the pause switch could not be set' } default { '' } })
   if ($stop) { return @{ State = $(if ($res -eq 'changed') { 'changed' } else { 'failed' }); Path = $fresh.Path; Lines = @(('Restore wrote no rows: ' + $stop + '.'), $fl) } }
   $lines = @(); $bad = 0; $back = 0
   for ($i = 1; $i -le $lists.Count; $i++) {
