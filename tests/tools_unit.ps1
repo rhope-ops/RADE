@@ -146,10 +146,10 @@ Assert-Case 'restore: Diagnose notes a marked site, with no site name (engine-v3
 Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake3'; $t = Test-RestoreSite $base; $n = Get-RestoreMarkNote $base; Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake'
 Assert-Case 'restore: a new site address needs a new mark' (-not $t.Ok -and $t.NeedMark -and $t.Name -eq 'fake3')
 Assert-Case 'restore: Diagnose notes a mark of another site' ($n.State -eq 'NOTE' -and $n.Text -like '*for another site*')
-Remove-RestoreMark $base; $t = Test-RestoreSite $base; $n = Get-RestoreMarkNote $base
+Clear-RestoreMark $base; $t = Test-RestoreSite $base; $n = Get-RestoreMarkNote $base
 Assert-Case 'restore: a removed mark makes Restore ask again (engine-v33)' (-not (Test-Path -LiteralPath $mk) -and -not $t.Ok -and $t.NeedMark)
 Assert-Case 'restore: Diagnose notes a site with no mark' ($n.State -eq 'NOTE' -and $n.Text -like '*not marked*')
-Remove-RestoreMark $base   # no file: nothing to do, no error
+Clear-RestoreMark $base   # no file: nothing to do, no error
 $script:app.Restore = @{ TestSites = @('fake'); Local = $false; Pause = $pause }
 Assert-Case 'restore: Diagnose has no mark line for a list of names' ($null -eq (Get-RestoreMarkNote $base))
 $script:app.Restore = @{ TestSites = @('Fake'); Pause = $pause }   # site names compare without case

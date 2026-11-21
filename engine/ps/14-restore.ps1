@@ -329,7 +329,7 @@ function Save-RestoreMark([string]$Base, [string]$Name) {
   [System.IO.File]::WriteAllText($p, ($Name.Trim() + "`r`n"), (New-Object System.Text.UTF8Encoding $true)) }
 # Removes the mark (engine-v33; the Administrator, 2026-11-21): Restore then asks for the site name again. Throws when
 # the file is there and cannot be removed. Takes the app folder.
-function Remove-RestoreMark([string]$Base) {
+function Clear-RestoreMark([string]$Base) {
   $p = Get-RestoreMarkFile $Base; if (Test-Path -LiteralPath $p -PathType Leaf) { Remove-Item -LiteralPath $p -Force -ErrorAction Stop } }
 <#
 .SYNOPSIS

@@ -6,7 +6,7 @@
 # backup card has "Remove test-site mark" (engine-v33).
 # Listed before 10-keys.ps1 in engine/rade_build.py (that part shows the form).
 # Network: none here (parts 13 and 14 name what each tool reaches).
-# Writes: the mark file, from the mark card, and its removal (Save-RestoreMark, Remove-RestoreMark, engine/ps/14-restore.ps1).
+# Writes: the mark file, from the mark card, and its removal (Save-RestoreMark, Clear-RestoreMark, engine/ps/14-restore.ps1).
 # Credentials: none.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
@@ -96,7 +96,7 @@ $ui.UnmarkButton = { return @{ Text = 'Remove test-site mark'; Kind = ''; Act = 
 $ui.RestoreUnmark = {
   if ($ui.Busy) { return }
   $res = @{ State = 'unmarked'; Path = ''; Lines = @('The saved site is no longer marked as a test site on this computer.', 'Restore asks for the site name again before it runs.') }
-  try { Remove-RestoreMark (Get-BasePath) }
+  try { Clear-RestoreMark (Get-BasePath) }
   catch { $res = @{ State = 'failed'; Path = ''; Lines = @(('The mark could not be removed [' + $_.Exception.GetType().Name + '].'), 'Nothing was changed.') } }
   & $ui.ToolResult 'Restore' $res }
 
