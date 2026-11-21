@@ -220,15 +220,22 @@ Remove-TypeData -TypeName System.Array -ErrorAction SilentlyContinue
 function Get-FileName([string]$N) { return ($N -replace '[^A-Za-z0-9 _()-]', '_') }
 # The IDs in a saved lookup or person value "id;#text;#id;#text" (the even parts). Takes the value; gives back ints.
 function Get-SavedIds($V) { $p = @(([string]$V) -split ';#'); return @(for ($k = 0; $k -lt $p.Count; $k += 2) { if ($p[$k] -match '^\d+$') { [int]$p[$k] } }) }
-# The same-row groups (review 3 of PR 151): each Restore that makes a row new links its old ID and the new one; all IDs
-# linked, step by step, are one row. Get-Root gives a group's root ID; takes the parents table and an ID.
-function Get-Root($P, [int]$X) { $h = 0; while ($P.ContainsKey($X) -and $P[$X] -ne $X -and $h -lt 1000) { $X = $P[$X]; $h++ }; return $X }
-# Links two IDs as one row. Takes the parents table and the two IDs.
-function Join-Ids($P, [int]$A, [int]$B) { $ra = Get-Root $P $A; $rb = Get-Root $P $B; $P[$ra] = $ra; if ($ra -ne $rb) { $P[$rb] = $ra } }
-# The IDs of the row that $X is one of (itself first). Takes the parents table and the ID; gives back ints.
-function Get-Group($P, [int]$X) { $r = Get-Root $P $X; return @(@($X) + @($P.Keys | Where-Object { (Get-Root $P $_) -eq $r } | ForEach-Object { [int]$_ }) | Select-Object -Unique) }
+# The same-row groups (reviews 3 and 4 of PR 151): each Restore that makes a row new links its old ID and the new one;
+# all IDs linked, step by step, are one row. $G holds P (each ID's parent) and M (each root's IDs), so a group is found
+# at once, not by a scan. Get-Root gives a group's root ID (and shortens the path); takes the groups and an ID.
+function Get-Root($G, [int]$X) { if (-not $G.P.ContainsKey($X)) { return $X }; $r = $X; while ($G.P[$r] -ne $r) { $r = $G.P[$r] }
+  while ($G.P[$X] -ne $r) { $nx = $G.P[$X]; $G.P[$X] = $r; $X = $nx }; return $r }
+# Links two IDs as one row. Takes the groups and the two IDs.
+function Join-Ids($G, [int]$A, [int]$B) {
+  foreach ($x in $A, $B) { if (-not $G.P.ContainsKey($x)) { $G.P[$x] = $x; $G.M[$x] = New-Object 'System.Collections.Generic.List[int]'; $G.M[$x].Add($x) } }
+  $ra = Get-Root $G $A; $rb = Get-Root $G $B; if ($ra -ne $rb) { $G.P[$rb] = $ra; $G.M[$ra].AddRange($G.M[$rb]); $G.M.Remove($rb) } }
+# The IDs of the row that $X is one of. Takes the groups and the ID; gives back ints.
+function Get-Group($G, [int]$X) { if (-not $G.P.ContainsKey($X)) { return @($X) }; return @($G.M[(Get-Root $G $X)]) }
 # The ID under which the row $X is on the list now (any ID of its group), or $null. Takes the list's data and the ID.
-function Get-OnList($L, [int]$X) { foreach ($m in (Get-Group $L.P $X)) { if ($L.Have.ContainsKey($m)) { return $m } }; return $null }
+function Get-OnList($L, [int]$X) { foreach ($m in (Get-Group $L.G $X)) { if ($L.Have.ContainsKey($m)) { return $m } }; return $null }
+# Says whether an ID of the row $X has a pending mark ("p<ID>": a new row was being written and not confirmed). Takes
+# the list's data and the ID.
+function Test-Pending($L, [int]$X) { foreach ($m in (Get-Group $L.G $X)) { if ($L.Pend.ContainsKey($m)) { return $true } }; return $false }
 # Turns a saved value (Back up's plain form) into what Add-PnPListItem takes for a field of this type. Lookup IDs are
 # re-pointed to the ID the row has on that list now (Get-OnList), when that list is one of the restored lists; an ID
 # that is not there is dropped and counted in $script:unlinked. Takes the field, the value and the restored lists' data.
@@ -264,10 +271,12 @@ try {
 $names = @($Lists -split '\|'); $info = @{ Lists = @{}; ById = @{} }
 # The links an earlier Restore made on this site ("old-new", per list title), from any backup of this app, so no run
 # makes a row again: Backups\~restore-map-<site hash>.json ('~': no backup folder has it; one file per site, as IDs
-# belong to a site). Every ID in a group is the same row (Get-Group).
+# belong to a site). Every ID in a group is the same row (Get-Group). "p<ID>" is a pending mark, saved before a new row
+# is written and replaced by the link after: a row with a mark is never made again (the write may have worked).
 $mapFile = $MapFile; $old = @{}
 if (Test-Path -LiteralPath $mapFile -PathType Leaf) { try { $mj = [System.IO.File]::ReadAllText($mapFile) | ConvertFrom-Json
-    foreach ($q in $mj.PSObject.Properties) { $old[$q.Name] = @(@($q.Value) | Where-Object { [string]$_ -match '^\d+-\d+$' } | ForEach-Object { [string]$_ }) } }
+    if ($null -eq $mj) { throw 'empty record' }   # a record that is there but empty is never read as "no record"
+    foreach ($q in $mj.PSObject.Properties) { $old[$q.Name] = @(@($q.Value) | Where-Object { [string]$_ -match '^(\d+-\d+|p\d+)$' } | ForEach-Object { [string]$_ }) } }
   catch { 'MAP failed'; exit 6 } }
 # Reads each list: the saved rows, the IDs on the list now and the writable fields. A list with no saved file or no
 # list on the site is reported and left out.
@@ -287,10 +296,13 @@ for ($i = 1; $i -le $names.Count; $i++) {
       $g = ''; if ([string]$x.SchemaXml -match 'List="\{?([0-9a-fA-F-]{36})\}?"') { $g = $Matches[1].ToLowerInvariant() }
       [pscustomobject]@{ InternalName = [string]$x.InternalName; TypeAsString = [string]$x.TypeAsString; LookupGuid = $g } })
     # A saved row is on the list when any ID of its group is (its own, or one an earlier Restore gave it).
-    $L = @{ Name = $n; Saved = $saved.Count; Have = $have; Fields = $fields; P = @{}; Links = @(); Bin = @{} }
-    if ($old.ContainsKey($n)) { $L.Links = @($old[$n]); foreach ($e in $L.Links) { $ab = $e -split '-'; Join-Ids $L.P ([int]$ab[0]) ([int]$ab[1]) } }
-    $ids = @{}; foreach ($r in $saved) { foreach ($m in (Get-Group $L.P ([int]$r.ID))) { $ids[$m] = $true } }
-    $L.Missing = @($saved | Where-Object { $null -eq (Get-OnList $L ([int]$_.ID)) })
+    $L = @{ Name = $n; Saved = $saved.Count; Have = $have; Fields = $fields; G = @{ P = @{}; M = @{} }; Links = @(); Bin = @{}; Pend = @{} }
+    if ($old.ContainsKey($n)) { $L.Links = @($old[$n])
+      foreach ($e in $L.Links) { if ($e -match '^p(\d+)$') { $L.Pend[[int]$Matches[1]] = $true } else { $ab = $e -split '-'; Join-Ids $L.G ([int]$ab[0]) ([int]$ab[1]) } } }
+    $ids = @{}; foreach ($r in $saved) { foreach ($m in (Get-Group $L.G ([int]$r.ID))) { $ids[$m] = $true } }
+    $gone = @($saved | Where-Object { $null -eq (Get-OnList $L ([int]$_.ID)) })
+    $L.Unsure = @($gone | Where-Object { Test-Pending $L ([int]$_.ID) }).Count   # not put back: a hand check
+    $L.Missing = @($gone | Where-Object { -not (Test-Pending $L ([int]$_.ID)) })
     $L.After = @($have.Keys | Where-Object { -not $ids.ContainsKey($_) }).Count
     $info.Lists[$i] = $L + @{
       Url = ([string]$list.RootFolder.ServerRelativeUrl).Trim('/').ToLowerInvariant() }
@@ -306,22 +318,25 @@ try { $script:bin = @(); $null = & { $script:bin = @(Get-PnPRecycleBinItem -RowL
     if ([string]$b.ItemType -ne 'ListItem' -or [string]$b.LeafName -notmatch '^(\d+)_\.000$') { continue }
     $inBin[([string]$b.DirName).Trim('/').ToLowerInvariant() + '|' + $Matches[1]] = $b }
   foreach ($k in @($info.Lists.Keys)) { $L = $info.Lists[$k]; $used = @{}
-    foreach ($r in $L.Missing) { foreach ($m in (Get-Group $L.P ([int]$r.ID))) { $key = $L.Url + '|' + $m
+    foreach ($r in $L.Missing) { foreach ($m in (Get-Group $L.G ([int]$r.ID))) { $key = $L.Url + '|' + $m
         if ($inBin.ContainsKey($key) -and -not $used.ContainsKey($m)) { $L.Bin[[int]$r.ID] = @{ Item = $inBin[$key]; Id = $m }; $used[$m] = $true; break } } } } }
 catch { $binOk = $false; 'BIN failed ' + $_.Exception.GetType().Name }
 $keys = @($info.Lists.Keys | Sort-Object)
-# Writes the map file: every link the Restore runs on this site made, the earlier ones kept. Takes nothing.
+# Writes the map file: every link and pending mark of the Restore runs on this site, the earlier ones kept. Writes a
+# new file, then puts it in place, so a stop halfway never leaves a cut file. Throws when it cannot. Takes nothing.
 function Save-RestoreMap {
   $o = [ordered]@{}
   foreach ($q in @($old.Keys)) { $o[$q] = @($old[$q]) }
   foreach ($k in $keys) { $L = $info.Lists[$k]; $o[$L.Name] = @($L.Links) }
-  [System.IO.File]::WriteAllText($mapFile, (ConvertTo-Json -InputObject $o -Depth 4), (New-Object System.Text.UTF8Encoding $true)) }
+  $tmp = $mapFile + '.new'
+  [System.IO.File]::WriteAllText($tmp, (ConvertTo-Json -InputObject $o -Depth 4), (New-Object System.Text.UTF8Encoding $true))
+  if (Test-Path -LiteralPath $mapFile) { [System.IO.File]::Replace($tmp, $mapFile, [NullString]::Value) } else { [System.IO.File]::Move($tmp, $mapFile) } }
 foreach ($k in $keys) { $L = $info.Lists[$k]
   # A short hash of the missing IDs and the bin IDs: the write checks the same rows, not only the same count (no ID is printed).
   $txt = (@($L.Missing | ForEach-Object { [int]$_.ID } | Sort-Object) -join ',') + '/' + (@($L.Bin.Keys | Sort-Object | ForEach-Object { [string]$_ + ':' + $L.Bin[$_].Id }) -join ',')
   $sha = [System.Security.Cryptography.SHA256]::Create(); $L.Sig = (-join ($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($txt))[0..5] | ForEach-Object { $_.ToString('x2') })); $sha.Dispose()
   'PLAN ' + $k + ' saved=' + $L.Saved + ' now=' + $L.Have.Count + ' missing=' + $L.Missing.Count + ' bin=' + $L.Bin.Count +
-    ' new=' + ($L.Missing.Count - $L.Bin.Count) + ' after=' + $L.After + ' sig=' + $L.Sig }
+    ' new=' + ($L.Missing.Count - $L.Bin.Count) + ' after=' + $L.After + ' unsure=' + $L.Unsure + ' sig=' + $L.Sig }
 if ($Mode -ne 'write') { 'RESULT plan'; exit 0 }
 # The write. First: the site must be as the dry run saw it (the same missing rows and Recycle Bin rows per list, by the
 # hash), else nothing is written.
@@ -338,7 +353,7 @@ if ($Pause) { $q = $Pause -split '\|'; $pz = @{ List = $q[0]; Title = $q[1]; Fie
     if ($pOld -eq $pz.On) { 'RESULT paused-already'; exit 5 }
     $null = & { Set-PnPListItem -List $pz.List -Identity $pRow.Id -Values @{ $pz.Field = $pz.On } -ErrorAction Stop } *>&1; 'PAUSE on' }
   catch { 'RESULT pause-failed ' + $_.Exception.GetType().Name; exit 5 } }
-$stopMake = $false
+$stopMake = $false; $mapStop = $false
 try {
   # R1: the Recycle Bin first, every list; a row that does not come back is made new below.
   foreach ($k in $keys) { $L = $info.Lists[$k]; $L.FromBin = 0; $L.BinFailed = 0
@@ -358,15 +373,19 @@ try {
     if ($null -eq $next) { $next = $left[0] }
     $order += $next; $null = $left.Remove($next) }
   foreach ($k in $order) { $L = $info.Lists[$k]; $L.Made = 0; $L.Failed = 0; $script:unlinked = 0
-    if ($stopMake) { continue }   # a list could not be read again after the Recycle Bin: no new row, so none is made twice
+    if ($stopMake -or $mapStop) { continue }   # a list not read again after the Recycle Bin, or a record not saved: no new row
     foreach ($r in @($L.Missing | Sort-Object { [int]$_.ID })) {
       if ($null -ne (Get-OnList $L ([int]$r.ID))) { continue }   # back from the Recycle Bin, or another saved ID of the same row was made
       $v = @{}
       foreach ($fd in $L.Fields) { $p = $r.PSObject.Properties[$fd.InternalName]; if (-not $p) { continue }
         $w = ConvertTo-WriteValue $fd $p.Value $info; if ($null -ne $w) { $v[$fd.InternalName] = $w } }
-      try { $script:made = $null; $null = & { $script:made = Add-PnPListItem -List $L.Name -Values $v -ErrorAction Stop } *>&1
-        $nid = [int]$script:made.Id; $L.Have[$nid] = $true; Join-Ids $L.P ([int]$r.ID) $nid; $L.Links += ([string]$r.ID + '-' + $nid); $L.Made++ } catch { $L.Failed++ }
-      Save-RestoreMap }   # after each row: a run that stops halfway never makes a row twice
+      # The pending mark is saved first: a write that works but reports an error, or a run that stops, never makes it again.
+      $mark = 'p' + [int]$r.ID
+      try { $L.Links += $mark; Save-RestoreMap } catch { $mapStop = $true; break }
+      try { $script:made = $null; $null = & { $script:made = Add-PnPListItem -List $L.Name -Values $v -ErrorAction Stop } *>&1; $nid = [int]$script:made.Id }
+      catch { $L.Failed++; continue }   # the mark stays: the row may be on the list; the next runs leave it for a hand check
+      $L.Have[$nid] = $true; Join-Ids $L.G ([int]$r.ID) $nid; $L.Links = @(@($L.Links | Where-Object { $_ -ne $mark }) + @([string]$r.ID + '-' + $nid)); $L.Made++
+      try { Save-RestoreMap } catch { $mapStop = $true; break } }   # the mark is on file: the row is not made again
     $L.Unlinked = $script:unlinked }
   # R7 (counts only): the rows on each list after the write.
   foreach ($k in $keys) { $L = $info.Lists[$k]; $c = -1
@@ -374,6 +393,7 @@ try {
     'DONE ' + $k + ' bin=' + $L.FromBin + ' made=' + $L.Made + ' failed=' + ($L.Failed + 0) + ' binfailed=' + $L.BinFailed + ' unlinked=' + ($L.Unlinked + 0) + ' now=' + $c }
 } finally {
   if ($pz) { try { $null = & { Set-PnPListItem -List $pz.List -Identity $pRow.Id -Values @{ $pz.Field = $pOld } -ErrorAction Stop } *>&1; 'RESUME ok' } catch { 'RESUME failed' } } }
+if ($mapStop) { 'RESULT map-write-failed'; exit 8 }
 if ($stopMake) { 'RESULT reread-failed'; exit 7 }
 'RESULT done'; exit 0
 '@
@@ -420,13 +440,13 @@ function Test-RestoreSite([string]$Base) {
 }
 
 # Reads the PLAN lines of the Restore child script: one table for each list number. Takes the output lines; gives
-# back @{ <n> = @{ Saved; Now; Missing; Bin; New; After; Sig } or @{ Error } }.
+# back @{ <n> = @{ Saved; Now; Missing; Bin; New; After; Unsure; Sig } or @{ Error } }.
 function Read-RestorePlan([string[]]$Lines) {
   $p = @{}
   foreach ($l in $Lines) {
-    if ($l -match '^PLAN (\d+) saved=(\d+) now=(\d+) missing=(\d+) bin=(\d+) new=(\d+) after=(\d+) sig=([0-9a-f]+)$') {
+    if ($l -match '^PLAN (\d+) saved=(\d+) now=(\d+) missing=(\d+) bin=(\d+) new=(\d+) after=(\d+) unsure=(\d+) sig=([0-9a-f]+)$') {
       $p[[int]$Matches[1]] = @{ Saved = [int]$Matches[2]; Now = [int]$Matches[3]; Missing = [int]$Matches[4]; Bin = [int]$Matches[5]
-        New = [int]$Matches[6]; After = [int]$Matches[7]; Sig = $Matches[8] } }
+        New = [int]$Matches[6]; After = [int]$Matches[7]; Unsure = [int]$Matches[8]; Sig = $Matches[9] } }
     elseif ($l -match '^PLAN (\d+) (.+)$') { $p[[int]$Matches[1]] = @{ Error = $Matches[2] } } }
   return $p
 }
@@ -440,6 +460,7 @@ function Get-RestoreMapArg([string]$Base, [string]$Site) {
 function Get-ChildStopText([string]$Res, [string]$Why) {
   switch ($Res) { 'no-pnp' { return 'the SharePoint tool is not installed' } 'not-connected' { return 'the sign-in did not finish' }
     'reread-failed' { return 'a list could not be read again after the Recycle Bin, so no new row was made' }
+    'map-write-failed' { return 'the record of re-made rows could not be saved, so Restore stopped making new rows' }
     default { return ('it stopped: ' + $(if ($Why) { $Why } else { 'no result' })) } } }
 
 <#
@@ -473,7 +494,8 @@ function Invoke-RestorePlan([string]$Base, [string]$Dir, [scriptblock]$Tick) {
       $lines += ('NOTE: "' + $n + '" is left out: ' + $why); continue }
     $exp += ([string]$i + ':' + $p.Sig); $tot += $p.Missing; $nb += $p.Bin; $nn += $p.New
     $lines += ('"' + $n + '": ' + $p.Saved + ' in the backup, ' + $p.Now + ' on the list now. Would put back ' + $p.Missing +
-      ' (' + $p.Bin + ' from the Recycle Bin, ' + $p.New + ' as new rows). ' + $p.After + ' made after the backup stay.') }
+      ' (' + $p.Bin + ' from the Recycle Bin, ' + $p.New + ' as new rows). ' + $p.After + ' made after the backup stay.')
+    if ($p.Unsure) { $lines += ('NOTE: "' + $n + '": ' + $p.Unsure + ' row(s) are left out: an earlier Restore wrote them but did not confirm it. Check the list by hand') } }
   $head = @(('Dry run: ' + $tot + ' rows would come back (' + $nb + ' from the Recycle Bin, ' + $nn + ' as new rows). Nothing was written.'))
   if (@($r.Lines | Where-Object { $_ -like 'BIN failed*' }).Count) { $head += 'NOTE: the Recycle Bin could not be read, so every missing row would come back as a new row (a new ID).' }
   return @{ State = 'plan'; Plan = $plan; Expect = ($exp -join ','); Missing = $tot; Lines = @($head + $lines) }
@@ -527,7 +549,8 @@ function Invoke-Restore([string]$Base, [string]$Dir, $Plan, [scriptblock]$Tick) 
     $txt = '"' + $n + '": ' + $b + ' back from the Recycle Bin, ' + $m + ' made new; ' + $now + ' rows on the list now'
     if ($u) { $txt += '; ' + $u + ' lookup value(s) left empty (the row they pointed to is not there)' }
     if ($ok) { $lines += ('PASS: ' + $txt); continue }
-    $bad++; $lines += ('FINDING: ' + $txt + $(if ($f) { '; ' + $f + ' row(s) could not be written' } else { '' }) + '. What to do: compare the list with the backup') }
+    $nc = $(if ($f) { '; ' + $f + ' row(s) not confirmed (they may be on the list; Restore never makes them again)' } else { '' })
+    $bad++; $lines += ('FINDING: ' + $txt + $nc + '. What to do: compare the list with the backup') }
   if ($res -ne 'done') { $bad++
     $lines += ('FINDING: Restore stopped before the end: ' + (Get-ChildStopText $res $r.Why) + '. What to do: run Restore again (it puts back only what is still missing)') }
   if ($pz -and $resume -ne 'ok') { $bad++; $lines += "FINDING: the pause switch could not be put back. What to do: set it back by hand in the app's settings" }

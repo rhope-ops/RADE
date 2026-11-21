@@ -227,6 +227,27 @@ Assert-Case 'restore: a Recycle Bin that cannot be read is named' ($pl.State -eq
 # An app that does not name Restore: refused.
 $script:app.Restore = $null; $t = Test-RestoreSite $base
 Assert-Case 'restore: an app that does not name it cannot run it' (-not $t.Ok -and $t.Lines[0] -like '*does not use Restore*')
+# A write that works but reports an error (review 4 of PR 151): the pending mark stays, so no later run makes it again.
+$script:app.Restore = @{ TestSites = @('fake'); Pause = $pause }
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $s.binError = $false; $s | Add-Member -NotePropertyName addThrow -NotePropertyValue $true
+$s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+$pl = Invoke-RestorePlan $base $b.Path $null; Start-Sleep -Seconds 1; $w = Invoke-Restore $base $b.Path $pl $null
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $s.addThrow = $false; $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+$pl2 = Invoke-RestorePlan $base $b.Path $null; $recs = @((Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json).items.'Sample Recs (Form 1)')
+Assert-Case 'restore: a write that reports an error is not made again' ($pl.Missing -eq 1 -and $w.State -eq 'failed' -and ($w.Lines -join ' ') -like '*not confirmed*' -and
+  $pl2.Missing -eq 0 -and ($pl2.Lines -join ' ') -like '*1 row(s) are left out: an earlier Restore wrote them but did not confirm it*' -and $recs.Count -eq 1)
+# The record cannot be saved: no row is written, and the result says why.
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $s.items.'Sample Pubs' = @($s.items.'Sample Pubs' | Where-Object { $_.ID -ne 1 })
+$s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+$mf = @(Get-ChildItem -LiteralPath (Join-Path $base 'Backups') -Filter '~restore-map-*.json')[0].FullName; $blk = $mf + '.new'; $null = New-Item -ItemType Directory -Path $blk
+$pl = Invoke-RestorePlan $base $b.Path $null; Start-Sleep -Seconds 1; $w = Invoke-Restore $base $b.Path $pl $null
+$p1 = @((Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json).items.'Sample Pubs' | Where-Object { $_.Title -eq 'P1' })
+Assert-Case 'restore: a record that cannot be saved stops before the row' ($pl.Missing -eq 1 -and $w.State -eq 'failed' -and $p1.Count -eq 0 -and
+  ($w.Lines -join ' ') -like '*record of re-made rows could not be saved*')
+Remove-Item -LiteralPath $blk -Recurse -Force
+# An empty record file stops the dry run (it is never read as "no record").
+$keepMap = Get-Content -LiteralPath $mf -Raw; Set-Content -LiteralPath $mf -Value 'null'; $pl = Invoke-RestorePlan $base $b.Path $null; Set-Content -LiteralPath $mf -Value $keepMap -NoNewline
+Assert-Case 'restore: an empty record stops the dry run' ($pl.State -eq 'failed' -and ($pl.Lines[0]) -like '*could not be read*')
 
 # Diagnose with no install record: one finding that names the fix, and the report file in Diagnose (not Rounds: the e-mail).
 $script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Backup = @(); Start = '' }

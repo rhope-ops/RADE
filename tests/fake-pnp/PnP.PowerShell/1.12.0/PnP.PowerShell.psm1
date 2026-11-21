@@ -45,6 +45,7 @@ function Add-PnPListItem { param($List, [hashtable]$Values)
   # A list of the Restore tests: the row gets the next ID (SharePoint never reuses an ID); each value is kept as given.
   $id = [int]$m.next; $m.next = $id + 1; $row = [ordered]@{ ID = $id }; foreach ($k in $Values.Keys) { $row[$k] = $Values[$k] }
   $s.items.([string]$List) = @($s.items.([string]$List)) + @([pscustomobject]$row); Save-FakeState $s
+  if ($s.addThrow) { throw 'the reply was lost' }   # "addThrow": the row is written, then the call fails (review 4 of PR 151)
   return [pscustomobject]@{ Id = $id } }
 # The fields of a list in "meta". Takes the list title.
 function Get-PnPField { param($List) $m = Get-FakeMeta (Get-FakeState) ([string]$List); if (-not $m) { throw 'list not found' }

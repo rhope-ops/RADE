@@ -31,3 +31,4 @@ For round R41 of 90-161.Z (test site only). Decisions: [plan](2026-11-21-plan-re
 Not proven before R41 (cloud tests use a fake SharePoint): PnP on Windows PowerShell 5.1 for `Get-PnPRecycleBinItem` (it may need site-collection admin; then the dry run says the Recycle Bin could not be read and every row would come back new: stop and report), person fields written by site user ID, managed-metadata fields by term ID, the lookup re-point on the tenant, and whether rows that looked up a row in the Recycle Bin show it again once it is back.
 
 Known limits: do not close RADE while Restore runs (the pause switch would stay on; the next Restore stops with "on already"; set it back by hand). The Recycle Bin read stops at 5,000 items.
+If the dry run says rows are "left out: an earlier Restore wrote them but did not confirm it", check that list by hand. Run Restore from the same account and computer folder each time (its record of re-made rows is in the app folder).

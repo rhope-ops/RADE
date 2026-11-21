@@ -26,3 +26,5 @@ MAJOR fixed: the record of re-made rows was one per backup folder, so two backup
 Second review (fix c812037): MAJOR fixed: the record is one file for each site (`Backups\~restore-map-<site hash>.json`), and a chain of re-made rows is followed to its end. MINOR fixed: a list that cannot be read again after the Recycle Bin stops the new rows and the result says so; old wording; the Windows job's line check.
 
 Third review (fix 6ca3583): MAJOR fixed by a new model: the record holds links (old ID - new ID); all linked IDs are one row, found on the list or in the Recycle Bin by any of its IDs; tests cover the reviewer's order (A, then B) and a later ID in the Recycle Bin. MINOR (a middle ID of a chain on the list) is covered by the same model. NIT: the site hash uses Get-SiteMark.
+
+Fourth review (ee00a88): 2 MAJOR (a write that worked but reported an error; a record that could not be saved). The Administrator chose (2026-11-21) to fix and keep the design: a pending mark before each new row (never made again; a hand check), a record that cannot be saved stops new rows, a safe file write (new file, then replace), indexed groups (no scan). Limits added to engine.md.
