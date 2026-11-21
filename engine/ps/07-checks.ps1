@@ -213,12 +213,11 @@ public delegate bool WinProc(System.IntPtr h, System.IntPtr l);
 [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
 public struct MonInfo { public int Size; public int ML, MT, MR, MB; public int WL, WT, WR, WB; public uint Flags; }
 static System.Threading.Timer timer; static WinProc each = Each; static int w, h, left;
-static System.Collections.Generic.HashSet<long> seen = new System.Collections.Generic.HashSet<long>();
+static System.Collections.Generic.HashSet<long> seen = new System.Collections.Generic.HashSet<long>(); static object gate = new object();
 // Starts the watch: every tickMs, for watchMs, each new visible top-level window of this process gets the size w x h (logical).
 public static void Start(int width, int height, int watchMs, int tickMs) {
   w = width; h = height; left = System.Math.Max(1, watchMs / System.Math.Max(1, tickMs));
   timer = new System.Threading.Timer(Tick, null, tickMs, tickMs); }
-static object gate = new object();
 // One tick: a tick that starts while the last one still runs is skipped (the timer can overlap), so seen has one writer.
 static void Tick(object state) {
   if (!System.Threading.Monitor.TryEnter(gate)) { return; }

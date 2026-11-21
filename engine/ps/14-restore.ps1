@@ -213,10 +213,11 @@ function Restore-BinRows {
   foreach ($k in $keys) { $state = $info.Lists[$k]; $state.FromBin = 0; $state.BinFailed = 0; $binErr = ''; $failed = @()
     foreach ($id in @($state.Bin.Keys)) { $choice = $state.Bin[$id]
       try { $null = & { Restore-PnPRecycleBinItem -Identity $choice.Item -Force -ErrorAction Stop } *>&1; $state.Have[[int]$choice.Id] = $true; $state.FromBin++ }
-      catch { $state.Bin.Remove($id); $failed += $choice; if (-not $binErr) { $binErr = $_.Exception.GetType().Name } } }
+      catch { $state.Bin.Remove($id); $failed += @{ Id = $choice.Id; Err = $_.Exception.GetType().Name } } }
     if ($failed.Count) { try { foreach ($id in @((Read-ListIds $state.Name).Keys)) { $state.Have[$id] = $true } } catch { $script:stopMake = $true } }
     # A restore that reported an error but put the row back (it is on the list now, with its own ID) counts as back.
-    foreach ($choice in $failed) { if ($state.Have.ContainsKey([int]$choice.Id)) { $state.FromBin++ } else { $state.BinFailed++ } }
+    # BINERR gives the error type of the first row that really did not come back.
+    foreach ($miss in $failed) { if ($state.Have.ContainsKey([int]$miss.Id)) { $state.FromBin++ } else { $state.BinFailed++; if (-not $binErr) { $binErr = [string]$miss.Err } } }
     if ($state.BinFailed) { 'BINERR ' + $k + ' ' + $binErr } } }   # an error type only: no site, name, ID or value
 
 # R5: the lists in dependency order: a list whose lookup reads another restored list comes after it; a loop keeps the
