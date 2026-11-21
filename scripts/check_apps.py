@@ -105,6 +105,18 @@ def show(commit, rel):
     return r.stdout
 
 
+def locked_font(commit, name):
+    """The bytes of engine/fonts/<name> at a commit of this repository, or None: a bad name, no such file, or not a file."""
+    if not font_name_ok(name):
+        return None
+    rel = 'engine/fonts/' + name
+    try:
+        data = show(commit, rel)
+    except LookupError:
+        return None
+    return data if run(['git', 'cat-file', '-t', commit + ':' + rel], ROOT) == (0, 'blob') else None
+
+
 def locked_accepts(lock, app_dir, manifest_rel, tmp):
     """'' when the schema and the engine at the locked commit accept the app; else why not (the app is broken by itself)."""
     commit, engine, files = lock
@@ -113,15 +125,7 @@ def locked_accepts(lock, app_dir, manifest_rel, tmp):
         dest = (home / rel)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(show(commit, rel))
-    def locked_font(name):
-        """The bytes of engine/fonts/<name> at the locked commit, or None (also for a name with a folder in it)."""
-        if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]*', name) or '..' in name:
-            return None
-        try:
-            return show(commit, 'engine/fonts/' + name)
-        except LookupError:
-            return None
-    stage_fonts(app_dir, json.loads((app_dir / manifest_rel).read_text()), locked_font)
+    stage_fonts(app_dir, json.loads((app_dir / manifest_rel).read_text()), lambda name: locked_font(commit, name))
     from jsonschema import Draft202012Validator
     try:
         errs = list(Draft202012Validator(json.loads(show(commit, SCHEMA))).iter_errors(json.loads((app_dir / manifest_rel).read_text())))
@@ -157,15 +161,23 @@ def stage_fonts(app_dir, manifest, read_font):
             data = read_font(m.group(1))
             if data is None:
                 continue
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            dst.write_bytes(data)
+            try:   # a file where a folder should be (a broken app): left to the build, which names it
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                dst.write_bytes(data)
+            except OSError:
+                continue
             copied.append(src)
     return copied
 
 
+def font_name_ok(name):
+    """True for a plain font file name (no folder, no '..'): the only names the check reads from engine/fonts."""
+    return bool(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]*', name)) and '..' not in name
+
+
 def this_font(name):
     """The bytes of engine/fonts/<name> in this checkout, or None (also for a name with a folder in it)."""
-    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]*', name) or '..' in name:
+    if not font_name_ok(name):
         return None
     p = ROOT / 'engine/fonts' / name
     return p.read_bytes() if p.is_file() else None
