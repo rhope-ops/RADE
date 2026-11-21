@@ -48,4 +48,39 @@ with tempfile.TemporaryDirectory() as t:
     (t / 'o.ps1').write_text("'ok'\n")
     assert c.recon_notes(t, m) == [] and c.recon_notes(t / 'none', m) == []
 
-print('CANARY rules ok: %d bad manifest paths, %d bad locks, 1 symbolic link, 1 no-reconnaissance note' % (len(muts), len(bads)))
+    # Fonts an app's build copies from the engine (the Administrator, 2026-11-21): put in from the engine, nothing else.
+    fm = {'bundles': [{'files': [{'src': 'assets/fonts/build/90161Z-OFL.txt'}, {'src': 'assets/fonts/build/90161Z-Nope.ttf'},
+                                 {'src': 'assets/fonts/build/90161Z-Here.ttf'}, {'src': '../fonts/build/X-OFL.txt'}, {'src': 'docs/OFL.txt'}]}]}
+    (t / 'assets/fonts/build').mkdir(parents=True); (t / 'assets/fonts/build/90161Z-Here.ttf').write_bytes(b'app')
+    fake = {'OFL.txt': b'licence', 'Here.ttf': b'engine'}
+    got = c.stage_fonts(t, fm, fake.get)
+    assert got == ['assets/fonts/build/90161Z-OFL.txt'], got
+    assert (t / 'assets/fonts/build/90161Z-OFL.txt').read_bytes() == b'licence' and (t / 'assets/fonts/build/90161Z-Here.ttf').read_bytes() == b'app'
+    assert not (t / 'assets/fonts/build/90161Z-Nope.ttf').exists() and not (t.parent / 'fonts').exists() and not (t / 'docs').exists()
+    assert c.this_font('OFL.txt') and c.this_font('none.ttf') is None and c.this_font('../rade_build.py') is None
+    # A file where a folder should be: no stop, the build names it. The locked engine: a font file, never a folder or a bad name.
+    (t / 'bad').write_text('x')
+    assert c.stage_fonts(t, {'bundles': [{'files': [{'src': 'bad/fonts/build/X-OFL.txt'}]}]}, fake.get) == []
+    head = c.run(['git', 'rev-parse', 'HEAD'], c.ROOT)[1]
+    assert c.locked_font(head, 'OFL.txt') == c.this_font('OFL.txt') and c.locked_font(head, 'none.ttf') is None and c.locked_font(head, '../rade_build.py') is None
+    real = c.git_type; c.git_type = lambda commit, rel: 'tree'   # a folder at that path: never read as a font
+    try:
+        assert c.locked_font(head, 'OFL.txt') is None
+    finally:
+        c.git_type = real
+    assert c.git_type(head, 'engine/fonts') == 'tree' and c.git_type(head, 'engine/fonts/OFL.txt') == 'blob'
+    assert not list((t / 'assets/fonts/build').glob('.rade-font-*'))   # no temporary file left after a copy
+    # A move that fails: no font and no temporary file stay; an app file with a similar name is not touched.
+    (t / 'assets/fonts/build/90161Z-OFL.txt').unlink(); (t / 'assets/fonts/build/90161Z-OFL.txt.part').write_bytes(b'APPFILE')
+    real_replace = c.os.replace
+    def no_replace(a, b):
+        raise OSError('disk full')
+    c.os.replace = no_replace
+    try:
+        assert c.stage_fonts(t, fm, fake.get) == []
+    finally:
+        c.os.replace = real_replace
+    assert not (t / 'assets/fonts/build/90161Z-OFL.txt').exists() and not list((t / 'assets/fonts/build').glob('.rade-font-*'))
+    assert (t / 'assets/fonts/build/90161Z-OFL.txt.part').read_bytes() == b'APPFILE'
+
+print('CANARY rules ok: %d bad manifest paths, %d bad locks, 1 symbolic link, 1 no-reconnaissance note, 1 font put in' % (len(muts), len(bads)))
