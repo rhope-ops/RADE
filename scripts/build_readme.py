@@ -53,8 +53,13 @@ def md(s):
     A bare web address can still show as a link on GitHub: a backslash cannot stop that.
     """
     s = re.sub(r'\s+', ' ', str(s)).strip()
-    s = re.sub(r'([\\`*_\[\]|<>#\-+=~&!])', r'\\\1', s)
+    s = re.sub(r'([\\`*_\[\]|<>#\-+=~&!$])', r'\\\1', s)
     return re.sub(r'^(\d+)([.)])', r'\1\\\2', s)
+
+
+def plain_path(p):
+    """Return True when a script path from a manifest is a plain relative .ps1 path (no space, markup, "..", or root)."""
+    return bool(re.fullmatch(r'[\w.-]+(/[\w.-]+)*\.ps1', str(p))) and '..' not in str(p)
 
 
 def short(h):
@@ -121,7 +126,7 @@ def app_section(app, steps, help_name):
     if not bundles or not bundles[-1].get('out'):
         raise RuntimeError('%s lists no script' % repo)
     b = bundles[-1]
-    if not re.fullmatch(r'[\w.-]+(/[\w.-]+)*\.ps1', str(b['out'])) or '..' in str(b['out']):
+    if not plain_path(b['out']):
         raise RuntimeError('%s: the script path is not a plain .ps1 path' % repo)
     cat = (b.get('apps') or [{}])[0]
     name = md((m.get('application') or {}).get('name') or repo)

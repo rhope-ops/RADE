@@ -43,6 +43,11 @@ for bad in ['- fake', '1. x', '2) y', '---', '    code', 'A\n---', '~~x~~', '+ z
     out = b.md(bad)   # one line, and no character left that starts a list, rule, code block, strike or image
     assert '\n' not in out and not re.match(r'(\d+[.)]|[-+=~!*]|\s)', out), (bad, out)
 assert b.md('a\n\n  b') == 'a b'
+assert b.md('$x^2$') == '\\$x^2\\$'   # no math
+for good in ['a/b.ps1', 'scripts/gov/paste/90161Z-R40-round-r1.ps1']:
+    assert b.plain_path(good), good
+for bad in ['a b.ps1', 'a`b.ps1', '../x.ps1', 'a/../b.ps1', '/abs.ps1', 'a.ps1\n', 'a)b.ps1', 'x.txt', '']:
+    assert not b.plain_path(bad), bad
 
 # 3. Refused: no hash line, a changed text, a stored hash that differs or cannot be read.
 for t, stored in [(body, {'sha256': h}), (text + 'x', {'sha256': h}), (text, {'sha256': '0' * 64}), (text, {})]:
