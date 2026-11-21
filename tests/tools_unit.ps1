@@ -193,6 +193,22 @@ $p3 = @($s.items.'Sample Pubs' | Where-Object { $_.Title -eq 'P3' })
 $pl = Invoke-RestorePlan $base $b.Path $null; $pubLine = @($pl.Lines | Where-Object { $_ -like '"Sample Pubs"*' })[0]
 Assert-Case 'restore: a row re-made twice is followed to its newest ID (no third copy)' ($w.State -eq 'done' -and $p3.Count -eq 1 -and $p3[0].ID -eq 6 -and
   $pubLine -like '*Would put back 0*')
+# The reverse order (review 3 of PR 151): 6 is deleted for good; Restore from the first backup makes P3 again (7); the
+# second backup (which holds 5) then makes nothing: 3, 5, 6 and 7 are one row.
+# Returns the rows of Sample Pubs titled P3 on the fake site. Takes nothing.
+function Get-P3 { return @((Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json).items.'Sample Pubs' | Where-Object { $_.Title -eq 'P3' }) }
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $s.items.'Sample Pubs' = @($s.items.'Sample Pubs' | Where-Object { $_.ID -ne 6 })
+$s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+$pl = Invoke-RestorePlan $base $b.Path $null; Start-Sleep -Seconds 1; $w = Invoke-Restore $base $b.Path $pl $null
+$pl = Invoke-RestorePlan $base $bB.Path $null; $p3 = Get-P3
+Assert-Case 'restore: the reverse order makes no second copy' ($w.State -eq 'done' -and $p3.Count -eq 1 -and $p3[0].ID -eq 7 -and $pl.Missing -eq 0)
+# The Recycle Bin holds a later ID of the row (7): Restore from the second backup brings 7 back, it makes no new row.
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $row = @($s.items.'Sample Pubs' | Where-Object { $_.ID -eq 7 })[0]
+$s.items.'Sample Pubs' = @($s.items.'Sample Pubs' | Where-Object { $_.ID -ne 7 }); $s.bin = @(@{ list = 'Sample Pubs'; row = $row })
+$s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+$pl = Invoke-RestorePlan $base $bB.Path $null; Start-Sleep -Seconds 1; $w = Invoke-Restore $base $bB.Path $pl $null; $p3 = Get-P3
+Assert-Case 'restore: a later ID of the row in the Recycle Bin comes back, no new row' ($pl.Missing -eq 1 -and $w.State -eq 'done' -and $p3.Count -eq 1 -and $p3[0].ID -eq 7 -and
+  @((Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json).bin).Count -eq 0)
 # Another test site: the record of the first site does not count there (its IDs are not this site's).
 Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake2'; $script:app.Restore = @{ TestSites = @('fake', 'fake2'); Pause = $pause }
 $pl = Invoke-RestorePlan $base $b.Path $null

@@ -233,7 +233,7 @@ def restore_why(lines):
     if any(" view=tools " in l for l in cards) and drawn != {"restpick", "restconfirm"}:
         return ["the Maintenance screen showed, but the Restore cards were not all drawn: %s" % sorted(drawn)]
     got = [int(m.group(1)) for m in (re.match(r"WIN restore-lines (\d+) visible=True", l) for l in lines) if m]
-    if drawn and not (got and got[0] >= 2):
+    if drawn and not (got and min(got) >= 2):
         return ["the Restore confirm card did not show its 2 count lines"]
     return []
 

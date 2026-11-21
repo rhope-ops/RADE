@@ -220,8 +220,17 @@ Remove-TypeData -TypeName System.Array -ErrorAction SilentlyContinue
 function Get-FileName([string]$N) { return ($N -replace '[^A-Za-z0-9 _()-]', '_') }
 # The IDs in a saved lookup or person value "id;#text;#id;#text" (the even parts). Takes the value; gives back ints.
 function Get-SavedIds($V) { $p = @(([string]$V) -split ';#'); return @(for ($k = 0; $k -lt $p.Count; $k += 2) { if ($p[$k] -match '^\d+$') { [int]$p[$k] } }) }
+# The same-row groups (review 3 of PR 151): each Restore that makes a row new links its old ID and the new one; all IDs
+# linked, step by step, are one row. Get-Root gives a group's root ID; takes the parents table and an ID.
+function Get-Root($P, [int]$X) { $h = 0; while ($P.ContainsKey($X) -and $P[$X] -ne $X -and $h -lt 1000) { $X = $P[$X]; $h++ }; return $X }
+# Links two IDs as one row. Takes the parents table and the two IDs.
+function Join-Ids($P, [int]$A, [int]$B) { $ra = Get-Root $P $A; $rb = Get-Root $P $B; $P[$ra] = $ra; if ($ra -ne $rb) { $P[$rb] = $ra } }
+# The IDs of the row that $X is one of (itself first). Takes the parents table and the ID; gives back ints.
+function Get-Group($P, [int]$X) { $r = Get-Root $P $X; return @(@($X) + @($P.Keys | Where-Object { (Get-Root $P $_) -eq $r } | ForEach-Object { [int]$_ }) | Select-Object -Unique) }
+# The ID under which the row $X is on the list now (any ID of its group), or $null. Takes the list's data and the ID.
+function Get-OnList($L, [int]$X) { foreach ($m in (Get-Group $L.P $X)) { if ($L.Have.ContainsKey($m)) { return $m } }; return $null }
 # Turns a saved value (Back up's plain form) into what Add-PnPListItem takes for a field of this type. Lookup IDs are
-# re-pointed by $Map (old ID to new ID) of the list the lookup reads, when that list is one of the restored lists; an ID
+# re-pointed to the ID the row has on that list now (Get-OnList), when that list is one of the restored lists; an ID
 # that is not there is dropped and counted in $script:unlinked. Takes the field, the value and the restored lists' data.
 function ConvertTo-WriteValue($F, $V, $Info) {
   if ($null -eq $V -or ([string]$V) -eq '') { return $null }
@@ -231,7 +240,7 @@ function ConvertTo-WriteValue($F, $V, $Info) {
     foreach ($id in (Get-SavedIds $V)) {
       if ($null -eq $j) { $out += $id; continue }   # a list RADE does not restore: the ID stays
       $tgt = $Info.Lists[$j]
-      if ($tgt.Map.ContainsKey($id)) { $out += [int]$tgt.Map[$id] } elseif ($tgt.Have.ContainsKey($id)) { $out += $id } else { $script:unlinked++ } }
+      $on = Get-OnList $tgt $id; if ($null -ne $on) { $out += [int]$on } else { $script:unlinked++ } }
     if (-not $out.Count) { return $null }
     if ($t -eq 'Lookup') { return $out[0] } else { return $out } }
   if ($t -eq 'User') { $i = @(Get-SavedIds $V); if ($i.Count) { return $i[0] } else { return $null } }
@@ -253,12 +262,13 @@ try {
   $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1
 } catch { 'RESULT not-connected ' + $_.Exception.GetType().Name; exit 2 }
 $names = @($Lists -split '\|'); $info = @{ Lists = @{}; ById = @{} }
-# The rows an earlier Restore made new on this site (old ID to new ID, per list title), from any backup of this app, so
-# no run makes them again: Backups\~restore-map-<site hash>.json ('~': no backup folder has it; one file per site, as
-# IDs belong to a site). A row re-made twice is a chain (5 to 20, then 20 to 21): it is followed to its end.
+# The links an earlier Restore made on this site ("old-new", per list title), from any backup of this app, so no run
+# makes a row again: Backups\~restore-map-<site hash>.json ('~': no backup folder has it; one file per site, as IDs
+# belong to a site). Every ID in a group is the same row (Get-Group).
 $mapFile = $MapFile; $old = @{}
 if (Test-Path -LiteralPath $mapFile -PathType Leaf) { try { $mj = [System.IO.File]::ReadAllText($mapFile) | ConvertFrom-Json
-    foreach ($q in $mj.PSObject.Properties) { $h = @{}; foreach ($r in $q.Value.PSObject.Properties) { $h[[int]$r.Name] = [int]$r.Value }; $old[$q.Name] = $h } } catch { 'MAP failed'; exit 6 } }
+    foreach ($q in $mj.PSObject.Properties) { $old[$q.Name] = @(@($q.Value) | Where-Object { [string]$_ -match '^\d+-\d+$' } | ForEach-Object { [string]$_ }) } }
+  catch { 'MAP failed'; exit 6 } }
 # Reads each list: the saved rows, the IDs on the list now and the writable fields. A list with no saved file or no
 # list on the site is reported and left out.
 for ($i = 1; $i -le $names.Count; $i++) {
@@ -276,39 +286,39 @@ for ($i = 1; $i -le $names.Count; $i++) {
       if ([string]$x.InternalName -in 'ContentType', 'Attachments') { continue }
       $g = ''; if ([string]$x.SchemaXml -match 'List="\{?([0-9a-fA-F-]{36})\}?"') { $g = $Matches[1].ToLowerInvariant() }
       [pscustomobject]@{ InternalName = [string]$x.InternalName; TypeAsString = [string]$x.TypeAsString; LookupGuid = $g } })
-    # A saved row is on the list under its own ID, or under the new ID an earlier Restore gave it.
-    $map = @{}
-    if ($old.ContainsKey($n)) { $om = $old[$n]
-      foreach ($k in @($om.Keys)) { $to = $om[$k]; $hop = 0; while ($om.ContainsKey($to) -and $hop -lt 100) { $to = $om[$to]; $hop++ }
-        if ($have.ContainsKey($to)) { $map[$k] = $to } } }
-    $ids = @{}; foreach ($r in $saved) { $ids[[int]$r.ID] = $true; if ($map.ContainsKey([int]$r.ID)) { $ids[$map[[int]$r.ID]] = $true } }
-    $missing = @($saved | Where-Object { -not $have.ContainsKey([int]$_.ID) -and -not $map.ContainsKey([int]$_.ID) })
-    $after = @($have.Keys | Where-Object { -not $ids.ContainsKey($_) }).Count
-    $info.Lists[$i] = @{ Name = $n; Saved = $saved.Count; Missing = $missing; Have = $have; Fields = $fields; Map = $map; Bin = @{}; After = $after
+    # A saved row is on the list when any ID of its group is (its own, or one an earlier Restore gave it).
+    $L = @{ Name = $n; Saved = $saved.Count; Have = $have; Fields = $fields; P = @{}; Links = @(); Bin = @{} }
+    if ($old.ContainsKey($n)) { $L.Links = @($old[$n]); foreach ($e in $L.Links) { $ab = $e -split '-'; Join-Ids $L.P ([int]$ab[0]) ([int]$ab[1]) } }
+    $ids = @{}; foreach ($r in $saved) { foreach ($m in (Get-Group $L.P ([int]$r.ID))) { $ids[$m] = $true } }
+    $L.Missing = @($saved | Where-Object { $null -eq (Get-OnList $L ([int]$_.ID)) })
+    $L.After = @($have.Keys | Where-Object { -not $ids.ContainsKey($_) }).Count
+    $info.Lists[$i] = $L + @{
       Url = ([string]$list.RootFolder.ServerRelativeUrl).Trim('/').ToLowerInvariant() }
     $info.ById[([string]$list.Id).Trim('{}').ToLowerInvariant()] = $i
   } catch { 'PLAN ' + $i + ' failed ' + $_.Exception.GetType().Name }
 }
-# The Recycle Bin (R1): a deleted row of a restored list that is missing comes back with its own ID.
+# The Recycle Bin (R1): a missing row comes back with an ID of its group (its own first), once; $L.Bin is saved ID to
+# @{ Item; Id }.
 $binOk = $true
 try { $script:bin = @(); $null = & { $script:bin = @(Get-PnPRecycleBinItem -RowLimit 5000 -ErrorAction Stop) } *>&1
+  $inBin = @{}
   foreach ($b in $script:bin) {
     if ([string]$b.ItemType -ne 'ListItem' -or [string]$b.LeafName -notmatch '^(\d+)_\.000$') { continue }
-    $id = [int]$Matches[1]; $dir = ([string]$b.DirName).Trim('/').ToLowerInvariant()
-    foreach ($k in @($info.Lists.Keys)) { $L = $info.Lists[$k]
-      if ($dir -eq $L.Url -and @($L.Missing | Where-Object { [int]$_.ID -eq $id }).Count -and -not $L.Bin.ContainsKey($id)) { $L.Bin[$id] = $b } } } }
+    $inBin[([string]$b.DirName).Trim('/').ToLowerInvariant() + '|' + $Matches[1]] = $b }
+  foreach ($k in @($info.Lists.Keys)) { $L = $info.Lists[$k]; $used = @{}
+    foreach ($r in $L.Missing) { foreach ($m in (Get-Group $L.P ([int]$r.ID))) { $key = $L.Url + '|' + $m
+        if ($inBin.ContainsKey($key) -and -not $used.ContainsKey($m)) { $L.Bin[[int]$r.ID] = @{ Item = $inBin[$key]; Id = $m }; $used[$m] = $true; break } } } } }
 catch { $binOk = $false; 'BIN failed ' + $_.Exception.GetType().Name }
 $keys = @($info.Lists.Keys | Sort-Object)
-# Writes the map file: every old-to-new ID pair the Restore runs on this site made, the earlier ones kept. Takes nothing.
+# Writes the map file: every link the Restore runs on this site made, the earlier ones kept. Takes nothing.
 function Save-RestoreMap {
   $o = [ordered]@{}
-  foreach ($q in @($old.Keys)) { $o[$q] = [ordered]@{}; foreach ($k in @($old[$q].Keys)) { $o[$q][[string]$k] = $old[$q][$k] } }
-  foreach ($k in $keys) { $L = $info.Lists[$k]; if (-not $o.Contains($L.Name)) { $o[$L.Name] = [ordered]@{} }
-    foreach ($m in @($L.Map.Keys)) { $o[$L.Name][[string]$m] = $L.Map[$m] } }
+  foreach ($q in @($old.Keys)) { $o[$q] = @($old[$q]) }
+  foreach ($k in $keys) { $L = $info.Lists[$k]; $o[$L.Name] = @($L.Links) }
   [System.IO.File]::WriteAllText($mapFile, (ConvertTo-Json -InputObject $o -Depth 4), (New-Object System.Text.UTF8Encoding $true)) }
 foreach ($k in $keys) { $L = $info.Lists[$k]
   # A short hash of the missing IDs and the bin IDs: the write checks the same rows, not only the same count (no ID is printed).
-  $txt = (@($L.Missing | ForEach-Object { [int]$_.ID } | Sort-Object) -join ',') + '/' + (@($L.Bin.Keys | Sort-Object) -join ',')
+  $txt = (@($L.Missing | ForEach-Object { [int]$_.ID } | Sort-Object) -join ',') + '/' + (@($L.Bin.Keys | Sort-Object | ForEach-Object { [string]$_ + ':' + $L.Bin[$_].Id }) -join ',')
   $sha = [System.Security.Cryptography.SHA256]::Create(); $L.Sig = (-join ($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($txt))[0..5] | ForEach-Object { $_.ToString('x2') })); $sha.Dispose()
   'PLAN ' + $k + ' saved=' + $L.Saved + ' now=' + $L.Have.Count + ' missing=' + $L.Missing.Count + ' bin=' + $L.Bin.Count +
     ' new=' + ($L.Missing.Count - $L.Bin.Count) + ' after=' + $L.After + ' sig=' + $L.Sig }
@@ -332,8 +342,8 @@ $stopMake = $false
 try {
   # R1: the Recycle Bin first, every list; a row that does not come back is made new below.
   foreach ($k in $keys) { $L = $info.Lists[$k]; $L.FromBin = 0; $L.BinFailed = 0
-    foreach ($id in @($L.Bin.Keys)) {
-      try { $null = & { Restore-PnPRecycleBinItem -Identity $L.Bin[$id] -Force -ErrorAction Stop } *>&1; $L.Have[$id] = $true; $L.FromBin++ }
+    foreach ($id in @($L.Bin.Keys)) { $bi = $L.Bin[$id]
+      try { $null = & { Restore-PnPRecycleBinItem -Identity $bi.Item -Force -ErrorAction Stop } *>&1; $L.Have[[int]$bi.Id] = $true; $L.FromBin++ }
       catch { $L.Bin.Remove($id); $L.BinFailed++ } }
     # The IDs on the list again: a Recycle Bin restore that reported an error but worked is not made a second time.
     if ($L.BinFailed) { try { $script:now = @(); $null = & { $script:now = @(Get-PnPListItem -List $L.Name -PageSize 500 -Fields 'ID' -ErrorAction Stop) } *>&1
@@ -349,12 +359,13 @@ try {
     $order += $next; $null = $left.Remove($next) }
   foreach ($k in $order) { $L = $info.Lists[$k]; $L.Made = 0; $L.Failed = 0; $script:unlinked = 0
     if ($stopMake) { continue }   # a list could not be read again after the Recycle Bin: no new row, so none is made twice
-    foreach ($r in @($L.Missing | Where-Object { -not $L.Have.ContainsKey([int]$_.ID) } | Sort-Object { [int]$_.ID })) {
+    foreach ($r in @($L.Missing | Sort-Object { [int]$_.ID })) {
+      if ($null -ne (Get-OnList $L ([int]$r.ID))) { continue }   # back from the Recycle Bin, or another saved ID of the same row was made
       $v = @{}
       foreach ($fd in $L.Fields) { $p = $r.PSObject.Properties[$fd.InternalName]; if (-not $p) { continue }
         $w = ConvertTo-WriteValue $fd $p.Value $info; if ($null -ne $w) { $v[$fd.InternalName] = $w } }
       try { $script:made = $null; $null = & { $script:made = Add-PnPListItem -List $L.Name -Values $v -ErrorAction Stop } *>&1
-        $L.Map[[int]$r.ID] = [int]$script:made.Id; $L.Made++ } catch { $L.Failed++ }
+        $nid = [int]$script:made.Id; $L.Have[$nid] = $true; Join-Ids $L.P ([int]$r.ID) $nid; $L.Links += ([string]$r.ID + '-' + $nid); $L.Made++ } catch { $L.Failed++ }
       Save-RestoreMap }   # after each row: a run that stops halfway never makes a row twice
     $L.Unlinked = $script:unlinked }
   # R7 (counts only): the rows on each list after the write.
@@ -423,7 +434,7 @@ function Read-RestorePlan([string[]]$Lines) {
 # for every backup of this app on that site (reviews of PR 151: a map per backup folder let two backups make the same row
 # twice; a map for every site would mix two sites' IDs). Takes the app folder and the site address.
 function Get-RestoreMapArg([string]$Base, [string]$Site) {
-  $h = Get-ShortHash $Site.Trim().TrimEnd('/').ToLowerInvariant()
+  $h = Get-SiteMark $Site
   return (' -MapFile "' + (Join-Path (Join-Path $Base 'Backups') ('~restore-map-' + $h + '.json')) + '"') }
 # The words for a sign-in or tool stop of a child script. Takes the RESULT word and the child's Why.
 function Get-ChildStopText([string]$Res, [string]$Why) {
