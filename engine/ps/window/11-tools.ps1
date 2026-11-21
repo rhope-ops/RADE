@@ -2,10 +2,11 @@
 # Diagnose or the Back up row runs it (engine/ps/13-maintenance.ps1), with a card while it runs and a card with its result.
 # Restore (engine-v31, the Administrator, 2026-11-21): pick a backup, the dry-run card with its counts, the typed app
 # name, then the write and its result card. The local test-site mark (engine-v32, the Administrator, 2026-11-21): for an
-# app with "testSites": "local", a card where the person types the site name marks the saved site as a test site.
+# app with "testSites": "local", a card where the person types the site name marks the saved site as a test site; the
+# backup card has "Remove test-site mark" (engine-v33).
 # Listed before 10-keys.ps1 in engine/rade_build.py (that part shows the form).
 # Network: none here (parts 13 and 14 name what each tool reaches).
-# Writes: the mark file, from the mark card (Save-RestoreMark, engine/ps/14-restore.ps1).
+# Writes: the mark file, from the mark card, and its removal (Save-RestoreMark, Clear-RestoreMark, engine/ps/14-restore.ps1).
 # Credentials: none.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
@@ -48,17 +49,21 @@ $ui.ToolResult = {
   Its result: Invoke-Diagnose (Lines, Path, Findings), Invoke-Backup or Invoke-Restore (State, Lines, Path).
   #>
   param([string]$Name, $Res)
-  $diag = ($Name -eq 'Diagnose'); $bad = $(if ($diag) { [int]$Res.Findings -gt 0 } else { [string]$Res.State -in 'failed', 'refused', 'changed' })
+  $diag = ($Name -eq 'Diagnose'); $bad = $(if ($diag) { [int]$Res.Findings -gt 0 } else { [string]$Res.State -in 'failed', 'refused', 'changed', 'unmark-failed' })
   $st = [string]$Res.State
   $sent = $(if ($diag -and $bad) { 'Diagnose found ' + $Res.Findings + ' thing(s) to fix.' } elseif ($diag) { 'Diagnose found nothing to fix.' }
     elseif ($Name -eq 'Restore') { $(switch ($st) { 'done' { 'Restore put the missing rows back.' } 'refused' { 'Restore cannot run here.' } 'none' { 'Restore has no backup to use.' }
         'changed' { 'Restore wrote nothing: the site changed after the dry run.' } default { 'Restore did not finish.' } }) }
     elseif ($st -eq 'done') { 'Back up saved the lists.' } elseif ($st -eq 'none') { 'Back up has no lists to save.' }
     elseif ($st -eq 'no-site') { 'Back up saved nothing.' } else { 'Back up did not save everything.' })
+  if ($Name -eq 'Restore' -and $st -eq 'unmarked') { $sent = 'The test-site mark is removed.' }
+  if ($Name -eq 'Restore' -and $st -eq 'unmark-failed') { $sent = 'The test-site mark was not removed.' }
   $lines = @($Res.Lines); $path = $(if ($Res.Path) { [string]$Res.Path } else { $null })
+  $buttons = @(@{ Text = 'Done'; Kind = 'primary'; Act = { & $ui.VTools $ui.MaintVerb } })
+  if ($Res.Unmark) { $buttons = @(& $ui.UnmarkButton) + $buttons }   # a marked site with no backup (engine-v33)
   & $ui.SetCard @{ View = 'toolres'; Light = $(if ($bad) { 'bad' } else { '' }); Kicker = [string]$ui.Kick.Text; Sentence = $sent
     P = @($lines | Select-Object -First 2); Lines = @($lines | Select-Object -Skip 2); Path = $path
-    Buttons = @(@{ Text = 'Done'; Kind = 'primary'; Act = { & $ui.VTools $ui.MaintVerb } }); Back = { & $ui.VTools $ui.MaintVerb } }
+    Buttons = $buttons; Back = { & $ui.VTools $ui.MaintVerb } }
   & $ui.ToFront }
 
 $ui.VRestorePick = {
@@ -73,14 +78,28 @@ $ui.VRestorePick = {
   $appPath = Get-BasePath; $siteCheck = Test-RestoreSite $appPath
   if ($siteCheck.NeedMark) { & $ui.VRestoreMark; return }
   if (-not $siteCheck.Ok) { & $ui.ToolResult 'Restore' @{ State = 'refused'; Path = ''; Lines = $siteCheck.Lines }; return }
-  $ui.RestoreSite = [string]$siteCheck.Name
+  $ui.RestoreSite = [string]$siteCheck.Name; $marked = [bool]$script:app.Restore.Local   # Ok with "local": the site is marked
   $ui.RestoreSets = @(Get-BackupSet $appPath)
-  if (-not $ui.RestoreSets.Count) { & $ui.ToolResult 'Restore' @{ State = 'none'; Path = ''; Lines = @('There is no backup of this app on this computer.', 'Select "Back up" first.') }; return }
+  $noSet = @('There is no backup of this app on this computer.', 'Select "Back up" first.')
+  if (-not $ui.RestoreSets.Count) { & $ui.ToolResult 'Restore' @{ State = 'none'; Path = ''; Unmark = $marked; Lines = $noSet }; return }
+  $buttons = $(if ($marked) { @(& $ui.UnmarkButton) } else { $null })   # the focus is on the newest backup row (SetCard), never on this button
   $rows = @(for ($k = 0; $k -lt $ui.RestoreSets.Count; $k++) { $set = $ui.RestoreSets[$k]
       @{ Index = $k; Name = $set.Name; Ver = ''; Sub = ([string]$set.Lists + ' of ' + @($script:app.Backup).Count + ' lists'); R1 = $(if ($k -eq 0) { 'Newest' } else { '' }) } })
   & $ui.SetCard @{ View = 'restpick'; Kicker = [string]$ui.Kick.Text; Sentence = 'Which backup does Restore use?'
     P = @('Restore first runs a dry run on the site and shows what it would put back. Nothing is written before you confirm.')
-    Options = $rows; OnOption = { param($j) & $ui.RestorePlan $j }; Back = { & $ui.VTools $ui.MaintVerb } } }
+    Options = $rows; OnOption = { param($j) & $ui.RestorePlan $j }; Buttons = $buttons; Back = { & $ui.VTools $ui.MaintVerb } } }
+
+# The "Remove test-site mark" button (engine-v33; the Administrator, 2026-11-21): a secondary button on the backup card
+# and on the no-backup result card of a marked site. Takes nothing; gives back the button table.
+$ui.UnmarkButton = { return @{ Text = 'Remove test-site mark'; Kind = ''; Act = { & $ui.RestoreUnmark } } }
+
+# Removes the mark, then shows the result card. No typed confirm: it makes Restore stricter. Takes nothing.
+$ui.RestoreUnmark = {
+  if ($ui.Busy) { return }
+  $res = @{ State = 'unmarked'; Path = ''; Lines = @('The saved site is no longer marked as a test site on this computer.', 'Restore asks for the site name again before it runs.') }
+  try { Clear-RestoreMark (Get-BasePath) }
+  catch { $res = @{ State = 'unmark-failed'; Path = ''; Lines = @(('The mark could not be removed [' + $_.Exception.GetType().Name + '].'), 'Nothing was changed.') } }
+  & $ui.ToolResult 'Restore' $res }
 
 $ui.VRestoreMark = {
   <#

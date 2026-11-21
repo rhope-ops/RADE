@@ -235,6 +235,14 @@ def restore_why(lines):
         return ["the Maintenance screen showed, but the Restore cards were not all drawn: %s" % sorted(drawn)]
     if drawn and "WIN restore-mark saved=True view=restpick" not in lines:
         return ["the Restore mark card did not save the mark and go on to the backup list"]
+    if drawn and not any(" view=restpick " in l and "[Remove test-site mark]" in l for l in cards):
+        return ["the Restore backup card of a marked site did not show \"Remove test-site mark\""]
+    if drawn and "WIN restore-unmark-button shown=True focused=False row-focused=True" not in lines:
+        return ["\"Remove test-site mark\" was not on the backup card, or the focus was not on the newest backup row"]
+    if drawn and not ("WIN restore-unmarked-site view=restmark" in lines and "WIN restore-nobackup-button view=toolres shown=True" in lines):
+        return ["after the removal the mark card did not show, or the no-backup card of a marked site had no button"]
+    if drawn and "WIN restore-unmark gone=True view=toolres" not in lines:
+        return ["\"Remove test-site mark\" did not remove the mark and show the result card"]
     if drawn and not any(" view=restconfirm " in l and " p=Test site: " in l for l in cards):
         return ["the Restore confirm card did not show \"Test site: <name>\" as its first line"]
     got = [int(m.group(1)) for m in (re.match(r"WIN restore-lines (\d+) visible=True", l) for l in lines) if m]
