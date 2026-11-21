@@ -71,7 +71,10 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
 /* Page palette: Fulcrum Minimal (the Administrator, 2026-11-21: "the color palettes need to match Fulcrum"), the kit roles in
    docs/brand/fulcrum.css; the window keeps engine/ui-tokens.json. Done shows in Fulcrum gold (the Administrator, 2026-11-21). */
-:root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--bg:var(--fm-page);--navy:var(--fm-page-fg);--text:var(--fm-page-fg);--gray:var(--fm-page-muted);--action:var(--fm-accent);--action-fg:var(--fm-on-accent);--link:var(--fm-page-link);--turn:var(--fm-rule);--fail:var(--fm-page-error);--edge:var(--fm-slate);--track:var(--fm-page-line);--btn:var(--fm-page);--pass:var(--fm-gold)}
+/* Off in forced colours (the system colours win); in more contrast, muted text, edges and the track move to the text
+   colour, as the contrast block below does for the old palette. */
+@media not (forced-colors:active){:root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--bg:var(--fm-page);--navy:var(--fm-page-fg);--text:var(--fm-page-fg);--gray:var(--fm-page-muted);--action:var(--fm-accent);--action-fg:var(--fm-on-accent);--link:var(--fm-page-link);--turn:var(--fm-rule);--fail:var(--fm-page-error);--edge:var(--fm-slate);--track:var(--fm-page-line);--btn:var(--fm-page);--pass:var(--fm-gold)}
+@media (prefers-contrast:more){:root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--gray:var(--fm-page-fg);--edge:var(--fm-page-fg);--track:var(--bg)}}}
 .band{background:var(--fm-band);border-bottom-color:var(--fm-rule)}
 .band .sub,.band .chan{color:var(--fm-band-muted)}
 .about{width:100%;max-width:860px;margin-inline:auto;padding-block:8px 28px}
@@ -123,12 +126,12 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
     <!-- >>> site:key-facts: generated from README.md by scripts/build_site.py --write (do not edit) -->
     <dl class="facts">
       <dt>Checks first:</dt><dd>checks the computer and your site rights before any step; a failed check stops the install.</dd>
-      <dt>NIPR only:</dt><dd>on any other network it stops before it writes a file.</dd>
+      <dt>NIPR only:</dt><dd>runs only where the computer's full name holds the NIPR domain; elsewhere it stops before it writes a file.</dd>
       <dt>Credentials:</dt><dd>CAC sign-on in a browser window for each run; nothing is stored.</dd>
       <dt>Access:</dt><dd>only sees what your account can see; only accepts a DAF SharePoint address.</dd>
-      <dt>Boundary:</dt><dd>nothing leaves DoD365.</dd>
-      <dt>Verifiable:</dt><dd>inspect the commented code yourself within a .txt before execution; the window shows the script's hash in its title bar.</dd>
-      <dt>Accessible:</dt><dd>paste and run via ISE; no download, no admin rights, no policy change.</dd>
+      <dt>Boundary:</dt><dd>nothing leaves DoD365, except the test-round results e-mail (masked counts, sent by hand) until the test rounds end.</dd>
+      <dt>Verifiable:</dt><dd>read the commented code as plain text before you paste it; the window warns when the script does not match its hash.</dd>
+      <dt>Accessible:</dt><dd>paste and run via ISE; no code download, no admin rights, no policy change.</dd>
       <dt>Maintenance:</dt><dd>Diagnose, Back up and Restore from the application's card.</dd>
       <dt>Independent:</dt><dd>delete RADE and the application still works.</dd>
     </dl>

@@ -14,12 +14,12 @@ Deploy and test applications on a locked-down work computer from one pasted Powe
 <!-- site:key-facts -->
 <table>
 <tr><td><b>Checks first:</b></td><td>checks the computer and your site rights before any step; a failed check stops the install.</td></tr> <!-- source: docs/engine.md "Check stages" and "Results" -->
-<tr><td><b>NIPR only:</b></td><td>on any other network it stops before it writes a file.</td></tr> <!-- source: docs/engine.md "Guardrails", NIPR only -->
+<tr><td><b>NIPR only:</b></td><td>runs only where the computer's full name holds the NIPR domain; elsewhere it stops before it writes a file.</td></tr> <!-- source: docs/engine.md "Guardrails", NIPR only -->
 <tr><td><b>Credentials:</b></td><td>CAC sign-on in a browser window for each run; nothing is stored.</td></tr> <!-- source: engine/ps/07-checks.ps1, Connect-PnPOnline -UseWebLogin -->
 <tr><td><b>Access:</b></td><td>only sees what your account can see; only accepts a DAF SharePoint address.</td></tr> <!-- source: docs/engine.md "Guardrails", Site address -->
-<tr><td><b>Boundary:</b></td><td>nothing leaves DoD365.</td></tr> <!-- source: AGENTS.md "DoD365 boundary" -->
-<tr><td><b>Verifiable:</b></td><td>inspect the commented code yourself within a .txt before execution; the window shows the script's hash in its title bar.</td></tr> <!-- source: docs/engine.md "Bundle layout", the .txt copy from engine-v34 -->
-<tr><td><b>Accessible:</b></td><td>paste and run via ISE; no download, no admin rights, no policy change.</td></tr> <!-- source: AGENTS.md "No code fetch at run time"; 90-161.Z ISSM ruling 2026-11-13 -->
+<tr><td><b>Boundary:</b></td><td>nothing leaves DoD365, except the test-round results e-mail (masked counts, sent by hand) until the test rounds end.</td></tr> <!-- source: AGENTS.md "DoD365 boundary" -->
+<tr><td><b>Verifiable:</b></td><td>read the commented code as plain text before you paste it; the window warns when the script does not match its hash.</td></tr> <!-- source: engine/ps/window/05-alignment.ps1 (ScriptWarn); the README "Open as .txt" link -->
+<tr><td><b>Accessible:</b></td><td>paste and run via ISE; no code download, no admin rights, no policy change.</td></tr> <!-- source: AGENTS.md "No code fetch at run time"; 90-161.Z ISSM ruling 2026-11-13 -->
 <tr><td><b>Maintenance:</b></td><td>Diagnose, Back up and Restore from the application's card.</td></tr> <!-- source: docs/engine.md "Maintenance run types" -->
 <tr><td><b>Independent:</b></td><td>delete RADE and the application still works.</td></tr> <!-- source: docs/engine.md "RADE and the app", After the install -->
 </table>
