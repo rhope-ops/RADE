@@ -1,11 +1,12 @@
-<!-- Sync: this top part mirrors the RADE page (index.html, Ready card). Change the two together: when the page's
-     words change, and when an application in apps.json publishes a new script (its manifest's last bundle). -->
+<!-- Sync: this top part mirrors the RADE page (index.html, Ready card). The part between the "apps" marks is written by
+     scripts/build_readme.py --write from apps.json, each app's manifest and the page's steps; the full check fails when it is old. -->
 # RADE
 
 Test, deploy, enjoy · Teams: **RHOPE-OPS**
 
 For a computer that cannot open the RADE page (https://rhope-ops.github.io/RADE): the same content, with links on github.com.
 
+<!-- >>> apps: generated from apps.json by scripts/build_readme.py --write (do not edit) -->
 ## 90-161.Z
 
 **Test round R40**
@@ -15,7 +16,7 @@ For a computer that cannot open the RADE page (https://rhope-ops.github.io/RADE)
 Round R40 r1: window r13 with 4 checks, the reopen check on the screen you closed it on, and the look questions. Fake data.
 
 `90161Z-R40-round-r1.ps1`<br>
-1,186,619 bytes, 13,067 lines<br>
+1,186,619 bytes, 13,068 lines<br>
 Script check: `da516687bfa9...509e`, the stored hash ([.sha256.json](https://github.com/rhope-ops/90-161.Z/blob/main/scripts/gov/paste/90161Z-R40-round-r1.ps1.sha256.json)). The RADE window shows the same value in its title bar.
 
 | Link | What to do |
@@ -31,6 +32,7 @@ If one link is blocked on your network, try the other.
 3. The RADE window opens. Do what it says.
 
 For help, ask in the Teams channel **RHOPE-OPS**.
+<!-- <<< apps -->
 
 [Repository](https://github.com/rhope-ops/RADE)
 
