@@ -114,7 +114,7 @@ $ui.VRestoreConfirm = {
 # Restore, card 4: checks the typed name, then runs the write (Invoke-Restore) and shows its result. Takes nothing.
 $ui.RestoreGo = {
   if ($ui.Busy) { return }
-  if ($ui.Field.Text.Trim() -ne [string]$script:app.Name) { & $ui.Say1 ('Type the app name as shown: ' + $script:app.Name); return }
+  if ($ui.Field.Text.Trim() -cne [string]$script:app.Name) { & $ui.Say1 ('Type the app name as shown: ' + $script:app.Name); return }
   & $ui.SetCard @{ View = 'toolrun'; Kicker = [string]$ui.Kick.Text; Sentence = 'Restore is running.'; P = @('It saves a fresh backup, then puts the missing rows back. Do not close RADE.') }
   $ui.Busy = $true; [System.Windows.Forms.Application]::DoEvents(); $res = $null
   try { $res = Invoke-Restore (Get-BasePath) $ui.RestoreDir $ui.RestoreDry { [System.Windows.Forms.Application]::DoEvents() } }

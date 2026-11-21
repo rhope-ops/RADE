@@ -13,8 +13,12 @@ Status: the Administrator (as PFM) answered the design questions on 2026-11-21 (
 
 ## Build
 
-1. Manifest `restore` (schema, build): `testSites` (site addresses), optional `pause` {list, title, field, on}. Back up list titles may hold parentheses (R39 open item).
+1. Manifest `restore` (schema, build): `testSites` (site names: the part after the site prefix; changed from "site addresses" in the build so no address is in a manifest), optional `pause` {list, title, field, on}. Back up list titles may hold parentheses (R39 open item).
 2. Engine part 13: the backup list, the dry run (read-only: counts per list), the write (refuses a site that is not a test site; R3, R2, R1, R5, a count check after; stops before any write when the site changed since the dry run).
 3. Window part 11: Restore row on; pick a backup; dry-run card with the typed name; result card.
 4. Tests: fake PnP (Recycle Bin, fields, add); tests/tools_unit.ps1 cases; the window stand-in.
 5. Docs: engine.md, window-design.md, make-an-app.md, DECISIONS.md; release engine-v31 with the R41 clicks.
+
+## Review of PR 151 (fresh reviewer, 2026-11-21)
+
+MAJOR fixed: the record of re-made rows was one per backup folder, so two backups could make the same row twice; it is now `Backups\~restore-map.json`, one for the app. MINOR fixed: the write checks a hash of the missing and Recycle Bin rows, not only their count; after a Recycle Bin error the list is read again; the typed name must match exactly. MINOR kept, in the release notes: closing RADE mid-run leaves the pause switch on; the Recycle Bin read stops at 5,000 items.

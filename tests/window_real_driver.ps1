@@ -41,6 +41,8 @@ function global:Save-RadeRestore {
       '"Sample Tasks": 12 in the backup, 9 on the list now. Would put back 3 (1 from the Recycle Bin, 2 as new rows). 1 made after the backup stay.',
       'NOTE: "Sample Recs (Form 1)" is left out: this backup has no file for it') }
   & $ui.VRestoreConfirm; Save-RadeCard 'restconfirm'
+  # The count lines are in the rich text box, which a picture cannot show (DrawToBitmap): log how many it holds.
+  Write-Host ('WIN restore-lines ' + @(([string]$ui.Guide.Text) -split "`n" | Where-Object { $_.Trim() }).Count + ' visible=' + $ui.Guide.Visible)
   $ui.Field.Text = 'wrong name'; & $ui.RestoreGo; Save-RadeCard 'restconfirm-wrongname'
   & $ui.ToolResult 'Restore' @{ State = 'done'; Path = (Join-Path $bp 'Backups\20261121-091500'); Lines = @('Restore put back 3 of 3 rows. Rows on the lists were not changed.',
       'Fresh backup before Restore: Backups\20261121-091500', "The app's pause switch is back as it was.", 'PASS: "Sample Tasks": 1 back from the Recycle Bin, 2 made new; 12 rows on the list now') }

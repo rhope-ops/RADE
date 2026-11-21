@@ -142,6 +142,14 @@ Start-Sleep -Seconds 1; $w = Invoke-Restore $base $b.Path $pl $null
 $s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json
 Assert-Case 'restore: a site that changed after the dry run gets no row' ($w.State -eq 'changed' -and @($s.items.'Sample Pubs').Count -eq 2 -and @($s.bin).Count -eq 1 -and @($s.log).Count -eq 0)
 $s.items.'Sample Endorse' = @(@{ ID = 1; Title = 'E1'; Pub = '2;#P2' }); $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+# The same count but other rows missing after the dry run: the write stops too (the hash of the missing rows).
+$pl = Invoke-RestorePlan $base $b.Path $null
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json
+$s.items.'Sample Endorse' = @(@{ ID = 2; Title = 'E2'; Pub = '3;#P3' }); $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+Start-Sleep -Seconds 1; $w = Invoke-Restore $base $b.Path $pl $null
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json
+Assert-Case 'restore: other rows missing with the same count stop the write' ($w.State -eq 'changed' -and @($s.items.'Sample Pubs').Count -eq 2 -and @($s.log).Count -eq 0)
+$s.items.'Sample Endorse' = @(@{ ID = 1; Title = 'E1'; Pub = '2;#P2' }); $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
 # The pause switch is on already: no row is written.
 $s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $s.rows.RestorePause = 'On'; $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
 $pl = Invoke-RestorePlan $base $b.Path $null; Start-Sleep -Seconds 1; $w = Invoke-Restore $base $b.Path $pl $null
@@ -165,6 +173,13 @@ Assert-Case 'restore: the pause switch goes on, then back (R2)' ((@($s.log) -joi
   ($w.Lines -join ' ') -like "*pause switch is back as it was*")
 Assert-Case 'restore: each list gets its count line' (($w.Lines -join ' ') -like '*PASS: "Sample Pubs": 1 back from the Recycle Bin, 1 made new; 4 rows on the list now*' -and
   ($w.Lines -join ' ') -like '*PASS: "Sample Endorse": 0 back from the Recycle Bin, 1 made new; 2 rows on the list now*')
+# Another backup that holds the same rows (a copy of the first): it finds nothing missing either; the record of re-made
+# rows is one for the app (Backups\~restore-map.json), not one per backup (review of PR 151).
+$b2 = $b.Path + '-copy'; Copy-Item -LiteralPath $b.Path -Destination $b2 -Recurse
+$pl = Invoke-RestorePlan $base $b2 $null
+Assert-Case 'restore: another backup of the same rows does not make a re-made row again' ($pl.State -eq 'plan' -and $pl.Missing -eq 0 -and
+  (Test-Path -LiteralPath (Join-Path $base 'Backups\~restore-map.json')))
+Remove-Item -LiteralPath $b2 -Recurse -Force
 # A second run has nothing to put back.
 $pl = Invoke-RestorePlan $base $b.Path $null
 Assert-Case 'restore: a second dry run finds nothing missing' ($pl.State -eq 'plan' -and $pl.Missing -eq 0)

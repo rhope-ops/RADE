@@ -199,14 +199,14 @@ Built in engine-v31 (the Administrator, 2026-11-20 and 2026-11-21; plan [reviews
 |---|---|---|---|
 | Pick a backup (newest first, 10 at most) | `Backups\<time>` in the app folder | none | No test site, or no backup: the result card says so; nothing changes |
 | R4 dry run: for each list in `backup`, the rows in the backup, on the list now, missing (from the Recycle Bin, as new rows) and made after the backup | The named lists (IDs and fields only), the site's Recycle Bin | none | A list with no file or not on the site is left out by name; a Recycle Bin it cannot read is named (the rows would come back as new rows) |
-| Confirm: the user types the app name | — | — | A wrong name: one line, nothing runs |
+| Confirm: the user types the app name (exact, with its capitals) | — | — | A wrong name: one line, nothing runs |
 | R3 a fresh backup | as Back up | `Backups\<time>` | Not every list saved: Restore writes nothing |
 | R2 the pause switch (`restore.pause`: list, row title, field, on value) | That one row | Its field: the on value, then the value it had | Row not there, or on already: no row is written |
-| The site must be as the dry run saw it (the same missing count per list) | as the dry run | none | Changed: no row is written |
-| R1 the Recycle Bin, then new rows in dependency order (R5: a list whose lookup reads another restored list comes after it; a lookup to a row made new points to its new ID) | the backup's JSON files | Missing rows only; a row on the list is never changed; a row made after the backup stays (the Administrator, 2026-11-21) | A row it cannot write is counted; the old-to-new ID pairs are saved after each row in `~restore-map.json` in the backup folder, so a second run never makes a row twice |
+| The site must be as the dry run saw it (the same missing and Recycle Bin rows per list, by a hash of their IDs) | as the dry run | none | Changed: no row is written |
+| R1 the Recycle Bin, then new rows in dependency order (R5: a list whose lookup reads another restored list comes after it; a lookup to a row made new points to its new ID) | the backup's JSON files | Missing rows only; a row on the list is never changed; a row made after the backup stays (the Administrator, 2026-11-21) | A row it cannot write is counted; the old-to-new ID pairs are saved after each row in `Backups\~restore-map.json` (one for the app, every backup), so a later run from any backup never makes a row twice |
 | R7 (counts only): the rows on each list after | the named lists | none | A count that differs is a finding |
 
-Field values go back in the form PnP takes: a person by its site user ID (R6 is not built: a person not on the site is not resolved), a link as "url, description", managed metadata by its term ID, several choices as a list, a date in ISO form; a place (Geolocation) is not written. The child script prints counts and error types only, never a site, name, ID or value.
+Field values go back in the form PnP takes: a person by its site user ID (R6 is not built: a person not on the site is not resolved), a link as "url, description", managed metadata by its term ID, several choices as a list, a date in ISO form; a place (Geolocation) is not written. The child script prints counts, error types and a short hash only, never a site, name, ID or value. Limits: the Recycle Bin read stops at 5,000 items (a row past that comes back as a new row); a run stopped by closing RADE does not put the pause switch back (the next Restore stops with "on already"; set it back by hand).
 
 The function lists below are an agent recommendation (2026-11-14), not approved; D1, D0 and R1 to R5 are built (R7 as a count check).
 

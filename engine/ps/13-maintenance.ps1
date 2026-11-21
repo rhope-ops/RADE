@@ -213,7 +213,7 @@ function Invoke-Backup([string]$Base, [scriptblock]$Tick) {
 # "plan" (the dry run: reads only) and "write" (after the typed confirm). It prints only list numbers, counts and error
 # types: never the site, a name, an ID or a value.
 $restoreScript = @'
-param([string]$Site, [string]$Folder, [string]$Lists, [string]$Mode, [string]$Expect, [string]$Pause)
+param([string]$Site, [string]$Folder, [string]$Lists, [string]$Mode, [string]$Expect, [string]$Pause, [string]$MapFile)
 # RADE Restore: missing rows only. Mode plan reads the site and writes nothing; mode write puts the missing rows back.
 Remove-TypeData -TypeName System.Array -ErrorAction SilentlyContinue
 # The file name of a saved list (the same rule as Get-BackupFileName in the engine). Takes the list title.
@@ -253,9 +253,9 @@ try {
   $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1
 } catch { 'RESULT not-connected ' + $_.Exception.GetType().Name; exit 2 }
 $names = @($Lists -split '\|'); $info = @{ Lists = @{}; ById = @{} }
-# The rows an earlier Restore made new from this backup (old ID to new ID, per list title), so a second run never makes
-# them again: ~restore-map.json in the backup folder ('~': no list title has it).
-$mapFile = Join-Path $Folder '~restore-map.json'; $old = @{}
+# The rows an earlier Restore made new (old ID to new ID, per list title), from any backup of this app, so no run makes
+# them again: Backups\~restore-map.json ('~': no backup folder has it). The IDs are the site's, the same in every backup.
+$mapFile = $MapFile; $old = @{}
 if (Test-Path -LiteralPath $mapFile -PathType Leaf) { try { $mj = [System.IO.File]::ReadAllText($mapFile) | ConvertFrom-Json
     foreach ($q in $mj.PSObject.Properties) { $h = @{}; foreach ($r in $q.Value.PSObject.Properties) { $h[[int]$r.Name] = [int]$r.Value }; $old[$q.Name] = $h } } catch { 'MAP failed'; exit 6 } }
 # Reads each list: the saved rows, the IDs on the list now and the writable fields. A list with no saved file or no
@@ -303,11 +303,16 @@ function Save-RestoreMap {
     foreach ($m in @($L.Map.Keys)) { $o[$L.Name][[string]$m] = $L.Map[$m] } }
   [System.IO.File]::WriteAllText($mapFile, (ConvertTo-Json -InputObject $o -Depth 4), (New-Object System.Text.UTF8Encoding $true)) }
 foreach ($k in $keys) { $L = $info.Lists[$k]
-  'PLAN ' + $k + ' saved=' + $L.Saved + ' now=' + $L.Have.Count + ' missing=' + $L.Missing.Count + ' bin=' + $L.Bin.Count + ' new=' + ($L.Missing.Count - $L.Bin.Count) + ' after=' + $L.After }
+  # A short hash of the missing IDs and the bin IDs: the write checks the same rows, not only the same count (no ID is printed).
+  $txt = (@($L.Missing | ForEach-Object { [int]$_.ID } | Sort-Object) -join ',') + '/' + (@($L.Bin.Keys | Sort-Object) -join ',')
+  $sha = [System.Security.Cryptography.SHA256]::Create(); $L.Sig = (-join ($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($txt))[0..5] | ForEach-Object { $_.ToString('x2') }))
+  'PLAN ' + $k + ' saved=' + $L.Saved + ' now=' + $L.Have.Count + ' missing=' + $L.Missing.Count + ' bin=' + $L.Bin.Count +
+    ' new=' + ($L.Missing.Count - $L.Bin.Count) + ' after=' + $L.After + ' sig=' + $L.Sig }
 if ($Mode -ne 'write') { 'RESULT plan'; exit 0 }
-# The write. First: the site must be as the dry run saw it (the same missing count per list), else nothing is written.
-$want = @{}; foreach ($e in ($Expect -split ',')) { if ($e -match '^(\d+):(\d+)$') { $want[[int]$Matches[1]] = [int]$Matches[2] } }
-foreach ($k in $keys) { if ($want[$k] -ne $info.Lists[$k].Missing.Count) { 'RESULT changed'; exit 4 } }
+# The write. First: the site must be as the dry run saw it (the same missing rows and Recycle Bin rows per list, by the
+# hash), else nothing is written.
+$want = @{}; foreach ($e in ($Expect -split ',')) { if ($e -match '^(\d+):([0-9a-f]+)$') { $want[[int]$Matches[1]] = $Matches[2] } }
+foreach ($k in $keys) { if ($want[$k] -ne $info.Lists[$k].Sig) { 'RESULT changed'; exit 4 } }
 if ($want.Count -ne $keys.Count) { 'RESULT changed'; exit 4 }
 # R2: the pause switch. Its earlier value is read first and put back after; a switch that is on already stops the run.
 $pz = $null; $pRow = $null; $pOld = $null
@@ -324,7 +329,10 @@ try {
   foreach ($k in $keys) { $L = $info.Lists[$k]; $L.FromBin = 0; $L.BinFailed = 0
     foreach ($id in @($L.Bin.Keys)) {
       try { $null = & { Restore-PnPRecycleBinItem -Identity $L.Bin[$id] -Force -ErrorAction Stop } *>&1; $L.Have[$id] = $true; $L.FromBin++ }
-      catch { $L.Bin.Remove($id); $L.BinFailed++ } } }
+      catch { $L.Bin.Remove($id); $L.BinFailed++ } }
+    # The IDs on the list again: a Recycle Bin restore that reported an error but worked is not made a second time.
+    if ($L.BinFailed) { try { $script:now = @(); $null = & { $script:now = @(Get-PnPListItem -List $L.Name -PageSize 500 -Fields 'ID' -ErrorAction Stop) } *>&1
+        foreach ($it in $script:now) { $L.Have[[int]$it.Id] = $true } } catch { 'RESULT reread-failed'; exit 7 } } }
   # R5: lists in dependency order (a list whose lookup reads another restored list comes after it); a loop keeps the
   # manifest order for the lists left.
   $order = @(); $left = [System.Collections.Generic.List[int]]::new(); foreach ($k in $keys) { $left.Add($k) }
@@ -394,15 +402,20 @@ function Test-RestoreSite([string]$Base) {
 }
 
 # Reads the PLAN lines of the Restore child script: one table for each list number. Takes the output lines; gives
-# back @{ <n> = @{ Saved; Now; Missing; Bin; New; After } or @{ Error } }.
+# back @{ <n> = @{ Saved; Now; Missing; Bin; New; After; Sig } or @{ Error } }.
 function Read-RestorePlan([string[]]$Lines) {
   $p = @{}
   foreach ($l in $Lines) {
-    if ($l -match '^PLAN (\d+) saved=(\d+) now=(\d+) missing=(\d+) bin=(\d+) new=(\d+) after=(\d+)$') {
-      $p[[int]$Matches[1]] = @{ Saved = [int]$Matches[2]; Now = [int]$Matches[3]; Missing = [int]$Matches[4]; Bin = [int]$Matches[5]; New = [int]$Matches[6]; After = [int]$Matches[7] } }
+    if ($l -match '^PLAN (\d+) saved=(\d+) now=(\d+) missing=(\d+) bin=(\d+) new=(\d+) after=(\d+) sig=([0-9a-f]+)$') {
+      $p[[int]$Matches[1]] = @{ Saved = [int]$Matches[2]; Now = [int]$Matches[3]; Missing = [int]$Matches[4]; Bin = [int]$Matches[5]
+        New = [int]$Matches[6]; After = [int]$Matches[7]; Sig = $Matches[8] } }
     elseif ($l -match '^PLAN (\d+) (.+)$') { $p[[int]$Matches[1]] = @{ Error = $Matches[2] } } }
   return $p
 }
+# The -MapFile argument of the Restore child script: Backups\~restore-map.json in the app folder, one record for every
+# backup of this app (review of PR 151: a map per backup folder let two backups make the same row twice). Takes the app
+# folder.
+function Get-RestoreMapArg([string]$Base) { return (' -MapFile "' + (Join-Path (Join-Path $Base 'Backups') '~restore-map.json') + '"') }
 # The words for a sign-in or tool stop of a child script. Takes the RESULT word and the child's Why.
 function Get-ChildStopText([string]$Res, [string]$Why) {
   switch ($Res) { 'no-pnp' { return 'the SharePoint tool is not installed' } 'not-connected' { return 'the sign-in did not finish' }
@@ -419,14 +432,14 @@ The backup folder (from Get-BackupSet).
 Run while the sign-in and the reads go on, or $null.
 .OUTPUTS
 @{ State; Lines; Plan; Expect; Missing }: State is plan, refused or failed; Lines are plain report lines (counts only);
-Plan is Read-RestorePlan's table; Expect is the missing count per list ("1:2,2:0") the write checks again; Missing is
-the total.
+Plan is Read-RestorePlan's table; Expect is the hash of the missing and Recycle Bin rows per list ("1:<hex>,2:<hex>")
+the write checks again; Missing is the total.
 #>
 function Invoke-RestorePlan([string]$Base, [string]$Dir, [scriptblock]$Tick) {
   $t = Test-RestoreSite $Base
   if (-not $t.Ok) { return @{ State = 'refused'; Lines = $t.Lines; Plan = @{}; Expect = ''; Missing = 0 } }
   $lists = @($script:app.Backup | Where-Object { $_ })
-  $r = Invoke-ChildScript $restoreScript ('-Site "' + $t.Site + '" -Folder "' + $Dir + '" -Lists "' + ($lists -join '|') + '" -Mode plan') 1800 $Tick
+  $r = Invoke-ChildScript $restoreScript ('-Site "' + $t.Site + '" -Folder "' + $Dir + '" -Lists "' + ($lists -join '|') + '" -Mode plan' + (Get-RestoreMapArg $Base)) 1800 $Tick
   $res = ''; foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $res = $Matches[1] } elseif ($l -eq 'MAP failed') { $res = 'map' } }
   $stop = $(if ($res -eq 'map') { "this backup's record of an earlier Restore (~restore-map.json) could not be read" } else { Get-ChildStopText $res $r.Why })
   if ($res -ne 'plan') { return @{ State = 'failed'; Plan = @{}; Expect = ''; Missing = 0; Lines = @(('The dry run did not finish: ' + $stop + '.'), 'Nothing was changed.') } }
@@ -437,7 +450,7 @@ function Invoke-RestorePlan([string]$Base, [string]$Dir, [scriptblock]$Tick) {
     if ($p.Error) { $why = $(switch -regex ($p.Error) { '^nofile' { 'this backup has no file for it' } '^nolist' { 'the list is not on the site (Restore does not make lists)' }
           default { 'it could not be read (' + ($p.Error -replace '^failed ', '') + ')' } })
       $lines += ('NOTE: "' + $n + '" is left out: ' + $why); continue }
-    $exp += ([string]$i + ':' + $p.Missing); $tot += $p.Missing; $nb += $p.Bin; $nn += $p.New
+    $exp += ([string]$i + ':' + $p.Sig); $tot += $p.Missing; $nb += $p.Bin; $nn += $p.New
     $lines += ('"' + $n + '": ' + $p.Saved + ' in the backup, ' + $p.Now + ' on the list now. Would put back ' + $p.Missing +
       ' (' + $p.Bin + ' from the Recycle Bin, ' + $p.New + ' as new rows). ' + $p.After + ' made after the backup stay.') }
   $head = @(('Dry run: ' + $tot + ' rows would come back (' + $nb + ' from the Recycle Bin, ' + $nn + ' as new rows). Nothing was written.'))
@@ -452,7 +465,7 @@ with lookups re-pointed (R5), the pause switch back, then the row count of each 
 .DESCRIPTION
 Runs only after the user typed the app name on the dry-run card, and only on a test site. Writes missing rows only: a
 row on the list is never changed, and a row made after the backup stays (the Administrator, 2026-11-21). The site must
-be as the dry run saw it (the same missing count per list), else nothing is written.
+be as the dry run saw it (the same missing and Recycle Bin rows per list), else nothing is written.
 .PARAMETER Base
 The RADE app folder.
 .PARAMETER Dir
@@ -472,14 +485,16 @@ function Invoke-Restore([string]$Base, [string]$Dir, $Plan, [scriptblock]$Tick) 
   if ($fresh.State -ne 'done') { return @{ State = 'failed'; Path = ''; Lines = @(@('Restore wrote nothing: the fresh backup before it did not save every list.') + @($fresh.Lines)) } }
   $lists = @($script:app.Backup | Where-Object { $_ }); $pz = $script:app.Restore.Pause
   $pa = $(if ($pz) { ' -Pause "' + $pz.List + '|' + $pz.Title + '|' + $pz.Field + '|' + $pz.On + '"' } else { '' })
-  $r = Invoke-ChildScript $restoreScript ('-Site "' + $t.Site + '" -Folder "' + $Dir + '" -Lists "' + ($lists -join '|') + '" -Mode write -Expect "' + $Plan.Expect + '"' + $pa) 3600 $Tick
+  $r = Invoke-ChildScript $restoreScript ('-Site "' + $t.Site + '" -Folder "' + $Dir + '" -Lists "' + ($lists -join '|') + '" -Mode write -Expect "' + $Plan.Expect + '"' + $pa +
+    (Get-RestoreMapArg $Base)) 3600 $Tick
   $res = ''; $done = @{}; $resume = ''
   foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $res = $Matches[1] } elseif ($l -match '^DONE (\d+) (.+)$') { $done[[int]$Matches[1]] = $Matches[2] }
     elseif ($l -match '^RESUME (\S+)') { $resume = $Matches[1] } }
   $fl = 'Fresh backup before Restore: ' + (ConvertTo-Masked $fresh.Path)
   $stop = $(switch ($res) { 'changed' { 'the site changed after the dry run. Run Restore again for a new dry run' }
       'paused-already' { 'the pause switch is on already (another Restore, or it was left on). Check it, then run Restore again' }
-      'no-pause-row' { "the app's pause-switch row is not on the site" } 'pause-failed' { 'the pause switch could not be set' } default { '' } })
+      'no-pause-row' { "the app's pause-switch row is not on the site" }
+      'reread-failed' { 'the lists could not be read again after the Recycle Bin' } 'pause-failed' { 'the pause switch could not be set' } default { '' } })
   if ($stop) { return @{ State = $(if ($res -eq 'changed') { 'changed' } else { 'failed' }); Path = $fresh.Path; Lines = @(('Restore wrote no rows: ' + $stop + '.'), $fl) } }
   $lines = @(); $bad = 0; $back = 0
   for ($i = 1; $i -le $lists.Count; $i++) {
