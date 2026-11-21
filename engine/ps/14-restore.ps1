@@ -1,5 +1,5 @@
-# RADE engine part 14, the Maintenance tool Restore (engine-v31; the Administrator, 2026-11-20 and 2026-11-21; plan
-# docs/reviews/2026-11-21-plan-restore-v31.md; docs/engine.md "Maintenance run types").
+# RADE engine part 14, the Maintenance tool Restore (engine-v31; the local test-site mark, engine-v32; the Administrator,
+# 2026-11-20 and 2026-11-21; plan docs/reviews/2026-11-21-plan-restore-v31.md; docs/engine.md "Maintenance run types").
 # Puts back the rows of a backup that are missing from their list, on a test site only: a dry run with counts first,
 # then (after the user types the app name) a fresh backup, the pause switch, the Recycle Bin, then new rows with lookups
 # re-pointed. A row that is on the list is never changed, and no row is made twice.
@@ -8,7 +8,8 @@
 # Network: signs in to the saved site and reads only the lists the manifest names ("backup"), their fields and the
 # site's Recycle Bin (AGENTS.md "No reconnaissance").
 # Writes: site rows of the named lists (missing rows only) and the app's pause-switch row, after the typed confirm; on
-# the computer, a fresh backup and Backups\~restore-map-<site hash>.json.
+# the computer, a fresh backup, Backups\~restore-map-<site hash>.json and, from the mark card,
+# Config\<prefix>-restore-test-site.txt.
 # Credentials: the interactive CAC sign-in of PnP (-UseWebLogin).
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
@@ -310,25 +311,48 @@ function Get-BackupSet([string]$Base) {
   return $out
 }
 
+# ---- The local test-site mark (engine-v32; the Administrator, 2026-11-21): an app whose manifest gives
+# "restore.testSites": "local" names no site (a public repo must not hold it). The person marks the saved site as a test
+# site on this computer, on the card where they type its name; the mark is Config\@@PREFIX@@-restore-test-site.txt in
+# the app folder, next to the site address (Config\@@PREFIX@@-site.txt), never in a repo.
+# Gives the path of the mark file. Takes the app folder.
+function Get-RestoreMarkFile([string]$Base) { return (Get-ConfigFile $Base '@@PREFIX@@-restore-test-site.txt') }
+# Gives the site name the mark holds, or '' (no mark, or a file that cannot be read). Takes the app folder.
+function Get-RestoreMark([string]$Base) {
+  $p = Get-RestoreMarkFile $Base
+  if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { return '' }
+  try { return ([string](Get-Content -LiteralPath $p -TotalCount 1)).Trim() } catch { return '' } }
+# Saves the mark: the site name, one line. Throws when it cannot. Takes the app folder and the site name.
+function Save-RestoreMark([string]$Base, [string]$Name) {
+  $p = Get-RestoreMarkFile $Base; $dir = Split-Path -Parent $p
+  if (-not (Test-Path -LiteralPath $dir -PathType Container)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
+  [System.IO.File]::WriteAllText($p, ($Name.Trim() + "`r`n"), (New-Object System.Text.UTF8Encoding $true)) }
+
 <#
 .SYNOPSIS
-Says whether Restore may write on the saved site: the app names Restore ("restore") and the site is one of its test sites.
+Says whether Restore may write on the saved site: the app names Restore ("restore") and the site is one of its test
+sites, or (with "testSites": "local") the site is marked as a test site on this computer.
 .DESCRIPTION
-Restore runs only on a site the app's manifest lists as a test site (the Administrator, 2026-11-20). The site name is
-the part of the saved address after the site prefix, compared without case.
+Restore runs only on a test site (the Administrator, 2026-11-20 and 2026-11-21). The site name is the part of the saved
+address after the site prefix, compared without case. With a list of names, the site must be in it; with "local", the
+mark (Get-RestoreMark) must hold this site's name. A mark of another site does not count.
 .PARAMETER Base
 The RADE app folder.
 .OUTPUTS
-@{ Ok; Site; Lines }: Ok is $true when Restore may run; Lines say why not.
+@{ Ok; Site; Name; NeedMark; Lines }: Ok is $true when Restore may run; Name is the site name; NeedMark is $true when
+only the mark is missing (the window then shows the mark card); Lines say why not.
 #>
 function Test-RestoreSite([string]$Base) {
   $restoreDef = $script:app.Restore
-  if (-not $restoreDef) { return @{ Ok = $false; Site = ''; Lines = @(($script:app.Name + ' does not use Restore in this version.'), 'Nothing was changed.') } }
+  if (-not $restoreDef) { return @{ Ok = $false; Site = ''; Name = ''; NeedMark = $false; Lines = @(($script:app.Name + ' does not use Restore in this version.'), 'Nothing was changed.') } }
   $site = Get-SiteUrl $Base
-  if (-not (Test-SiteUrl $site)) { return @{ Ok = $false; Site = ''; Lines = @('No site address is saved, so Restore did not sign in.', 'Select "Repair": its checks ask for the site address.') } }
+  if (-not (Test-SiteUrl $site)) { return @{ Ok = $false; Site = ''; Name = ''; NeedMark = $false; Lines = @('No site address is saved, so Restore did not sign in.', 'Select "Repair": its checks ask for the site address.') } }
   $name = $site.Substring($sitePrefix.Length).TrimEnd('/')
-  if (@($restoreDef.TestSites | Where-Object { [string]$_ -eq $name }).Count) { return @{ Ok = $true; Site = $site; Lines = @() } }
-  return @{ Ok = $false; Site = $site; Lines = @('Restore runs only on a test site that the app names. The saved site is not one.', 'Nothing was changed.') }
+  if ($restoreDef.Local) {
+    if ((Get-RestoreMark $Base) -eq $name) { return @{ Ok = $true; Site = $site; Name = $name; NeedMark = $false; Lines = @() } }
+    return @{ Ok = $false; Site = $site; Name = $name; NeedMark = $true; Lines = @('Restore runs only on a site marked as a test site on this computer. The saved site is not marked.', 'Nothing was changed.') } }
+  if (@($restoreDef.TestSites | Where-Object { [string]$_ -eq $name }).Count) { return @{ Ok = $true; Site = $site; Name = $name; NeedMark = $false; Lines = @() } }
+  return @{ Ok = $false; Site = $site; Name = $name; NeedMark = $false; Lines = @('Restore runs only on a test site that the app names. The saved site is not one.', 'Nothing was changed.') }
 }
 
 # Reads the PLAN lines of the Restore child script: one table for each list number. Takes the output lines; gives

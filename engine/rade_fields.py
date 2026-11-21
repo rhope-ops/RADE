@@ -45,24 +45,28 @@ def hand_part(s):
 
 
 def restore_part(a):
-    """The manifest field "restore" of an app (engine-v31; the Administrator, 2026-11-20 and 2026-11-21) as PowerShell.
+    """The manifest field "restore" of an app (engine-v31 and v32; the Administrator, 2026-11-20 and 2026-11-21) as PowerShell.
 
-    "testSites": the site names (the part after the site prefix) where Restore may write; RADE refuses Restore on any
-    other site. "pause" (optional): the app's pause-switch row (list, row title, field, the "on" value) that Restore
-    sets before it writes and puts back after, so the app's flows can skip while rows come back (plan R2).
+    "testSites": the site names (the part after the site prefix) where Restore may write, or "local" (engine-v32): the
+    person marks the saved site as a test site on that computer (for an app whose public repo must not hold the name).
+    RADE refuses Restore on any other site. "pause" (optional): the app's pause-switch row (list, row title, field, the
+    "on" value) that Restore sets before it writes and puts back after, so the app's flows can skip while rows come back
+    (plan R2); a row the flows do not read yet needs no other setting (the Administrator, 2026-11-21).
 
     Args:
         a: the manifest app entry; a bad field stops the build (the schema says the same).
 
     Returns:
-        '$null' when the app has no "restore" field, else '@{ TestSites = @(...); Pause = $null or @{...} }'.
+        '$null' when the app has no "restore" field, else '@{ TestSites = @(...); Local = $true or $false; Pause = $null or @{...} }'.
     """
     r = a.get('restore')
     if not r:
         return '$null'
     assert a.get('backup'), 'app %r: restore needs backup (Restore puts back the lists that Back up saves)' % a['name']
     sites = r.get('testSites', [])
-    assert sites and all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', n) for n in sites), 'app %r: restore.testSites: one or more site names (letters, digits, "_", "-")' % a['name']
+    local = sites == 'local'
+    assert local or (isinstance(sites, list) and sites and all(isinstance(n, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', n) for n in sites)), \
+        'app %r: restore.testSites: "local", or one or more site names (letters, digits, "_", "-")' % a['name']
     pause = '$null'
     pz = r.get('pause')
     if pz:
@@ -70,4 +74,4 @@ def restore_part(a):
         assert plain, 'app %r: restore.pause list, title and field hold plain names only' % a['name']
         assert re.fullmatch(r'[A-Za-z0-9 _-]{1,40}', pz['on']), 'app %r: restore.pause.on: a plain value' % a['name']
         pause = '@{ List = %s; Title = %s; Field = %s; On = %s }' % (q(pz['list']), q(pz['title']), q(pz['field']), q(pz['on']))
-    return '@{ TestSites = @(%s); Pause = %s }' % (', '.join(map(q, sites)), pause)
+    return '@{ TestSites = @(%s); Local = %s; Pause = %s }' % ('' if local else ', '.join(map(q, sites)), '$true' if local else '$false', pause)
