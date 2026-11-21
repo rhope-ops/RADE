@@ -227,13 +227,18 @@ function Test-ScriptResult([string]$Name, [string]$Path = '') {
   return $true
 }
 # Says whether a file starts with the bundle hash line, so it is a copy of a bundle (a whole script) whatever its name.
-# Reads only the first line; a file it cannot read counts as no copy (the extension check still holds). Takes the full
-# path ('' for none); gives back $true for a bundle copy.
+# Reads to the first line that is not blank (at most 20 lines; a paste can put blank lines or spaces above it, and the
+# bundle still runs); a file it cannot read counts as no copy (the extension check still holds). Takes the full path
+# ('' for none); gives back $true for a bundle copy.
 function Test-BundleCopy([string]$Path) {
   if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
   $reader = $null
-  try { $reader = New-Object System.IO.StreamReader($Path); $first = [string]$reader.ReadLine() } catch { return $false } finally { if ($reader) { $reader.Dispose() } }
-  return $first.TrimStart([char]0xFEFF).StartsWith('# @@BUNDLE-HASH ')
+  $first = ''
+  try {
+    $reader = New-Object System.IO.StreamReader($Path)
+    for ($i = 0; $i -lt 20 -and -not $first; $i++) { $line = $reader.ReadLine(); if ($null -eq $line) { break }; $first = $line.TrimStart([char]0xFEFF).Trim() }
+  } catch { return $false } finally { if ($reader) { $reader.Dispose() } }
+  return $first.StartsWith('# @@BUNDLE-HASH ')
 }
 # Fills the results folder Rounds\<round>: a copy of each collect file (never a script file), then the report (the
 # summary and the full log). Takes the RADE app folder and the summary; gives back the folder, the file count and the

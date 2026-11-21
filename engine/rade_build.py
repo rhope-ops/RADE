@@ -540,6 +540,8 @@ def main():
     m = json.loads((ROOT / MANIFEST).read_text())
     APP = m['application']
     stale = 0
+    for b in m['bundles']:   # every bundle path is checked before the first file is written
+        rade_hash.text_copy(ROOT / b['out'])
     for b in m['bundles']:
         out = ROOT / b['out']
         text = build(b)

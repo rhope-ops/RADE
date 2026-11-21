@@ -103,9 +103,10 @@ def write(out, text, release):
     Returns:
         The HASH line to print.
     """
+    copy = text_copy(out)   # first: a path that is not .ps1 is refused before any file is written
     rec = record(out, text, release)
     out.write_bytes(text.encode('ascii'))
-    text_copy(out).write_bytes(text.encode('ascii'))
+    copy.write_bytes(text.encode('ascii'))
     stored(out).write_bytes(rec.encode('ascii'))
     sha = json.loads(rec)
     return 'HASH %s %s (%s)' % (out.name, sha['sha256'], sha['short'])
