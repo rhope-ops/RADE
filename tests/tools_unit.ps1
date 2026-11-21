@@ -1,4 +1,4 @@
-# RADE test: the Maintenance tools Diagnose and Back up (engine/ps/13-maintenance.ps1), on the engine parts themselves
+# RADE test: the Maintenance tools Diagnose, Back up and Restore (engine/ps/13-maintenance.ps1), on the engine parts themselves
 # (no bundle, no window), with the fake PnP.PowerShell of tests/fake-pnp (no SharePoint, no network).
 # Run by tests/resume_test.sh: pwsh -NoProfile -File tests/tools_unit.ps1 <scratch folder>.
 # Prints one PASS or FAIL line for each case, then "TOOLS-UNIT pass=N fail=M".
@@ -88,6 +88,96 @@ Start-Sleep -Seconds 1; $script:app.Backup = @('2', 'X'); $r4 = Invoke-Backup $b
 $x2 = @(); $xx = @()
 if ($r4.Path) { $x2 = @(Get-Content -LiteralPath (Join-Path $r4.Path '2.json') -Raw | ConvertFrom-Json); $xx = @(Get-Content -LiteralPath (Join-Path $r4.Path 'X.json') -Raw | ConvertFrom-Json) }
 Assert-Case 'backup: a list titled with digits keeps its own rows' ($r4.State -eq 'done' -and $x2[0].Title -eq 'from-list-2' -and $xx[0].Title -eq 'from-list-X')
+
+# ---- Restore (engine-v31). Two lists: Sample Pubs and Sample Endorse (its lookup "Pub" reads Sample Pubs), and a list
+# whose title has parentheses (R39). Fake data only.
+$g1 = '11111111-1111-1111-1111-111111111111'; $g2 = '22222222-2222-2222-2222-222222222222'; $g3 = '33333333-3333-3333-3333-333333333333'
+$tf = @{ InternalName = 'Title'; TypeAsString = 'Text' }; $ro = @{ InternalName = 'Modified'; TypeAsString = 'DateTime'; ReadOnlyField = $true }
+$pubF = @($tf, $ro, @{ InternalName = 'Owner'; TypeAsString = 'User' }, @{ InternalName = 'Link'; TypeAsString = 'URL' }, @{ InternalName = 'Due'; TypeAsString = 'DateTime' })
+$endF = @($tf, @{ InternalName = 'Pub'; TypeAsString = 'Lookup'; SchemaXml = ('<Field Type="Lookup" List="{' + $g1 + '}" ShowField="Title" />') })
+$pubs = @(@{ ID = 1; Title = 'P1' }, @{ ID = 2; Title = 'P2'; Owner = @{ LookupId = 7; LookupValue = 'Sample Person' } },
+  @{ ID = 3; Title = 'P3'; Link = @{ Url = 'https://example.invalid/p3'; Description = 'Page' }; Due = '2026-11-20T12:00:00Z' })
+$ends = @(@{ ID = 1; Title = 'E1'; Pub = @{ LookupId = 2; LookupValue = 'P2' } }, @{ ID = 2; Title = 'E2'; Pub = @{ LookupId = 3; LookupValue = 'P3' } })
+$recs = @(@{ ID = 1; Title = 'R1' })
+$meta = @{ 'Sample Pubs' = @{ id = $g1; url = 'sites/fake/Lists/SamplePubs'; next = 4; fields = $pubF }
+  'Sample Endorse' = @{ id = $g2; url = 'sites/fake/Lists/SampleEndorse'; next = 3; fields = $endF }
+  'Sample Recs (Form 1)' = @{ id = $g3; url = 'sites/fake/Lists/SampleRecs'; next = 2; fields = @($tf) } }
+Set-Fake @{ admin = $true; rights = $true; list = $true; rows = @{ RestorePause = 'Off' }; log = @(); bin = @(); meta = $meta
+  items = @{ 'Sample Pubs' = $pubs; 'Sample Endorse' = $ends; 'Sample Recs (Form 1)' = $recs } }
+Remove-Item -LiteralPath (Join-Path $base 'Backups') -Recurse -Force
+$pause = @{ List = 'Sample Settings'; Title = 'RestorePause'; Field = 'SettingValue'; On = 'On' }
+$script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Backup = @('Sample Pubs', 'Sample Endorse', 'Sample Recs (Form 1)'); Start = ''
+  Restore = @{ TestSites = @('fake'); Pause = $pause } }
+$b = Invoke-Backup $base $null
+Assert-Case 'backup: a list title with parentheses is saved under its own name (R39)' ($b.State -eq 'done' -and (Test-Path -LiteralPath (Join-Path $b.Path 'Sample Recs (Form 1).json')))
+$sets = @(Get-BackupSet $base)
+Assert-Case 'restore: the backup list names the backup and its 3 lists' ($sets.Count -eq 1 -and $sets[0].Lists -eq 3 -and $sets[0].Path -eq $b.Path)
+# The site after the backup: P2 deleted to the Recycle Bin, P3 and E2 deleted for good, P4 made after the backup.
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json
+$s.bin = @(@{ list = 'Sample Pubs'; row = ($s.items.'Sample Pubs' | Where-Object { $_.ID -eq 2 }) })
+$s.items.'Sample Pubs' = @(($s.items.'Sample Pubs' | Where-Object { $_.ID -eq 1 }), @{ ID = 4; Title = 'P4' }); $s.meta.'Sample Pubs'.next = 5
+$s.items.'Sample Endorse' = @($s.items.'Sample Endorse' | Where-Object { $_.ID -eq 1 })
+$s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+$before = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw
+# A site that is not a test site: refused, before the sign-in, nothing written.
+$script:app.Restore = @{ TestSites = @('other'); Pause = $pause }
+$pl = Invoke-RestorePlan $base $b.Path $null
+Assert-Case 'restore: a site that is not a test site is refused' ($pl.State -eq 'refused' -and ($pl.Lines -join ' ') -like '*only on a test site*')
+$w = Invoke-Restore $base $b.Path @{ State = 'plan'; Missing = 1; Expect = '1:1'; Plan = @{} } $null
+Assert-Case 'restore: the write refuses a site that is not a test site' ($w.State -eq 'refused' -and (Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw) -eq $before)
+$script:app.Restore = @{ TestSites = @('Fake'); Pause = $pause }   # site names compare without case
+# The dry run: counts per list, nothing written.
+$pl = Invoke-RestorePlan $base $b.Path $null; $all = $pl.Lines -join ' '
+Assert-Case 'restore: the dry run gives the total' ($pl.State -eq 'plan' -and $pl.Missing -eq 3 -and
+  $pl.Lines[0] -like 'Dry run: 3 rows would come back (1 from the Recycle Bin, 2 as new rows). Nothing was written.')
+$wantP = '*"Sample Pubs": 3 in the backup, 2 on the list now. Would put back 2 (1 from the Recycle Bin, 1 as new rows). 1 made after the backup stay.*'
+Assert-Case 'restore: the dry run counts each list' ($all -like $wantP -and
+  $all -like '*"Sample Endorse": 2 in the backup, 1 on the list now. Would put back 1 (0 from the Recycle Bin, 1 as new rows).*' -and
+  $all -like '*"Sample Recs (Form 1)": 1 in the backup, 1 on the list now. Would put back 0*')
+Assert-Case 'restore: the dry run writes nothing' ((Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw) -eq $before)
+Assert-Case 'restore: the dry run lines hold no row value' ($all -notmatch 'P2|P3|E2|Sample Person|example\.invalid')
+# The site changes after the dry run: the write stops before any row (the fresh backup is still made).
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $s.items.'Sample Endorse' = @(); $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+Start-Sleep -Seconds 1; $w = Invoke-Restore $base $b.Path $pl $null
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json
+Assert-Case 'restore: a site that changed after the dry run gets no row' ($w.State -eq 'changed' -and @($s.items.'Sample Pubs').Count -eq 2 -and @($s.bin).Count -eq 1 -and @($s.log).Count -eq 0)
+$s.items.'Sample Endorse' = @(@{ ID = 1; Title = 'E1'; Pub = '2;#P2' }); $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+# The pause switch is on already: no row is written.
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $s.rows.RestorePause = 'On'; $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+$pl = Invoke-RestorePlan $base $b.Path $null; Start-Sleep -Seconds 1; $w = Invoke-Restore $base $b.Path $pl $null
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json
+Assert-Case 'restore: a pause switch that is on already stops it' ($w.State -eq 'failed' -and ($w.Lines[0]) -like '*pause switch is on already*' -and @($s.items.'Sample Pubs').Count -eq 2)
+$s.rows.RestorePause = 'Off'; $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+# The write.
+$pl = Invoke-RestorePlan $base $b.Path $null; Start-Sleep -Seconds 1; $w = Invoke-Restore $base $b.Path $pl $null
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $pu = @($s.items.'Sample Pubs'); $en = @($s.items.'Sample Endorse')
+Assert-Case 'restore: the write is done and says so' ($w.State -eq 'done' -and $w.Lines[0] -eq 'Restore put back 3 of 3 rows. Rows on the lists were not changed.')
+Assert-Case 'restore: a fresh backup is saved first (R3)' ($w.Path -and $w.Path -ne $b.Path -and (Test-Path -LiteralPath (Join-Path $w.Path 'Sample Pubs.json')))
+$p2 = @($pu | Where-Object { $_.ID -eq 2 })[0]; $p3 = @($pu | Where-Object { $_.Title -eq 'P3' })[0]
+Assert-Case 'restore: a row in the Recycle Bin comes back with its own ID (R1)' ($p2 -and $p2.Title -eq 'P2' -and @($s.bin).Count -eq 0)
+Assert-Case 'restore: a row gone for good comes back as a new row' ($p3 -and $p3.ID -eq 5 -and $pu.Count -eq 4)
+Assert-Case 'restore: a person, a link and a date go back in the form PnP takes' ($p3.Link -eq 'https://example.invalid/p3, Page' -and ([datetime]$p3.Due).ToUniversalTime().Hour -eq 12)
+$e2 = @($en | Where-Object { $_.Title -eq 'E2' })[0]
+Assert-Case 'restore: a lookup to a row made new points to its new ID (R5)' ($e2 -and [int]$e2.Pub -eq 5)
+Assert-Case 'restore: a row made after the backup stays' (@($pu | Where-Object { $_.Title -eq 'P4' }).Count -eq 1)
+Assert-Case 'restore: a row on the list is not changed' ([string]@($en | Where-Object { $_.ID -eq 1 })[0].Pub -eq '2;#P2')
+Assert-Case 'restore: the pause switch goes on, then back (R2)' ((@($s.log) -join ',') -eq 'On,Off' -and $s.rows.RestorePause -eq 'Off' -and
+  ($w.Lines -join ' ') -like "*pause switch is back as it was*")
+Assert-Case 'restore: each list gets its count line' (($w.Lines -join ' ') -like '*PASS: "Sample Pubs": 1 back from the Recycle Bin, 1 made new; 4 rows on the list now*' -and
+  ($w.Lines -join ' ') -like '*PASS: "Sample Endorse": 0 back from the Recycle Bin, 1 made new; 2 rows on the list now*')
+# A second run has nothing to put back.
+$pl = Invoke-RestorePlan $base $b.Path $null
+Assert-Case 'restore: a second dry run finds nothing missing' ($pl.State -eq 'plan' -and $pl.Missing -eq 0)
+$w = Invoke-Restore $base $b.Path $pl $null
+Assert-Case 'restore: with nothing missing the write does nothing' ($w.State -eq 'failed' -and $w.Lines[0] -eq 'There are no rows to put back.')
+# A Recycle Bin that cannot be read: the dry run says so (the rows would come back as new rows).
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $s | Add-Member -NotePropertyName binError -NotePropertyValue $true
+$s.items.'Sample Recs (Form 1)' = @(); $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+$pl = Invoke-RestorePlan $base $b.Path $null
+Assert-Case 'restore: a Recycle Bin that cannot be read is named' ($pl.State -eq 'plan' -and $pl.Missing -eq 1 -and ($pl.Lines -join ' ') -like '*Recycle Bin could not be read*')
+# An app that does not name Restore: refused.
+$script:app.Restore = $null; $t = Test-RestoreSite $base
+Assert-Case 'restore: an app that does not name it cannot run it' (-not $t.Ok -and $t.Lines[0] -like '*does not use Restore*')
 
 # Diagnose with no install record: one finding that names the fix, and the report file in Diagnose (not Rounds: the e-mail).
 $script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Backup = @(); Start = '' }

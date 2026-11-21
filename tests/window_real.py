@@ -219,6 +219,22 @@ def r31_why(lines, app, fresh):
     return why
 
 
+def restore_why(lines):
+    """Say what a run misses of the Restore cards (engine-v31): a run that shows the Maintenance screen draws both.
+
+    Args:
+        lines: the run's output lines.
+
+    Returns:
+        A list of reasons (empty when nothing is missing).
+    """
+    cards = [l for l in lines if l.startswith("WIN card=")]
+    drawn = {v for v in ("restpick", "restconfirm") if any((" view=%s " % v) in l for l in cards)}
+    if any(" view=tools " in l for l in cards) and drawn != {"restpick", "restconfirm"}:
+        return ["the Maintenance screen showed, but the Restore cards were not all drawn: %s" % sorted(drawn)]
+    return []
+
+
 def swaps_for(name):
     """The swaps of a run's test copy, by the start of its name: device150-, device125-, device200- (the scale) or contrast-.
     200 % on the job's 1920 x 1080 screen is 960 x 540 at 100 %, smaller than 1020 x 616, so its text may scroll too (main)."""
@@ -288,7 +304,7 @@ def main():
                 print("   " + l[:300])
         # a hand card ("Your turn") may scroll at any size (the Administrator, 2026-11-17); every other card only at the smallest
         scrolls = [l for l in lines if l.startswith("WIN scrolls ") and not l.rstrip().endswith("-hand")]
-        why = r31_why(lines, app, name == RUNS[0][0] or not shared) + r32_why(lines, name)   # R31: tour and test-round cards; R32: wheel, step row
+        why = r31_why(lines, app, name == RUNS[0][0] or not shared) + r32_why(lines, name) + restore_why(lines)   # R31: tour and test-round cards; R32: wheel, step row; engine-v31: Restore cards
         if not closed:
             why.append("the window did not reach its end")
         if layout:

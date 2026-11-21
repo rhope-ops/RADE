@@ -21,7 +21,7 @@ Test round checks (R38): Diagnose on a good install shows "Diagnose found nothin
 
 Each list the app's manifest names (new field `backup`, the Administrator, 2026-11-20) is read through PnP on the saved site and saved as JSON plus a CSV copy in `Backups\<time>` in the app folder. An app that names no lists: Back up says so and saves nothing (the Administrator, 2026-11-20). No site address: it stops before the sign-in. A list it cannot read is named in the result. Nothing on the site changes. Test round checks (R38, after the app session adds `backup`): the row count of each file equals the list's count on the site; a second backup makes a new folder; a list the account cannot read is reported, not skipped; with no `backup` field the card says "no lists to save".
 
-## Stage 3: Restore (WRITES SITE ROWS; engine-v31 at the earliest; not built)
+## Stage 3: Restore (WRITES SITE ROWS; built in engine-v31: [plan](2026-11-21-plan-restore-v31.md))
 
 R1 Recycle Bin restore first; else rows from a backup the user picks, after R3 (a fresh backup), R4 (a dry run with counts the user confirms by typing the app name), R2 (flows paused before, resumed after), R5 (dependency order, lookup IDs remapped). A live data write: test sites only until the Administrator approves it for a real site; a test site is one the app's manifest lists as a test site, and RADE refuses Restore on any other site (the Administrator, 2026-11-20). Test round checks: on a test site, delete 3 rows, restore them; the dry-run counts match; the flows are on again; the fresh backup exists.
 

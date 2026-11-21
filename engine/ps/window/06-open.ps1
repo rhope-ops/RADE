@@ -69,7 +69,7 @@ $ui.TourCards = @(
   @{ S = 'The results stay on this computer.'; P = @('RADE writes a report into its results folder. RADE sends nothing.', 'After a test round RADE makes an e-mail draft with the results. You read it, and you send it.') },
   @{ S = 'The Record shows everything.'; P = @('Select "Record" or press F2 to see all checks, steps, files and the log.', 'Select "Help" or press F1 to see this tour again.') })
 # The cards that "Help (F1)" can leave and show again: no step or check runs on them, and none waits inside the engine.
-$ui.HelpViews = @('choose', 'maint', 'tools', 'toolres', 'site', 'fail', 'need', 'ready', 'nodrive', 'done', 'review', 'stopped', 'noapps', 'booterr')
+$ui.HelpViews = @('choose', 'maint', 'tools', 'toolres', 'restpick', 'restconfirm', 'site', 'fail', 'need', 'ready', 'nodrive', 'done', 'review', 'stopped', 'noapps', 'booterr')
 # Shows card $I of the tour (0 = the first). "Next" and "Back" move; "Skip the tour" and the last card's button end it.
 # Takes the card number.
 $ui.VTour = { param([int]$I)
@@ -131,14 +131,14 @@ $ui.VMaint = { param($Inst)
     Buttons = @(@{ Text = 'Uninstall'; Kind = 'dangeroff' }, $startB, @{ Text = 'Maintenance'; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.VTools $ui.MaintVerb } })   # Uninstall first: away from the primary   # B5: 1 primary + 3 others at most
     Back = { & $ui.VChoose } } }
 # The Maintenance screen (the Administrator, 2026-11-20): Update or Repair (works: the checks, then the install run),
-# and the list of Diagnose and Back up (engine-v30) and Restore (not available yet; docs/engine.md "Maintenance run types").
+# and the list of Diagnose and Back up (engine-v30) and Restore (engine-v31; docs/engine.md "Maintenance run types").
 # Takes the install verb ("Update to <version>" or "Repair").
 $ui.VTools = { param([string]$Verb)
   & $ui.SetCard @{ View = 'tools'; Kicker = [string]$ui.Kick.Text; Sentence = 'Maintenance'
     # The tools are a list (the Administrator, 2026-11-20: Repair must not stand alone on a row): one row each, as on Choose,
     # with what it does; shown not available until it is built. The action row is Back (Esc) and the install verb.
     P = @(($Verb + ' adds what is missing and keeps your data.'))
-    Options = (& $ui.ToolRows); OnOption = { param($j) & $ui.RunTool $j }   # Diagnose and Back up run on a click (window/11-tools.ps1)
+    Options = (& $ui.ToolRows); OnOption = { param($j) & $ui.RunTool $j }   # Diagnose and Back up run on a click; Restore opens its cards (window/11-tools.ps1)
     Buttons = @(@{ Text = $Verb; Kind = 'primary'; Act = { & $ui.Checks $false } })
     Back = { & $ui.VMaint $ui.MaintInst } } }
 # Says whether the chosen application has a check that needs the site address. Takes nothing; gives back $true or

@@ -16,6 +16,39 @@ function Start-Process { param($FilePath, $ArgumentList, $WorkingDirectory) Writ
 $global:RadeT = @{ Seen = ''; N = 0; Out = [string]$env:RADE_T_OUT; App = [int]$env:RADE_T_APP; Hand = [string]$env:RADE_T_HAND; Tour = ($env:RADE_T_TOUR -eq '1'); Size = [string]$env:RADE_T_SIZE
   Forced = $false; Opened = $false; Lay = 0; SignIn = $false; Sized = $false; T0 = (Get-Date); Env = $false }
 
+function global:Save-RadeRestore {
+  <#
+  .SYNOPSIS
+  Draws the Restore cards once (engine-v31), from the Maintenance screen: the backup list, the dry-run card, a wrong
+  typed name and the result card.
+  .DESCRIPTION
+  Fake data: two backup folders of one list; the dry run and the result are set by the test (no SharePoint on the
+  runner). The app's own Backup and Restore, its site file and the backup folders are put back as they were after.
+  Takes no parameter.
+  #>
+  if ($global:RadeT.Restored) { return }; $global:RadeT.Restored = $true
+  $bp = Get-BasePath; $keep = @{ B = $script:app.Backup; R = $script:app.Restore }
+  $cfg = Join-Path $bp 'Config'; $had = @(Get-ChildItem -LiteralPath $cfg -Filter '*-site.txt' -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+  if (-not (Test-SiteUrl (Get-SiteUrl $bp))) { Save-SiteUrl $bp ($sitePrefix + 'fake') }   # taken out again below: the run goes on as before
+  $nm = (Get-SiteUrl $bp).Substring($sitePrefix.Length).TrimEnd('/')
+  $script:app.Backup = @('Sample Tasks', 'Sample Recs (Form 1)')
+  $script:app.Restore = @{ TestSites = @($nm); Pause = @{ List = 'Sample Settings'; Title = 'RestorePause'; Field = 'SettingValue'; On = 'On' } }
+  foreach ($d in '20261120-140000', '20261121-090000') { $f = Join-Path $bp ('Backups\' + $d); $null = New-Item -ItemType Directory -Path $f -Force
+    Set-Content -LiteralPath (Join-Path $f 'Sample Tasks.json') -Value '[]' }
+  & $ui.VRestorePick; Save-RadeCard 'restpick'
+  $ui.RestoreDir = Join-Path $bp 'Backups\20261121-090000'
+  $ui.RestoreDry = @{ State = 'plan'; Missing = 3; Expect = '1:3'; Plan = @{}; Lines = @('Dry run: 3 rows would come back (1 from the Recycle Bin, 2 as new rows). Nothing was written.',
+      '"Sample Tasks": 12 in the backup, 9 on the list now. Would put back 3 (1 from the Recycle Bin, 2 as new rows). 1 made after the backup stay.',
+      'NOTE: "Sample Recs (Form 1)" is left out: this backup has no file for it') }
+  & $ui.VRestoreConfirm; Save-RadeCard 'restconfirm'
+  $ui.Field.Text = 'wrong name'; & $ui.RestoreGo; Save-RadeCard 'restconfirm-wrongname'
+  & $ui.ToolResult 'Restore' @{ State = 'done'; Path = (Join-Path $bp 'Backups\20261121-091500'); Lines = @('Restore put back 3 of 3 rows. Rows on the lists were not changed.',
+      'Fresh backup before Restore: Backups\20261121-091500', "The app's pause switch is back as it was.", 'PASS: "Sample Tasks": 1 back from the Recycle Bin, 2 made new; 12 rows on the list now') }
+  Save-RadeCard 'toolres-restore'
+  Get-ChildItem -LiteralPath $cfg -Filter '*-site.txt' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notin $had } | Remove-Item -Force
+  Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force; $script:app.Backup = $keep.B; $script:app.Restore = $keep.R
+  & $ui.VTools $ui.MaintVerb }
+
 function global:Save-RadeCard([string]$Tag) {
   $global:RadeT.N++; $card = ('{0:00}-{1}' -f $global:RadeT.N, $Tag)
   try { $ui.Form.Refresh() } catch { $null = $_ }
@@ -84,7 +117,7 @@ function global:Step-Rade {
     foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Index -eq $global:RadeT.App) { $o.PerformClick(); return } }
     Write-Host 'WIN BAD no choice for the application'; [Environment]::Exit(4)
   }
-  elseif ($v -eq 'maint') { Write-RadeRow; @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Maintenance' })[0].PerformClick() } elseif ($v -eq 'tools') { (Get-RadeMain).PerformClick() }   # the Maintenance screen, then Repair or Update (Start would start the application)
+  elseif ($v -eq 'maint') { Write-RadeRow; @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Maintenance' })[0].PerformClick() } elseif ($v -eq 'tools') { Save-RadeRestore; (Get-RadeMain).PerformClick() }   # the Maintenance screen (and the Restore cards once), then Repair or Update (Start would start the application)
   elseif ($v -eq 'site') { $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }
   elseif ($v -in 'fail', 'need') {
     $id = [string]@($script:appChecks)[([int]($ui.Kick.Text -replace '^CHECK (\d+) OF .*$', '$1')) - 1]

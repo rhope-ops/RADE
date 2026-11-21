@@ -24,7 +24,8 @@ Usage: python3 engine/rade_build.py --app-root DIR [--manifest scripts/paste_bun
 """
 import base64, fnmatch, hashlib, json, re, sys, textwrap
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent)); import rade_hash, rade_tokens   # the bundle hash; the UI tokens and fonts (UI standard v1); both beside this file
+sys.path.insert(0, str(Path(__file__).resolve().parent)); import rade_hash, rade_tokens, rade_fields   # the bundle hash; the UI tokens and fonts (UI standard v1); the manifest field parts; all beside this file
+from rade_fields import q, hand_part, restore_part, BACKUP_RE
 
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
 WINDOW_FILE = ENGINE_ROOT / 'engine/window.json'   # the window's layout values (the Administrator, 2026-11-18; docs/window-design.md)
@@ -62,11 +63,6 @@ def here(text):
     if any(ord(c) > 127 for c in text):
         raise SystemExit('cannot embed: non-ASCII text (keep sources ASCII)')
     return "@'\n" + text + "\n'@"
-
-
-def q(s):
-    """Return `s` as a PowerShell single-quoted string ('' for each quote inside)."""
-    return "'" + s.replace("'", "''") + "'"
 
 
 # ---- The engine's PowerShell (the Administrator, 2026-11-17: docs/code-standard.md C10). It lives in engine/ps as
@@ -168,35 +164,11 @@ def app_lines(b):
         start = a.get('start', '')   # (R28) the app's start script, a plain relative .ps1 path in its install folder; Start runs it after the checks
         assert not start or START_RE.fullmatch(start), 'app %r: start must be a relative .ps1 path of plain names (letters, digits, space, ".", "_", "-"), for example App/Start-App.ps1' % a['name']
         backup = a.get('backup', [])   # (2026-11-20) the app's own lists Back up saves; plain names (a command line); RADE never finds lists
-        ok = all(re.fullmatch(r'[A-Za-z0-9]([A-Za-z0-9 _-]*[A-Za-z0-9_-])?', n) for n in backup) and not {n.upper() for n in backup} & WIN_RESERVED   # names in a command line and a file
-        assert ok and len({n.lower() for n in backup}) == len(backup), 'app %r: backup: unique plain titles, not a name Windows reserves' % a['name']
-        out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s; Marker = %s; Start = %s; Backup = @(%s) }'
-                   % (q(a['name']), q(a['summary']), ', '.join(map(str, idx)), ', '.join(map(q, checks)), q(mode), q(version), marker, q(start), ', '.join(map(q, backup))))
-    return out
-
-
-def hand_part(s):
-    """The fields "hide" and "answersOnly" of a guide step (docs/engine.md "Step contract") as a part of its $steps line.
-
-    Args:
-        s: the manifest step; a bad field stops the build (the schema says the same).
-
-    Returns:
-        '; Hide = @(...)' and/or '; AnswersOnly = $true', or ''.
-    """
-    def no(why):
-        """Stop the build with the step name and the reason."""
-        raise SystemExit('step %r: %s' % (s['name'], why))
-    out, guide, hide = '', s.get('kind', 'script') == 'guide', s.get('hide')
-    if 'hide' in s:
-        if not guide or not isinstance(hide, list) or not 1 <= len(hide) <= 2 or len(set(hide)) != len(hide) or set(hide) - {'done', 'failed', 'skip'} or ('done' in hide and s.get('answers')):
-            no('hide: only for a guide step (kind "guide"): 1 or 2 of done, failed and skip, each one time (one button stays); not done when the step has answers')
-        out += '; Hide = @(%s)' % ', '.join(q(h) for h in hide)
-    if 'answersOnly' in s:
-        used = [f for f in ('hide', 'doneText', 'doneLog', 'marker', 'url', 'urlConfig', 'file', 'guide') if s.get(f)]
-        if s['answersOnly'] is not True or not guide or not s.get('answers') or used:
-            no('answersOnly: true, only for a guide step (kind "guide") with "answers" and no Done card (so without: %s)' % (', '.join(used) or 'nothing'))
-        out += '; AnswersOnly = $true'
+        # (2026-11-21, R39) a title may hold parentheses ("Name (Form 1)"): no quote, "|" or path sign, so it stays safe in a command line and a file name
+        ok = all(re.fullmatch(BACKUP_RE, n) for n in backup) and not {n.upper() for n in backup} & WIN_RESERVED
+        assert ok and len({n.lower() for n in backup}) == len(backup), 'app %r: backup: unique plain titles (letters, digits, space, "_", "-", "(", ")"), not a name Windows reserves' % a['name']
+        out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s; Marker = %s; Start = %s; Backup = @(%s); Restore = %s }'
+                   % (q(a['name']), q(a['summary']), ', '.join(map(str, idx)), ', '.join(map(q, checks)), q(mode), q(version), marker, q(start), ', '.join(map(q, backup)), restore_part(a)))
     return out
 
 
@@ -588,11 +560,11 @@ def main():
 # part in build order, the shared UI file, the window layout values and the logo (path, then bytes). An app's lock still checks each file on its
 # own, and a bundle's header names each file with its own hash (part_lines); this one value is what --sha prints.
 ENGINE_SHA = hashlib.sha256(b''.join(rel.encode() + b'\0' + (ENGINE_ROOT / rel).read_bytes() + b'\0' for rel in
-                                     ['engine/rade_build.py', 'engine/rade_hash.py'] + ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS]
+                                     ['engine/rade_build.py', 'engine/rade_hash.py', 'engine/rade_fields.py'] + ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS]
                                      + ['engine/rade_ui.ps1', 'engine/window.json', 'assets/logo/rho-fulcrum-128.png'] + rade_tokens.FILES)).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
-ENGINE_RELEASE = 30
+ENGINE_RELEASE = 31
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':
