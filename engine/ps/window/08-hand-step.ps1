@@ -59,7 +59,7 @@ $ui.VAnswer = {
       $c.Options = @(for ($k = 0; $k -lt $ws.Count; $k++) { @{ Index = $k; Name = [string]$ws[$k]; Ver = '' } })
       # A click on choice row j answers with that choice's own text. Takes the row's index.
       $c.OnOption = { param($j) $ui.Reply = [string]$ui.AnswerWords[$j] }
-      $c.P = @(@($c.P) + @('Select your answer. The next card then opens.') | Where-Object { $_ }) } }
+      $c.P = @(@($c.P) + @('Click your answer. You see the next card. Go on.') | Where-Object { $_ }) } }
   & $ui.SetCard $c }
 # Says whether every answer choice fits the widest action button (UI standard v1, B1: 240 x 40), measured in the button
 # font with the button's padding, as $ui.BtnSize measures it. Takes the choices; gives back $true or $false.
