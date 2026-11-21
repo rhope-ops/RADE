@@ -4,7 +4,7 @@ Status: decisions approved by the Administrator, 2026-11-21 (question dialog; [D
 
 ## Goal
 
-A first-time user sees what RADE is and what the app is before anything is installed. The window uses the Fulcrum palette. The RADE shortcut shows the RADE logo.
+A first-time user sees what RADE is and what the app is before anything is installed. The window uses the Fulcrum palette. Each installed app gets its own shortcut with the app's name and icon.
 
 ## Flow
 
@@ -26,7 +26,7 @@ Shown: one time for a Windows profile, and again from "Help (F1)". Cards 1-2 rep
 4. **Intro cards.** New views in the window (engine/ps/window), built with the existing card builders (`$ui.SetCard`); they replace `$ui.TourCards` and `$ui.VTour`. RADE's own lines are RADE text; the app's lines come from the manifest.
 5. **Manifest field.** `application.intro`: 3 lines (what, how, does), each at most 150 characters. Optional: without it, card 4 shows the app summary. Schema, docs/make-an-app.md, the app canary (scripts/check_apps.py).
 6. **Fades.** A timer paints the card with a black layer that goes from 100 % to 0 % (fade in) or back (fade out) in about 300 ms. No fade, a plain cut, when Windows animations are off (`SystemInformation.UIEffectsEnabled`), in a contrast theme, or in a remote session (`SystemInformation.TerminalServerSession`). This keeps the rule "still when Windows animations are off" (window-design.md).
-7. **Shortcut icon.** At a deploy RADE writes `rade.ico` (16, 32, 48 and 256 px, from the RADE logo) and sets the shortcut's `IconLocation` (engine/ps/05-installed.ps1 `Add-DesktopIcon`). A shortcut made before gets the icon at the next deploy; no second shortcut.
+7. **App shortcut.** RADE is never installed by itself, so the shortcut belongs to the app (the Administrator, 2026-11-21). At a deploy RADE makes one shortcut for each installed app: its name is the app's name, its icon is `<key>.ico` (16, 32, 48 and 256 px, made from `application.logo`; the RADE logo when the app has none), and it opens that app's own runner copy (`RADE\runners\<key>.ps1`, the app's last passed paste; `<key>` = the 12-hex name of the app's install record). So a deploy of a second app does not change the first app's shortcut. Today's one shortcut "RADE" and one runner (`rade-runner.ps1`, engine.md "Shared files") go: the next deploy moves the old `RADE.lnk` to the Recycle Bin, as a made item of RADE. Code: engine/ps/05-installed.ps1 `Add-DesktopIcon` (`IconLocation`).
 8. **Tests and self-check.** The layout self-check covers cards 1-5 (centered logo, the text column, no cut text). The Windows job draws each card, once with fades off. A unit test checks the .ico file (sizes, header).
 9. **Release** engine-v34 and send the tag to 90-161.Z. That app adds `application.intro` and an SVG logo, then R42.
 
@@ -37,13 +37,13 @@ Shown: one time for a Windows profile, and again from "Help (F1)". Cards 1-2 rep
 - T3 The logos are sharp at the work computer's scale.
 - T4 The Fulcrum colors read well; the contrast theme shows system colors.
 - T5 The options card shows only for an app with optional steps; "Install" starts the deploy.
-- T6 The RADE shortcut shows the RADE logo, also after a sign-out and sign-in.
+- T6 The shortcut has the app's name and icon, also after a sign-out and sign-in; it opens RADE for that app; the old RADE shortcut is in the Recycle Bin.
 
 ## Assumptions (source, confidence)
 
 - A1 R42 is the next round after R41 (docs/NEXT_PROMPT.md; medium). If R41 slips, this goes to the round after the one that tests engine-v33.
 - A2 The run-time logo can be built in this release; if not, a 512 px PNG travels in the bundle as a stopgap, about 30-60 KB bigger (medium).
-- A3 Windows shows an icon from a file in the RADE folder. The RADE folder is under OneDrive: a file that OneDrive keeps online only can show a blank icon. If T6 fails, the .ico goes to the user's local app data folder (low; T6 is the proof).
+- A3 Windows shows an icon from a file in the RADE folder; with two apps, each shortcut keeps its own icon and runner (agent design; medium). The RADE folder is under OneDrive: a file that OneDrive keeps online only can show a blank icon. If T6 fails, the .ico goes to the user's local app data folder (low; T6 is the proof).
 - A4 A timer fade of about 300 ms runs smoothly on Windows PowerShell 5.1 with Windows Forms (medium; T2 is the proof).
 
 ## Gaps
