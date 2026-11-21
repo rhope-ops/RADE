@@ -501,17 +501,29 @@ except ValueError: pass" "$d" && [ -z "$(ls -A "$d")" ] && ok || bad "bundle .tx
 # it must say "checked", also when every line ends in CR LF (as a paste in ISE can make it) and with a blank line above.
 go H; {   # group H: runs in the background (see "go" above)
 mkdir -p "$t/hu/test1234/OneDrive - United States Air Force"; sed "s#usersRoot = '$t/u'#usersRoot = '$t/hu'#" "$t/b.ps1" > "$t/h1.ps1"
-python3 - "$t/h1.ps1" "$t/h2.ps1" "$t/h3.ps1" <<'P'
+python3 - "$t/h1.ps1" "$t/h2.ps1" "$t/h3.ps1" "$t/h4.ps1" "$t/h5.ps1" "$t/h6.ps1" <<'P'
 import hashlib, sys
 first, rest = open(sys.argv[1], newline='').read().split('\n', 1)
 good = '# @@BUNDLE-HASH %s @@\n' % hashlib.sha256(rest.encode()).hexdigest() + rest
 open(sys.argv[2], 'w', newline='').write(good)
 open(sys.argv[3], 'w', newline='').write('\r\n' + good.replace('\n', '\r\n'))
+assert good.endswith('\n') and not good.endswith('\n\n'), 'the build writes the text with exactly one LF at its end'
+open(sys.argv[4], 'w', newline='').write(good[:-1])                              # E1 (R41): the ISE paste lost the final LF
+open(sys.argv[5], 'w', newline='').write(good + '\n  \n')                         # extra line ends and a blank line at the end
+cut = good.rstrip('\n'); open(sys.argv[6], 'w', newline='').write(cut[:cut.rfind('\n') + 1])   # a copy cut off: the last line is gone
 P
-for n in 1 2 3; do psrun "$t/h$n.ps1" "$t/outh$n.txt" $'2\n\n\n\n' USERPROFILE="$t/hu/test1234"; done
+for n in 1 2 3 4 5; do psrun "$t/h$n.ps1" "$t/outh$n.txt" $'2\n\n\n\n' USERPROFILE="$t/hu/test1234"; done
 sed -n 2p "$t/outh1.txt" | grep -q "^Script check: [0-9a-f]\{12\}\.\.\.[0-9a-f]\{4\} DOES NOT MATCH the line in the script ([0-9a-f]\{12\}\.\.\.[0-9a-f]\{4\})$" && ok || { bad "bundle hash: a changed bundle must say DOES NOT MATCH on its second line"; head -3 "$t/outh1.txt"; }
 want="Script check: $(python3 -c "import sys; h=open(sys.argv[1]).readline().split()[2]; print(h[:12]+'...'+h[-4:])" "$t/h2.ps1") (checked)"
 [ "$(sed -n 2p "$t/outh2.txt")" = "$want" ] && [ "$(sed -n 2p "$t/outh3.txt")" = "$want" ] && ok || { bad "bundle hash: a whole bundle must say '$want' (LF and CR LF)"; sed -n 2p "$t/outh2.txt" "$t/outh3.txt"; }
+[ "$(sed -n 2p "$t/outh4.txt")" = "$want" ] && [ "$(sed -n 2p "$t/outh5.txt")" = "$want" ] && ok || { bad "bundle hash: a paste that lost its final LF, or got more line ends at the end, must say '$want' (E1, R41)"; sed -n 2p "$t/outh4.txt" "$t/outh5.txt"; }
+# A copy cut off before the end does not parse as a whole script, so Get-ScriptCheck itself reads it (the function from the bundle).
+python3 - "$t/h1.ps1" "$t/hcut.ps1" "$t/h6.ps1" <<'P2'
+import re, sys
+f = re.search(r'(?ms)^function Get-ScriptCheck \{.*?^\}$', open(sys.argv[1]).read()).group(0)
+open(sys.argv[2], 'w').write(f + "\n$script:selfText = [System.IO.File]::ReadAllText('" + sys.argv[3] + "')\n(Get-ScriptCheck).Line\n")
+P2
+pwsh -NoProfile -File "$t/hcut.ps1" 2>&1 | grep -q "^Script check: [0-9a-f]\{12\}\.\.\.[0-9a-f]\{4\} DOES NOT MATCH" && ok || { bad "bundle hash: a copy cut off before the end must say DOES NOT MATCH"; pwsh -NoProfile -File "$t/hcut.ps1" 2>&1 | head -3; }
 grep -rqF "$want" "$t/hu/test1234/OneDrive - United States Air Force/RADE" && ok || bad "bundle hash: the line is in the round's log or report"
 echo "GROUP $pass $fail"; } > "$t/grp-H.log" 2>&1 &
 # 2. Only a site on the DAF SharePoint host is accepted.

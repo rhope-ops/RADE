@@ -296,6 +296,27 @@ Remove-Item -LiteralPath $b3 -Recurse -Force
 # An empty record file stops the dry run (it is never read as "no record").
 $keepMap = Get-Content -LiteralPath $mf -Raw; Set-Content -LiteralPath $mf -Value 'null'; $pl = Invoke-RestorePlan $base $b.Path $null; Set-Content -LiteralPath $mf -Value $keepMap -NoNewline
 Assert-Case 'restore: an empty record stops the dry run' ($pl.State -eq 'failed' -and ($pl.Lines[0]) -like '*could not be read*')
+# E2 (R42; the Administrator, 2026-11-21): a Recycle Bin row that cannot be restored is made new, and the card says so
+# as a FINDING with the error type (never a PASS: the row has a new row number).
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $row = @($s.items.'Sample Pubs' | Where-Object { $_.Title -eq 'P2' })[0]
+$s.items.'Sample Pubs' = @($s.items.'Sample Pubs' | Where-Object { $_.Title -ne 'P2' }); $s.bin = @(@{ list = 'Sample Pubs'; row = $row })
+$s | Add-Member -Force -NotePropertyName binRestoreError -NotePropertyValue $true; $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+$pl = Invoke-RestorePlan $base $b.Path $null; Start-Sleep -Seconds 1; $w = Invoke-Restore $base $b.Path $pl $null; $all = $w.Lines -join ' '
+$p2 = @((Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json).items.'Sample Pubs' | Where-Object { $_.Title -eq 'P2' })
+Assert-Case 'restore: a Recycle Bin row that fails is a FINDING with its error type, not a PASS (E2)' ($pl.Lines[0] -like '*(1 from the Recycle Bin,*' -and $w.State -eq 'failed' -and
+  $all -like '*FINDING: "Sample Pubs": 0 back from the Recycle Bin, 2 made new;*' -and
+  $all -like '*1 row(s) did not come back from the Recycle Bin (InvalidOperationException), so Restore made them as new rows with new row numbers*' -and
+  $p2.Count -eq 1 -and [int]$p2[0].ID -ne [int]$row.ID)
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $s.binRestoreError = $false; $s.bin = @(); $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+# A restore that reports an error but worked (review of PR 166): the row is back with its own ID, counted as back, no BINERR.
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $row = @($s.items.'Sample Pubs' | Where-Object { $_.Title -eq 'P2' })[0]
+$s.items.'Sample Pubs' = @($s.items.'Sample Pubs' | Where-Object { $_.Title -ne 'P2' }); $s.bin = @(@{ list = 'Sample Pubs'; row = $row })
+$s | Add-Member -Force -NotePropertyName binRestoreLies -NotePropertyValue $true; $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+$pl = Invoke-RestorePlan $base $b.Path $null; Start-Sleep -Seconds 1; $w = Invoke-Restore $base $b.Path $pl $null; $all = $w.Lines -join ' '
+$p2 = @((Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json).items.'Sample Pubs' | Where-Object { $_.Title -eq 'P2' })
+Assert-Case 'restore: a Recycle Bin restore that throws but worked counts as back, not made new' ($all -like '*"Sample Pubs": 1 back from the Recycle Bin,*' -and
+  $all -notlike '*did not come back from the Recycle Bin*' -and $p2.Count -eq 1 -and [int]$p2[0].ID -eq [int]$row.ID)
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $s.binRestoreLies = $false; $s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
 
 # Diagnose with no install record: one finding that names the fix, and the report file in Diagnose (not Rounds: the e-mail).
 $script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Backup = @(); Start = '' }
@@ -322,7 +343,17 @@ Assert-Case 'diagnose: the mark line is a NOTE, not a finding' ($d.Findings -eq 
 $script:appChecks = @('ps'); $d = Invoke-Diagnose $base $null; $all = $d.Lines -join ' '
 Assert-Case 'diagnose: D0 runs the app checks again' ($all -match '(PASS|FINDING): [^:]+: (PASSED|WARNING|FAILED|NOT RUN)')
 # The child scripts are PowerShell in here-strings: the parser reads each one (code standard C10 and X2).
-foreach ($c in @(@{ N = 'Back up'; T = $backupScript }, @{ N = 'Restore'; T = $restoreScript })) { $perr = $null
+$kids = @(@{ N = 'Back up'; T = $backupScript }, @{ N = 'Restore'; T = $restoreScript }, @{ N = 'Rights'; T = $rightsScript }, @{ N = 'Marker'; T = $markerScript })
+foreach ($c in $kids) { $perr = $null
   $null = [System.Management.Automation.Language.Parser]::ParseInput($c.T, [ref]$null, [ref]$perr)
-  Assert-Case ('child script parses: ' + $c.N) (@($perr).Count -eq 0) }
+  Assert-Case ('child script parses: ' + $c.N) (@($perr).Count -eq 0)
+  # E3: each child script that signs in holds the one sign-in window size block (no marker left) and starts it before the sign-in.
+  $sign = $c.T.IndexOf('Start-SignInSize   #'); $conn = $c.T.IndexOf('Connect-PnPOnline -Url')
+  Assert-Case ('sign-in window size block in: ' + $c.N) ($c.T.Contains($signInSize.TrimEnd()) -and -not $c.T.Contains('# <RADE sign-in window size>') -and $sign -gt 0 -and $sign -lt $conn) }
+# E3: the block compiles and its timer starts and stops with no error off Windows (no user32 here: each tick fails quietly).
+$env:RADE_SIGNIN_TEST = '1'; $sbErr = $null
+try { . ([scriptblock]::Create($signInSize)); $SignInWatchMs = 300; Start-SignInSize; Start-Sleep -Milliseconds 600 } catch { $sbErr = $_ }
+$env:RADE_SIGNIN_TEST = $null
+Assert-Case 'sign-in window size: the helper compiles and starts (E3)' ($null -eq $sbErr -and [bool]('RadeSignIn.Size' -as [type]) -and
+  $signInSize -match '(?m)^# ---- RADE sign-in window size \(start' -and $signInSize -match '(?m)^# ---- RADE sign-in window size \(end\)' -and $signInSize -notmatch 'EnumWindows\(')
 Write-Host ('TOOLS-UNIT pass=' + $script:pass + ' fail=' + $script:fail)

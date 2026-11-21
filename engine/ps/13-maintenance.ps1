@@ -103,6 +103,7 @@ function Invoke-Diagnose([string]$Base, [scriptblock]$Tick) {
 # It prints only a list number, a row count or an error type: never the site, a name, a value or an error message.
 $backupScript = @'
 param([string]$Site, [string]$Folder, [string]$Lists)
+# <RADE sign-in window size>
 # RADE Back up (reads the site, writes this computer only): signs in with the CAC and saves each named list.
 # Windows PowerShell 5.1 writes an array as {value, Count} while this type data is loaded: take it out first.
 Remove-TypeData -TypeName System.Array -ErrorAction SilentlyContinue
@@ -124,6 +125,7 @@ try {
   if (-not $mod.Count) { 'RESULT no-pnp'; exit 3 }
   $pin = @($mod | Where-Object { [string]$_.Version -eq '1.12.0' }); if ($pin.Count) { $mod = $pin }
   $null = & { Import-Module PnP.PowerShell -RequiredVersion $mod[0].Version -DisableNameChecking } *>&1
+  Start-SignInSize   # E3: the CAC sign-in window opens at about 480 x 360, centered (the block above)
   $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1
   $i = 0
   foreach ($name in ($Lists -split '\|')) {
@@ -143,6 +145,7 @@ try {
   'RESULT done'; exit 0
 } catch { 'RESULT not-connected ' + $_.Exception.GetType().Name; exit 2 }
 '@
+$backupScript = Add-SignInSize $backupScript   # E3: the sign-in window size block (07-checks.ps1)
 
 # Gives the file name (no extension) of a saved list: its title with any sign a file name cannot hold made "_" (the
 # build allows letters, digits, space, "_", "-", "(" and ")", so this changes nothing today). Takes the list title.

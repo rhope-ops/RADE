@@ -44,8 +44,8 @@ function global:Test-RadeRecordCopy {
 The red line of a script whose hash does not match (the Administrator, 2026-11-19): prints the "WIN script-warn" lines.
 .DESCRIPTION
 On the real Choose card: a mismatch, a match and a hash that is not available. Then on cards that have a last line of
-their own (Choose of a test-only paste, Ready with a site, boot): the warning takes that line on a mismatch and the own
-text is back on a match. The real state is restored and Choose is shown again.
+their own (Choose of a test-only paste, Ready with a site, boot): the warning takes that line on a mismatch, with the full
+"Script check:" line under it, and the own text is back on a match (Ready: with the full line under it; E1, R42). The real state is restored and Choose is shown again.
 .OUTPUTS
 Nothing; 9 WIN lines.
 #>
@@ -53,15 +53,43 @@ function global:Test-RadeScriptWarn {
   if ($global:RadeT.WarnDone) { return }; $global:RadeT.WarnDone = $true
   $was = $script:scriptCheck
   foreach ($k in @(@('mismatch', 'abc...def', $false), @('match', 'abc...def', $true), @('unavailable', '', $false))) {
-    $script:scriptCheck = @{ Line = 'x'; Short = $k[1]; Ok = $k[2] }; & $ui.VChoose
-    Write-Host ('WIN script-warn ' + $k[0] + ' view=' + $ui.View + ' text=[' + $(if ($ui.Foot.Visible) { $ui.Foot.Text } else { '' }) + '] red=' + [object]::Equals($ui.Foot.ForeColor, $ui.C.Red)) }
+    $script:scriptCheck = @{ Line = 'Script check: line'; Short = $k[1]; Ok = $k[2] }; & $ui.VChoose
+    Write-Host ('WIN script-warn ' + $k[0] + ' view=' + $ui.View + ' text=[' + $(if ($ui.Foot.Visible) { $ui.Foot.Text -replace "`r`n", ' | ' } else { '' }) + '] red=' + [object]::Equals($ui.Foot.ForeColor, $ui.C.Red)) }
   # Cards that have a last line of their own (Choose of a test-only paste, Ready with a site, boot with none): the warning takes it on a mismatch; the own text is back on a match.
   foreach ($k in @(@('mismatch', $false), @('match', $true))) {
-    $script:scriptCheck = @{ Line = 'x'; Short = 'abc...def'; Ok = $k[1] }
+    $script:scriptCheck = @{ Line = 'Script check: line'; Short = 'abc...def'; Ok = $k[1] }
     foreach ($v in @(@('choose', 'Last round on this computer: none recorded yet.'), @('ready', 'Site: example'), @('boot', ''))) {
       & $ui.Show $ui.Foot ([string]$v[1]); & $ui.ScriptWarn @{ View = $v[0]; Foot = $v[1] }   # what SetCard does with the card's own last line
-      Write-Host ('WIN script-warn own ' + $k[0] + ' ' + $v[0] + ' text=[' + $(if ($ui.Foot.Visible) { $ui.Foot.Text } else { '' }) + '] red=' + [object]::Equals($ui.Foot.ForeColor, $ui.C.Red)) } }
+      Write-Host ('WIN script-warn own ' + $k[0] + ' ' + $v[0] + ' text=[' + $(if ($ui.Foot.Visible) { $ui.Foot.Text -replace "`r`n", ' | ' } else { '' }) + '] red=' + [object]::Equals($ui.Foot.ForeColor, $ui.C.Red)) } }
   $script:scriptCheck = $was; & $ui.VChoose }
+<#
+.SYNOPSIS
+E4: prints "WIN scale-lines", the count of WINDOW lines in the round's window text and the first one up to its SCALE.
+.OUTPUTS
+Nothing; 1 WIN line.
+#>
+function global:Test-RadeScaleLines {
+  $wl = @((& $ui.WindowLine) -split "`r`n" | Where-Object { $_ -like 'WINDOW *' })
+  Write-Host ('WIN scale-lines=' + $wl.Count + ' first=[' + $(if ($wl.Count) { $wl[0] -replace ' SCALE .*$', ' SCALE' } else { '' }) + ']') }
+<#
+.SYNOPSIS
+E5 (R41: the answer card cut a button text): prints "WIN long-answer" lines.
+.DESCRIPTION
+A question whose choices fit the widest button keeps its buttons. A question with one choice too long for it shows
+each choice as a full-width row, with no answer button; a click on the second row answers with that choice's own text.
+The Choose card is shown again.
+.OUTPUTS
+Nothing; 2 WIN lines.
+#>
+function global:Test-RadeLongAnswer {
+  if ($global:RadeT.LongDone) { return }; $global:RadeT.LongDone = $true; $global:RadeT.Hold = $true   # the driver does not answer these cards
+  $null = & $ui.VAnswer @{ Kind = 'choice'; Prompt = 'Which result did you see?'; Choices = @('Four', 'Two') } 1 1
+  Write-Host ('WIN long-answer short buttons=' + @($ui.B | Where-Object { $_.Shown }).Count + ' rows=' + @($ui.Opts.Controls).Count)
+  $long = 'Put back 4 of 4 rows, 3 from the Recycle Bin and 1 made new'
+  $null = & $ui.VAnswer @{ Kind = 'choice'; Prompt = 'Which result did you see?'; Choices = @('Nothing to restore', $long) } 1 1
+  $ui.Reply = $null; $rows = @($ui.Opts.Controls); $null = $rows[1].PerformClick()
+  Write-Host ('WIN long-answer long buttons=' + @($ui.B | Where-Object { $_.Shown }).Count + ' rows=' + $rows.Count + ' name=[' + $rows[1].Tag.Name + '] reply=[' + $ui.Reply + ']')
+  $ui.Reply = $null; $null = & $ui.VChoose; $global:RadeT.Hold = $false }
 <#
 .SYNOPSIS
 The Administrator, 2026-11-19 ("values cause fluttering"): prints "WIN steady", proof that no control moves or resizes
@@ -226,7 +254,7 @@ The view of the card that shows.
 $true when the card was answered here; $false when the caller must answer it.
 #>
 function global:Step-RadeR31([string]$V) {
-  if ($V -eq 'choose') { Test-RadeScriptWarn }
+  if ($V -eq 'choose') { Test-RadeScriptWarn; Test-RadeLongAnswer }
   if ($V -eq 'tour') {   # RADE_T_WALK=1: every card, with Back one time; else the test user skips it. From Help: skipped.
     if ($env:RADE_T_WALK -eq '1' -and -not $global:RadeT.Helped) {
       if ($ui.Kick.Text -match ' 2 OF 5$' -and -not $global:RadeT.TourBack) { $global:RadeT.TourBack = $true; Push-RadeButton 'Back'; return $true }
@@ -274,7 +302,7 @@ function global:Push-RadeButton([string]$Text) {
   if (-not $ui -or -not $ui.Form -or $ui.Form.Closed -or -not $ui.View) { return }
   if (-not $global:RadeT.Quick) { $global:RadeT.Quick = $true; $ui.GuardMs = 0; Start-RadeR31 }   # the test user acts at once, as if it had waited (the guard is tested on the first question)
   $key = [string]$ui.View + '|' + $ui.Sent.Text + '|' + $ui.Kick.Text
-  if ($key -eq $global:RadeT.Seen) { return }
+  if ($global:RadeT.Hold -or $key -eq $global:RadeT.Seen) { return }   # Hold: a test shows cards of its own (Test-RadeLongAnswer)
   $global:RadeT.Seen = $key
   Show-RadeCard
   $v = [string]$ui.View; if (Step-RadeR31 $v) { return }; if (Step-RadeNote $v) { return }
@@ -393,7 +421,7 @@ function global:Push-RadeButton([string]$Text) {
     [RadeStub.Driver]::Clip = ''
     foreach ($b in @($ui.RecB)) { if ($b.Shown -and (Test-Deploy)) { $b.PerformClick(); Write-Host ('WIN made=' + [bool]($ui.RecText.Text -match "Made by this app's installs") + ' log=' + [bool]($ui.RecText.Text -match '(?m)^LOG') + ' locked=' + (-not @($ui.RecSteps.Controls | Where-Object { $_ -is [System.Windows.Forms.CheckBox] })[0].Enabled)); $ui.RecClose.PerformClick() } }
     $ui.Form.Key('F2'); $ui.Form.Repaint(); $ui.Form.Key('F2')
-    Write-Host ('WIN layline=' + ((& $ui.LayLine) -replace "`r`n", ' ~ '))
+    Write-Host ('WIN layline=' + ((& $ui.LayLine) -replace "`r`n", ' ~ ')); Test-RadeScaleLines
     $ok = @(& $ui.RowBad 'fixture' 'FieldRow' @(@{ N = 'FieldL'; Top = 10; H = 18; Kind = 'other' }, @{ N = 'FieldBox'; Top = 4; H = 30; Kind = 'box' }, @{ N = 'FieldB'; Top = 4; H = 30; Kind = 'button' })) + @(& $ui.EdgeBad 'fixture' @(@{ N = 'Kick'; X = 125 }, @{ N = 'Sent'; X = 126 }, @{ N = 'P0'; X = 125 }, @{ N = 'B0'; X = 125 }))
     $no = @(& $ui.RowBad 'fixture' 'FieldRow' @(@{ N = 'FieldL'; Top = 13; H = 18; Kind = 'other' }, @{ N = 'FieldBox'; Top = 4; H = 23; Kind = 'box' }, @{ N = 'FieldB'; Top = 4; H = 30; Kind = 'button' })) + @(& $ui.EdgeBad 'fixture' @(@{ N = 'Kick'; X = 123 }, @{ N = 'Sent'; X = 126 }, @{ N = 'P0'; X = 123 }, @{ N = 'B0'; X = 124 }))
     Write-Host ('WIN rule aligned=' + $ok.Count + ' misaligned=' + $no.Count + ' ~ ' + ($no -join ' ~ '))
