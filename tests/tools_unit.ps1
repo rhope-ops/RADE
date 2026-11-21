@@ -125,6 +125,25 @@ $pl = Invoke-RestorePlan $base $b.Path $null
 Assert-Case 'restore: a site that is not a test site is refused' ($pl.State -eq 'refused' -and ($pl.Lines -join ' ') -like '*only on a test site*')
 $w = Invoke-Restore $base $b.Path @{ State = 'plan'; Missing = 1; Expect = '1:1'; Plan = @{} } $null
 Assert-Case 'restore: the write refuses a site that is not a test site' ($w.State -eq 'refused' -and (Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw) -eq $before)
+# The local test-site mark (engine-v32): "testSites": "local" needs the mark of this site on this computer.
+$script:app.Restore = @{ TestSites = @(); Local = $true; Pause = $pause }; $mk = Get-RestoreMarkFile $base
+if (Test-Path -LiteralPath $mk) { Remove-Item -LiteralPath $mk -Force }
+$t = Test-RestoreSite $base; $pl = Invoke-RestorePlan $base $b.Path $null
+Assert-Case 'restore: a local app with no mark is refused and asks for the mark' (-not $t.Ok -and $t.NeedMark -and $t.Name -eq 'fake' -and
+  $pl.State -eq 'refused' -and ($pl.Lines -join ' ') -like '*marked as a test site on this computer*')
+$w = Invoke-Restore $base $b.Path @{ State = 'plan'; Missing = 1; Expect = '1:1'; Plan = @{} } $null
+Assert-Case 'restore: the write refuses a site with no mark' ($w.State -eq 'refused' -and (Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw) -eq $before)
+Save-RestoreMark $base 'other'; $t = Test-RestoreSite $base
+Assert-Case 'restore: the mark of another site does not count' (-not $t.Ok -and $t.NeedMark)
+$script:app.Restore = @{ TestSites = @('other'); Local = $false; Pause = $pause }; $t = Test-RestoreSite $base
+Assert-Case 'restore: a list of names ignores the mark' (-not $t.Ok -and -not $t.NeedMark -and ($t.Lines -join ' ') -like '*only on a test site that the app names*')
+$script:app.Restore = @{ TestSites = @(); Local = $true; Pause = $pause }; Save-RestoreMark $base 'FAKE'; $t = Test-RestoreSite $base
+Assert-Case 'restore: the mark of this site lets Restore run (without case)' ($t.Ok -and $t.Name -eq 'fake')
+Assert-Case 'restore: the mark is in Config next to the site address' ((Split-Path -Parent $mk) -eq (Split-Path -Parent (Get-ConfigFile $base '@@PREFIX@@-site.txt')) -and
+  (Get-RestoreMark $base) -eq 'FAKE')
+Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake3'; $t = Test-RestoreSite $base; Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake'
+Assert-Case 'restore: a new site address needs a new mark' (-not $t.Ok -and $t.NeedMark -and $t.Name -eq 'fake3')
+Remove-Item -LiteralPath $mk -Force
 $script:app.Restore = @{ TestSites = @('Fake'); Pause = $pause }   # site names compare without case
 # The dry run: counts per list, nothing written.
 $pl = Invoke-RestorePlan $base $b.Path $null; $all = $pl.Lines -join ' '

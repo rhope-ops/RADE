@@ -19,11 +19,12 @@ $global:RadeT = @{ Seen = ''; N = 0; Out = [string]$env:RADE_T_OUT; App = [int]$
 function global:Save-RadeRestore {
   <#
   .SYNOPSIS
-  Draws the Restore cards once (engine-v31), from the Maintenance screen: the backup list, the dry-run card, a wrong
-  typed name and the result card.
+  Draws the Restore cards once (engine-v31), from the Maintenance screen: the mark card (engine-v32) with a wrong and
+  then the right site name, the backup list, the dry-run card, a wrong typed name and the result card.
   .DESCRIPTION
   Fake data: two backup folders of one list; the dry run and the result are set by the test (no SharePoint on the
-  runner). The app's own Backup and Restore, its site file and the backup folders are put back as they were after.
+  runner). The app's own Backup and Restore, its site file, the mark file and the backup folders are put back as they
+  were after.
   Takes no parameter.
   #>
   if ($global:RadeT.Restored) { return }; $global:RadeT.Restored = $true
@@ -32,10 +33,16 @@ function global:Save-RadeRestore {
   if (-not (Test-SiteUrl (Get-SiteUrl $bp))) { Save-SiteUrl $bp ($sitePrefix + 'fake') }   # taken out again below: the run goes on as before
   $nm = (Get-SiteUrl $bp).Substring($sitePrefix.Length).TrimEnd('/')
   $script:app.Backup = @('Sample Tasks', 'Sample Recs (Form 1)')
-  $script:app.Restore = @{ TestSites = @($nm); Pause = @{ List = 'Sample Settings'; Title = 'RestorePause'; Field = 'SettingValue'; On = 'On' } }
+  $script:app.Restore = @{ TestSites = @(); Local = $true; Pause = @{ List = 'Sample Settings'; Title = 'RestorePause'; Field = 'SettingValue'; On = 'On' } }
   foreach ($d in '20261120-140000', '20261121-090000') { $f = Join-Path $bp ('Backups\' + $d); $null = New-Item -ItemType Directory -Path $f -Force
     Set-Content -LiteralPath (Join-Path $f 'Sample Tasks.json') -Value '[]' }
-  & $ui.VRestorePick; Save-RadeCard 'restpick'
+  $mk = Get-RestoreMarkFile $bp; $keepMark = $(if (Test-Path -LiteralPath $mk) { [System.IO.File]::ReadAllBytes($mk) } else { $null })
+  if ($keepMark) { Remove-Item -LiteralPath $mk -Force }   # no mark, so the mark card shows; put back below
+  & $ui.VRestorePick; Save-RadeCard 'restmark'
+  $ui.Field.Text = 'not-the-site'; & $ui.RestoreMarkGo; Save-RadeCard 'restmark-wrongname'
+  $ui.Field.Text = $nm.ToUpperInvariant(); & $ui.RestoreMarkGo
+  Write-Host ('WIN restore-mark saved=' + ((Get-RestoreMark $bp) -eq $nm) + ' view=' + $ui.View)
+  Save-RadeCard 'restpick'
   $ui.RestoreDir = Join-Path $bp 'Backups\20261121-090000'
   $ui.RestoreDry = @{ State = 'plan'; Missing = 3; Expect = '1:3'; Plan = @{}; Lines = @('Dry run: 3 rows would come back (1 from the Recycle Bin, 2 as new rows). Nothing was written.',
       '"Sample Tasks": 12 in the backup, 9 on the list now. Would put back 3 (1 from the Recycle Bin, 2 as new rows). 1 made after the backup stay.',
@@ -48,6 +55,7 @@ function global:Save-RadeRestore {
       'Fresh backup before Restore: Backups\20261121-091500', "The app's pause switch is back as it was.", 'PASS: "Sample Tasks": 1 back from the Recycle Bin, 2 made new; 12 rows on the list now') }
   Save-RadeCard 'toolres-restore'
   Get-ChildItem -LiteralPath $cfg -Filter '*-site.txt' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notin $had } | Remove-Item -Force
+  if ($keepMark) { [System.IO.File]::WriteAllBytes($mk, $keepMark) } else { Remove-Item -LiteralPath $mk -Force -ErrorAction SilentlyContinue }
   Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force; $script:app.Backup = $keep.B; $script:app.Restore = $keep.R
   & $ui.VTools $ui.MaintVerb }
 

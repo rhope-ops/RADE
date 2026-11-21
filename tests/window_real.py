@@ -220,7 +220,8 @@ def r31_why(lines, app, fresh):
 
 
 def restore_why(lines):
-    """Say what a run misses of the Restore cards (engine-v31): a run that shows the Maintenance screen draws both.
+    """Say what a run misses of the Restore cards (engine-v31; the mark card, engine-v32): a run that shows the
+    Maintenance screen draws all three.
 
     Args:
         lines: the run's output lines.
@@ -229,9 +230,13 @@ def restore_why(lines):
         A list of reasons (empty when nothing is missing).
     """
     cards = [l for l in lines if l.startswith("WIN card=")]
-    drawn = {v for v in ("restpick", "restconfirm") if any((" view=%s " % v) in l for l in cards)}
-    if any(" view=tools " in l for l in cards) and drawn != {"restpick", "restconfirm"}:
+    drawn = {v for v in ("restmark", "restpick", "restconfirm") if any((" view=%s " % v) in l for l in cards)}
+    if any(" view=tools " in l for l in cards) and drawn != {"restmark", "restpick", "restconfirm"}:
         return ["the Maintenance screen showed, but the Restore cards were not all drawn: %s" % sorted(drawn)]
+    if drawn and "WIN restore-mark saved=True view=restpick" not in lines:
+        return ["the Restore mark card did not save the mark and go on to the backup list"]
+    if drawn and not any(" view=restconfirm " in l and " p=Test site: " in l for l in cards):
+        return ["the Restore confirm card did not show \"Test site: <name>\" as its first line"]
     got = [int(m.group(1)) for m in (re.match(r"WIN restore-lines (\d+) visible=True", l) for l in lines) if m]
     if drawn and not (got and min(got) >= 2):
         return ["the Restore confirm card did not show its 2 count lines"]
