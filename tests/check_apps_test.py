@@ -63,5 +63,12 @@ with tempfile.TemporaryDirectory() as t:
     assert c.stage_fonts(t, {'bundles': [{'files': [{'src': 'bad/fonts/build/X-OFL.txt'}]}]}, fake.get) == []
     head = c.run(['git', 'rev-parse', 'HEAD'], c.ROOT)[1]
     assert c.locked_font(head, 'OFL.txt') == c.this_font('OFL.txt') and c.locked_font(head, 'none.ttf') is None and c.locked_font(head, '../rade_build.py') is None
+    real = c.git_type; c.git_type = lambda commit, rel: 'tree'   # a folder at that path: never read as a font
+    try:
+        assert c.locked_font(head, 'OFL.txt') is None
+    finally:
+        c.git_type = real
+    assert c.git_type(head, 'engine/fonts') == 'tree' and c.git_type(head, 'engine/fonts/OFL.txt') == 'blob'
+    assert not list((t / 'assets/fonts/build').glob('*.part'))   # no part file left after a copy
 
 print('CANARY rules ok: %d bad manifest paths, %d bad locks, 1 symbolic link, 1 no-reconnaissance note, 1 font put in' % (len(muts), len(bads)))

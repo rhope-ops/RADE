@@ -114,7 +114,17 @@ def locked_font(commit, name):
         data = show(commit, rel)
     except LookupError:
         return None
-    return data if run(['git', 'cat-file', '-t', commit + ':' + rel], ROOT) == (0, 'blob') else None
+    return data if git_type(commit, rel) == 'blob' else None
+
+
+def git_type(commit, rel):
+    """The git object type of a path at a commit ('blob' for a file), from stdout only (a warning on stderr changes
+    nothing); '' when it cannot be read."""
+    try:
+        r = subprocess.run(['git', 'cat-file', '-t', commit + ':' + rel], cwd=ROOT, capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        return ''
+    return r.stdout.strip() if r.returncode == 0 else ''
 
 
 def locked_accepts(lock, app_dir, manifest_rel, tmp):
@@ -161,10 +171,16 @@ def stage_fonts(app_dir, manifest, read_font):
             data = read_font(m.group(1))
             if data is None:
                 continue
-            try:   # a file where a folder should be (a broken app): left to the build, which names it
+            try:   # a file where a folder should be (a broken app), or a write that stops: left to the build, which names it
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                dst.write_bytes(data)
+                part = dst.with_name(dst.name + '.part')
+                part.write_bytes(data)
+                os.replace(part, dst)   # whole or not there: never a cut font
             except OSError:
+                try:
+                    part.unlink()
+                except (OSError, NameError):
+                    pass
                 continue
             copied.append(src)
     return copied
