@@ -54,11 +54,19 @@ function global:Save-RadeRestore {
   & $ui.ToolResult 'Restore' @{ State = 'done'; Path = (Join-Path $bp 'Backups\20261121-091500'); Lines = @('Restore put back 3 of 3 rows. Rows on the lists were not changed.',
       'Fresh backup before Restore: Backups\20261121-091500', "The app's pause switch is back as it was.", 'PASS: "Sample Tasks": 1 back from the Recycle Bin, 2 made new; 12 rows on the list now') }
   Save-RadeCard 'toolres-restore'
-  & $ui.RestoreUnmark; Save-RadeCard 'toolres-unmark'   # engine-v33: the button of the backup card
+  # engine-v33: the backup card of a marked site has "Remove test-site mark"; the focus is not on it; a click removes the mark.
+  & $ui.VRestorePick; $ub = @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Remove test-site mark' })[0]
+  Write-Host ('WIN restore-unmark-button shown=' + [bool]$ub + ' focused=' + $(if ($ub) { $ub.Focused } else { 'n/a' }))
+  if ($ub) { $ub.PerformClick() }; Save-RadeCard 'toolres-unmark'
   Write-Host ('WIN restore-unmark gone=' + (-not (Test-Path -LiteralPath $mk)) + ' view=' + $ui.View)
+  & $ui.VRestorePick; Write-Host ('WIN restore-unmarked-site view=' + $ui.View)   # no mark: the mark card again, no button
+  # A marked site with no backup: the result card has the button too.
+  Save-RestoreMark $bp $nm; Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force
+  & $ui.VRestorePick; Save-RadeCard 'toolres-nobackup-marked'
+  Write-Host ('WIN restore-nobackup-button view=' + $ui.View + ' shown=' + [bool]@($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Remove test-site mark' }).Count)
   Get-ChildItem -LiteralPath $cfg -Filter '*-site.txt' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notin $had } | Remove-Item -Force
   if ($keepMark) { [System.IO.File]::WriteAllBytes($mk, $keepMark) } else { Remove-Item -LiteralPath $mk -Force -ErrorAction SilentlyContinue }
-  Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force; $script:app.Backup = $keep.B; $script:app.Restore = $keep.R
+  Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force -ErrorAction SilentlyContinue; $script:app.Backup = $keep.B; $script:app.Restore = $keep.R
   & $ui.VTools $ui.MaintVerb }
 
 function global:Save-RadeCard([string]$Tag) {
