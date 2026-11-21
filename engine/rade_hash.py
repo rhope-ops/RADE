@@ -21,10 +21,30 @@ import re
 from pathlib import Path
 
 HASH_LINE = '# @@BUNDLE-HASH %s @@\n'
+# The end of the hashed text: the line ends and blank lines after the last line of code (R41: a paste in Windows
+# PowerShell ISE drops the final line end; the Administrator, 2026-11-21). They are left out and one LF stands in their place.
+TRAIL = re.compile(r'(?:\n[ \t]*)+\Z')
+
+
+def canonical(rest):
+    """Return the text after the hash line in the form that is hashed: line ends as LF, and its end as exactly one LF.
+
+    Args:
+        rest: the text after the hash line (any line ends).
+
+    Returns:
+        The same text with CR LF as LF and the line ends and blank lines at its end replaced by one LF. A paste that
+        lost or added line ends at the end gives the same text; a copy that is cut off before the end does not.
+    """
+    return TRAIL.sub('', rest.replace('\r\n', '\n')) + '\n'
 
 
 def add_line(rest):
-    """Return the whole bundle: the hash line of `rest` (the bundle text without it, ASCII with LF line ends), then `rest`."""
+    """Return the whole bundle: the hash line of `rest` (the bundle text without it, ASCII with LF line ends), then `rest`.
+
+    The build writes `rest` in its canonical form (canonical()), so the bytes on disk are the bytes that are hashed.
+    """
+    rest = canonical(rest)
     return HASH_LINE % hashlib.sha256(rest.encode('ascii')).hexdigest() + rest
 
 

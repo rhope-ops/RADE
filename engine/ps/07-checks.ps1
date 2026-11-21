@@ -184,8 +184,67 @@ function Invoke-ChildScript([string]$Text, [string]$ArgText, [int]$Seconds, [scr
   finally { $script:child = $null; try { if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force } } catch { $null = $_ } }
   return $res
 }
+# E3 (R42 plan; the Owner, 2026-11-21): the one copy of the sign-in window size block. Each child script that signs in
+# holds the line "# <RADE sign-in window size>" in its place; Add-SignInSize puts the block there. An app copies the block
+# (from its start line to its end line) into its own task scripts, so both use the same code.
+$signInSize = @'
+# ---- RADE sign-in window size (start; engine/ps/07-checks.ps1 $signInSize; E3, the Owner, 2026-11-21)
+# The CAC sign-in window of Connect-PnPOnline -UseWebLogin (PnP.PowerShell 1.12.0) opens very large. Start-SignInSize,
+# called just before Connect-PnPOnline, starts a background timer that, for up to 2 minutes, finds each new visible window
+# of THIS process only (the windows of its own threads: no other process and no other host is read) and makes it about
+# 480 x 360 logical pixels, in the center of the work area of its screen. The window stays visible, so it can still take
+# input. Copy this block unchanged between its start and end lines (an app's task scripts may hold the same copy).
+# Windows PowerShell 5.1, no module. When the helper cannot be compiled (Constrained Language Mode) or the calls fail,
+# nothing changes and the sign-in goes on as before.
+$SignInW = 480; $SignInH = 360; $SignInWatchMs = 120000; $SignInTickMs = 100
+function Start-SignInSize {
+  if ($env:OS -ne 'Windows_NT' -and $env:RADE_SIGNIN_TEST -ne '1') { return }   # Windows only (the cloud test sets RADE_SIGNIN_TEST to compile it)
+  try {
+    if (-not ('RadeSignIn.Size' -as [type])) {
+      Add-Type -Namespace RadeSignIn -Name Size -ErrorAction Stop -MemberDefinition @"
+public delegate bool WinProc(System.IntPtr h, System.IntPtr l);
+[System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool EnumThreadWindows(uint tid, WinProc f, System.IntPtr l);
+[System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsWindowVisible(System.IntPtr h);
+[System.Runtime.InteropServices.DllImport("user32.dll")] static extern System.IntPtr GetWindow(System.IntPtr h, uint cmd);
+[System.Runtime.InteropServices.DllImport("user32.dll")] static extern System.IntPtr MonitorFromWindow(System.IntPtr h, uint flags);
+[System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool GetMonitorInfo(System.IntPtr m, ref MonInfo i);
+[System.Runtime.InteropServices.DllImport("user32.dll")] static extern uint GetDpiForWindow(System.IntPtr h);
+[System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetWindowPos(System.IntPtr h, System.IntPtr after, int x, int y, int cx, int cy, uint flags);
+[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+public struct MonInfo { public int Size; public int ML, MT, MR, MB; public int WL, WT, WR, WB; public uint Flags; }
+static System.Threading.Timer timer; static WinProc each = Each; static int w, h, left;
+static System.Collections.Generic.HashSet<long> seen = new System.Collections.Generic.HashSet<long>();
+// Starts the watch: every tickMs, for watchMs, each new visible top-level window of this process gets the size w x h (logical).
+public static void Start(int width, int height, int watchMs, int tickMs) {
+  w = width; h = height; left = System.Math.Max(1, watchMs / System.Math.Max(1, tickMs));
+  timer = new System.Threading.Timer(Tick, null, tickMs, tickMs); }
+static void Tick(object state) {
+  try { if (--left < 0) { timer.Dispose(); return; }
+    foreach (System.Diagnostics.ProcessThread t in System.Diagnostics.Process.GetCurrentProcess().Threads) { EnumThreadWindows((uint)t.Id, each, System.IntPtr.Zero); } }
+  catch { } }
+// One window of this process: a visible top-level window (no owner) not seen before is sized and centered once.
+static bool Each(System.IntPtr hw, System.IntPtr l) {
+  long k = hw.ToInt64(); if (seen.Contains(k) || !IsWindowVisible(hw) || GetWindow(hw, 4) != System.IntPtr.Zero) { return true; }
+  seen.Add(k);
+  int dpi = 96; try { dpi = (int)GetDpiForWindow(hw); } catch { } if (dpi <= 0) { dpi = 96; }
+  int cw = w * dpi / 96, ch = h * dpi / 96;
+  MonInfo mi = new MonInfo(); mi.Size = System.Runtime.InteropServices.Marshal.SizeOf(typeof(MonInfo));
+  if (!GetMonitorInfo(MonitorFromWindow(hw, 2), ref mi)) { return true; }
+  int x = mi.WL + System.Math.Max(0, (mi.WR - mi.WL - cw) / 2), y = mi.WT + System.Math.Max(0, (mi.WB - mi.WT - ch) / 2);
+  SetWindowPos(hw, System.IntPtr.Zero, x, y, cw, ch, 0x0004 | 0x0010 | 0x4000);   // no Z order change, no activate, async
+  return true; }
+"@
+    }
+    [RadeSignIn.Size]::Start($SignInW, $SignInH, $SignInWatchMs, $SignInTickMs)
+  } catch { $null = $_ }   # no helper: the sign-in window keeps its own size
+}
+# ---- RADE sign-in window size (end)
+'@
+# Gives a child script's text with the sign-in window size block in place of its marker line. Takes the text; gives back the text.
+function Add-SignInSize([string]$Text) { return $Text.Replace('# <RADE sign-in window size>', $signInSize.TrimEnd()) }
 $rightsScript = @'
 param([string]$Site, [string]$MarkerList = '', [string]$MarkerKey = '', [string]$MarkerField = '')
+# <RADE sign-in window size>
 # RADE check (read-only): signs in with the CAC (web login, as T16 does) and prints your rights on the site, whether your
 # own account is a site collection administrator (one flag; no list of administrators) and, when the app keeps an install
 # record on the site, the version in that one row. Prints only right names, True/False and a version, never the site,
@@ -195,6 +254,7 @@ try {
   if (-not $mod.Count) { 'RESULT no-pnp'; exit 3 }
   $pin = @($mod | Where-Object { [string]$_.Version -eq '1.12.0' }); if ($pin.Count) { $mod = $pin }   # the tested version first (2.x needs PowerShell 7)
   $null = & { Import-Module PnP.PowerShell -RequiredVersion $mod[0].Version -DisableNameChecking } *>&1
+  Start-SignInSize   # E3: the CAC sign-in window opens at about 480 x 360, centered (the block above)
   $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1
   $script:web = $null
   $null = & { $script:web = Get-PnPWeb -Includes EffectiveBasePermissions -ErrorAction Stop } *>&1
@@ -226,6 +286,7 @@ try {
   exit 0
 } catch { 'RESULT not-connected ' + $_.Exception.GetType().Name; exit 2 }
 '@
+$rightsScript = Add-SignInSize $rightsScript
 $rightWords = @{ ViewListItems = 'read items'; AddListItems = 'add items'; EditListItems = 'edit items'; ManageLists = 'manage lists'; ManageWeb = 'manage the site'; ManagePermissions = 'manage permissions' }
 $rightsNeeded = @('ManageLists', 'ManageWeb', 'ManagePermissions')   # what T16 site setup and list set-up use
 # ---- Install record on the site (the Administrator, 14 Nov 26: one install per site). An app with "marker" in the
@@ -255,6 +316,7 @@ function Test-InstalledHere {
 function Test-FirstInstall { return ((Test-Deploy) -and [bool]$script:app.Marker -and -not (Test-InstalledHere)) }
 $markerScript = @'
 param([string]$Site, [string]$MarkerList, [string]$MarkerKey, [string]$MarkerField, [string]$Value)
+# <RADE sign-in window size>
 # RADE (one write): signs in with the CAC and sets one row of the app's own list to the installed version and the date.
 # Adds the row when it is missing; changes nothing else. Prints one RESULT word, never the site, a name or an error message.
 try {
@@ -262,6 +324,7 @@ try {
   if (-not $mod.Count) { 'RESULT no-pnp'; exit 3 }
   $pin = @($mod | Where-Object { [string]$_.Version -eq '1.12.0' }); if ($pin.Count) { $mod = $pin }
   $null = & { Import-Module PnP.PowerShell -RequiredVersion $mod[0].Version -DisableNameChecking } *>&1
+  Start-SignInSize   # E3: the CAC sign-in window opens at about 480 x 360, centered (the block above)
   $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1
   $script:res = 'no-list'
   $null = & {
@@ -277,6 +340,7 @@ try {
   exit 0
 } catch { 'RESULT failed ' + $_.Exception.GetType().Name; exit 2 }
 '@
+$markerScript = Add-SignInSize $markerScript
 function Write-SiteMarker([string]$Base, [bool]$Whole) {
   # After a deploy that ran a step: a part install is recorded too (its flows may be imported already), with the word
   # "partial". Returns the one line for the log and the report.

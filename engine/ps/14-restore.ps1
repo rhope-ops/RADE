@@ -21,6 +21,7 @@ $backupSetMax = 10            # backups the Restore card lists, newest first (on
 # types: never the site, a name, an ID or a value.
 $restoreScript = @'
 param([string]$Site, [string]$Folder, [string]$Lists, [string]$Mode, [string]$Expect, [string]$Pause, [string]$MapFile)
+# <RADE sign-in window size>
 # RADE Restore: missing rows only. Mode plan reads the site and writes nothing; mode write puts the missing rows back.
 # Output: PLAN, BIN, PAUSE, DONE, RESUME and RESULT lines with numbers, error types and a short hash only.
 Remove-TypeData -TypeName System.Array -ErrorAction SilentlyContinue   # Windows PowerShell 5.1 writes an array as {value, Count} while it is loaded; absent elsewhere
@@ -205,12 +206,15 @@ function Set-PauseOn {
   return ($switch + @{ Row = $row; Old = $old }) }
 
 # R1: puts back each chosen Recycle Bin item; after an error the list is read again (a restore that reported an error
-# but worked is not made a second time). Takes nothing; sets $script:stopMake when a list cannot be read again.
+# but worked is not made a second time). A row that did not come back is made new later (Add-MissingRows): the BINERR
+# line gives its list and the first error type, so the result card says so (E2, R42; the Administrator, 2026-11-21).
+# Takes nothing; sets $script:stopMake when a list cannot be read again.
 function Restore-BinRows {
-  foreach ($k in $keys) { $state = $info.Lists[$k]; $state.FromBin = 0; $state.BinFailed = 0
+  foreach ($k in $keys) { $state = $info.Lists[$k]; $state.FromBin = 0; $state.BinFailed = 0; $binErr = ''
     foreach ($id in @($state.Bin.Keys)) { $choice = $state.Bin[$id]
       try { $null = & { Restore-PnPRecycleBinItem -Identity $choice.Item -Force -ErrorAction Stop } *>&1; $state.Have[[int]$choice.Id] = $true; $state.FromBin++ }
-      catch { $state.Bin.Remove($id); $state.BinFailed++ } }
+      catch { $state.Bin.Remove($id); $state.BinFailed++; if (-not $binErr) { $binErr = $_.Exception.GetType().Name } } }
+    if ($binErr) { 'BINERR ' + $k + ' ' + $binErr }   # an error type only: no site, name, ID or value
     if ($state.BinFailed) { try { foreach ($id in @((Read-ListIds $state.Name).Keys)) { $state.Have[$id] = $true } } catch { $script:stopMake = $true } } } }
 
 # R5: the lists in dependency order: a list whose lookup reads another restored list comes after it; a loop keeps the
@@ -261,6 +265,7 @@ try {
   if (-not $mod.Count) { 'RESULT no-pnp'; exit 3 }
   $pin = @($mod | Where-Object { [string]$_.Version -eq '1.12.0' }); if ($pin.Count) { $mod = $pin }
   $null = & { Import-Module PnP.PowerShell -RequiredVersion $mod[0].Version -DisableNameChecking } *>&1
+  Start-SignInSize   # E3: the CAC sign-in window opens at about 480 x 360, centered (the block above)
   $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1
 } catch { 'RESULT not-connected ' + $_.Exception.GetType().Name; exit 2 }
 $record = Read-RestoreRecord
@@ -290,6 +295,7 @@ if ($script:mapStop) { 'RESULT map-write-failed'; exit 8 }
 if ($script:stopMake) { 'RESULT reread-failed'; exit 7 }
 'RESULT done'; exit 0
 '@
+$restoreScript = Add-SignInSize $restoreScript   # E3: the sign-in window size block (07-checks.ps1)
 
 <#
 .SYNOPSIS
@@ -474,9 +480,9 @@ function Invoke-Restore([string]$Base, [string]$Dir, $Plan, [scriptblock]$Tick) 
   $pauseArg = $(if ($pause) { ' -Pause "' + $pause.List + '|' + $pause.Title + '|' + $pause.Field + '|' + $pause.On + '"' } else { '' })
   $child = Invoke-ChildScript $restoreScript ('-Site "' + $siteCheck.Site + '" -Folder "' + $Dir + '" -Lists "' + ($lists -join '|') + '" -Mode write -Expect "' + $Plan.Expect + '"' + $pauseArg +
     (Get-RestoreMapArg $Base $siteCheck.Site)) $restoreWriteSeconds $Tick
-  $res = ''; $done = @{}; $resume = ''
+  $res = ''; $done = @{}; $resume = ''; $binErr = @{}
   foreach ($line in $child.Lines) { if ($line -match '^RESULT (\S+)') { $res = $Matches[1] } elseif ($line -match '^DONE (\d+) (.+)$') { $done[[int]$Matches[1]] = $Matches[2] }
-    elseif ($line -match '^RESUME (\S+)') { $resume = $Matches[1] } }
+    elseif ($line -match '^RESUME (\S+)') { $resume = $Matches[1] } elseif ($line -match '^BINERR (\d+) ([A-Za-z0-9_.]+)$') { $binErr[[int]$Matches[1]] = $Matches[2] } }
   $freshLine = 'Fresh backup before Restore: ' + (ConvertTo-Masked $fresh.Path)
   $stop = $(switch ($res) { 'changed' { 'the site changed after the dry run. Run Restore again for a new dry run' }
       'paused-already' { 'the pause switch is on already (another Restore, or it was left on). Check it, then run Restore again' }
@@ -489,14 +495,16 @@ function Invoke-Restore([string]$Base, [string]$Dir, $Plan, [scriptblock]$Tick) 
     if ($doneText -notmatch '^before=(\d+) bin=(\d+) made=(\d+) failed=(\d+) skipped=(\d+) binfailed=(\d+) unlinked=(\d+) now=(-?\d+)$') {
       $bad++; $lines += ('FINDING: "' + $listName + '": no result. What to do: compare the list with the backup'); continue }
     $before = [int]$Matches[1]; $fromBin = [int]$Matches[2]; $made = [int]$Matches[3]; $notConfirmed = [int]$Matches[4]; $skipped = [int]$Matches[5]
-    $unlinkedCount = [int]$Matches[7]; $now = [int]$Matches[8]
+    $binFailed = [int]$Matches[6]; $unlinkedCount = [int]$Matches[7]; $now = [int]$Matches[8]
     $back += $fromBin + $made
-    $want = $before + $fromBin + $made; $ok = ($notConfirmed -eq 0 -and $skipped -eq 0 -and $now -eq $want)
+    $want = $before + $fromBin + $made; $ok = ($notConfirmed -eq 0 -and $skipped -eq 0 -and $binFailed -eq 0 -and $now -eq $want)
     $txt = '"' + $listName + '": ' + $fromBin + ' back from the Recycle Bin, ' + $made + ' made new; ' + $now + ' rows on the list now'
     if ($unlinkedCount) { $txt += '; ' + $unlinkedCount + ' lookup value(s) left empty (the row they pointed to is not there)' }
     if ($ok) { $lines += ('PASS: ' + $txt); continue }
     $notConfirmedText = $(if ($notConfirmed) { '; ' + $notConfirmed + ' row(s) not confirmed (they may be on the list; Restore never makes them again)' } else { '' })
     if ($skipped) { $notConfirmedText += '; ' + $skipped + ' row(s) not written: a saved value could not be read (the next dry run offers them again)' }
+    if ($binFailed) { $notConfirmedText += '; ' + $binFailed + ' row(s) did not come back from the Recycle Bin (' + $(if ($binErr[$i]) { $binErr[$i] } else { 'error' }) +
+        '), so Restore made them as new rows with new row numbers' }   # E2 (R42): a planned Recycle Bin row made new is never a PASS
     $bad++; $lines += ('FINDING: ' + $txt + $notConfirmedText + '. What to do: compare the list with the backup') }
   if ($res -ne 'done') { $bad++
     $lines += ('FINDING: Restore stopped before the end: ' + (Get-ChildStopText $res $child.Why) + '. What to do: run Restore again (it puts back only what is still missing)') }

@@ -28,9 +28,24 @@ $ui.VHandFail = {
 # A question of a hand step (manifest "answers"), after Done: the prompt is the sentence; yes/no and pick answer with
 # one button per word, a text with one line (10,000 characters at most; empty is allowed; R28: kept whole) and "Continue". No Back.
 $ui.ReplyActs = @({ $ui.Reply = [string]$ui.B[0].Text }, { $ui.Reply = [string]$ui.B[1].Text }, { $ui.Reply = [string]$ui.B[2].Text }, { $ui.Reply = [string]$ui.B[3].Text })
-# Shows one question of a hand step (text, yes or no, or a pick). The first sentence of the prompt is the headline.
-# Takes the question, its number and the count; the answer is set in $ui.Reply.
-$ui.VAnswer = { param($Q, [int]$I, [int]$N)
+$ui.VAnswer = {
+  <#
+  .SYNOPSIS
+  Shows one question of a hand step (text, yes or no, or a pick). The first sentence of the prompt is the headline.
+  .DESCRIPTION
+  Yes / no and a pick answer with one plain button per choice. When a choice does not fit the widest button (E5, R42
+  plan; $ui.AnswerFits), each choice is a full-width choice row instead, so no answer text is cut. A text question has
+  the box "Your answer" and "Continue". No Back.
+  .PARAMETER Q
+  The question (Kind, Prompt, Choices).
+  .PARAMETER I
+  Its number.
+  .PARAMETER N
+  The count of questions.
+  .OUTPUTS
+  None; the answer is set in $ui.Reply.
+  #>
+  param($Q, [int]$I, [int]$N)
   $ui.Reply = $null
   $c = @{ View = 'answer'; Light = 'you'; Kicker = ($(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN + $dot } else { '' }) + 'Question ' + $I + ' of ' + $N); Sentence = [string]$Q.Prompt }
   # The prompt's first sentence (up to the first "?", "." or ":" followed by a space or the end) is the headline; the rest
@@ -38,8 +53,20 @@ $ui.VAnswer = { param($Q, [int]$I, [int]$N)
   if ([string]$Q.Prompt -match '^(.+?[?.:])(?:\s+(\S.*))?$') { $c.Sentence = $Matches[1]; if ($Matches[2]) { $c.P = @($Matches[2].Trim()) } }
   if ($Q.Kind -eq 'text') { $c.Field = @{ Label = 'Your answer'; Text = ''; Name = [string]$Q.Prompt; Max = 10000; Above = $true }
     $c.Focus = 'field'; $c.Buttons = @(@{ Text = 'Continue'; Kind = 'primary'; Act = { $ui.Reply = [string]$ui.Field.Text } }) }
-  else { $ws = @($(if ($Q.Kind -eq 'yesno') { 'Yes', 'No' } else { $Q.Choices })); $c.Buttons = @(for ($k = 0; $k -lt $ws.Count; $k++) { @{ Text = [string]$ws[$k]; Act = $ui.ReplyActs[$k] } }) }
+  else { $ws = @($(if ($Q.Kind -eq 'yesno') { 'Yes', 'No' } else { $Q.Choices })); $ui.AnswerWords = @($ws | ForEach-Object { [string]$_ })
+    if (& $ui.AnswerFits $ws) { $c.Buttons = @(for ($k = 0; $k -lt $ws.Count; $k++) { @{ Text = [string]$ws[$k]; Act = $ui.ReplyActs[$k] } }) }
+    else {   # E5 (R41: "needs 416 has 360"): a choice too long for the widest button; each choice is a full-width row, no text is cut
+      $c.Options = @(for ($k = 0; $k -lt $ws.Count; $k++) { @{ Index = $k; Name = [string]$ws[$k]; Ver = '' } })
+      # A click on choice row j answers with that choice's own text. Takes the row's index.
+      $c.OnOption = { param($j) $ui.Reply = [string]$ui.AnswerWords[$j] }
+      $c.P = @(@($c.P) + @('Select your answer. The next card then opens.') | Where-Object { $_ }) } }
   & $ui.SetCard $c }
+# Says whether every answer choice fits the widest action button (UI standard v1, B1: 240 x 40), measured in the button
+# font with the button's padding, as $ui.BtnSize measures it. Takes the choices; gives back $true or $false.
+$ui.AnswerFits = { param($Words)
+  $max = & $ui.Sc $ui.Z.WideW; $pad = & $ui.Sc (2 * $ui.Z.G2)
+  foreach ($w in @($Words)) { try { if ([int][System.Windows.Forms.TextRenderer]::MeasureText([string]$w, $ui.F.SmallB).Width + $pad -gt $max) { return $false } } catch { $null = $_ } }   # no measure: buttons, as before
+  return $true }
 # E2 (the Administrator, 2026-11-19): after an answer that the manifest marks as a failure ("failOn"), the card where the
 # user pastes the error text. Its button keeps the text in $script:guideError and sets $ui.Reply. No Back. Takes nothing.
 $ui.VAnswerFail = {

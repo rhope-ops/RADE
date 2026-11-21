@@ -296,6 +296,24 @@ $ui.Scale = {
     $sy = 'n/a'; try { $sy = [string][Rade.Dpi]::GetDpiForSystem() } catch { $null = $_ }   # no Rade.Dpi (not Windows, before 1607): n/a
     return ($l + ' thread=' + $script:dpiThread + ' sysDpi=' + $sy)   # R34: the window thread's dpi awareness (01-setup.ps1) and the system dpi
   } catch { return ('SCALE could not be read: ' + (ConvertTo-Masked ([string]$_.Exception.Message))) } }
+$ui.ScaleKeep = 20   # the SCALE lines rade-window-scale.txt keeps (E4)
+# E4 (R42 plan; the Administrator, 2026-11-21): each RADE window writes its SCALE line, with the time, its own host name and
+# its own process name (no other process is read), to RADE\Config\rade-window-scale.txt when it is shown, so a round's
+# results hold the line of every RADE window, also one opened from the RADE shortcut in another process. The file keeps
+# the last $ui.ScaleKeep lines. Numbers and names of programs only: no path, user or site. A failure is ignored. Takes nothing.
+$ui.LogScale = {
+  try { $p = Get-RadeConfigFile 'rade-window-scale.txt'; $d = Split-Path -Parent $p
+    if (-not (Test-Path -LiteralPath $d -PathType Container)) { [void](New-Item -ItemType Directory -Path $d -Force) }
+    $exe = 'n/a'; try { $exe = [System.Diagnostics.Process]::GetCurrentProcess().ProcessName } catch { $null = $_ }   # no name: the line says n/a
+    $line = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss') + ' host=' + ([string]$Host.Name -replace '\s', '') + ' exe=' + $exe + ' build=' + $buildId + ' ' + (& $ui.Scale)
+    $old = @(); if (Test-Path -LiteralPath $p -PathType Leaf) { $old = @(Get-Content -LiteralPath $p | Where-Object { $_ }) }
+    Write-FileWhole $p ((@(@($old) + @($line)) | Select-Object -Last $ui.ScaleKeep) -join "`r`n") } catch { $null = $_ } }   # not written: the round has no line of this window
+# The SCALE lines of the RADE windows shown since this window opened ($ui.OpenedAt), this one included, for the round's
+# results (E4). Takes nothing; gives back the lines (none when the file cannot be read).
+$ui.ScaleLines = {
+  try { $p = Get-RadeConfigFile 'rade-window-scale.txt'; if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { return @() }
+    $since = $ui.OpenedAt.ToString('yyyy-MM-ddTHH:mm:ss')
+    return @(Get-Content -LiteralPath $p | Where-Object { $_ -match '^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d) ' -and [string]::CompareOrdinal($Matches[1], $since) -ge 0 } | ForEach-Object { 'WINDOW ' + $_ }) } catch { return @() } }
 # Gives the result of the layout self-check: its pass line, or the defects found, with the window size and scale. Takes
 # nothing; gives back the text.
 $ui.LayLine = {
@@ -308,13 +326,16 @@ $ui.LayLine = {
 # Sets a label's text and shows it only when the text is not empty. Takes the label and the text; gives back nothing.
 $ui.Show = { param($C, [string]$Text) $C.Text = $Text; $C.Visible = [bool]$Text }
 # A script whose hash does not match its own hash line (the Administrator, 2026-11-19; docs/specs/bundle-hash.md R3): on the
-# boot, choose and ready cards the last line says so in dark red, in place of the card's own last line (no exception: the
-# warning alone, so the layout holds at every size). A hash that cannot be read ("not available") and a match show nothing
-# here (the card's own last line stays). Takes the card; changes the color and text of $ui.Foot.
+# boot, choose and ready cards the last line says so in dark red, in place of the card's own last line, with the full
+# "Script check:" line under it (E1, R42 plan, the Owner, 2026-11-21: the values to compare, before Run). The Ready card
+# (the card with Run) always shows the full "Script check:" line under its own last line: checked, does not match, or not
+# available. A match and a hash that cannot be read show nothing on the boot and choose cards. Takes the card; changes the
+# color and text of $ui.Foot.
 $ui.ScriptWarn = { param($c)
-  $bad = [bool]($script:scriptCheck.Short -and -not $script:scriptCheck.Ok)
-  if ($bad -and [string]$c.View -in 'boot', 'choose', 'ready') { & $ui.Show $ui.Foot 'This script does not match its hash. Do not run it.'; $ui.Foot.ForeColor = $ui.C.Red }
-  else { $ui.Foot.ForeColor = $ui.C.Gray } }
+  $bad = [bool]($script:scriptCheck.Short -and -not $script:scriptCheck.Ok); $line = [string]$script:scriptCheck.Line
+  if ($bad -and [string]$c.View -in 'boot', 'choose', 'ready') { & $ui.Show $ui.Foot ('This script does not match its hash. Do not run it.' + $(if ($line) { "`r`n" + $line } else { '' })); $ui.Foot.ForeColor = $ui.C.Red }
+  else { $ui.Foot.ForeColor = $ui.C.Gray
+    if ([string]$c.View -eq 'ready' -and $line) { & $ui.Show $ui.Foot (@(@([string]$c.Foot, $line) | Where-Object { $_ }) -join "`r`n") } } }
 # Sets what each card text box with changing values can show on the card that comes ($ui.Range): the card's Range names
 # them (Kick, P0, StepName: lists of texts); a part the card does not name has no range. Takes the card's Range (or $null).
 $ui.SetRange = { param($R) foreach ($k in 'Kick', 'P0', 'StepName') { $box = $(if ($k -eq 'P0') { $ui.P[0] } else { $ui[$k] })

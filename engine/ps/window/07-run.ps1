@@ -72,7 +72,8 @@ $ui.OnStep = { param($k, $line)
   $ui.StepState[[int]$k] = $st; $null = & $ui.Paint }
 # Gives the "Window: OK" or "Window: NOT OK" line for the report, with the layout self-check when it is on. Takes
 # nothing; gives back the text.
-$ui.WindowLine = { $w = $(if ($ui.OkBox.Checked) { 'Window: OK' } else { 'Window: NOT OK - write here what overlapped or was cut off' }); if ($ui.LayOn -and ($env:RADE_LAYOUT -eq '1' -or -not (Test-Deploy))) { $w + "`r`n" + (& $ui.LayLine) } else { $w } }
+$ui.WindowLine = { $w = $(if ($ui.OkBox.Checked) { 'Window: OK' } else { 'Window: NOT OK - write here what overlapped or was cut off' }); if ($ui.LayOn -and ($env:RADE_LAYOUT -eq '1' -or -not (Test-Deploy))) { $w += "`r`n" + (& $ui.LayLine) }
+  @(@($w) + @(& $ui.ScaleLines)) -join "`r`n" }   # E4: the SCALE line of each RADE window shown since this one opened
 $ui.StartApp = {
   # The installed app opens from its local copy in its own powershell.exe process; then RADE closes.
   $p = Get-StartPath; if (-not $p) { & $ui.Say1 'The start file of this application was not found. Select "Install" to put it back.'; return }
