@@ -72,4 +72,21 @@ Assert-Case 'collect: the PDF is copied' ($got -contains 'T22-SAMPLE-T22-feedbac
 Assert-Case 'collect: no script file is copied' (-not @($got | Where-Object { $_ -match '\.(ps1|cmd)$' }).Count)
 $one = @($script:runLog | Where-Object { $_ -eq 'SKIPPED script file SAMPLE-T22-feedback-r1.ps1 (scripts never go in results)' }).Count
 Assert-Case 'collect: one SKIPPED line for each script file' ($one -eq 1 -and @($script:runLog | Where-Object { $_ -like 'SKIPPED script file *' }).Count -eq 2)
+# A saved bundle copy (engine-v34: the .txt a link opens) is a whole script under any name: the collect step refuses it by
+# its first line that is not blank; a text file that only mentions the hash line later is still copied.
+Set-Content -LiteralPath (Join-Path $src 'SAMPLE-T22-feedback-r2.txt') -Value @('# @@BUNDLE-HASH 0123 @@', 'Write-Host x')
+Set-Content -LiteralPath (Join-Path $src 'SAMPLE-T22-feedback-r3.txt') -Value @('notes', '# @@BUNDLE-HASH 0123 @@')
+$z = Export-RoundResult $base @('subject', 'line')
+$got = @(Get-ChildItem -LiteralPath $z.Dir -File | ForEach-Object { $_.Name })
+Assert-Case 'collect: a saved bundle copy (.txt) is not copied' (-not ($got -contains 'T22-SAMPLE-T22-feedback-r2.txt'))
+Assert-Case 'collect: a plain .txt is still copied' ($got -contains 'T22-SAMPLE-T22-feedback-r3.txt')
+# A paste can put blank lines and spaces above the hash line; an exact collect name is checked the same way.
+Set-Content -LiteralPath (Join-Path $src 'SAMPLE-T22-feedback-r4.txt') -Value @('', '   ', '  # @@BUNDLE-HASH 0123 @@', 'Write-Host x')
+Set-Content -LiteralPath (Join-Path $src 'exact-copy.txt') -Value @('# @@BUNDLE-HASH 0123 @@', 'Write-Host x')
+$collect = @(@{ Dir = 'T22'; Name = 'SAMPLE-T22-feedback-*'; Step = '' }, @{ Dir = 'T22'; Name = 'exact-copy.txt'; Step = '' })
+$z = Export-RoundResult $base @('subject', 'line')
+$got2 = @(Get-ChildItem -LiteralPath $z.Dir -File | ForEach-Object { $_.Name })
+Assert-Case 'collect: a copy with blank lines above the hash line is not copied' (-not ($got2 -contains 'T22-SAMPLE-T22-feedback-r4.txt'))
+Assert-Case 'collect: an exact-name bundle copy is not copied' (-not ($got2 -contains 'exact-copy.txt'))
+Assert-Case 'collect: the bundle copy has its SKIPPED line' (@($script:runLog | Where-Object { $_ -eq 'SKIPPED script file SAMPLE-T22-feedback-r2.txt (scripts never go in results)' }).Count -eq 1)
 Write-Host ('RESUME-UNIT pass=' + $script:pass + ' fail=' + $script:fail)
