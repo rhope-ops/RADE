@@ -62,9 +62,9 @@ $ui.ToolResult = {
 # Restore, card 1 (view restpick): the backups on this computer, newest first, one row each. A site that is not a test
 # site, or no backup, goes straight to the result card. Takes nothing.
 $ui.VRestorePick = {
-  $bp = Get-BasePath; $siteCheck = Test-RestoreSite $bp
+  $appPath = Get-BasePath; $siteCheck = Test-RestoreSite $appPath
   if (-not $siteCheck.Ok) { & $ui.ToolResult 'Restore' @{ State = 'refused'; Path = ''; Lines = $siteCheck.Lines }; return }
-  $ui.RestoreSets = @(Get-BackupSet $bp)
+  $ui.RestoreSets = @(Get-BackupSet $appPath)
   if (-not $ui.RestoreSets.Count) { & $ui.ToolResult 'Restore' @{ State = 'none'; Path = ''; Lines = @('There is no backup of this app on this computer.', 'Select "Back up" first.') }; return }
   $rows = @(for ($k = 0; $k -lt $ui.RestoreSets.Count; $k++) { $set = $ui.RestoreSets[$k]
       @{ Index = $k; Name = $set.Name; Ver = ''; Sub = ([string]$set.Lists + ' of ' + @($script:app.Backup).Count + ' lists'); R1 = $(if ($k -eq 0) { 'Newest' } else { '' }) } })
@@ -104,8 +104,8 @@ $ui.VRestoreConfirm = {
   if (-not $dry.Missing) { & $ui.SetCard @{ View = 'restconfirm'; Kicker = [string]$ui.Kick.Text; Sentence = 'Nothing to restore.'
       P = @($lines | Select-Object -First 1); Lines = @($lines | Select-Object -Skip 1)
       Buttons = @(@{ Text = 'Done'; Kind = 'primary'; Act = { & $ui.VTools $ui.MaintVerb } }); Back = { & $ui.VRestorePick } }; return }
-  $pz = $script:app.Restore.Pause
-  $flow = $(if ($pz) { "RADE turns the app's pause switch on while it writes, then puts it back." } else { 'This app names no pause switch: its flows keep running while rows come back.' })
+  $pauseDef = $script:app.Restore.Pause
+  $flow = $(if ($pauseDef) { "RADE turns the app's pause switch on while it writes, then puts it back." } else { 'This app names no pause switch: its flows keep running while rows come back.' })
   & $ui.SetCard @{ View = 'restconfirm'; Light = 'you'; Kicker = [string]$ui.Kick.Text; Sentence = ('Put back ' + $dry.Missing + ' rows on the site?')
     P = @($lines[0], ('RADE first saves a fresh backup. Rows on the lists now are not changed. ' + $flow)); Lines = @($lines | Select-Object -Skip 1)
     Field = @{ Label = ('Type ' + $script:app.Name + ' to confirm'); Text = ''; Name = 'The app name, to confirm Restore' }; Focus = 'field'

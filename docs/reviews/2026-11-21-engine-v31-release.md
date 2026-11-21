@@ -32,3 +32,4 @@ Not proven before R41 (cloud tests use a fake SharePoint): PnP on Windows PowerS
 
 Known limits: do not close RADE while Restore runs (the pause switch would stay on; the next Restore stops with "on already"; set it back by hand). The Recycle Bin read stops at 5,000 items.
 If the dry run says rows are "left out: an earlier Restore wrote them but did not confirm it", check that list by hand. Run Restore from the same account and computer folder each time (its record of re-made rows is in the app folder).
+A row left out for a hand check stays left out in later dry runs (its mark is kept on purpose).

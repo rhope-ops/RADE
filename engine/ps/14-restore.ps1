@@ -22,7 +22,7 @@ $restoreScript = @'
 param([string]$Site, [string]$Folder, [string]$Lists, [string]$Mode, [string]$Expect, [string]$Pause, [string]$MapFile)
 # RADE Restore: missing rows only. Mode plan reads the site and writes nothing; mode write puts the missing rows back.
 # Output: PLAN, BIN, PAUSE, DONE, RESUME and RESULT lines with numbers, error types and a short hash only.
-Remove-TypeData -TypeName System.Array -ErrorAction SilentlyContinue
+Remove-TypeData -TypeName System.Array -ErrorAction SilentlyContinue   # Windows PowerShell 5.1 writes an array as {value, Count} while it is loaded; absent elsewhere
 $PageSize = 500         # rows a read asks for at once: under the SharePoint list view threshold of 5,000
 $BinRowLimit = 5000     # Recycle Bin items read at most (docs/engine.md "Maintenance run types", limits)
 $SigBytes = 6           # bytes of the SHA-256 kept as the dry-run hash of a list (12 hex characters)
@@ -51,8 +51,8 @@ function Get-Root($Groups, [int]$Id) { if (-not $Groups.P.ContainsKey($Id)) { re
 function Join-Ids($Groups, [int]$First, [int]$Second) {
   foreach ($id in $First, $Second) { if (-not $Groups.P.ContainsKey($id)) { $Groups.P[$id] = $id
       $Groups.M[$id] = New-Object 'System.Collections.Generic.List[int]'; $Groups.M[$id].Add($id) } }
-  $ra = Get-Root $Groups $First; $rb = Get-Root $Groups $Second
-  if ($ra -ne $rb) { $Groups.P[$rb] = $ra; $Groups.M[$ra].AddRange($Groups.M[$rb]); $Groups.M.Remove($rb) } }
+  $rootA = Get-Root $Groups $First; $rootB = Get-Root $Groups $Second
+  if ($rootA -ne $rootB) { $Groups.P[$rootB] = $rootA; $Groups.M[$rootA].AddRange($Groups.M[$rootB]); $Groups.M.Remove($rootB) } }
 # The IDs of the row that an ID is one of. Takes the groups and the ID; gives back ints.
 function Get-Group($Groups, [int]$Id) { if (-not $Groups.P.ContainsKey($Id)) { return @($Id) }; return @($Groups.M[(Get-Root $Groups $Id)]) }
 # The ID under which a row is on the list now (any ID of its group), or $null. Takes the list's state and the ID.
@@ -155,6 +155,7 @@ function Read-RestoreList([int]$Number, [string]$Name) {
     $state.Unsure = @($gone | Where-Object { Test-Pending $state ([int]$_.ID) }).Count   # not put back: a hand check
     $state.Missing = @($gone | Where-Object { -not (Test-Pending $state ([int]$_.ID)) })
     $state.After = @($have.Keys | Where-Object { -not $known.ContainsKey($_) }).Count
+    $state.Before = $have.Count   # the rows on the list when this run read it: the base of the count check after the write
     return $state
   } catch { 'PLAN ' + $Number + ' failed ' + $_.Exception.GetType().Name; return $null }
 }
@@ -239,11 +240,13 @@ function Add-MissingRows($State) {
   foreach ($row in @($State.Missing | Sort-Object { [int]$_.ID })) {
     if ($null -ne (Get-OnList $State ([int]$row.ID))) { continue }   # back from the Recycle Bin, or another saved ID of the same row was made
     $values = @{}
-    foreach ($field in $State.Fields) { $prop = $row.PSObject.Properties[$field.InternalName]; if (-not $prop) { continue }
-      $value = ConvertTo-WriteValue $field $prop.Value $info; if ($null -ne $value) { $values[$field.InternalName] = $value } }
+    try { foreach ($field in $State.Fields) { $prop = $row.PSObject.Properties[$field.InternalName]; if (-not $prop) { continue }
+        $value = ConvertTo-WriteValue $field $prop.Value $info; if ($null -ne $value) { $values[$field.InternalName] = $value } } }
+    catch { $State.Failed++; continue }   # a saved value that cannot be read (a bad date): this row is not written, no mark, the next rows go on
     $mark = 'p' + [int]$row.ID
     try { $State.Links += $mark; Save-RestoreRecord } catch { $script:mapStop = $true; break }
-    try { $script:made = $null; $null = & { $script:made = Add-PnPListItem -List $State.Name -Values $values -ErrorAction Stop } *>&1; $newId = [int]$script:made.Id }
+    try { $script:made = $null; $null = & { $script:made = Add-PnPListItem -List $State.Name -Values $values -ErrorAction Stop } *>&1; $newId = [int]$script:made.Id
+      if ($newId -le 0) { throw 'no ID' } }   # no ID back: the write is not confirmed, so the mark stays
     catch { $State.Failed++; continue }   # the mark stays: the row may be on the list; the next runs leave it for a hand check
     $State.Have[$newId] = $true; Join-Ids $State.Groups ([int]$row.ID) $newId; $State.Made++
     $State.Links = @(@($State.Links | Where-Object { $_ -ne $mark }) + @([string]$row.ID + '-' + $newId))
@@ -275,7 +278,8 @@ try {
     if (-not ($script:stopMake -or $script:mapStop)) { Add-MissingRows $state } }   # a list not read again, or a record not saved: no new row
   # R7 (counts only): the rows on each list after the write.
   foreach ($k in $keys) { $state = $info.Lists[$k]; $count = -1; try { $count = (Read-ListIds $state.Name).Count } catch { $count = -1 }   # -1: not read
-    'DONE ' + $k + ' bin=' + $state.FromBin + ' made=' + $state.Made + ' failed=' + $state.Failed + ' binfailed=' + $state.BinFailed + ' unlinked=' + $state.Unlinked + ' now=' + $count }
+    'DONE ' + $k + ' before=' + $state.Before + ' bin=' + $state.FromBin + ' made=' + $state.Made +
+      ' failed=' + $state.Failed + ' binfailed=' + $state.BinFailed + ' unlinked=' + $state.Unlinked + ' now=' + $count }
 } finally {
   if ($pauseSwitch) { $back = @{ $pauseSwitch.Field = $pauseSwitch.Old }
     try { $null = & { Set-PnPListItem -List $pauseSwitch.List -Identity $pauseSwitch.Row.Id -Values $back -ErrorAction Stop } *>&1; 'RESUME ok' }
@@ -317,12 +321,12 @@ The RADE app folder.
 @{ Ok; Site; Lines }: Ok is $true when Restore may run; Lines say why not.
 #>
 function Test-RestoreSite([string]$Base) {
-  $rs = $script:app.Restore
-  if (-not $rs) { return @{ Ok = $false; Site = ''; Lines = @(($script:app.Name + ' does not use Restore in this version.'), 'Nothing was changed.') } }
+  $restoreDef = $script:app.Restore
+  if (-not $restoreDef) { return @{ Ok = $false; Site = ''; Lines = @(($script:app.Name + ' does not use Restore in this version.'), 'Nothing was changed.') } }
   $site = Get-SiteUrl $Base
   if (-not (Test-SiteUrl $site)) { return @{ Ok = $false; Site = ''; Lines = @('No site address is saved, so Restore did not sign in.', 'Select "Repair": its checks ask for the site address.') } }
   $name = $site.Substring($sitePrefix.Length).TrimEnd('/')
-  if (@($rs.TestSites | Where-Object { [string]$_ -eq $name }).Count) { return @{ Ok = $true; Site = $site; Lines = @() } }
+  if (@($restoreDef.TestSites | Where-Object { [string]$_ -eq $name }).Count) { return @{ Ok = $true; Site = $site; Lines = @() } }
   return @{ Ok = $false; Site = $site; Lines = @('Restore runs only on a test site that the app names. The saved site is not one.', 'Nothing was changed.') }
 }
 
@@ -372,18 +376,18 @@ function Invoke-RestorePlan([string]$Base, [string]$Dir, [scriptblock]$Tick) {
   $res = ''; foreach ($line in $child.Lines) { if ($line -match '^RESULT (\S+)') { $res = $Matches[1] } elseif ($line -eq 'MAP failed') { $res = 'map' } }
   $stop = $(if ($res -eq 'map') { "the record of an earlier Restore on this site (Backups\~restore-map-*.json) could not be read" } else { Get-ChildStopText $res $child.Why })
   if ($res -ne 'plan') { return @{ State = 'failed'; Plan = @{}; Expect = ''; Missing = 0; Lines = @(('The dry run did not finish: ' + $stop + '.'), 'Nothing was changed.') } }
-  $plan = Read-RestorePlan $child.Lines; $lines = @(); $exp = @(); $tot = 0; $nb = 0; $nn = 0
+  $plan = Read-RestorePlan $child.Lines; $lines = @(); $exp = @(); $tot = 0; $fromBinTotal = 0; $newTotal = 0
   for ($i = 1; $i -le $lists.Count; $i++) {
     $listName = [string]$lists[$i - 1]; $item = $plan[$i]
     if (-not $item) { $lines += ('NOTE: "' + $listName + '": no result'); continue }
     if ($item.Error) { $why = $(switch -regex ($item.Error) { '^nofile' { 'this backup has no file for it' } '^nolist' { 'the list is not on the site (Restore does not make lists)' }
           default { 'it could not be read (' + ($item.Error -replace '^failed ', '') + ')' } })
       $lines += ('NOTE: "' + $listName + '" is left out: ' + $why); continue }
-    $exp += ([string]$i + ':' + $item.Sig); $tot += $item.Missing; $nb += $item.Bin; $nn += $item.New
+    $exp += ([string]$i + ':' + $item.Sig); $tot += $item.Missing; $fromBinTotal += $item.Bin; $newTotal += $item.New
     $lines += ('"' + $listName + '": ' + $item.Saved + ' in the backup, ' + $item.Now + ' on the list now. Would put back ' + $item.Missing +
       ' (' + $item.Bin + ' from the Recycle Bin, ' + $item.New + ' as new rows). ' + $item.After + ' made after the backup stay.')
     if ($item.Unsure) { $lines += ('NOTE: "' + $listName + '": ' + $item.Unsure + ' row(s) are left out: an earlier Restore wrote them but did not confirm it. Check the list by hand') } }
-  $head = @(('Dry run: ' + $tot + ' rows would come back (' + $nb + ' from the Recycle Bin, ' + $nn + ' as new rows). Nothing was written.'))
+  $head = @(('Dry run: ' + $tot + ' rows would come back (' + $fromBinTotal + ' from the Recycle Bin, ' + $newTotal + ' as new rows). Nothing was written.'))
   if (@($child.Lines | Where-Object { $_ -like 'BIN failed*' }).Count) { $head += 'NOTE: the Recycle Bin could not be read, so every missing row would come back as a new row (a new ID).' }
   return @{ State = 'plan'; Plan = $plan; Expect = ($exp -join ','); Missing = $tot; Lines = @($head + $lines) }
 }
@@ -429,10 +433,11 @@ function Invoke-Restore([string]$Base, [string]$Dir, $Plan, [scriptblock]$Tick) 
   for ($i = 1; $i -le $lists.Count; $i++) {
     $listName = [string]$lists[$i - 1]; $doneText = [string]$done[$i]; $item = $Plan.Plan[$i]
     if (-not $item -or $item.Error) { continue }
-    if ($doneText -notmatch '^bin=(\d+) made=(\d+) failed=(\d+) binfailed=(\d+) unlinked=(\d+) now=(-?\d+)$') {
+    if ($doneText -notmatch '^before=(\d+) bin=(\d+) made=(\d+) failed=(\d+) binfailed=(\d+) unlinked=(\d+) now=(-?\d+)$') {
       $bad++; $lines += ('FINDING: "' + $listName + '": no result. What to do: compare the list with the backup'); continue }
-    $fromBin = [int]$Matches[1]; $made = [int]$Matches[2]; $notConfirmed = [int]$Matches[3]; $unlinkedCount = [int]$Matches[5]; $now = [int]$Matches[6]; $back += $fromBin + $made
-    $want = $item.Now + $fromBin + $made; $ok = ($notConfirmed -eq 0 -and $now -eq $want)
+    $before = [int]$Matches[1]; $fromBin = [int]$Matches[2]; $made = [int]$Matches[3]; $notConfirmed = [int]$Matches[4]; $unlinkedCount = [int]$Matches[6]; $now = [int]$Matches[7]
+    $back += $fromBin + $made
+    $want = $before + $fromBin + $made; $ok = ($notConfirmed -eq 0 -and $now -eq $want)
     $txt = '"' + $listName + '": ' + $fromBin + ' back from the Recycle Bin, ' + $made + ' made new; ' + $now + ' rows on the list now'
     if ($unlinkedCount) { $txt += '; ' + $unlinkedCount + ' lookup value(s) left empty (the row they pointed to is not there)' }
     if ($ok) { $lines += ('PASS: ' + $txt); continue }

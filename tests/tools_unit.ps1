@@ -245,6 +245,21 @@ $p1 = @((Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json).it
 Assert-Case 'restore: a record that cannot be saved stops before the row' ($pl.Missing -eq 1 -and $w.State -eq 'failed' -and $p1.Count -eq 0 -and
   ($w.Lines -join ' ') -like '*record of re-made rows could not be saved*')
 Remove-Item -LiteralPath $blk -Recurse -Force
+# A saved value that cannot be read (a bad date): that row is not written and gets no mark; a row added on the site
+# between the dry run and the write gives no false finding (the count check starts from the write's own read).
+$b3 = $b.Path + '-bad'; Copy-Item -LiteralPath $b.Path -Destination $b3 -Recurse
+$pj = Join-Path $b3 'Sample Pubs.json'; $rows = @(Get-Content -LiteralPath $pj -Raw | ConvertFrom-Json)
+foreach ($row in $rows) { if ($row.ID -eq 1) { $row | Add-Member -Force -NotePropertyName Due -NotePropertyValue 'not a date' } }
+ConvertTo-Json -InputObject $rows -Depth 4 | Set-Content -LiteralPath $pj
+$pl = Invoke-RestorePlan $base $b3 $null
+$s = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json; $s.items.'Sample Endorse' = @($s.items.'Sample Endorse') + @(@{ ID = 99; Title = 'E99' })
+$s | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP
+Start-Sleep -Seconds 1; $w = Invoke-Restore $base $b3 $pl $null; $all = $w.Lines -join ' '
+$p1 = @((Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json).items.'Sample Pubs' | Where-Object { $_.Title -eq 'P1' })
+$pl2 = Invoke-RestorePlan $base $b3 $null
+Assert-Case 'restore: a bad saved value skips that row only, with no mark' ($pl.Missing -eq 1 -and $w.State -eq 'failed' -and $p1.Count -eq 0 -and $pl2.Missing -eq 1)
+Assert-Case 'restore: a row added after the dry run gives no false finding' ($all -like '*PASS: "Sample Endorse":*' -and $all -notlike '*FINDING: "Sample Endorse"*')
+Remove-Item -LiteralPath $b3 -Recurse -Force
 # An empty record file stops the dry run (it is never read as "no record").
 $keepMap = Get-Content -LiteralPath $mf -Raw; Set-Content -LiteralPath $mf -Value 'null'; $pl = Invoke-RestorePlan $base $b.Path $null; Set-Content -LiteralPath $mf -Value $keepMap -NoNewline
 Assert-Case 'restore: an empty record stops the dry run' ($pl.State -eq 'failed' -and ($pl.Lines[0]) -like '*could not be read*')
