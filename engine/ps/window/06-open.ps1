@@ -69,7 +69,7 @@ $ui.TourCards = @(
   @{ S = 'The results stay on this computer.'; P = @('RADE writes a report into its results folder. RADE sends nothing.', 'After a test round RADE makes an e-mail draft with the results. You read it, and you send it.') },
   @{ S = 'The Record shows everything.'; P = @('Select "Record" or press F2 to see all checks, steps, files and the log.', 'Select "Help" or press F1 to see this tour again.') })
 # The cards that "Help (F1)" can leave and show again: no step or check runs on them, and none waits inside the engine.
-$ui.HelpViews = @('choose', 'maint', 'tools', 'toolres', 'restpick', 'restconfirm', 'site', 'fail', 'need', 'ready', 'nodrive', 'done', 'review', 'stopped', 'noapps', 'booterr')
+$ui.HelpViews = @('choose', 'maint', 'tools', 'toolres', 'restmark', 'restpick', 'restconfirm', 'site', 'fail', 'need', 'ready', 'nodrive', 'done', 'review', 'stopped', 'noapps', 'booterr')
 # Shows card $I of the tour (0 = the first). "Next" and "Back" move; "Skip the tour" and the last card's button end it.
 # Takes the card number.
 $ui.VTour = { param([int]$I)

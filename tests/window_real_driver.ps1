@@ -37,6 +37,7 @@ function global:Save-RadeRestore {
   foreach ($d in '20261120-140000', '20261121-090000') { $f = Join-Path $bp ('Backups\' + $d); $null = New-Item -ItemType Directory -Path $f -Force
     Set-Content -LiteralPath (Join-Path $f 'Sample Tasks.json') -Value '[]' }
   $mk = Get-RestoreMarkFile $bp; $keepMark = $(if (Test-Path -LiteralPath $mk) { [System.IO.File]::ReadAllBytes($mk) } else { $null })
+  if ($keepMark) { Remove-Item -LiteralPath $mk -Force }   # no mark, so the mark card shows; put back below
   & $ui.VRestorePick; Save-RadeCard 'restmark'
   $ui.Field.Text = 'not-the-site'; & $ui.RestoreMarkGo; Save-RadeCard 'restmark-wrongname'
   $ui.Field.Text = $nm.ToUpperInvariant(); & $ui.RestoreMarkGo
