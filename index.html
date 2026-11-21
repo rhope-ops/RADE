@@ -79,7 +79,7 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 .band .sub,.band .chan{color:var(--fm-band-muted)}
 /* Done in gold gets a thin edge in the page text colour, so the bar stands out from its track (the Administrator, 2026-11-21:
    gold 1.46:1 against the light track; the edge gives 15:1 against cream). */
-.win[data-done] .bar i{box-shadow:inset 0 0 0 1px var(--fm-page-fg)}
+@media not (forced-colors:active){.win[data-done] .bar i{box-shadow:inset 0 0 0 1px var(--fm-page-fg)}}   /* forced colours: system colours only */
 .about{width:100%;max-width:860px;margin-inline:auto;padding-block:8px 28px}
 /* The README's intro and Summary (scripts/build_site.py writes them from README.md) in a Fulcrum disc: an ink card with a ring, as the logo. */
 .about .disc{background:var(--fm-disc);color:var(--fm-disc-fg);border-radius:14px;padding:22px;box-shadow:inset 0 0 0 5px var(--fm-disc),inset 0 0 0 6px var(--fm-disc-ring)}

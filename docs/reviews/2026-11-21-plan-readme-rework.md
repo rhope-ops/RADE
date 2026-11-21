@@ -19,6 +19,7 @@ Later decisions (the Administrator, 2026-11-21, question dialogs):
 - README intro opens with the AGENTS.md "Purpose" line (the kit "README" default).
 - Both pages use Fulcrum Minimal (the kit's docs/brand/fulcrum.css, as 33-332.Z): ink band, gold rule, cream page, ember button, the README text in an ink disc (previews v2 approved). The RADE window keeps engine/ui-tokens.json for now (open item). "Done" on the RADE page shows in Fulcrum gold.
 - RADE session load over the cap after the sync: move old handoff lines into the handoff detail file.
+- Question dialog (later): merge RADE PR 161; merge 90-161.Z PR 211 when its sweep has no MAJOR; checks job limit 10 minutes through the kit (kit 8.0.0 has it); the gold done bar gets a thin edge in the page text colour.
 
 ## Steps (each needs the one before it)
 
@@ -27,7 +28,7 @@ Later decisions (the Administrator, 2026-11-21, question dialogs):
 | 1 | kit | Attach the kit repo. Make build_site.py general (README marked sections into index.html; --check fails on drift). Release the kit. | C (check.sh) | done: #96 merged a15b34b; tag pending |
 | 2 | RADE | rade_build.py writes a .txt next to each bundle, with tests. Release engine-v34 (engine-v33 was taken by another session's release, 2026-11-21). | B | done: #157 merged fd944c2; release run started |
 | 3 (now, R41 safe) | 90-161.Z | Take engine-v34 and the kit release; rebuild the bundles; tasks to TASKS.md; new README; page preview, then the page. | B, then C | open |
-| 4 (done: PR 161, merge 2289131; live page = main) | RADE | Take the kit release; the apps block links only the .txt; new README; page preview, then the page. | B, then C | open |
+| 4 (done: PR 161, merge 2289131; live page = main) | RADE | Take the kit release; the apps block links only the .txt; new README; page preview, then the page. | B, then C | done |
 | 5 | all | Confirm that main has each commit; report the tags and links. | — | open |
 
 Hold (the Administrator, 2026-11-21: "I don't want my existing round jeopardized by your changes. this is for the next one"): steps 3 and 4 change R41's files, the 90-161.Z page, the RADE page and the RADE README links, so they wait until R41 ends. Step 3's code is kept as a patch in rhope-ops/90-161.Z pull request 211 (docs/reviews/2026-11-21-readme-rework-held.patch). Previews: README v4 and pages v2 (Fulcrum), approved; rebuild them from this plan and the decisions above. Review findings to carry into step 4: none open.
@@ -41,5 +42,3 @@ Hold (the Administrator, 2026-11-21: "I don't want my existing round jeopardized
 Effort: authored by the session; one fresh reviewer per pull request (5). Estimate 4 to 6 hours.
 
 Start now (the Administrator, 2026-11-21, question dialog "Start now, R41 safe"): steps 3 and 4 run now; R41's bundle, hash, script links and copy steps do not change; the .txt link starts with the next round.
-
-Later decisions (the Administrator, 2026-11-21, question dialog): merge RADE PR 161; merge 90-161.Z PR 211 when its sweep has no MAJOR; the checks job limit goes to 10 minutes in the kit (then a sync); the gold done bar gets a thin edge in the page text colour.
