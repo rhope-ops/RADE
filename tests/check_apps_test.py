@@ -48,4 +48,15 @@ with tempfile.TemporaryDirectory() as t:
     (t / 'o.ps1').write_text("'ok'\n")
     assert c.recon_notes(t, m) == [] and c.recon_notes(t / 'none', m) == []
 
-print('CANARY rules ok: %d bad manifest paths, %d bad locks, 1 symbolic link, 1 no-reconnaissance note' % (len(muts), len(bads)))
+    # Fonts an app's build copies from the engine (the Administrator, 2026-11-21): put in from the engine, nothing else.
+    fm = {'bundles': [{'files': [{'src': 'assets/fonts/build/90161Z-OFL.txt'}, {'src': 'assets/fonts/build/90161Z-Nope.ttf'},
+                                 {'src': 'assets/fonts/build/90161Z-Here.ttf'}, {'src': '../fonts/build/X-OFL.txt'}, {'src': 'docs/OFL.txt'}]}]}
+    (t / 'assets/fonts/build').mkdir(parents=True); (t / 'assets/fonts/build/90161Z-Here.ttf').write_bytes(b'app')
+    fake = {'OFL.txt': b'licence', 'Here.ttf': b'engine'}
+    got = c.stage_fonts(t, fm, fake.get)
+    assert got == ['assets/fonts/build/90161Z-OFL.txt'], got
+    assert (t / 'assets/fonts/build/90161Z-OFL.txt').read_bytes() == b'licence' and (t / 'assets/fonts/build/90161Z-Here.ttf').read_bytes() == b'app'
+    assert not (t / 'assets/fonts/build/90161Z-Nope.ttf').exists() and not (t.parent / 'fonts').exists() and not (t / 'docs').exists()
+    assert c.this_font('OFL.txt') and c.this_font('none.ttf') is None and c.this_font('../rade_build.py') is None
+
+print('CANARY rules ok: %d bad manifest paths, %d bad locks, 1 symbolic link, 1 no-reconnaissance note, 1 font put in' % (len(muts), len(bads)))

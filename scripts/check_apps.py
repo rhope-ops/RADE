@@ -8,6 +8,9 @@ For each application in apps.json it makes a fresh, shallow copy of the app repo
 folder (read-only: nothing is pushed, the app repository is never changed, and no RADE checkout of the app is used), then:
   1. checks the app's manifest with scripts/check_manifest.py (the schema in this checkout);
   2. builds every bundle with the engine in this checkout.
+Before a build it puts in the engine's font files that an app's own build copies (stage_fonts: a missing bundle file
+<folder>/fonts/build/<prefix>-<name> gets the engine's engine/fonts/<name>; the Administrator, 2026-11-21: the check
+copies them itself and runs no app code). The locked build gets the files of the locked commit.
 A bundle that builds is also read for the words of the "No reconnaissance" rule (scripts/no_recon.py): NOTE lines only.
 If 1 or 2 fails, it does the same with what the app has locked (its rade.lock.json beside the manifest): the schema at the
 locked commit, and the locked engine, both taken from this repository's history.
@@ -22,7 +25,7 @@ manifest or lock with a path that leaves its folder, is not built (NOTE or FAIL 
 An app repository that cannot be fetched is a FAIL (no skip): the check needs network access to github.com.
 Usage: python3 scripts/check_apps.py     Pass = last line "APPS apps=N fail=0".
 """
-import json, os, shutil, subprocess, sys, tempfile
+import json, os, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -30,6 +33,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 import no_recon   # the word search of the "No reconnaissance" rule (scripts/no_recon.py)
 ENGINE = ROOT / 'engine/rade_build.py'
 SCHEMA = 'schemas/rade-manifest.schema.json'
+FONT_RE = re.compile(r'(?:[A-Za-z0-9_-]+/)*fonts/build/[A-Za-z0-9]+-([A-Za-z0-9][A-Za-z0-9.-]*)')   # a bundle file an app's build copies from engine/fonts
 
 
 def run(cmd, cwd=None):
@@ -109,6 +113,15 @@ def locked_accepts(lock, app_dir, manifest_rel, tmp):
         dest = (home / rel)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(show(commit, rel))
+    def locked_font(name):
+        """The bytes of engine/fonts/<name> at the locked commit, or None (also for a name with a folder in it)."""
+        if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]*', name) or '..' in name:
+            return None
+        try:
+            return show(commit, 'engine/fonts/' + name)
+        except LookupError:
+            return None
+    stage_fonts(app_dir, json.loads((app_dir / manifest_rel).read_text()), locked_font)
     from jsonschema import Draft202012Validator
     try:
         errs = list(Draft202012Validator(json.loads(show(commit, SCHEMA))).iter_errors(json.loads((app_dir / manifest_rel).read_text())))
@@ -118,6 +131,44 @@ def locked_accepts(lock, app_dir, manifest_rel, tmp):
         return 'its manifest does not follow the schema of its own locked engine (%s)' % errs[0].message[:120]
     code, out = run([sys.executable, '-B', str(home / engine), '--app-root', str(app_dir), '--manifest', manifest_rel])
     return '' if code == 0 else 'it does not build with its own locked engine:\n' + tail(out, 3)
+
+
+def stage_fonts(app_dir, manifest, read_font):
+    """Puts in the engine font files that an app's own build copies before it builds (90-161.Z: copy_fonts in its
+    scripts/build_paste_bundles.py); the check runs no app code, so it copies them itself (the Administrator, 2026-11-21).
+
+    Args:
+        app_dir: the app copy (Path).
+        manifest: the app's manifest (dict).
+        read_font: gives the bytes of engine/fonts/<name> of the engine used, or None when it has no such file.
+
+    Returns:
+        The bundle file paths copied. A path that leaves the folder, a file already there and a name the engine does not
+        have are left alone (the build then names the missing file).
+    """
+    copied = []
+    for b in manifest.get('bundles', []):
+        for f in b.get('files', []):
+            src = f.get('src') if isinstance(f, dict) else None
+            m = FONT_RE.fullmatch(src) if isinstance(src, str) and not leaves(src) else None
+            dst = app_dir / src if m else None
+            if not m or dst.exists() or dst.is_symlink():
+                continue
+            data = read_font(m.group(1))
+            if data is None:
+                continue
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_bytes(data)
+            copied.append(src)
+    return copied
+
+
+def this_font(name):
+    """The bytes of engine/fonts/<name> in this checkout, or None (also for a name with a folder in it)."""
+    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]*', name) or '..' in name:
+        return None
+    p = ROOT / 'engine/fonts' / name
+    return p.read_bytes() if p.is_file() else None
 
 
 def recon_notes(app_dir, manifest):
@@ -156,6 +207,7 @@ def check(app, tmp):
     base = tmp / (d.name + '__locked')
     shutil.copytree(d, base)   # the copy for the locked engine, made before this engine writes its bundles
     problems = []
+    fonts = stage_fonts(d, manifest, this_font)
     code, out = run([sys.executable, str(ROOT / 'scripts/check_manifest.py'), str(d / manifest_rel)])
     if code != 0:
         problems.append('scripts/check_manifest.py:\n' + tail(out))
@@ -167,7 +219,8 @@ def check(app, tmp):
     if not problems:
         # A text longer than its limit (docs/window-design.md "Text lengths") is a note for the app's own session, not a FAIL.
         long = sorted(set(l.replace('WARNING text length: ', 'text length: ') for l in out.splitlines() if l.startswith('WARNING text length: ')))
-        return 'ok', ['%d bundle(s) built with this engine' % count] + long + recon_notes(d, manifest)
+        staged = ['%d font file(s) put in from this engine before the build (the app\'s own build copies them)' % len(fonts)] if fonts else []
+        return 'ok', ['%d bundle(s) built with this engine' % count] + staged + long + recon_notes(d, manifest)
     try:
         lock = read_lock(base, manifest_rel)
         if lock is None:
