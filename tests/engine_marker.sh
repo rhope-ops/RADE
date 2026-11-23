@@ -59,7 +59,7 @@ mkround() { # $1 = users root name; runs the marker bundle as the deploy app wit
     echo "https://usaf.dps.mil/sites/fake" > "$t/$1/test1234/OneDrive - United States Air Force/RADE/SampleApp/Config/SAMPLE-site.txt"
   swap "$t/mk/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$t/m-$1.ps1" "$t/$1"
   psrun "$t/m-$1.ps1" "$t/out-$1.txt" $'2\n\n\n\n' RADE_FAKE_PNP="$fake" PSModulePath="$mods" USERPROFILE="$t/$1/test1234"; }
-go MA; {   # group MA: runs in the background (see "go" above)
+go MA; {   # group MA: runs in the background (see "go" in tests/engine_test.sh)
 fake="$t/fake-ma.json"
 echo '{ "admin": false, "rights": true, "list": true, "rows": {} }' > "$fake"; mkround m1
 grep -q "PASSED: You can change the site.*Site collection administrator: no (shown only, not required)" "$t/out-m1.txt" && ok || { bad "rights: admin flag shown, not required";
@@ -93,7 +93,7 @@ psrun "$t/m-m1.ps1" "$t/out-m1b.txt" $'2\n\n\n\n' RADE_FAKE_PNP="$fake" PSModule
 grep -q "FAILED: You can change the site.*\[version 9.9\], made from another account or for another site" "$t/out-m1b.txt" && ok || { bad "marker: the installer is stopped on another site";
   grep "change the site" "$t/out-m1b.txt"; }
 echo "GROUP $pass $fail"; } > "$t/grp-MA.log" 2>&1 &
-go MC; {   # group MC: runs in the background (see "go" above)
+go MC; {   # group MC: runs in the background (see "go" in tests/engine_test.sh)
 fake="$t/fake-mc.json"
 # A row value that is not a version still counts as an install; a list that cannot be read is FAILED.
 echo '{ "admin": false, "rights": true, "list": true, "rows": { "InstalledVersion": "v9.9 someday" } }' > "$fake"; mkround m5
@@ -102,7 +102,7 @@ echo '{ "admin": false, "rights": true, "list": true, "listError": true, "rows":
 grep -q "FAILED: You can change the site.*The install record on the site could not be read" "$t/out-m7.txt" && ok || { bad "marker: an unreadable record fails closed";
   grep "change the site" "$t/out-m7.txt"; }
 echo "GROUP $pass $fail"; } > "$t/grp-MC.log" 2>&1 &
-go MD; {   # group MD: runs in the background (see "go" above)
+go MD; {   # group MD: runs in the background (see "go" in tests/engine_test.sh)
 fake="$t/fake-md.json"
 # A part install (one step skipped) writes the row marked partial; that account's next run is not stopped; the row is then updated.
 echo '{ "admin": false, "rights": true, "list": true, "rows": {} }' > "$fake"
@@ -152,7 +152,7 @@ assert all(f.name == hashlib.sha256(k.lower().encode()).hexdigest()[:12] + '.jso
 assert not any('usaf.dps.mil' in r for r in raw)
 P
 echo "GROUP $pass $fail"; } > "$t/grp-MD.log" 2>&1 &
-go MG; {   # group MG: runs in the background (see "go" above)
+go MG; {   # group MG: runs in the background (see "go" in tests/engine_test.sh)
 fake="$t/fake-mg.json"
 # The site row is not written when the account's own record cannot be saved (it would stop that account's next run).
 echo '{ "admin": false, "rights": true, "list": true, "listError": false, "rows": {} }' > "$fake"
@@ -172,7 +172,7 @@ for x in e: print('  schema:', '/'.join(str(p) for p in x.path), x.message[:160]
 sys.exit(1 if e else 0)
 P
 }
-go X; {   # group X: runs in the background (see "go" above)
+go X; {   # group X: runs in the background (see "go" in tests/engine_test.sh)
 # Cross-version: the engine in the field (engine-v1) and this engine on one computer. Run this engine, then v1, then this
 # engine. The two keep their records in different files, so the first check shows that v1 really ran a deploy on the same
 # folder and left this engine's file alone; the second can fail: this engine reads the saved checks that v1 wrote.
