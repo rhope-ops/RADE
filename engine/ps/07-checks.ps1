@@ -109,7 +109,7 @@ How long to wait for the answer, in milliseconds.
 The request object (System.Net.WebRequest).
 #>
 function Get-WebRequest([string]$Url, [int]$TimeoutMs) {
-  Set-RadeTls
+  Use-TlsFloor
   $rq = [System.Net.WebRequest]::Create($Url)
   $rq.Timeout = $TimeoutMs
   try { $rq.UserAgent = $webAgent } catch { $null = $_ }   # a file address (tests) has no user agent

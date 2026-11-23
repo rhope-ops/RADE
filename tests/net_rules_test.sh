@@ -41,8 +41,8 @@ P
 [ "$(pwsh -NoProfile -File "$t/portal.ps1" 2>&1)" = "PORTALOK" ] || { echo "FAIL Get-FlowPortal uses or hides a saved address on another host"; fail=1; }
 # Get-WebRequest, run: the request it gives back has the sign-in off and no credentials for the address, and carries the
 # user agent and the timeout. Nothing is sent (the request is only made, never started).
-# Set-RadeTls (engine/ps/03-files.ps1; fleet v2) is copied too: after it, TLS 1.2 is on and SSL 3, TLS 1.0 and 1.1 are off.
-{ awk '/^function Set-RadeTls/{on=1} on{print} on&&/^}/{exit}' engine/ps/03-files.ps1; awk '/^function Get-WebRequest/{on=1} on{print} on&&/^}/{exit}' "$src"; cat <<'P'
+# Use-TlsFloor (engine/ps/03-files.ps1; fleet v2) is copied too: after it, TLS 1.2 is on and SSL 3, TLS 1.0 and 1.1 are off.
+{ awk '/^function Use-TlsFloor/{on=1} on{print} on&&/^}/{exit}' engine/ps/03-files.ps1; awk '/^function Get-WebRequest/{on=1} on{print} on&&/^}/{exit}' "$src"; cat <<'P'
 $webAgent = 'agent-of-the-test'
 $r = Get-WebRequest 'https://example.invalid/x' 4321
 $p = [Net.ServicePointManager]::SecurityProtocol
