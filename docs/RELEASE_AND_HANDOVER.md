@@ -69,8 +69,9 @@ In these steps, "you" is the person who decides now. The repository belongs to t
 5. On the page **Collaborators**, reload the page. Wait until the account of the new person shows without the text **Pending invite**. After 7 days with no change, the invitation ends: a new invitation is necessary.
 6. In your Google Drive, open the master denylist file. It holds the names that the content check blocks. You see the file. Go on.
 7. Share the file with the Google e-mail address that you wrote down, with the role **Viewer**. You see that address in the sharing list of the file. Do not put the file in the repository or in a chat with an agent. Go on.
-8. On GitHub, open `https://github.com/rhope-ops/RADE/pulls?q=is%3Amerged`. You see the merged pull requests. The title of an engine pull request starts with `engine-v`. Go on.
-9. Wait until a new engine pull request shows on that page. This can take days or weeks. Do not change your access until then.
-10. Let the new person do all the steps under the heading "Make an engine release" while you watch. You see their run on the page of the workflow **release**. Wait until the run stops.
-11. If their run shows a green check mark, the new person can make releases. You see the new release on the page **Releases**. The task is complete.
-12. If their run shows a red cross, the new person sends the `FAIL` line in the Teams channel **RHOPE-OPS**. You see their message. The task is complete.
+8. In Microsoft Teams, add the new person to the channel **RHOPE-OPS**. You see their name in the member list of the channel. Go on.
+9. On GitHub, open `https://github.com/rhope-ops/RADE/pulls?q=is%3Amerged`. You see the merged pull requests, the newest at the top. The title of an engine pull request starts with `engine-v`. Write down the number (`#` and digits) of the newest engine pull request.
+10. Wait until an engine pull request with a number above the one you wrote down shows there. This can take days or weeks. Do not change your access until then.
+11. Let the new person do all the steps under the heading "Make an engine release" while you watch. You see their run on the page of the workflow **release**. Wait until the run stops.
+12. If their run shows a green check mark, the new person can make releases. You see the new release on the page **Releases**. The task is complete.
+13. If their run shows a red cross, the new person sends the `FAIL` line in the Teams channel **RHOPE-OPS**. You see their message. The task is complete.
