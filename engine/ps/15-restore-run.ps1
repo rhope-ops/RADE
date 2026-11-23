@@ -1,7 +1,7 @@
 # RADE engine part 15, the Maintenance tool Restore, the functions the window and the text mode call (moved out of
 # engine/ps/14-restore.ps1 to keep each file at 450 lines or fewer; fleet v2 DEC 6): the backups Restore can use, the
 # local test-site mark, the dry run and the write. Part 14 holds the child script ($restoreScript) these functions run.
-# Uses parts 01 to 08, 13 and 14 (Get-SiteUrl, Test-SiteUrl, Get-SiteMark, Invoke-ChildScript, Get-BackupFileName,
+# Uses parts 01 to 08, 13, 14 and 16 (Get-SiteUrl, Test-SiteUrl, Get-SiteMark, Invoke-ChildScript, Get-BackupFileName,
 # $restoreScript, $restoreWriteSeconds, $backupSetMax).
 # Network: through the child script of part 14 only (the saved site; AGENTS.md "No reconnaissance").
 # Writes: through the child script of part 14 (site rows, after the typed confirm); on the computer, a fresh backup,

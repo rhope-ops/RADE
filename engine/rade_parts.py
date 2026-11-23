@@ -24,7 +24,7 @@ WINDOW_FILE = ENGINE_ROOT / 'engine/window.json'   # the window's layout values 
 # kept 4 spaces less indented than in the bundle and go where engine/ps/10-window.ps1 has its "# @@WINDOW@@" line.
 ENGINE_DIR = ENGINE_ROOT / 'engine/ps'
 ENGINE_PARTS = ['01-base.ps1', '02-config.ps1', '03-files.ps1', '04-steps.ps1', '05-installed.ps1', '06-round.ps1', '12-resume.ps1',
-                '07-checks.ps1', '08-saved-checks.ps1', '13-maintenance.ps1', '14-restore.ps1', '15-restore-run.ps1', '09-start.ps1', '10-window.ps1', '11-text-mode.ps1']
+                '07-checks.ps1', '16-site-scripts.ps1', '08-saved-checks.ps1', '13-maintenance.ps1', '14-restore.ps1', '15-restore-run.ps1', '09-start.ps1', '10-window.ps1', '11-text-mode.ps1']
 WINDOW_PARTS = ['window/01-setup.ps1', 'window/02-fixed-parts.ps1', 'window/03-card.ps1', 'window/04-record-parts.ps1',
                 'window/05-alignment.ps1', 'window/06-open.ps1', 'window/07-run.ps1', 'window/08-hand-step.ps1',
                 'window/09-record.ps1', 'window/11-tools.ps1', 'window/10-keys.ps1']   # 11-tools before 10-keys: the keys part shows the form

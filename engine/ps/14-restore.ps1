@@ -3,7 +3,7 @@
 # Puts back the rows of a backup that are missing from their list, on a test site only: a dry run with counts first,
 # then (after the user types the app name) a fresh backup, the pause switch, the Recycle Bin, then new rows with lookups
 # re-pointed. A row that is on the list is never changed, and no row is made twice.
-# Uses parts 01 to 08 and 13 (Get-SiteUrl, Test-SiteUrl, Get-SiteMark, Invoke-ChildScript, Invoke-Backup,
+# Uses parts 01 to 08, 13 and 16 (Get-SiteUrl, Test-SiteUrl, Get-SiteMark, Invoke-ChildScript, Invoke-Backup,
 # Get-BackupFileName, ConvertTo-Masked).
 # Network: signs in to the saved site and reads only the lists the manifest names ("backup"), their fields and the
 # site's Recycle Bin (AGENTS.md "No reconnaissance").
@@ -300,4 +300,4 @@ if ($script:mapStop) { 'RESULT map-write-failed'; exit 8 }
 if ($script:stopMake) { 'RESULT reread-failed'; exit 7 }
 'RESULT done'; exit 0
 '@
-$restoreScript = Add-SignInSize $restoreScript   # E3: the sign-in window size block (07-checks.ps1)
+$restoreScript = Add-SignInSize $restoreScript   # E3: the sign-in window size block (16-site-scripts.ps1)
