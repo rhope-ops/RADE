@@ -77,7 +77,9 @@ $ui.WindowLine = { $w = $(if ($ui.OkBox.Checked) { 'Window: OK' } else { 'Window
 $ui.StartApp = {
   # The installed app opens from its local copy in its own powershell.exe process; then RADE closes.
   $p = Get-StartPath; if (-not $p) { & $ui.Say1 'The start file of this application was not found. Select "Install" to put it back.'; return }
-  try { $pr = Start-Process -FilePath (Get-PowerShellExe) -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -STA -File "' + $p + '"') -WorkingDirectory (Split-Path -Parent $p) -PassThru
+  # No -ExecutionPolicy setting (DEC 3): drop only a "Bypass" handed down by an old RADE shortcut (RADE closes after this)
+  if ($env:PSExecutionPolicyPreference -ceq 'Bypass') { Remove-Item -LiteralPath 'Env:PSExecutionPolicyPreference' -ErrorAction SilentlyContinue }
+  try { $pr = Start-Process -FilePath (Get-PowerShellExe) -ArgumentList ('-NoProfile -STA -File "' + $p + '"') -WorkingDirectory (Split-Path -Parent $p) -PassThru
     if ($pr) { $null = $pr.Handle }   # Windows PowerShell 5.1 keeps the exit code only when the handle is held
     # A start script that a policy blocks or that fails at once ends within a moment: say so and keep RADE open.
     if ($pr -and $pr.WaitForExit(2500) -and $pr.ExitCode -ne 0) { & $ui.Say1 ('The application stopped as soon as it started (exit code ' + $pr.ExitCode + '). Ask in the Teams channel.'); return }

@@ -22,7 +22,7 @@ assert len(steps) == 3 and steps[0].startswith('1. ') and 'File > New' in steps[
 assert not any('<' in s or '&gt;' in s for s in steps), steps
 try:
     b.page_steps('no list here')
-    raise AssertionError('a page with no STEPS list must fail')
+    raise AssertionError('a page with no steps() list must fail')
 except RuntimeError:
     pass
 
@@ -61,5 +61,13 @@ for t, stored in [(body, {'sha256': h}), (text + 'x', {'sha256': h}), (text, {'s
 doc = 'top\n%s\nold\n%s\nend\n' % (b.MARK_A, b.MARK_B)
 assert b.spliced(doc, 'new') == 'top\n%s\nnew\n%s\nend\n' % (b.MARK_A, b.MARK_B)
 assert b.spliced('top\nend\n', 'new') is None and b.spliced('%s\n%s' % (b.MARK_B, b.MARK_A), 'x') is None
+
+# 5. Fetch reads https only (fleet v2): a file:, http: or ftp: address is refused before any request.
+for u in ['file:///etc/hostname', 'http://example.invalid/x', 'ftp://example.invalid/x', 'HTTPS-no-colon']:
+    try:
+        b.fetch(u)
+        raise AssertionError('must refuse: %s' % u)
+    except RuntimeError as e:
+        assert 'only https' in str(e), e
 
 print('README rules ok')

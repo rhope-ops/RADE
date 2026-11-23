@@ -105,7 +105,7 @@ function Save-CheckCache($Results, [string]$Base, [string]$Site) {
 Writes each check of this run, with its result and its detail, to the file RADE\Config\rade-checks-last.txt.
 .DESCRIPTION
 The Administrator, 2026-11-18: a round's report and e-mail hold the check counts and only the detail of a check that did
-not pass, so a detail such as "without Bypass [ran]" was only in the window's Record. This file holds every detail and
+not pass, so a detail such as the child check's policy scopes was only in the window's Record. This file holds every detail and
 is not sent: it is in RADE\Config (the user's OneDrive), not in the results folder, so no e-mail draft attaches it (the detail of the child check
 names an execution policy, a setting of this computer). The newest run replaces it. Never an error: it is a convenience.
 .PARAMETER Results

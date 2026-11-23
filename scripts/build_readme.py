@@ -25,6 +25,7 @@ import json
 import pathlib
 import re
 import sys
+import urllib.parse
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -37,7 +38,21 @@ HASH_LINE = re.compile(r'^\s*# @@BUNDLE-HASH ([0-9a-f]{64}) @@\n')   # the same 
 
 
 def fetch(url):
-    """Return the text at an https URL (UTF-8), or raise an error that names the URL."""
+    """Return the text at an https URL (UTF-8), or raise an error that names the URL.
+
+    Only https is read (fleet v2): a file:, ftp: or http: address raises before any request (bandit B310).
+
+    Args:
+        url: the address to read; it must start with https://.
+
+    Returns:
+        The text of the answer, decoded as UTF-8.
+
+    Raises:
+        RuntimeError: the address is not https, or the request or the decoding failed.
+    """
+    if urllib.parse.urlsplit(url).scheme != 'https':
+        raise RuntimeError('%s did not load: only https addresses are read' % url)
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers={'Cache-Control': 'no-cache'}), timeout=60) as r:
             return r.read().decode('utf-8')
@@ -74,14 +89,15 @@ def page_steps(page):
         page: the text of index.html.
 
     Returns:
-        One "1. ..." line for each <li> of the page's STEPS list, with the HTML entities written as plain characters.
+        One "1. ..." line for each h('li',null,'...') item of the page's steps() list (safe DOM, fleet v2: plain
+        text in single quotes), with any HTML entity written as a plain character.
     """
-    m = re.search(r"var STEPS='(.*?)';", page, re.S)
+    m = re.search(r"function steps\(\)\{return h\('ol',null,(.*?)\)\}", page, re.S)
     if not m:
-        raise RuntimeError('index.html has no STEPS list')
-    items = re.findall(r'<li>(.*?)</li>', m.group(1).replace("'+\n  '", '').replace("'+'", ''), re.S)
+        raise RuntimeError('index.html has no steps() list')
+    items = [t.replace("\\'", "'") for t in re.findall(r"h\('li',null,'((?:[^'\\]|\\.)*)'\)", m.group(1))]
     if not items:
-        raise RuntimeError('the STEPS list of index.html has no <li> items')
+        raise RuntimeError('the steps() list of index.html has no li items')
     return ['%d. %s' % (i + 1, html.unescape(t)) for i, t in enumerate(items)]
 
 

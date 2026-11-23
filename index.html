@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>RADE</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1xNS9y9iWJ1jcP0MdL0vv9VJfx98UyOIbAqFsUHx1M8='; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://raw.githubusercontent.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e141c" media="(prefers-color-scheme: dark)">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png" media="(prefers-color-scheme:light)">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png" media="(prefers-color-scheme:dark)">
-<link rel="stylesheet" href="docs/brand/fulcrum.css">
 <style>
 /* Layout: the RADE window as a page ("One thing", docs/window-design.md): the band
    (the header of the 90-161.Z page: navy to blue, a yellow line under it; the logo, RADE with the tagline under it, and
@@ -69,27 +72,27 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 .bar i{display:block;height:100%;width:0;background:var(--fill,var(--action));transition:width .25s linear}
 .win[data-done] .bar i{background:var(--pass)}
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
-/* Page palette: Fulcrum Minimal (the Administrator, 2026-11-21: "the color palettes need to match Fulcrum"), the kit roles in
-   docs/brand/fulcrum.css; the window keeps engine/ui-tokens.json. Done shows in Fulcrum gold (the Administrator, 2026-11-21). */
-/* Off in forced colours (the system colours win); in more contrast, muted text, edges and the track move to the text
-   colour, as the contrast block below does for the old palette. */
-@media not (forced-colors:active){:root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--bg:var(--fm-page);--navy:var(--fm-page-fg);--text:var(--fm-page-fg);--gray:var(--fm-page-muted);--action:var(--fm-accent);--action-fg:var(--fm-on-accent);--link:var(--fm-page-link);--turn:var(--fm-rule);--fail:var(--fm-page-error);--edge:var(--fm-slate);--track:var(--fm-page-line);--btn:var(--fm-page);--pass:var(--fm-gold)}
-@media (prefers-contrast:more){:root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--gray:var(--fm-page-fg);--edge:var(--fm-page-fg);--track:var(--bg)}}}
-.band{background:var(--fm-band);border-bottom-color:var(--fm-rule)}
-.band .sub,.band .chan{color:var(--fm-band-muted)}
-/* Done in gold gets a thin edge in the page text colour, so the bar stands out from its track (the Administrator, 2026-11-21:
-   gold 1.46:1 against the light track; the edge gives 15:1 against cream). */
-@media not (forced-colors:active){.win[data-done] .bar i{box-shadow:inset 0 0 0 1px var(--fm-page-fg)}}   /* forced colours: system colours only */
+/* Page palette: Option A (fleet v2 DEC 5, 2026-11-23; the Fulcrum mapping of 2026-11-21 is gone): the tokens above.
+   --control: the 1 px edge of the bar track (WCAG 1.4.11: 3:1 or more against the page); --warn: the 1 px edge under the
+   yellow line of the band (the yellow alone is 1.4:1 on a white page). tests/page_test.py computes each ratio. */
+:root{--control:#6c7b8e;--warn:#8a5a00}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--control:#8794a6;--warn:#f2c14e}}
+:root[data-theme="dark"]{--control:#8794a6;--warn:#f2c14e}
+@media not (forced-colors:active){.bar{box-shadow:inset 0 1px 0 var(--control)}.band{box-shadow:0 1px 0 var(--warn)}}
+a{color:var(--link)}
+/* Skip link (WCAG 2.4.1): the first stop of the Tab key; shown only while it has the focus. */
+.skip-link{position:absolute;left:16px;top:-60px;z-index:2;padding:8px 12px;background:var(--bg);color:var(--link);border:2px solid var(--navy)}
+.skip-link:focus{top:8px}
 .about{width:100%;max-width:860px;margin-inline:auto;padding-block:8px 28px}
 /* The README's intro and Summary (scripts/build_site.py writes them from README.md) in a Fulcrum disc: an ink card with a ring, as the logo. */
-.about .disc{background:var(--fm-disc);color:var(--fm-disc-fg);border-radius:14px;padding:22px;box-shadow:inset 0 0 0 5px var(--fm-disc),inset 0 0 0 6px var(--fm-disc-ring)}
+.about .disc{background:var(--btn);color:var(--text);border:1px solid var(--edge);border-radius:14px;padding:22px}
 .about .disc p{margin:0 0 14px;max-width:65ch}
 .about .disc p:last-child{margin-bottom:0}
 .facts{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 16px;margin:0 0 14px;max-width:65ch}
-.facts dt{font-weight:700;color:var(--fm-disc-fg)}
+.facts dt{font-weight:700;color:var(--navy)}
 .facts dd{margin:0}
 .about .small{font-size:.875rem}
-.about .mut{color:var(--fm-disc-muted)}
+.about .mut{color:var(--gray)}
 @media (max-width:520px){.facts{grid-template-columns:1fr;gap:0}.facts dd{margin-bottom:8px}}
 @media (forced-colors:active){.about .disc{box-shadow:none;border:1px solid CanvasText}}
 /* >>> ui-tokens-contrast: generated from engine/ui-tokens.json by scripts/ui_tokens.py --write (do not edit) */
@@ -119,9 +122,10 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 .bar i,.win[data-done] .bar i{forced-color-adjust:none;background:Highlight}
 :focus-visible{outline:3px solid Highlight}}
 </style></head><body>
+<a class="skip-link" href="#main">Skip to the card</a>
 <div class="win" id="win">
 <header class="band"><div class="row band-in"><img class="logo" src="assets/logo/rho-fulcrum-64.png" srcset="assets/logo/rho-fulcrum-64.png 1x, assets/logo/rho-fulcrum-128.png 2x" alt=""><p class="name">RADE</p><p class="sub">Test, deploy, enjoy</p><p class="team" id="team" hidden>TEAMS</p><p class="chan" id="chan"></p></div></header>
-<main class="row stage"><div class="card" id="card" aria-live="polite"><p class="caps">RADE</p><h1>Getting the newest script.</h1></div></main>
+<main class="row stage" id="main" tabindex="-1"><div class="card" id="card" aria-live="polite"><p class="caps">RADE</p><h1>Getting the newest script.</h1></div></main>
 <section class="row about" aria-label="About"><div class="disc">
     <!-- >>> site:intro: generated from README.md by scripts/build_site.py --write (do not edit) -->
     <p>Deploy and test applications on a locked-down work computer from one pasted PowerShell window: checks, files, steps and a results e-mail. RADE checks the computer first, saves the application's files, guides you through each step, and keeps a record of the install. After the install, the application works without RADE.</p>
@@ -141,7 +145,7 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
     <p class="small mut">Need help? Ask in the Teams channel <strong>RHOPE-OPS</strong>.</p>
     <!-- <<< site:key-facts -->
 </div></section>
-<footer class="row bottom"><a href="https://github.com/rhope-ops/RADE">Repository</a><a id="back" href="#" hidden>Back</a><span class="state" id="state"></span></footer>
+<footer class="row bottom"><a id="repo" hidden>Repository</a><a id="back" href="#" hidden>Back</a><span class="state" id="state"></span></footer>
 <div class="bar" aria-hidden="true"><i id="bar"></i></div>
 </div>
 <script>
@@ -150,9 +154,18 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 var KEY='rade-page-app-v1';
 var win=document.getElementById('win'),card=document.getElementById('card'),state=document.getElementById('state'),bar=document.getElementById('bar'),back=document.getElementById('back');
 var HELP='',APPS=[],cur=null,load=0;   // load: a counter for each load, so a late answer of an older load is dropped
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+// Safe DOM (fleet v2): every card is built from elements and text nodes, never from an HTML string, so no text from a
+// manifest, a script or a network answer can become markup. h(tag, attrs, children...): an attribute that is null or
+// false is left out, true gives an empty attribute; a child is a node, a text, an array of children, or null (left out).
+function add(e,c){if(c==null||c===false||c===''){return}if(Array.isArray(c)){c.forEach(function(x){add(e,x)});return}e.appendChild(typeof c==='object'?c:document.createTextNode(String(c)))}
+function h(tag,attrs){var e=document.createElement(tag),k;for(k in (attrs||{})){if(attrs[k]!=null&&attrs[k]!==false){e.setAttribute(k,attrs[k]===true?'':String(attrs[k]))}}
+  for(var i=2;i<arguments.length;i++){add(e,arguments[i])}return e}
+function caps(t){return h('p',{'class':'caps'},t)}
+function btn(label,act,primary,focus){return h('button',{type:'button','class':'btn'+(primary?' primary':''),'data-act':act,'data-focus':!!focus},label)}
+function txtLink(a,primary,focus){return h('a',{'class':'btn'+(primary?' primary':''),href:txtUrl(a),target:'_blank',rel:'noopener noreferrer','data-focus':!!focus},'View as .txt',h('span',{'class':'sr'},' (opens in a new tab)'))}
 function num(n){return Number(n).toLocaleString('en-US')}
-function recall(){try{return localStorage.getItem(KEY)}catch(e){return null}}
+// The stored choice is only an owner/name repository text (fleet v2): any other value is dropped, never used.
+function recall(){try{var v=localStorage.getItem(KEY);if(v!=null&&!/^[A-Za-z0-9._-]{1,100}\/[A-Za-z0-9._-]{1,100}$/.test(v)){localStorage.removeItem(KEY);return null}return v}catch(e){return null}}
 function remember(v){try{localStorage.setItem(KEY,v)}catch(e){}}
 function web(u){return /^https:\/\//i.test(String(u||''))?String(u):''}   // links from a manifest: https only
 function get(url,asJson){return fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('code ['+r.status+']');return asJson?r.json():r.text()})}
@@ -182,11 +195,11 @@ function scriptCheck(text,url){
   });
 }
 function checkLine(a){
-  var h=a.check||{state:'none'};
-  if(h.state==='match'){return '<br>Script check: <span class="file">'+esc(h.short)+'</span>, matches the stored hash. The RADE window shows the same value in its title bar.'}
-  if(h.state==='nostored'){return '<br>Script check: <span class="file">'+esc(h.short)+'</span>, no stored value to compare.'}
-  if(h.state==='nocrypto'){return '<br>Script check: hash not available in this browser.'}
-  return '<br>Script check: this script has no hash (an older build).';
+  var c=a.check||{state:'none'};
+  if(c.state==='match'){return [h('br'),'Script check: ',h('span',{'class':'file'},c.short),', matches the stored hash. The RADE window shows the same value in its title bar.']}
+  if(c.state==='nostored'){return [h('br'),'Script check: ',h('span',{'class':'file'},c.short),', no stored value to compare.']}
+  if(c.state==='nocrypto'){return [h('br'),'Script check: hash not available in this browser.']}
+  return [h('br'),'Script check: this script has no hash (an older build).'];
 }
 function show(o){
   win.setAttribute('data-light',o.light||'');
@@ -194,38 +207,40 @@ function show(o){
   bar.style.width=(o.bar==null?0:o.bar)+'%';
   state.textContent=o.state||'';
   back.hidden=!(APPS.length>1&&cur);
-  card.innerHTML=o.html;
+  while(card.firstChild){card.removeChild(card.firstChild)}
+  add(card,o.body);
   var f=card.querySelector('[data-focus]');if(f){f.focus()}
 }
-function helpLine(){return HELP?'<p class="help">For help, ask in the Teams channel <b>'+esc(HELP)+'</b>.</p>':''}
+function helpLine(){return HELP?h('p',{'class':'help'},'For help, ask in the Teams channel ',h('b',null,HELP),'.'):null}
 function failCard(what,found,todo,btns){
-  show({light:'fail',bar:0,state:'FAILED',html:'<p class="caps">Failed</p><h1>'+esc(what)+'</h1>'+
-    '<p>Found: '+esc(found)+'</p><p class="todo"><b>What to do:</b> '+todo+'</p><div class="btns">'+btns+'</div>'+helpLine()});
+  show({light:'fail',bar:0,state:'FAILED',body:[caps('Failed'),h('h1',null,what),
+    h('p',null,'Found: '+found),h('p',{'class':'todo'},h('b',null,'What to do:'),' '+todo),h('div',{'class':'btns'},btns),helpLine()]});
 }
 function start(){
   cur=null;load++;
-  show({bar:10,state:'Loading',html:'<p class="caps">RADE</p><h1>Getting the list of applications.</h1>'});
+  show({bar:10,state:'Loading',body:[caps('RADE'),h('h1',null,'Getting the list of applications.')]});
   get('apps.json',true).then(function(c){
     HELP=c.help||'';
+    var rl=document.getElementById('repo');if(/^[\w.-]+\/[\w.-]+$/.test(String(c.repo||''))){rl.href='https://github.com/'+c.repo;rl.hidden=false}   // the Repository link (one place: apps.json, DEC 7)
     document.getElementById('team').hidden=!HELP;document.getElementById('chan').textContent=HELP;   // the band shows the channel name (one place: apps.json)
     APPS=(c.apps||[]).map(function(a){return {repo:a.repo,base:a.base||('https://raw.githubusercontent.com/'+a.repo+'/main/'),manifest:a.manifest}});
-    if(!APPS.length){show({state:'No applications',html:'<p class="caps">RADE</p><h1>No application is available yet.</h1>'+helpLine()});return}
+    if(!APPS.length){show({state:'No applications',body:[caps('RADE'),h('h1',null,'No application is available yet.'),helpLine()]});return}
     var last=recall(),pick=APPS.length===1?APPS[0]:APPS.filter(function(a){return a.repo===last})[0];
     if(pick){open(pick)}else{choose()}
   }).catch(function(e){
-    failCard('The list of applications did not load.',e.message||'no answer','Check the network connection, then select "Try again".','<button type="button" class="btn primary" data-act="start" data-focus>Try again</button>');
+    failCard('The list of applications did not load.',e.message||'no answer','Check the network connection, then select "Try again".',btn('Try again','start',true,true));
   });
 }
 function choose(){
   if(cur&&cur.blob){URL.revokeObjectURL(cur.blob);cur.blob=''}   // free the .txt of the application the user left
   cur=null;load++;
-  show({light:'turn',state:num(APPS.length)+' applications',html:'<p class="caps">Choose</p><h1>Which application?</h1><div class="btns">'+
-    APPS.map(function(a,i){return '<button type="button" class="btn app" data-app="'+i+'"'+(i?'':' data-focus')+'><b>'+esc(a.name||a.repo)+'</b></button>'}).join('')+'</div>'+helpLine()});
+  show({light:'turn',state:num(APPS.length)+' applications',body:[caps('Choose'),h('h1',null,'Which application?'),h('div',{'class':'btns'},
+    APPS.map(function(a,i){return h('button',{type:'button','class':'btn app','data-app':i,'data-focus':!i},h('b',null,a.name||a.repo))})),helpLine()]});
 }
 function open(a){
   if(a.blob){URL.revokeObjectURL(a.blob);a.blob=''}
   cur=a;a.url='';a.none=false;remember(a.repo);var my=++load;
-  show({bar:30,state:'Loading',html:'<p class="caps">RADE</p><h1>Getting the newest script.</h1><p class="second">'+esc(a.repo)+'</p>'});
+  show({bar:30,state:'Loading',body:[caps('RADE'),h('h1',null,'Getting the newest script.'),h('p',{'class':'second'},a.repo)]});
   get(a.base+a.manifest,true).then(function(m){
     if(my!==load){return null}
     var b=(m.bundles||[])[(m.bundles||[]).length-1];
@@ -244,7 +259,7 @@ function open(a){
       if(my!==load){return}
       a.check=h;a.loaded=new Date();
       if(h.state==='bad'){   // R6: say so in plain words and stop; no Copy button
-        failCard('The script does not match its hash. Do not run it.',h.why,h.todo||'Select "Try again". If it fails again, do not run the script: ask in the Teams channel.','<button type="button" class="btn primary" data-act="open" data-focus>Try again</button>');
+        failCard('The script does not match its hash. Do not run it.',h.why,h.todo||'Select "Try again". If it fails again, do not run the script: ask in the Teams channel.',btn('Try again','open',true,true));
         return;
       }
       ready(a,false);
@@ -252,17 +267,17 @@ function open(a){
   }).catch(function(e){
     if(my!==load){return}
     // No link to the raw .ps1 file (the Administrator, 20 Nov 26): only the checked text is offered, as .txt, on the Ready card.
-    var link=a.url?'':'<a class="btn" href="https://github.com/'+esc(a.repo)+'">Open the repository</a>';
+    var link=a.url?null:h('a',{'class':'btn',href:'https://github.com/'+a.repo},'Open the repository');
     failCard('The script did not load.',e.message||'no answer',a.none?'No script is published for this application yet. Ask in the Teams channel.':'Check the network connection, then select "Try again".',
-      '<button type="button" class="btn primary" data-act="open" data-focus>Try again</button>'+link);
+      [btn('Try again','open',true,true),link]);
   });
 }
 function facts(a){
   var bytes=(window.TextEncoder?new TextEncoder().encode(a.text).length:a.text.length);
-  return '<p class="second"><span class="file">'+esc(a.file)+'</span><br>'+num(bytes)+' bytes, '+num(a.text.split('\n').length)+' lines'+checkLine(a)+'</p>';
+  return h('p',{'class':'second'},h('span',{'class':'file'},a.file),h('br'),num(bytes)+' bytes, '+num(a.text.split('\n').length)+' lines',checkLine(a));
 }
-var STEPS='<ol><li>Start menu: type ISE and open Windows PowerShell ISE as yourself (not "Run as administrator").</li>'+
-  '<li>File &gt; New. Click in the white script pane. Press Ctrl+V, then F5.</li><li>The RADE window opens. Do what it says.</li></ol>';
+function steps(){return h('ol',null,h('li',null,'Start menu: type ISE and open Windows PowerShell ISE as yourself (not "Run as administrator").'),
+  h('li',null,'File > New. Click in the white script pane. Press Ctrl+V, then F5.'),h('li',null,'The RADE window opens. Do what it says.'))}
 // Read before you paste (the Administrator, 20 Nov 26): "View as .txt" and "Save as .txt" give the text the page already
 // fetched and checked, the same text "Copy script" copies, as a plain-text file (a blob URL, made in the browser, no new
 // download). One blob at a time: open() and choose() free the one of the last load.
@@ -272,19 +287,19 @@ function txtUrl(a){
 }
 function ready(a,copied){
   var t=a.loaded,hm=('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2);
-  show({light:'turn',done:copied,bar:100,state:(copied?'Copied':'Ready')+' · loaded '+hm,html:
-    '<p class="caps">'+esc(a.kind)+'</p><h1>'+(copied?'Copied. Now paste it in PowerShell ISE.':'Copy the script for '+esc(a.name).replace(/-/g,'\u2011')+'.')+'</h1>'+
-    (copied?'':(a.summary?'<p>'+esc(a.summary)+'</p>':''))+facts(a)+
-    '<div class="btns"><button type="button" class="btn primary" data-act="copy" data-focus>'+(copied?'Copy again':'Copy script')+'</button>'+
-    '<a class="btn" href="'+txtUrl(a)+'" target="_blank" rel="noopener">View as .txt<span class="sr"> (opens in a new tab)</span></a>'+
-    '<a class="btn" href="'+txtUrl(a)+'" download="'+esc(a.file.replace(/\.ps1$/i,''))+'.txt">Save as .txt</a>'+(a.home?'<a class="btn" href="'+esc(a.home)+'">Tasks for this application</a>':'')+'</div>'+
-    STEPS+helpLine()});
+  show({light:'turn',done:copied,bar:100,state:(copied?'Copied':'Ready')+' · loaded '+hm,body:[
+    caps(a.kind),h('h1',null,copied?'Copied. Now paste it in PowerShell ISE.':'Copy the script for '+String(a.name).replace(/-/g,'\u2011')+'.'),
+    (!copied&&a.summary)?h('p',null,a.summary):null,facts(a),
+    h('div',{'class':'btns'},btn(copied?'Copy again':'Copy script','copy',true,true),txtLink(a,false,false),
+      h('a',{'class':'btn',href:txtUrl(a),download:a.file.replace(/\.ps1$/i,'')+'.txt'},'Save as .txt'),
+      a.home?h('a',{'class':'btn',href:a.home,rel:'noopener noreferrer'},'Tasks for this application'):null),
+    steps(),helpLine()]});
 }
 function viaArea(t){var x=document.createElement('textarea');x.value=t;x.setAttribute('aria-hidden','true');x.style.position='fixed';x.style.opacity='0';document.body.appendChild(x);x.select();var r=false;try{r=document.execCommand('copy')}catch(e){}document.body.removeChild(x);return r}
 function copy(a){
   var ok=function(){ready(a,true)};
   var no=function(){failCard('The browser blocked the copy.','the clipboard is not available to this page','Select "View as .txt". On that page press Ctrl+A, then Ctrl+C. Then do the steps for PowerShell ISE.',
-    '<a class="btn primary" href="'+txtUrl(a)+'" target="_blank" rel="noopener" data-focus>View as .txt<span class="sr"> (opens in a new tab)</span></a><button type="button" class="btn" data-act="copy">Try again</button>')};
+    [txtLink(a,true,true),btn('Try again','copy')])};
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(a.text).then(ok,function(){viaArea(a.text)?ok():no()})}
   else{viaArea(a.text)?ok():no()}
 }

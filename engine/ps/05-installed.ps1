@@ -185,7 +185,7 @@ function Get-StepDefault([int]$K) {
   return ($prior[[string]$steps[$K].Name] -ne 'PASSED')
 }
 # The RADE page (R28: the newer-version notice points here, not to the app page; the Administrator, 2026-11-17).
-$radeUrl = 'https://rhope-ops.github.io/RADE'
+$radeUrl = '@@RADE_PAGE@@'   # from apps.json "page" (fleet v2 DEC 7)
 function Get-NewerVersion {
   # Reads rade-release.json in the app repository (data, not code): { "apps": { "<app name>": "<version>" } }.
   # Returns that version when it is newer than the one this bundle installs, else ''. Short timeout; any failure is silent.
@@ -304,10 +304,15 @@ function Add-DesktopIcon([string]$Dir) {
     if (-not (Test-Path -LiteralPath $runner -PathType Leaf)) { return '' }
     $desk = $(if ($Dir) { $Dir } else { Get-ShortcutDir }); $isDesk = (-not $desk -or $desk -eq (Get-DesktopDir))   # no folder given: the one chosen before (review of PR 78), else the Desktop
     if (-not $desk -or -not (Test-Path -LiteralPath $desk -PathType Container)) { return $(if ($isDesk) { 'RADE could not find your Desktop folder, so it made no desktop shortcut. Open RADE from the RADE page instead.' } else { 'RADE could not find the folder you chose, so it made no shortcut. Open RADE from the RADE page instead.' }) }
-    $lnk = Join-Path $desk 'RADE.lnk'
-    if (Test-Path -LiteralPath $lnk) { return '' }
+    $lnk = Join-Path $desk 'RADE.lnk'; $args1 = '-NoProfile -STA -WindowStyle Minimized -File "' + $runner + '"'
+    if (Test-Path -LiteralPath $lnk) {
+      # A shortcut made by an engine before v36 starts RADE with an -ExecutionPolicy setting: take it out (DEC 3). Only a
+      # shortcut RADE made (it starts RADE's own runner file) is changed; any other RADE.lnk is never touched.
+      try { $old = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk); if ([string]$old.Arguments -match '-ExecutionPolicy' -and ([string]$old.Arguments).Contains('"' + $runner + '"')) { $old.Arguments = $args1; $old.Save() } } catch { $null = $_ }   # a repair that fails leaves the old shortcut; RADE still opens
+      return ''
+    }
     $sh = New-Object -ComObject WScript.Shell; $sc = $sh.CreateShortcut($lnk)
-    $sc.TargetPath = (Get-PowerShellExe); $sc.Arguments = '-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Minimized -File "' + $runner + '"'
+    $sc.TargetPath = (Get-PowerShellExe); $sc.Arguments = $args1
     $sc.WorkingDirectory = (Get-RadePath); $sc.Description = 'Open RADE'; $sc.WindowStyle = 7; $sc.Save()
     return $(if ($isDesk) { 'A shortcut named RADE is now on your desktop. It opens RADE.' } else { 'A shortcut named RADE is now in the folder "' + (Split-Path -Leaf $desk) + '". It opens RADE.' })
   } catch { return 'RADE could not make a desktop shortcut. Open RADE from the RADE page instead.' }

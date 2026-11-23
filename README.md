@@ -15,7 +15,7 @@ Deploy and test applications on a locked-down work computer from one pasted Powe
 <table>
 <tr><td><b>Checks first:</b></td><td>checks the computer and your site rights before any step; a failed check stops the install.</td></tr> <!-- source: docs/engine.md "Check stages" and "Results" -->
 <tr><td><b>NIPR only:</b></td><td>runs only where the computer's full name holds the NIPR domain; elsewhere it stops before it writes a file.</td></tr> <!-- source: docs/engine.md "Guardrails", NIPR only -->
-<tr><td><b>Credentials:</b></td><td>CAC sign-on in a browser window for each run; nothing is stored.</td></tr> <!-- source: engine/ps/07-checks.ps1, Connect-PnPOnline -UseWebLogin -->
+<tr><td><b>Credentials:</b></td><td>CAC sign-on in a browser window for each run; nothing is stored.</td></tr> <!-- source: engine/ps/16-site-scripts.ps1, Connect-PnPOnline -UseWebLogin -->
 <tr><td><b>Access:</b></td><td>only sees what your account can see; only accepts a DAF SharePoint address.</td></tr> <!-- source: docs/engine.md "Guardrails", Site address -->
 <tr><td><b>Boundary:</b></td><td>nothing leaves DoD365, except the test-round results e-mail (masked counts, sent by hand) until the test rounds end.</td></tr> <!-- source: AGENTS.md "DoD365 boundary" -->
 <tr><td><b>Verifiable:</b></td><td>read the commented code as plain text before you paste it; the window warns when the script does not match its hash.</td></tr> <!-- source: engine/ps/window/05-alignment.ps1 (ScriptWarn); the README "Open as .txt" link -->

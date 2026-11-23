@@ -1,7 +1,7 @@
 # RADE engine part 13, the Maintenance tools (the Administrator, 2026-11-20; docs/engine.md "Maintenance run types").
 # Diagnose: read-only; the install record, the app's local files and the app's RADE checks again; one report file.
 # Back up: reads only the lists the app's manifest names ("backup") and saves each as JSON plus a CSV copy.
-# Restore (engine-v31) is part 14, engine/ps/14-restore.ps1; it uses Invoke-Backup and Get-BackupFileName from here.
+# Restore (engine-v31) is parts 14 and 15, engine/ps/14-restore.ps1 and 15-restore-run.ps1; it uses Invoke-Backup and Get-BackupFileName from here.
 # Uses parts 01 to 08 (Get-BasePath, Read-Installed, Get-InstalledKey, Get-StartPath, Invoke-Check, Invoke-ChildScript).
 # Network: Diagnose runs the app's own RADE checks (their fixed addresses only); Back up signs in to the saved site and
 # reads only the lists the manifest names (AGENTS.md "No reconnaissance"). Neither one writes to the site.
@@ -145,7 +145,7 @@ try {
   'RESULT done'; exit 0
 } catch { 'RESULT not-connected ' + $_.Exception.GetType().Name; exit 2 }
 '@
-$backupScript = Add-SignInSize $backupScript   # E3: the sign-in window size block (07-checks.ps1)
+$backupScript = Add-SignInSize $backupScript   # E3: the sign-in window size block (16-site-scripts.ps1)
 
 # Gives the file name (no extension) of a saved list: its title with any sign a file name cannot hold made "_" (the
 # build allows letters, digits, space, "_", "-", "(" and ")", so this changes nothing today). Takes the list title.

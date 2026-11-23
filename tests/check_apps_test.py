@@ -61,14 +61,25 @@ with tempfile.TemporaryDirectory() as t:
     # A file where a folder should be: no stop, the build names it. The locked engine: a font file, never a folder or a bad name.
     (t / 'bad').write_text('x')
     assert c.stage_fonts(t, {'bundles': [{'files': [{'src': 'bad/fonts/build/X-OFL.txt'}]}]}, fake.get) == []
-    head = c.run(['git', 'rev-parse', 'HEAD'], c.ROOT)[1]
-    assert c.locked_font(head, 'OFL.txt') == c.this_font('OFL.txt') and c.locked_font(head, 'none.ttf') is None and c.locked_font(head, '../rade_build.py') is None
-    real = c.git_type; c.git_type = lambda commit, rel: 'tree'   # a folder at that path: never read as a font
-    try:
-        assert c.locked_font(head, 'OFL.txt') is None
-    finally:
-        c.git_type = real
-    assert c.git_type(head, 'engine/fonts') == 'tree' and c.git_type(head, 'engine/fonts/OFL.txt') == 'blob'
+    # The locked engine is read from git: a temporary git repository holds engine/fonts/OFL.txt, so this test also
+    # passes outside a .git checkout (a release archive; fleet v2).
+    real_root = c.ROOT
+    with tempfile.TemporaryDirectory() as g:
+        g = Path(g); (g / 'engine/fonts').mkdir(parents=True); (g / 'engine/fonts/OFL.txt').write_bytes(b'licence')
+        for cmd in (['git', 'init', '-q'], ['git', 'add', '-A'], ['git', '-c', 'user.name=test', '-c', 'user.email=fixture', 'commit', '-q', '-m', 'fixture']):
+            assert c.run(cmd, g)[0] == 0, cmd
+        c.ROOT = g
+        try:
+            head = c.run(['git', 'rev-parse', 'HEAD'], g)[1].strip()
+            assert c.locked_font(head, 'OFL.txt') == c.this_font('OFL.txt') == b'licence' and c.locked_font(head, 'none.ttf') is None and c.locked_font(head, '../rade_build.py') is None
+            real = c.git_type; c.git_type = lambda commit, rel: 'tree'   # a folder at that path: never read as a font
+            try:
+                assert c.locked_font(head, 'OFL.txt') is None
+            finally:
+                c.git_type = real
+            assert c.git_type(head, 'engine/fonts') == 'tree' and c.git_type(head, 'engine/fonts/OFL.txt') == 'blob'
+        finally:
+            c.ROOT = real_root
     assert not list((t / 'assets/fonts/build').glob('.rade-font-*'))   # no temporary file left after a copy
     # A move that fails: no font and no temporary file stay; an app file with a similar name is not touched.
     (t / 'assets/fonts/build/90161Z-OFL.txt').unlink(); (t / 'assets/fonts/build/90161Z-OFL.txt.part').write_bytes(b'APPFILE')

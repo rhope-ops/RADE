@@ -91,13 +91,24 @@ function Write-BundleFile([string]$Base, [scriptblock]$Say) {
   }
   & $Say ('  ' + $files.Count + ' files saved.')
 }
+# Sets the TLS versions of this PowerShell's web calls (fleet v2, DEC 1): assigns TLS 1.2, and adds TLS 1.3 only when
+# this .NET has that enum value (Windows PowerShell 5.1 on an older .NET throws on the name). Assigns, never ORs, so
+# SSL 3, TLS 1.0 and TLS 1.1 are off. Takes nothing; returns nothing. Called before each download and web request.
+function Use-TlsFloor {
+  try {
+    $p = [Net.SecurityProtocolType]::Tls12
+    if ([Enum]::GetNames([Net.SecurityProtocolType]) -contains 'Tls13') { $p = $p -bor [Net.SecurityProtocolType]'Tls13' }
+    [Net.ServicePointManager]::SecurityProtocol = $p
+  } catch { $null = $_ }   # a host that refuses the setting keeps its own; the request then names the TLS in its error
+}
+
 function Save-RoundDownload([string]$Base, [scriptblock]$Say) {
   # Data files only (briefs, public color documents), never code (PFM 3A). The address never gets the Windows sign-in
   # (engine-v14, as in Get-WebRequest); only the work proxy does.
   # A repo file must match its SHA-256; a failed download leaves the link on the bookmark page as the fallback.
   $ok = 0; $bad = 0
   if (-not $fetch.Count) { return '' }
-  try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { $null = $_ }   # TLS 1.2 on PS 5.1
+  Use-TlsFloor
   foreach ($f in $fetch) {
     $dir = Join-Path $Base $f.Dir
     if (-not (Test-Path -LiteralPath $dir -PathType Container)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
