@@ -34,11 +34,14 @@ You need the number of your release: the number on the line `ENGINE_RELEASE = ` 
 7. Run `gh auth status`. You see `Logged in to github.com`, or a text that you are not logged in. Go on.
 8. If you are not logged in, run `gh auth login`. You see a question about the account type. Go on.
 9. Answer the questions of `gh auth login` with these choices, in this order:
-   1. Select `GitHub.com`.
-   2. Select `HTTPS`.
-   3. Select `Login with a web browser`.
-   4. Sign in on the web page that opens, with the code that `gh` shows.
-   You see `Logged in as` and your account. Go on.
+   1. At "Where do you use GitHub?", select `GitHub.com`.
+   2. At the question about the protocol, select `HTTPS`.
+   3. At "Authenticate Git with your GitHub credentials?", type `Y`.
+   4. At "How would you like to authenticate GitHub CLI?", select `Login with a web browser`.
+   5. Write down the one-time code that `gh` shows, then press **Enter**.
+   6. On the web page that opens, type the one-time code.
+   7. Sign in to GitHub on that page.
+   You see `Logged in as` and your account in the terminal. Go on.
 10. If a folder **rade-check** is in the terminal folder from an earlier check, delete it. You see the prompt. Go on.
 11. Run `git clone https://github.com/rhope-ops/RADE rade-check`. You see `Cloning into 'rade-check'` and then the prompt. Go on.
 12. Run `cd rade-check`. You see the prompt again. Go on.
@@ -51,7 +54,7 @@ You need the number of your release: the number on the line `ENGINE_RELEASE = ` 
 
 In these steps, "you" is the person who decides now. The repository belongs to the personal account **rhope-ops**, not to an organization. So a new person gets write access as a collaborator: they can merge pull requests and make releases. The settings of the repository stay with the account **rhope-ops**. A move of the repository to another owner changes every address (the page, the app locks), so these steps do not move it. Do not send a password, a token or a key in a message. The repository holds none of these, and a handover needs none.
 
-1. In a message to the new person, ask for their GitHub account name. You see their reply with the name. Write down the name.
+1. In a message to the new person, ask for their GitHub account name and their Google e-mail address. You see their reply. Write down the name and the address.
 2. On GitHub, signed in as **rhope-ops**, open `https://github.com/rhope-ops/RADE/settings/access`. GitHub can ask for your password first. You see the page **Collaborators**. Go on.
 3. On the page **Collaborators**, do these actions:
    1. Click **Add people**. A dialog opens.
@@ -60,9 +63,11 @@ In these steps, "you" is the person who decides now. The repository belongs to t
    4. Click **Add** and the account name, to add it to this repository.
    You see the account on the page, with the text **Pending invite**. Go on.
 4. In a message to the new person, ask them to accept the invitation in their GitHub notifications. An invitation ends after 7 days. You see your sent message. Go on.
-5. On the page **Collaborators**, reload the page. Wait until the account of the new person shows without the text **Pending invite**. After 7 days with no change, the invitation ends: a new one is necessary.
-6. On GitHub, open `https://github.com/rhope-ops/RADE/pulls?q=is%3Amerged`. You see the merged pull requests, the newest at the top. Go on.
-7. When the next engine pull request shows there, let the new person make its engine release while you watch. You see a green check mark on their run. Go on.
-8. If their run shows a red cross, the new person sends the `FAIL` line in the Teams channel **RHOPE-OPS**. You see their message. Go on.
-9. In your Google Drive, open the master denylist file of the personal-data guard. You see the file. Go on.
-10. Share the file with the new person, with the role **Viewer**. You see the new person in the sharing list of the file. Do not put the file in the repository or in a chat with an agent. The task is complete.
+5. On the page **Collaborators**, reload the page. Wait until the account of the new person shows without the text **Pending invite**. After 7 days with no change, the invitation ends: a new invitation is necessary.
+6. In your Google Drive, open the master denylist file. It holds the names that the content check blocks. You see the file. Go on.
+7. Share the file with the Google e-mail address that you wrote down, with the role **Viewer**. You see that address in the sharing list of the file. Do not put the file in the repository or in a chat with an agent. Go on.
+8. On GitHub, open `https://github.com/rhope-ops/RADE/pulls?q=is%3Amerged`. You see the merged pull requests. The title of an engine pull request starts with `engine-v`. Go on.
+9. Wait until a new engine pull request shows on that page. This can take days or weeks. Do not change your access until then.
+10. Let the new person do all the steps under the heading "Make an engine release" while you watch. You see their run on the page of the workflow **release**. Wait until the run stops.
+11. If their run shows a green check mark, the new person can make releases. You see the new release on the page **Releases**. The task is complete.
+12. If their run shows a red cross, the new person sends the `FAIL` line in the Teams channel **RHOPE-OPS**. You see their message. The task is complete.
