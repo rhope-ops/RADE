@@ -307,7 +307,7 @@ function Add-DesktopIcon([string]$Dir) {
     $lnk = Join-Path $desk 'RADE.lnk'; $args1 = '-NoProfile -STA -WindowStyle Minimized -File "' + $runner + '"'
     if (Test-Path -LiteralPath $lnk) {
       # A shortcut made by an engine before v36 starts RADE with an -ExecutionPolicy setting: take it out (DEC 3).
-      try { $old = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk); if ([string]$old.Arguments -match '-ExecutionPolicy') { $old.Arguments = $args1; $old.Save() } } catch { $null = $_ }
+      try { $old = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk); if ([string]$old.Arguments -match '-ExecutionPolicy') { $old.Arguments = $args1; $old.Save() } } catch { $null = $_ }   # a repair that fails leaves the old shortcut; RADE still opens
       return ''
     }
     $sh = New-Object -ComObject WScript.Shell; $sc = $sh.CreateShortcut($lnk)

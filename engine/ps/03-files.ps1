@@ -99,7 +99,7 @@ function Set-RadeTls {
     $p = [Net.SecurityProtocolType]::Tls12
     if ([Enum]::GetNames([Net.SecurityProtocolType]) -contains 'Tls13') { $p = $p -bor [Net.SecurityProtocolType]'Tls13' }
     [Net.ServicePointManager]::SecurityProtocol = $p
-  } catch { $null = $_ }
+  } catch { $null = $_ }   # a host that refuses the setting keeps its own; the request then names the TLS in its error
 }
 
 function Save-RoundDownload([string]$Base, [scriptblock]$Say) {
