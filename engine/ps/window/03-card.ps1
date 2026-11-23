@@ -2,7 +2,7 @@
 # sentence, paragraphs, choices, box, hand-step text, step line, buttons) and the one-line text box helper.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
-# ---- The card: one block, its text column centered (76.5 % of the width, at most 900 px: engine/window.json), 40 % of the spare height above it. Top to bottom: a small
+# ---- The card: one block, its text column centered (76.5 % of the width, at most 680 px: engine/window.json), 40 % of the spare height above it. Top to bottom: a small
 # line in capitals (the header row), the sentence, up to four paragraphs, the choices, a box with its label, the lines of a hand step (one
 # selectable text: the numbered lines, then the unnumbered ones), the file path of a hand step, the step line (name, bar,
 # time in the step, count), the last log line, the error box, two file links, a note, the help line, the closing line of
