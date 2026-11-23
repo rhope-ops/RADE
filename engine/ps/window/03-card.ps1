@@ -128,6 +128,7 @@ foreach ($c in @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox)) { [void]$ui.Test
 # the row count; gives back nothing.
 $ui.Fill = { param($T, $Parts) $row = 0; foreach ($c in @($Parts)) { [void]$T.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('AutoSize'))); $T.Controls.Add($c, 0, $row); $row++ }; $T.RowCount = $row }
 & $ui.Fill $ui.Body @($ui.SentRow, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.Opts, $ui.FieldRow, $ui.Guide, $ui.PathL, $ui.PathT, $ui.StepRow, $ui.Now, $ui.ErrRow, $ui.LinkRow, $ui.Note, $ui.Help)
+$i = 0; foreach ($x in @($ui.BtnRow.Controls)) { $x.TabIndex = $i; $i++ }   # Tab goes along the row from the left: Back (Esc) first, the primary last (B3, B6)
 & $ui.Fill $ui.Tail @($ui.Close, $ui.BtnRow, $ui.Foot, $ui.TestRow)
 & $ui.Fill $ui.Stack @($ui.Head, $ui.Scroll, $ui.Gap, $ui.Tail)
 $ui.Card.Controls.Add($ui.Stack, 1, 1); $ui.Card.SetColumnSpan($ui.Stack, 2)   # two columns: room for the scroll bar beside the text
