@@ -28,7 +28,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WINDOWS = os.name == "nt"
 # Windows PowerShell 5.1 on Windows (the floor on every NIPR computer, AGENTS.md "Project rules"); PowerShell 7 elsewhere.
-POWERSHELL = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass"] if WINDOWS else ["pwsh", "-NoProfile"]
+POWERSHELL = ["powershell.exe", "-NoProfile"] if WINDOWS else ["pwsh", "-NoProfile"]
 TIME_LIMIT = 120   # seconds for the whole run: a run that waits for input is a failure, not a hang (a decision of this task)
 # The answers, as tests/engine_test.sh line 48 ("round") feeds them: 2 = the deploy application, Enter, S = skip the hand step, Enter.
 ANSWERS = "2\n\nS\n\n"

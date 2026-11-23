@@ -10,6 +10,9 @@ on:
     paths:
       - "engine/**"
       - "tests/**"
+      - "schemas/**"
+      - "assets/logo/**"
+      - "apps.json"
       - ".github/workflows/window.yml"
   workflow_dispatch:
 permissions:

@@ -11,7 +11,7 @@ function Get-StepStartInfo([string]$Base, $Step, [string]$Answer, [scriptblock]$
   $dir = Join-Path $Base $Step.Dir
   $psi = New-Object System.Diagnostics.ProcessStartInfo
   $psi.FileName = $exe
-  $psi.Arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + (Join-Path $dir $Step.File) + '" -Id "' + $script:dodid + '" -NoPause'
+  $psi.Arguments = '-NoProfile -File "' + (Join-Path $dir $Step.File) + '" -Id "' + $script:dodid + '" -NoPause'
   if ($Step.Args) { $psi.Arguments += ' ' + $Step.Args }   # fixed arguments from the round (for example -Set T12)
   if ($Step.AskParam -and $Answer) {
     # A trailing \ before the closing quote would escape it (command-line rules): trim it, but a drive root keeps its \,
@@ -21,6 +21,9 @@ function Get-StepStartInfo([string]$Base, $Step, [string]$Answer, [scriptblock]$
     $psi.Arguments += ' -' + $Step.AskParam + ' "' + $a + '"'
   }
   $psi.WorkingDirectory = $dir
+  # No -ExecutionPolicy setting (fleet v2, DEC 3: Group Policy governs). A RADE started from an old shortcut hands its
+  # setting down in this variable: take it out, so a step runs as the child check proved it can.
+  $psi.EnvironmentVariables.Remove('PSExecutionPolicyPreference')
   $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true
   $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
   try { $envs = Get-StepEnv $Base $Step; foreach ($k in @($envs.Keys)) { $psi.EnvironmentVariables[[string]$k] = [string]$envs[$k] } } catch { & $Say ('    NOTE: the step inputs could not be set: ' + (ConvertTo-Masked $_.Exception.Message)) }
