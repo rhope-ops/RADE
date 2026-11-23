@@ -264,7 +264,7 @@ function Get-ComputerCheck([string]$Id, [scriptblock]$Tick) {
     # ends with code 8 if a Bypass setting was handed down to it, so "ran" proves a step runs without one.
     $r = Invoke-ChildScript "if (`$env:PSExecutionPolicyPreference -eq 'Bypass') { exit 8 }`r`n'child ok'`r`nexit 7`r`n" '' 60 $Tick
     # The policy of each scope that sets one: on a pass the Group Policy scopes only; on a failure every scope, for the ISSM.
-    $all = @(); try { $all = @(Get-ExecutionPolicy -List | Where-Object { [string]$_.ExecutionPolicy -ne 'Undefined' } | ForEach-Object { [string]$_.Scope + '=' + [string]$_.ExecutionPolicy }) } catch { $null = $_ }
+    $all = @(); try { $all = @(Get-ExecutionPolicy -List | Where-Object { [string]$_.ExecutionPolicy -ne 'Undefined' } | ForEach-Object { [string]$_.Scope + '=' + [string]$_.ExecutionPolicy }) } catch { $null = $_ }   # no scope list: the detail says none set
     $pol = (@($all | Where-Object { $_ -match '^\w*Policy=' }) -join ', ')
     if ($r.Exit -eq 7) { $one = Format-CheckResult 'PASSED' ('Test script ran' + $(if ($pol) { ', policy [' + $pol + ']' } else { '' })) '' }
     else { $one = Format-CheckResult 'FAILED' ('Test script did not run, exit code [' + $r.Exit + ']' + $(if ($r.Why) { ', ' + $r.Why } else { '' }) + ', scopes [' + $(if ($all.Count) { $all -join ', ' } else { 'none set' }) + ']') 'This computer blocks RADE scripts. Contact your ISSM and send the results e-mail as is' }

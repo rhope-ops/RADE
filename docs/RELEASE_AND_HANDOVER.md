@@ -39,16 +39,19 @@ You need the number of your release: the number on the line `ENGINE_RELEASE = ` 
    3. At "Authenticate Git with your GitHub credentials?", type `Y`.
    4. At "How would you like to authenticate GitHub CLI?", select `Login with a web browser`.
    5. Write down the one-time code that `gh` shows, then press **Enter**.
-   6. On the web page that opens, type the one-time code.
-   7. Sign in to GitHub on that page.
+   6. In the browser page that opens, sign in to GitHub if the page asks for it.
+   7. On the page **Device Activation**, type the one-time code.
+   8. Click **Continue**.
+   9. Click **Authorize github**.
    You see `Logged in as` and your account in the terminal. Go on.
-10. If a folder **rade-check** is in the terminal folder from an earlier check, delete it. You see the prompt. Go on.
+10. Run `rm -rf rade-check` (in Windows PowerShell: `Remove-Item -Recurse -Force rade-check`). It deletes the folder of an earlier check, if there is one. You see the prompt. Go on.
 11. Run `git clone https://github.com/rhope-ops/RADE rade-check`. You see `Cloning into 'rade-check'` and then the prompt. Go on.
 12. Run `cd rade-check`. You see the prompt again. Go on.
 13. Run `git checkout engine-v36`, but type your number in place of `36`. You see a note about a "detached HEAD", then `HEAD is now at` and a commit. Go on.
 14. Run `gh attestation verify engine/rade_build.py --repo rhope-ops/RADE`. It checks that the release workflow of RADE signed the SHA-256 of this file. You see `Verification succeeded!` among the lines. Go on.
 15. If you do not see `Verification succeeded!`, send all the lines in the Teams channel **RHOPE-OPS**. You see your message in the channel. Do not use the release. The task is complete.
-16. Run `cd ..`. You see the prompt again. You can delete the folder **rade-check**. The task is complete.
+16. Run `cd ..`. You see the prompt again. Go on.
+17. Run `rm -rf rade-check` (in Windows PowerShell: `Remove-Item -Recurse -Force rade-check`). You see the prompt again. The task is complete.
 
 ## Hand over RADE to a new person
 
