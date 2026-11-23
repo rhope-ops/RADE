@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ENGINE = 'engine/rade_build.py'
-REPO = 'rhope-ops/RADE'
+REPO = json.loads((ROOT / 'apps.json').read_text(encoding='utf-8'))['repo']   # the one config home (fleet v2 DEC 7)
 
 
 def trace():

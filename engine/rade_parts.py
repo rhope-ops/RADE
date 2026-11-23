@@ -16,6 +16,7 @@ from pathlib import Path
 
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
 WINDOW_FILE = ENGINE_ROOT / 'engine/window.json'   # the window's layout values (the Administrator, 2026-11-18; docs/window-design.md)
+APPS_FILE = ENGINE_ROOT / 'apps.json'   # the one config home: repo, page and help (fleet v2 DEC 7)
 
 
 # ---- The engine's PowerShell (the Administrator, 2026-11-17: docs/code-standard.md C10). It lives in engine/ps as
@@ -117,6 +118,34 @@ def window_values():
     assert 120 <= frame <= 1080 and 0 <= step_ms <= 3000, 'engine/window.json cardFrame.minHeight must be 120 to 1080 and minStepMs 0 to 3000'
     return {'@@TEXT_SHARE@@': repr(share), '@@TEXT_MAX@@': str(cap), '@@MIN_W@@': str(min_w), '@@MIN_H@@': str(min_h),
             '@@FRAME_MIN@@': str(frame), '@@MIN_STEP_MS@@': str(step_ms)}
+
+
+def site_values():
+    """Read repo, page and help from apps.json, the one config home (fleet v2 DEC 7), and check them.
+
+    The build stops when a value is missing or has a character that could break the PowerShell text it goes into.
+
+    Returns:
+        A dict of placeholder -> text: '@@RADE_REPO@@' (owner/name), '@@RADE_PAGE@@' (an https address) and
+        '@@HELP@@' (the Teams channel name).
+    """
+    c = json.loads(APPS_FILE.read_text(encoding='utf-8'))
+    repo, page, help_name = str(c.get('repo', '')), str(c.get('page', '')), str(c.get('help', ''))
+    assert re.fullmatch(r'[A-Za-z0-9._-]+/[A-Za-z0-9._-]+', repo), 'apps.json repo must be owner/name'
+    assert re.fullmatch(r'https://[A-Za-z0-9.-]+(/[A-Za-z0-9._~/-]*)?', page), 'apps.json page must be an https address'
+    assert re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ._-]{0,59}', help_name), 'apps.json help must be a plain channel name'
+    return {'@@RADE_REPO@@': repo, '@@RADE_PAGE@@': page, '@@HELP@@': help_name}
+
+
+def logo_path():
+    """Return the path (from the repo root) of RADE's own logo, from engine/window.json "logo" (fleet v2).
+
+    Returns:
+        A relative path such as 'assets/logo/rho-fulcrum-128.png'; the build stops on a path outside assets/logo/.
+    """
+    rel = str(json.loads(WINDOW_FILE.read_text(encoding='utf-8')).get('logo', ''))
+    assert re.fullmatch(r'assets/logo/[A-Za-z0-9._-]+\.png', rel), 'engine/window.json logo must be a PNG under assets/logo/'
+    return rel
 
 
 # No scripts in results (the PFM, 2026-11-20; R37: a collect pattern matched the .ps1 runner and the work e-mail gateway

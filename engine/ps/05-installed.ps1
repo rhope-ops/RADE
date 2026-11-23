@@ -185,7 +185,7 @@ function Get-StepDefault([int]$K) {
   return ($prior[[string]$steps[$K].Name] -ne 'PASSED')
 }
 # The RADE page (R28: the newer-version notice points here, not to the app page; the Administrator, 2026-11-17).
-$radeUrl = 'https://rhope-ops.github.io/RADE'
+$radeUrl = '@@RADE_PAGE@@'   # from apps.json "page" (fleet v2 DEC 7)
 function Get-NewerVersion {
   # Reads rade-release.json in the app repository (data, not code): { "apps": { "<app name>": "<version>" } }.
   # Returns that version when it is newer than the one this bundle installs, else ''. Short timeout; any failure is silent.

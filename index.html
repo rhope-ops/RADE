@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>RADE</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-bLwrLRX1y4FtVUdylXW1xe9caAKWZhbBXmWdVohYKbs='; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://raw.githubusercontent.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1xNS9y9iWJ1jcP0MdL0vv9VJfx98UyOIbAqFsUHx1M8='; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://raw.githubusercontent.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png">
@@ -143,7 +143,7 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
     <p class="small mut">Need help? Ask in the Teams channel <strong>RHOPE-OPS</strong>.</p>
     <!-- <<< site:key-facts -->
 </div></section>
-<footer class="row bottom"><a href="https://github.com/rhope-ops/RADE">Repository</a><a id="back" href="#" hidden>Back</a><span class="state" id="state"></span></footer>
+<footer class="row bottom"><a id="repo" hidden>Repository</a><a id="back" href="#" hidden>Back</a><span class="state" id="state"></span></footer>
 <div class="bar" aria-hidden="true"><i id="bar"></i></div>
 </div>
 <script>
@@ -219,6 +219,7 @@ function start(){
   show({bar:10,state:'Loading',body:[caps('RADE'),h('h1',null,'Getting the list of applications.')]});
   get('apps.json',true).then(function(c){
     HELP=c.help||'';
+    var rl=document.getElementById('repo');if(/^[\w.-]+\/[\w.-]+$/.test(String(c.repo||''))){rl.href='https://github.com/'+c.repo;rl.hidden=false}   // the Repository link (one place: apps.json, DEC 7)
     document.getElementById('team').hidden=!HELP;document.getElementById('chan').textContent=HELP;   // the band shows the channel name (one place: apps.json)
     APPS=(c.apps||[]).map(function(a){return {repo:a.repo,base:a.base||('https://raw.githubusercontent.com/'+a.repo+'/main/'),manifest:a.manifest}});
     if(!APPS.length){show({state:'No applications',body:[caps('RADE'),h('h1',null,'No application is available yet.'),helpLine()]});return}

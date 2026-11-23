@@ -29,7 +29,7 @@ function Get-Progress {
 }
 $script:secret = @(); $script:dodid = ''; $script:child = $null; $script:runLog = $null; $script:resultsDir = ''; $script:draftMade = $false; $script:textMode = $false; $script:helped = @{}; $stepMinutes = 30
 $script:statusBase = ''; $script:stepStart = $null; $script:stepEst = 0; $script:noWindowWhy = ''; $script:ranSteps = @(); $script:prog = $null; $script:roundStart = Get-Date
-$helpChannel = 'RHOPE-OPS'   # a placeholder name (the Administrator, 14 Nov 26); a name only, never a link or an address
+$helpChannel = '@@HELP@@'   # from apps.json "help" (fleet v2 DEC 7); a name only, never a link or an address
 $script:checkResults = @{}; $script:closing = $false; $script:guideUi = $null; $checkGate = $true   # tests turn the gate off to run steps
 $script:checkHost = $null; $script:savedWhy = @{}
 function Select-App([int]$I) {
