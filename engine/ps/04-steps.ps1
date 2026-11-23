@@ -24,7 +24,7 @@ function Get-StepStartInfo([string]$Base, $Step, [string]$Answer, [scriptblock]$
   # No -ExecutionPolicy setting (fleet v2, DEC 3: Group Policy governs). A RADE started from an old shortcut hands its
   # setting down in this variable as "Bypass": take only that value out (any other value a person set stays), so a step
   # runs as the child check proved it can.
-  if ($psi.EnvironmentVariables['PSExecutionPolicyPreference'] -eq 'Bypass') { $psi.EnvironmentVariables.Remove('PSExecutionPolicyPreference') }
+  if ($psi.EnvironmentVariables['PSExecutionPolicyPreference'] -ceq 'Bypass') { $psi.EnvironmentVariables.Remove('PSExecutionPolicyPreference') }
   $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true
   $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
   try { $envs = Get-StepEnv $Base $Step; foreach ($k in @($envs.Keys)) { $psi.EnvironmentVariables[[string]$k] = [string]$envs[$k] } } catch { & $Say ('    NOTE: the step inputs could not be set: ' + (ConvertTo-Masked $_.Exception.Message)) }

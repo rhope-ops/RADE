@@ -168,7 +168,7 @@ function Invoke-ChildScript([string]$Text, [string]$ArgText, [int]$Seconds, [scr
     # A PowerShell started with -ExecutionPolicy hands that setting to its child processes in this variable (an old RADE
     # shortcut sets "Bypass"): take only that value out, as Get-StepStartInfo does, else a check would say "ran" where a
     # step cannot. Any other value a person set stays.
-    if ($psi.EnvironmentVariables['PSExecutionPolicyPreference'] -eq 'Bypass') { $psi.EnvironmentVariables.Remove('PSExecutionPolicyPreference') }
+    if ($psi.EnvironmentVariables['PSExecutionPolicyPreference'] -ceq 'Bypass') { $psi.EnvironmentVariables.Remove('PSExecutionPolicyPreference') }
     $p = [System.Diagnostics.Process]::Start($psi)
     $script:child = $p   # Exit stops a check too (review R17)
     $outTask = $p.StandardOutput.ReadToEndAsync(); $errTask = $p.StandardError.ReadToEndAsync()
@@ -262,7 +262,7 @@ function Get-ComputerCheck([string]$Id, [scriptblock]$Tick) {
   'child' {
     # Steps run as child scripts with no -ExecutionPolicy setting (DEC 3); a Group Policy can block them. The test script
     # ends with code 8 if a Bypass setting was handed down to it, so "ran" proves a step runs without one.
-    $r = Invoke-ChildScript "if (`$env:PSExecutionPolicyPreference -eq 'Bypass') { exit 8 }`r`n'child ok'`r`nexit 7`r`n" '' 60 $Tick
+    $r = Invoke-ChildScript "if (`$env:PSExecutionPolicyPreference -ceq 'Bypass') { exit 8 }`r`n'child ok'`r`nexit 7`r`n" '' 60 $Tick
     # The policy of each scope that sets one: on a pass the Group Policy scopes only; on a failure every scope, for the ISSM.
     $all = @(); try { $all = @(Get-ExecutionPolicy -List | Where-Object { [string]$_.ExecutionPolicy -ne 'Undefined' } | ForEach-Object { [string]$_.Scope + '=' + [string]$_.ExecutionPolicy }) } catch { $null = $_ }   # no scope list: the detail says none set
     $pol = (@($all | Where-Object { $_ -match '^\w*Policy=' }) -join ', ')

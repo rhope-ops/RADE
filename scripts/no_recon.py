@@ -20,7 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 # What the plain run reads: every file the bundle is made of, the build, and the sample app's scripts.
-SOURCES = ('engine/ps/*.ps1', 'engine/ps/window/*.ps1', 'engine/rade_ui.ps1', 'engine/rade_build.py', 'engine/rade_hash.py', 'tests/fixture-app/**/*.ps1')
+SOURCES = ('engine/ps/*.ps1', 'engine/ps/window/*.ps1', 'engine/*.ps1', 'engine/*.py', 'tests/fixture-app/**/*.ps1')   # every engine file (fleet v2: the 450-line splits made new ones)
 # Kind and pattern, matched in any letter case. Add a word here when a review finds a new way to do the same thing.
 # Allowed on purpose, so no pattern names them: NetworkInformation.IPGlobalProperties (the NIPR guardrail reads this
 # computer's own domain name) and Sockets.SocketException (an error kind the reach check names in its detail).

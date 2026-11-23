@@ -78,7 +78,7 @@ $ui.StartApp = {
   # The installed app opens from its local copy in its own powershell.exe process; then RADE closes.
   $p = Get-StartPath; if (-not $p) { & $ui.Say1 'The start file of this application was not found. Select "Install" to put it back.'; return }
   # No -ExecutionPolicy setting (DEC 3): drop only a "Bypass" handed down by an old RADE shortcut (RADE closes after this)
-  if ($env:PSExecutionPolicyPreference -eq 'Bypass') { Remove-Item -LiteralPath 'Env:PSExecutionPolicyPreference' -ErrorAction SilentlyContinue }
+  if ($env:PSExecutionPolicyPreference -ceq 'Bypass') { Remove-Item -LiteralPath 'Env:PSExecutionPolicyPreference' -ErrorAction SilentlyContinue }
   try { $pr = Start-Process -FilePath (Get-PowerShellExe) -ArgumentList ('-NoProfile -STA -File "' + $p + '"') -WorkingDirectory (Split-Path -Parent $p) -PassThru
     if ($pr) { $null = $pr.Handle }   # Windows PowerShell 5.1 keeps the exit code only when the handle is held
     # A start script that a policy blocks or that fails at once ends within a moment: say so and keep RADE open.
