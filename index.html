@@ -3,11 +3,12 @@
 <title>RADE</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1xNS9y9iWJ1jcP0MdL0vv9VJfx98UyOIbAqFsUHx1M8='; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://raw.githubusercontent.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e141c" media="(prefers-color-scheme: dark)">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png" media="(prefers-color-scheme:light)">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png" media="(prefers-color-scheme:dark)">
-<link rel="stylesheet" href="docs/brand/fulcrum.css">
 <style>
 /* Layout: the RADE window as a page ("One thing", docs/window-design.md): the band
    (the header of the 90-161.Z page: navy to blue, a yellow line under it; the logo, RADE with the tagline under it, and
@@ -71,27 +72,27 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 .bar i{display:block;height:100%;width:0;background:var(--fill,var(--action));transition:width .25s linear}
 .win[data-done] .bar i{background:var(--pass)}
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
-/* Page palette: Fulcrum Minimal (the Administrator, 2026-11-21: "the color palettes need to match Fulcrum"), the kit roles in
-   docs/brand/fulcrum.css; the window keeps engine/ui-tokens.json. Done shows in Fulcrum gold (the Administrator, 2026-11-21). */
-/* Off in forced colours (the system colours win); in more contrast, muted text, edges and the track move to the text
-   colour, as the contrast block below does for the old palette. */
-@media not (forced-colors:active){:root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--bg:var(--fm-page);--navy:var(--fm-page-fg);--text:var(--fm-page-fg);--gray:var(--fm-page-muted);--action:var(--fm-accent);--action-fg:var(--fm-on-accent);--link:var(--fm-page-link);--turn:var(--fm-rule);--fail:var(--fm-page-error);--edge:var(--fm-slate);--track:var(--fm-page-line);--btn:var(--fm-page);--pass:var(--fm-gold)}
-@media (prefers-contrast:more){:root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--gray:var(--fm-page-fg);--edge:var(--fm-page-fg);--track:var(--bg)}}}
-.band{background:var(--fm-band);border-bottom-color:var(--fm-rule)}
-.band .sub,.band .chan{color:var(--fm-band-muted)}
-/* Done in gold gets a thin edge in the page text colour, so the bar stands out from its track (the Administrator, 2026-11-21:
-   gold 1.46:1 against the light track; the edge gives 15:1 against cream). */
-@media not (forced-colors:active){.win[data-done] .bar i{box-shadow:inset 0 0 0 1px var(--fm-page-fg)}}   /* forced colours: system colours only */
+/* Page palette: Option A (fleet v2 DEC 5, 2026-11-23; the Fulcrum mapping of 2026-11-21 is gone): the tokens above.
+   --control: the 1 px edge of the bar track (WCAG 1.4.11: 3:1 or more against the page); --warn: the 1 px edge under the
+   yellow line of the band (the yellow alone is 1.4:1 on a white page). tests/page_test.py computes each ratio. */
+:root{--control:#6c7b8e;--warn:#8a5a00}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--control:#8794a6;--warn:#f2c14e}}
+:root[data-theme="dark"]{--control:#8794a6;--warn:#f2c14e}
+@media not (forced-colors:active){.bar{box-shadow:inset 0 1px 0 var(--control)}.band{box-shadow:0 1px 0 var(--warn)}}
+a{color:var(--link)}
+/* Skip link (WCAG 2.4.1): the first stop of the Tab key; shown only while it has the focus. */
+.skip-link{position:absolute;left:16px;top:-60px;z-index:2;padding:8px 12px;background:var(--bg);color:var(--link);border:2px solid var(--navy)}
+.skip-link:focus{top:8px}
 .about{width:100%;max-width:860px;margin-inline:auto;padding-block:8px 28px}
 /* The README's intro and Summary (scripts/build_site.py writes them from README.md) in a Fulcrum disc: an ink card with a ring, as the logo. */
-.about .disc{background:var(--fm-disc);color:var(--fm-disc-fg);border-radius:14px;padding:22px;box-shadow:inset 0 0 0 5px var(--fm-disc),inset 0 0 0 6px var(--fm-disc-ring)}
+.about .disc{background:var(--btn);color:var(--text);border:1px solid var(--edge);border-radius:14px;padding:22px}
 .about .disc p{margin:0 0 14px;max-width:65ch}
 .about .disc p:last-child{margin-bottom:0}
 .facts{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 16px;margin:0 0 14px;max-width:65ch}
-.facts dt{font-weight:700;color:var(--fm-disc-fg)}
+.facts dt{font-weight:700;color:var(--navy)}
 .facts dd{margin:0}
 .about .small{font-size:.875rem}
-.about .mut{color:var(--fm-disc-muted)}
+.about .mut{color:var(--gray)}
 @media (max-width:520px){.facts{grid-template-columns:1fr;gap:0}.facts dd{margin-bottom:8px}}
 @media (forced-colors:active){.about .disc{box-shadow:none;border:1px solid CanvasText}}
 /* >>> ui-tokens-contrast: generated from engine/ui-tokens.json by scripts/ui_tokens.py --write (do not edit) */
@@ -121,9 +122,10 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 .bar i,.win[data-done] .bar i{forced-color-adjust:none;background:Highlight}
 :focus-visible{outline:3px solid Highlight}}
 </style></head><body>
+<a class="skip-link" href="#main">Skip to the card</a>
 <div class="win" id="win">
 <header class="band"><div class="row band-in"><img class="logo" src="assets/logo/rho-fulcrum-64.png" srcset="assets/logo/rho-fulcrum-64.png 1x, assets/logo/rho-fulcrum-128.png 2x" alt=""><p class="name">RADE</p><p class="sub">Test, deploy, enjoy</p><p class="team" id="team" hidden>TEAMS</p><p class="chan" id="chan"></p></div></header>
-<main class="row stage"><div class="card" id="card" aria-live="polite"><p class="caps">RADE</p><h1>Getting the newest script.</h1></div></main>
+<main class="row stage" id="main" tabindex="-1"><div class="card" id="card" aria-live="polite"><p class="caps">RADE</p><h1>Getting the newest script.</h1></div></main>
 <section class="row about" aria-label="About"><div class="disc">
     <!-- >>> site:intro: generated from README.md by scripts/build_site.py --write (do not edit) -->
     <p>Deploy and test applications on a locked-down work computer from one pasted PowerShell window: checks, files, steps and a results e-mail. RADE checks the computer first, saves the application's files, guides you through each step, and keeps a record of the install. After the install, the application works without RADE.</p>
