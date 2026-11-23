@@ -37,10 +37,27 @@ MARK_B = '<!-- <<< apps -->'
 HASH_LINE = re.compile(r'^\s*# @@BUNDLE-HASH ([0-9a-f]{64}) @@\n')   # the same pattern as index.html scriptCheck()
 
 
+def https_opener():
+    """Return an opener that can read https addresses only (fleet v2; bandit B310).
+
+    It has the proxy, https, redirect and error handlers and no handler for file:, ftp:, data: or http: (UnknownHandler), so such an
+    address, also as the target of a redirect, fails with "unknown url type" and is never read.
+
+    Returns:
+        A urllib.request.OpenerDirector.
+    """
+    opener = urllib.request.OpenerDirector()
+    for h in (urllib.request.ProxyHandler(), urllib.request.HTTPSHandler(), urllib.request.UnknownHandler(), urllib.request.HTTPDefaultErrorHandler(),
+              urllib.request.HTTPRedirectHandler(), urllib.request.HTTPErrorProcessor()):
+        opener.add_handler(h)
+    return opener
+
+
 def fetch(url):
     """Return the text at an https URL (UTF-8), or raise an error that names the URL.
 
-    Only https is read (fleet v2): a file:, ftp: or http: address raises before any request (bandit B310).
+    Only https is read (fleet v2): another scheme raises before any request, and the opener (https_opener) has no
+    handler for another scheme.
 
     Args:
         url: the address to read; it must start with https://.
@@ -54,7 +71,7 @@ def fetch(url):
     if urllib.parse.urlsplit(url).scheme != 'https':
         raise RuntimeError('%s did not load: only https addresses are read' % url)
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={'Cache-Control': 'no-cache'}), timeout=60) as r:
+        with https_opener().open(urllib.request.Request(url, headers={'Cache-Control': 'no-cache'}), timeout=60) as r:
             return r.read().decode('utf-8')
     except Exception as e:   # one message for every network or code error
         raise RuntimeError('%s did not load: %s' % (url, e)) from e
