@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
+import urllib.error
 import build_readme as b
 
 # 1. The steps of the real page: 3 items, entities written as plain characters, no HTML left.
@@ -69,5 +70,13 @@ for u in ['file:///etc/hostname', 'http://example.invalid/x', 'ftp://example.inv
         raise AssertionError('must refuse: %s' % u)
     except RuntimeError as e:
         assert 'only https' in str(e), e
+
+# 6. The opener itself has no handler for another scheme: a file: or http: address fails there too (also after a redirect).
+for u2 in ['file:///etc/hostname', 'http://example.invalid/x']:
+    try:
+        b.https_opener().open(u2, timeout=5)
+        raise AssertionError('the opener must refuse: %s' % u2)
+    except urllib.error.URLError as e:
+        assert 'unknown url type' in str(e), e
 
 print('README rules ok')

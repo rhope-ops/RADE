@@ -24,3 +24,5 @@ skip: engine/fonts/*.ttf
 code-max-line-chars: 200
 code-c1-safety: on
 code-c2: full
+code-strict-gate: on
+dod-security: on
