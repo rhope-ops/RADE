@@ -9,7 +9,6 @@
  "code_standard": {
   "debt": {
    "comment": {
-    "engine/rade_ui.ps1::$ui.BreakLong": 1,
     "engine/rade_ui.ps1::$ui.Check": 1,
     "engine/rade_ui.ps1::$ui.EdgeBad": 1,
     "engine/rade_ui.ps1::$ui.Face": 1,
@@ -17,7 +16,6 @@
     "engine/rade_ui.ps1::$ui.FormDpi": 1,
     "engine/rade_ui.ps1::$ui.GetWrap": 1,
     "engine/rade_ui.ps1::$ui.InField": 1,
-    "engine/rade_ui.ps1::$ui.Ink": 1,
     "engine/rade_ui.ps1::$ui.IsCardText": 1,
     "engine/rade_ui.ps1::$ui.Label": 1,
     "engine/rade_ui.ps1::$ui.LinkBtn": 1,
@@ -27,11 +25,8 @@
     "engine/rade_ui.ps1::$ui.Reflow": 1,
     "engine/rade_ui.ps1::$ui.Ring": 1,
     "engine/rade_ui.ps1::$ui.Sc": 1,
-    "engine/rade_ui.ps1::$ui.SetLeft": 1,
     "engine/rade_ui.ps1::$ui.SetWrap": 1,
     "engine/rade_ui.ps1::$ui.Text": 1,
-    "engine/rade_ui.ps1::$ui.Word": 1,
-    "engine/rade_ui.ps1::$ui.WordW": 1,
     "scripts/build_logo.py::svg": 1,
     "scripts/check_apps.py::main": 1,
     "scripts/check_apps.py::run": 1,
@@ -157,9 +152,7 @@
     "engine/rade_build.py::step_lines": 1,
     "engine/rade_build.py::text_lengths": 1,
     "engine/rade_build.py::use_shared": 1,
-    "engine/rade_ui.ps1::$ui.BreakLong": 1,
     "engine/rade_ui.ps1::$ui.Check": 1,
-    "engine/rade_ui.ps1::$ui.Ink": 1,
     "engine/rade_ui.ps1::$ui.Style": 1,
     "scripts/build_logo.py::svg": 1,
     "scripts/check_apps.py::check": 1,

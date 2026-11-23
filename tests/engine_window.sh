@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # RADE engine tests, the window part: sourced by tests/engine_test.sh (its section "window"), never run alone. Split out
 # of engine_test.sh by the speed audit of 2026-11-17 (docs/code-standard.md C4: a file is at most 600 lines). Uses what
-# engine_test.sh defined before it: $t, $b, $engine_src, swap, ans, go, ok and bad. Starts the background groups W, W2, W3 and W4;
+# engine_test.sh defined before it: $t, $b, $engine_src, $ui_src, swap, ans, go, ok and bad. Starts the background groups W, W2, W3 and W4;
 # engine_test.sh "gather" waits for them and adds their counts.
 # Network: none.
 # Writes: temporary files under the test folder $t, deleted on exit.
@@ -62,7 +62,7 @@ has "WIN turn font=Segoe UI Semibold 12 Bold blue=True head=Kick,Turn down=TopDo
   grep "^WIN steady checking " "$wd/win.txt" | grep -q " moved=0 probe=True" && ! grep -qi "kick=[^=]*your turn" "$wd/win.txt" &&
   [ "$(grep "^WIN view=.* help=[TF][a-z]* turn=" "$wd/win.txt" | awk '{ y = ($0 ~ / light=your turn /); u = ($0 ~ / turn=Your turn$/); s = ($0 ~ / turn=(hidden)?$/); if (y != u || (!y && !s)) n++ } END { print n + 0 }')" = 0 ] &&
   grep -q "^WIN view=hand .* turn=Your turn$" "$wd/win.txt" && grep -q "^WIN view=run .* turn=$" "$wd/win.txt" && ok || { bad "window 1a3: Your turn above the headline, no value moves a control"; grep "WIN turn\|WIN steady" "$wd/win.txt" | cut -c1-400; }
-[ "$(cat $engine_src engine/rade_ui.ps1 | grep -c Consolas)" = 1 ] && grep -qF "mono = @('Consolas', '', 'Consolas')" engine/rade_ui.ps1 && grep -qF "\$ui.Styles.Mono = @('mono', 9, '')" engine/rade_ui.ps1 && [ "$(cat $engine_src engine/rade_ui.ps1 | grep -c 'F\.Mono')" = 1 ] && grep -q "RecText.Font = \$ui.F.Mono" $engine_src && ok || bad "type: Consolas is only the Mono token, and only the Record's text box uses it"
+[ "$(cat $engine_src $ui_src | grep -c Consolas)" = 1 ] && grep -qF "mono = @('Consolas', '', 'Consolas')" engine/rade_ui.ps1 && grep -qF "\$ui.Styles.Mono = @('mono', 9, '')" engine/rade_ui.ps1 && [ "$(cat $engine_src $ui_src | grep -c 'F\.Mono')" = 1 ] && grep -q "RecText.Font = \$ui.F.Mono" $engine_src && ok || bad "type: Consolas is only the Mono token, and only the Record's text box uses it"
 wr="$wd/u/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt"
 ! grep -q "Import the sample flow\|Check this computer" "$wr" && grep -q "^T01 Sample check r1: PASSED" "$wr" && grep -q "^T02 Sample import r1: PASSED (confirmed by you)" "$wr" && ok || { bad "title: the report keeps the step name and never shows the title"; grep -n "Import the sample flow\|Check this computer" "$wr"; }
 # 1b. The hand step's questions after Done: one card each (No, the second choice, a text with an e-mail address), and
@@ -213,7 +213,7 @@ grep -q "^WIN script-warn mismatch view=choose text=\[This script does not match
 grep -q "^WIN topbar title=Redacted Application Deployment Engine · build [^ ]* spot=Test, deploy, enjoy\. shown=True same-font=True right=\[\]$" "$wd/win.txt" && grep -q "right=[0-9]* %\( \|$\)" "$wd/win.txt" && ! grep -q "right=RADE is working\|right=Your turn\|right=[0-9]* % ·" "$wd/win.txt" && ok || bad "top bar: title, tagline spot, percent only"
 # L4: the last card of a test round (after the last step); its text is in the report under its own line, masked. L5: the 2 state texts.
 has "view=feedback light=your turn kick=LAST QUESTION sent=Anything else about this round or the app? p=This is optional. Do not type names or addresses. btn=[Continue]" "right= app=" "WIN feedback max=10000 enter=Continue focus=True" "WIN paste ok=True text=line one line two cut=xxxxx joined=a b c note=" "WIN paste-cut ok=True inserted=3 note=The paste was too long: 1,234 characters did not fit. shown=True" "WIN paste-cut one=The paste was too long: 1 character did not fit." "WIN paste-cut none=[]" 'foot=RADE asks you one last question at the end. Until then, keep this window open.' &&
-  grep -q "^Other feedback: The second card was slow. Mail <EMAIL>" "$wr" && ! grep -q "someone@\|RADE is waiting for you" "$wd/win.txt" "$wr" && [ "$(cat $engine_src engine/rade_ui.ps1 | grep -c "RADE is waiting for you")" = 0 ] && ok || { bad "r31 L4, L5: the last card, its report line, the state texts"; grep "view=feedback\|Other feedback\|foot=" "$wd/win.txt" "$wr" | cut -c1-260; }
+  grep -q "^Other feedback: The second card was slow. Mail <EMAIL>" "$wr" && ! grep -q "someone@\|RADE is waiting for you" "$wd/win.txt" "$wr" && [ "$(cat $engine_src $ui_src | grep -c "RADE is waiting for you")" = 0 ] && ok || { bad "r31 L4, L5: the last card, its report line, the state texts"; grep "view=feedback\|Other feedback\|foot=" "$wd/win.txt" "$wr" | cut -c1-260; }
 # L7: the now-doing line shows the step's "doing", then a plain sentence for each result line, and a NOW line; none of them is in the log.
 # The Administrator, 2026-11-19: each ends with "...", a long one is cut to 2 lines, and the line keeps one height (Cancel does not move).
 # L8: a step stays on the Run card for the minimum time (engine/window.json minStepMs; the test user sets it to 0 after this one measure).
