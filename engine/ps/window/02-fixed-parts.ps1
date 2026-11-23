@@ -28,7 +28,7 @@ $ui.TopRow = & $ui.LogoRow
 $ui.Logo = & $ui.LogoPic $logoPng 'RADE logo'; if ($ui.Logo) { [void]$ui.TopRow.Controls.Add($ui.Logo) }
 # The title column beside the RADE logo: the word RADE, and under it, when the application has no logo of its own, a thin
 # line and the application name (L2, the Administrator, 2026-11-19: 4 px, a 1 px line as wide as the word, 4 px, ink to
-# ink; $ui.FitHead). The word and the name draw their own text ink-tight ($ui.InkText in engine/rade_ui.ps1).
+# ink; $ui.FitHead). The word and the name draw their own text ink-tight ($ui.InkText in engine/rade_ui_text.ps1).
 $ui.TitleCol = New-Object System.Windows.Forms.FlowLayoutPanel
 $ui.TitleCol.AutoSize = $true; $ui.TitleCol.AutoSizeMode = 'GrowAndShrink'; $ui.TitleCol.FlowDirection = 'TopDown'; $ui.TitleCol.WrapContents = $false
 $ui.TitleCol.Margin = (& $ui.Pad 0 0 0 0); $ui.TitleCol.Padding = (& $ui.Pad 0 0 0 0); $ui.TitleCol.BackColor = $ui.C.White
