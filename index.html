@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>RADE</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-bLwrLRX1y4FtVUdylXW1xe9caAKWZhbBXmWdVohYKbs='; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://raw.githubusercontent.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png" media="(prefers-color-scheme:light)">
@@ -150,9 +152,18 @@ a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-off
 var KEY='rade-page-app-v1';
 var win=document.getElementById('win'),card=document.getElementById('card'),state=document.getElementById('state'),bar=document.getElementById('bar'),back=document.getElementById('back');
 var HELP='',APPS=[],cur=null,load=0;   // load: a counter for each load, so a late answer of an older load is dropped
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+// Safe DOM (fleet v2): every card is built from elements and text nodes, never from an HTML string, so no text from a
+// manifest, a script or a network answer can become markup. h(tag, attrs, children...): an attribute that is null or
+// false is left out, true gives an empty attribute; a child is a node, a text, an array of children, or null (left out).
+function add(e,c){if(c==null||c===false||c===''){return}if(Array.isArray(c)){c.forEach(function(x){add(e,x)});return}e.appendChild(typeof c==='object'?c:document.createTextNode(String(c)))}
+function h(tag,attrs){var e=document.createElement(tag),k;for(k in (attrs||{})){if(attrs[k]!=null&&attrs[k]!==false){e.setAttribute(k,attrs[k]===true?'':String(attrs[k]))}}
+  for(var i=2;i<arguments.length;i++){add(e,arguments[i])}return e}
+function caps(t){return h('p',{'class':'caps'},t)}
+function btn(label,act,primary,focus){return h('button',{type:'button','class':'btn'+(primary?' primary':''),'data-act':act,'data-focus':!!focus},label)}
+function txtLink(a,primary,focus){return h('a',{'class':'btn'+(primary?' primary':''),href:txtUrl(a),target:'_blank',rel:'noopener noreferrer','data-focus':!!focus},'View as .txt',h('span',{'class':'sr'},' (opens in a new tab)'))}
 function num(n){return Number(n).toLocaleString('en-US')}
-function recall(){try{return localStorage.getItem(KEY)}catch(e){return null}}
+// The stored choice is only an owner/name repository text (fleet v2): any other value is dropped, never used.
+function recall(){try{var v=localStorage.getItem(KEY);if(v!=null&&!/^[A-Za-z0-9._-]{1,100}\/[A-Za-z0-9._-]{1,100}$/.test(v)){localStorage.removeItem(KEY);return null}return v}catch(e){return null}}
 function remember(v){try{localStorage.setItem(KEY,v)}catch(e){}}
 function web(u){return /^https:\/\//i.test(String(u||''))?String(u):''}   // links from a manifest: https only
 function get(url,asJson){return fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('code ['+r.status+']');return asJson?r.json():r.text()})}
@@ -182,11 +193,11 @@ function scriptCheck(text,url){
   });
 }
 function checkLine(a){
-  var h=a.check||{state:'none'};
-  if(h.state==='match'){return '<br>Script check: <span class="file">'+esc(h.short)+'</span>, matches the stored hash. The RADE window shows the same value in its title bar.'}
-  if(h.state==='nostored'){return '<br>Script check: <span class="file">'+esc(h.short)+'</span>, no stored value to compare.'}
-  if(h.state==='nocrypto'){return '<br>Script check: hash not available in this browser.'}
-  return '<br>Script check: this script has no hash (an older build).';
+  var c=a.check||{state:'none'};
+  if(c.state==='match'){return [h('br'),'Script check: ',h('span',{'class':'file'},c.short),', matches the stored hash. The RADE window shows the same value in its title bar.']}
+  if(c.state==='nostored'){return [h('br'),'Script check: ',h('span',{'class':'file'},c.short),', no stored value to compare.']}
+  if(c.state==='nocrypto'){return [h('br'),'Script check: hash not available in this browser.']}
+  return [h('br'),'Script check: this script has no hash (an older build).'];
 }
 function show(o){
   win.setAttribute('data-light',o.light||'');
@@ -194,38 +205,39 @@ function show(o){
   bar.style.width=(o.bar==null?0:o.bar)+'%';
   state.textContent=o.state||'';
   back.hidden=!(APPS.length>1&&cur);
-  card.innerHTML=o.html;
+  while(card.firstChild){card.removeChild(card.firstChild)}
+  add(card,o.body);
   var f=card.querySelector('[data-focus]');if(f){f.focus()}
 }
-function helpLine(){return HELP?'<p class="help">For help, ask in the Teams channel <b>'+esc(HELP)+'</b>.</p>':''}
+function helpLine(){return HELP?h('p',{'class':'help'},'For help, ask in the Teams channel ',h('b',null,HELP),'.'):null}
 function failCard(what,found,todo,btns){
-  show({light:'fail',bar:0,state:'FAILED',html:'<p class="caps">Failed</p><h1>'+esc(what)+'</h1>'+
-    '<p>Found: '+esc(found)+'</p><p class="todo"><b>What to do:</b> '+todo+'</p><div class="btns">'+btns+'</div>'+helpLine()});
+  show({light:'fail',bar:0,state:'FAILED',body:[caps('Failed'),h('h1',null,what),
+    h('p',null,'Found: '+found),h('p',{'class':'todo'},h('b',null,'What to do:'),' '+todo),h('div',{'class':'btns'},btns),helpLine()]});
 }
 function start(){
   cur=null;load++;
-  show({bar:10,state:'Loading',html:'<p class="caps">RADE</p><h1>Getting the list of applications.</h1>'});
+  show({bar:10,state:'Loading',body:[caps('RADE'),h('h1',null,'Getting the list of applications.')]});
   get('apps.json',true).then(function(c){
     HELP=c.help||'';
     document.getElementById('team').hidden=!HELP;document.getElementById('chan').textContent=HELP;   // the band shows the channel name (one place: apps.json)
     APPS=(c.apps||[]).map(function(a){return {repo:a.repo,base:a.base||('https://raw.githubusercontent.com/'+a.repo+'/main/'),manifest:a.manifest}});
-    if(!APPS.length){show({state:'No applications',html:'<p class="caps">RADE</p><h1>No application is available yet.</h1>'+helpLine()});return}
+    if(!APPS.length){show({state:'No applications',body:[caps('RADE'),h('h1',null,'No application is available yet.'),helpLine()]});return}
     var last=recall(),pick=APPS.length===1?APPS[0]:APPS.filter(function(a){return a.repo===last})[0];
     if(pick){open(pick)}else{choose()}
   }).catch(function(e){
-    failCard('The list of applications did not load.',e.message||'no answer','Check the network connection, then select "Try again".','<button type="button" class="btn primary" data-act="start" data-focus>Try again</button>');
+    failCard('The list of applications did not load.',e.message||'no answer','Check the network connection, then select "Try again".',btn('Try again','start',true,true));
   });
 }
 function choose(){
   if(cur&&cur.blob){URL.revokeObjectURL(cur.blob);cur.blob=''}   // free the .txt of the application the user left
   cur=null;load++;
-  show({light:'turn',state:num(APPS.length)+' applications',html:'<p class="caps">Choose</p><h1>Which application?</h1><div class="btns">'+
-    APPS.map(function(a,i){return '<button type="button" class="btn app" data-app="'+i+'"'+(i?'':' data-focus')+'><b>'+esc(a.name||a.repo)+'</b></button>'}).join('')+'</div>'+helpLine()});
+  show({light:'turn',state:num(APPS.length)+' applications',body:[caps('Choose'),h('h1',null,'Which application?'),h('div',{'class':'btns'},
+    APPS.map(function(a,i){return h('button',{type:'button','class':'btn app','data-app':i,'data-focus':!i},h('b',null,a.name||a.repo))})),helpLine()]});
 }
 function open(a){
   if(a.blob){URL.revokeObjectURL(a.blob);a.blob=''}
   cur=a;a.url='';a.none=false;remember(a.repo);var my=++load;
-  show({bar:30,state:'Loading',html:'<p class="caps">RADE</p><h1>Getting the newest script.</h1><p class="second">'+esc(a.repo)+'</p>'});
+  show({bar:30,state:'Loading',body:[caps('RADE'),h('h1',null,'Getting the newest script.'),h('p',{'class':'second'},a.repo)]});
   get(a.base+a.manifest,true).then(function(m){
     if(my!==load){return null}
     var b=(m.bundles||[])[(m.bundles||[]).length-1];
@@ -244,7 +256,7 @@ function open(a){
       if(my!==load){return}
       a.check=h;a.loaded=new Date();
       if(h.state==='bad'){   // R6: say so in plain words and stop; no Copy button
-        failCard('The script does not match its hash. Do not run it.',h.why,h.todo||'Select "Try again". If it fails again, do not run the script: ask in the Teams channel.','<button type="button" class="btn primary" data-act="open" data-focus>Try again</button>');
+        failCard('The script does not match its hash. Do not run it.',h.why,h.todo||'Select "Try again". If it fails again, do not run the script: ask in the Teams channel.',btn('Try again','open',true,true));
         return;
       }
       ready(a,false);
@@ -252,17 +264,17 @@ function open(a){
   }).catch(function(e){
     if(my!==load){return}
     // No link to the raw .ps1 file (the Administrator, 20 Nov 26): only the checked text is offered, as .txt, on the Ready card.
-    var link=a.url?'':'<a class="btn" href="https://github.com/'+esc(a.repo)+'">Open the repository</a>';
+    var link=a.url?null:h('a',{'class':'btn',href:'https://github.com/'+a.repo},'Open the repository');
     failCard('The script did not load.',e.message||'no answer',a.none?'No script is published for this application yet. Ask in the Teams channel.':'Check the network connection, then select "Try again".',
-      '<button type="button" class="btn primary" data-act="open" data-focus>Try again</button>'+link);
+      [btn('Try again','open',true,true),link]);
   });
 }
 function facts(a){
   var bytes=(window.TextEncoder?new TextEncoder().encode(a.text).length:a.text.length);
-  return '<p class="second"><span class="file">'+esc(a.file)+'</span><br>'+num(bytes)+' bytes, '+num(a.text.split('\n').length)+' lines'+checkLine(a)+'</p>';
+  return h('p',{'class':'second'},h('span',{'class':'file'},a.file),h('br'),num(bytes)+' bytes, '+num(a.text.split('\n').length)+' lines',checkLine(a));
 }
-var STEPS='<ol><li>Start menu: type ISE and open Windows PowerShell ISE as yourself (not "Run as administrator").</li>'+
-  '<li>File &gt; New. Click in the white script pane. Press Ctrl+V, then F5.</li><li>The RADE window opens. Do what it says.</li></ol>';
+function steps(){return h('ol',null,h('li',null,'Start menu: type ISE and open Windows PowerShell ISE as yourself (not "Run as administrator").'),
+  h('li',null,'File > New. Click in the white script pane. Press Ctrl+V, then F5.'),h('li',null,'The RADE window opens. Do what it says.'))}
 // Read before you paste (the Administrator, 20 Nov 26): "View as .txt" and "Save as .txt" give the text the page already
 // fetched and checked, the same text "Copy script" copies, as a plain-text file (a blob URL, made in the browser, no new
 // download). One blob at a time: open() and choose() free the one of the last load.
@@ -272,19 +284,19 @@ function txtUrl(a){
 }
 function ready(a,copied){
   var t=a.loaded,hm=('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2);
-  show({light:'turn',done:copied,bar:100,state:(copied?'Copied':'Ready')+' · loaded '+hm,html:
-    '<p class="caps">'+esc(a.kind)+'</p><h1>'+(copied?'Copied. Now paste it in PowerShell ISE.':'Copy the script for '+esc(a.name).replace(/-/g,'\u2011')+'.')+'</h1>'+
-    (copied?'':(a.summary?'<p>'+esc(a.summary)+'</p>':''))+facts(a)+
-    '<div class="btns"><button type="button" class="btn primary" data-act="copy" data-focus>'+(copied?'Copy again':'Copy script')+'</button>'+
-    '<a class="btn" href="'+txtUrl(a)+'" target="_blank" rel="noopener">View as .txt<span class="sr"> (opens in a new tab)</span></a>'+
-    '<a class="btn" href="'+txtUrl(a)+'" download="'+esc(a.file.replace(/\.ps1$/i,''))+'.txt">Save as .txt</a>'+(a.home?'<a class="btn" href="'+esc(a.home)+'">Tasks for this application</a>':'')+'</div>'+
-    STEPS+helpLine()});
+  show({light:'turn',done:copied,bar:100,state:(copied?'Copied':'Ready')+' · loaded '+hm,body:[
+    caps(a.kind),h('h1',null,copied?'Copied. Now paste it in PowerShell ISE.':'Copy the script for '+String(a.name).replace(/-/g,'\u2011')+'.'),
+    (!copied&&a.summary)?h('p',null,a.summary):null,facts(a),
+    h('div',{'class':'btns'},btn(copied?'Copy again':'Copy script','copy',true,true),txtLink(a,false,false),
+      h('a',{'class':'btn',href:txtUrl(a),download:a.file.replace(/\.ps1$/i,'')+'.txt'},'Save as .txt'),
+      a.home?h('a',{'class':'btn',href:a.home,rel:'noopener noreferrer'},'Tasks for this application'):null),
+    steps(),helpLine()]});
 }
 function viaArea(t){var x=document.createElement('textarea');x.value=t;x.setAttribute('aria-hidden','true');x.style.position='fixed';x.style.opacity='0';document.body.appendChild(x);x.select();var r=false;try{r=document.execCommand('copy')}catch(e){}document.body.removeChild(x);return r}
 function copy(a){
   var ok=function(){ready(a,true)};
   var no=function(){failCard('The browser blocked the copy.','the clipboard is not available to this page','Select "View as .txt". On that page press Ctrl+A, then Ctrl+C. Then do the steps for PowerShell ISE.',
-    '<a class="btn primary" href="'+txtUrl(a)+'" target="_blank" rel="noopener" data-focus>View as .txt<span class="sr"> (opens in a new tab)</span></a><button type="button" class="btn" data-act="copy">Try again</button>')};
+    [txtLink(a,true,true),btn('Try again','copy')])};
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(a.text).then(ok,function(){viaArea(a.text)?ok():no()})}
   else{viaArea(a.text)?ok():no()}
 }
