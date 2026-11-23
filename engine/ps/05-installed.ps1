@@ -306,8 +306,9 @@ function Add-DesktopIcon([string]$Dir) {
     if (-not $desk -or -not (Test-Path -LiteralPath $desk -PathType Container)) { return $(if ($isDesk) { 'RADE could not find your Desktop folder, so it made no desktop shortcut. Open RADE from the RADE page instead.' } else { 'RADE could not find the folder you chose, so it made no shortcut. Open RADE from the RADE page instead.' }) }
     $lnk = Join-Path $desk 'RADE.lnk'; $args1 = '-NoProfile -STA -WindowStyle Minimized -File "' + $runner + '"'
     if (Test-Path -LiteralPath $lnk) {
-      # A shortcut made by an engine before v36 starts RADE with an -ExecutionPolicy setting: take it out (DEC 3).
-      try { $old = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk); if ([string]$old.Arguments -match '-ExecutionPolicy') { $old.Arguments = $args1; $old.Save() } } catch { $null = $_ }   # a repair that fails leaves the old shortcut; RADE still opens
+      # A shortcut made by an engine before v36 starts RADE with an -ExecutionPolicy setting: take it out (DEC 3). Only a
+      # shortcut RADE made (it starts RADE's own runner file) is changed; any other RADE.lnk is never touched.
+      try { $old = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk); if ([string]$old.Arguments -match '-ExecutionPolicy' -and ([string]$old.Arguments).Contains('"' + $runner + '"')) { $old.Arguments = $args1; $old.Save() } } catch { $null = $_ }   # a repair that fails leaves the old shortcut; RADE still opens
       return ''
     }
     $sh = New-Object -ComObject WScript.Shell; $sc = $sh.CreateShortcut($lnk)
