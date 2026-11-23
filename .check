@@ -9,8 +9,8 @@
 #   audit-<key>: <value>    a setting of the audit, for example `audit-ignore: ref/**`
 #                           (the keys and their defaults: the header of scripts/check_settings.py; a `code-` change
 #                           needs a docs/DECISIONS.md row that names this file)
-# An allowed string or a skip line is added only on the Administrator's request, never by an agent to get past a block (AGENTS.md "Guards and checks").
-# DoD tier and its entries: approved by the Administrator, 2026-11-15 (docs/DECISIONS.md).
+# An allowed string or a skip line is added only on the Maintainer's request, never by an agent to get past a block (AGENTS.md "Guards and checks").
+# DoD tier and its entries: approved by the Maintainer, 2026-11-15 (docs/DECISIONS.md).
 profile: dod
 usaf.dps.mil
 smil.mil
@@ -18,7 +18,7 @@ area.example.smil.mil
 notsmil.mil
 skip: assets/logo/*.png
 skip: tests/fixture-app/flow/SAMPLE-T02-import-r1.zip
-# The RADE fonts: binary OFL font files, not scannable (UI standard v1 B12; the Administrator, 2026-11-20).
+# The RADE fonts: binary OFL font files, not scannable (UI standard v1 B12; the Maintainer, 2026-11-20).
 skip: engine/fonts/*.ttf
 # Code standard and audit settings (the keys: the header of scripts/check_settings.py).
 code-max-line-chars: 200
