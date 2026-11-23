@@ -42,5 +42,5 @@ jobs:
           curl -sSfL -o "$RUNNER_TEMP/gitleaks/checksums.txt" "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
           (cd "$RUNNER_TEMP/gitleaks" && grep " $tarball\$" checksums.txt | sha256sum --check --strict -)
           tar -xzf "$RUNNER_TEMP/gitleaks/$tarball" -C "$RUNNER_TEMP/gitleaks" gitleaks
-      - name: Scan the working tree
-        run: '"$RUNNER_TEMP/gitleaks/gitleaks" detect --no-git --source . --redact'
+      - name: Scan the working tree (-v names the rule, file and line of each finding; --redact hides the value)
+        run: '"$RUNNER_TEMP/gitleaks/gitleaks" detect --no-git --source . --redact -v'
