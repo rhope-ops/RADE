@@ -6,6 +6,9 @@
 3. The Content-Security-Policy meta names the SHA-256 of each inline script, and has no 'unsafe-inline' for scripts.
 4. A referrer meta sets no-referrer.
 Usage: python3 tests/page_test.py [path]   (default: index.html). Run by scripts/check.local.sh.
+Network: none.
+Writes: none.
+Credentials: none.
 """
 import base64
 import hashlib
@@ -17,13 +20,27 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def script_hashes(page):
-    """Return the CSP source text ('sha256-...') of each inline <script> block of the page, in order."""
+    """Return the CSP source text ('sha256-...') of each inline <script> block of the page, in order.
+
+    Args:
+        page: the text of the page.
+
+    Returns:
+        A list of strings such as "'sha256-abc...='", one for each inline script.
+    """
     return ["'sha256-%s'" % base64.b64encode(hashlib.sha256(body.encode('utf-8')).digest()).decode('ascii')
             for body in re.findall(r'<script>(.*?)</script>', page, re.S)]
 
 
 def problems(page):
-    """Return the list of broken rules of the page text (empty when every rule holds)."""
+    """Return the list of broken rules of the page text (empty when every rule holds).
+
+    Args:
+        page: the text of the page.
+
+    Returns:
+        A list of plain-text lines, one for each broken rule.
+    """
     out = []
     scripts = ''.join(re.findall(r'<script>(.*?)</script>', page, re.S))
     for sink in ('innerHTML', 'outerHTML', 'insertAdjacentHTML', 'document.write'):

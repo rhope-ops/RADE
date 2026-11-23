@@ -222,7 +222,7 @@
     "tests/fixture-app/scripts/gov/SAMPLE-T01-check-r1.ps1": 226,
     "tests/net_rules_test.sh": 206,
     "tests/window_driver.ps1": 734,
-    "tests/window_real.py": 219,
+    "tests/window_real.py": 204,
     "tests/window_real_driver.ps1": 473
    },
    "parse": {},

@@ -58,11 +58,13 @@ cmp -s "$lt/assets/logo/logo-rho.svg" assets/logo/logo-rho.svg || { echo "FAIL l
 # App canary (the Administrator, 2026-11-15): this engine and schema still build every real application in apps.json
 # (a read-only copy of each app's main branch; needs network access to github.com). Its own test is offline.
 python3 tests/check_apps_test.py
-if [ "${RADE_OFFLINE:-}" = 1 ]; then echo "SKIP app canary (RADE_OFFLINE=1: no network; not a pass)"; elif [ "$lane" = full ]; then python3 scripts/check_apps.py; else echo "SKIP app canary (fast lane: the full lane runs it)"; fi
+if [ "${RADE_OFFLINE:-}" = 1 ]; then echo "SKIP app canary (RADE_OFFLINE=1: no network; not a pass)"
+elif [ "$lane" = full ]; then python3 scripts/check_apps.py; else echo "SKIP app canary (fast lane: the full lane runs it)"; fi
 # README apps part (the Administrator, 2026-11-21): README.md shows each app's newest script as the RADE page does, written by
 # scripts/build_readme.py --write; the check fails when it is old (needs network access to github.com). Its own test is offline.
 python3 tests/build_readme_test.py
-if [ "${RADE_OFFLINE:-}" = 1 ]; then echo "SKIP README apps part (RADE_OFFLINE=1: no network; not a pass)"; elif [ "$lane" = full ]; then python3 scripts/build_readme.py | tail -3 || exit 1; else echo "SKIP README apps part (fast lane: the full lane runs it)"; fi
+if [ "${RADE_OFFLINE:-}" = 1 ]; then echo "SKIP README apps part (RADE_OFFLINE=1: no network; not a pass)"
+elif [ "$lane" = full ]; then python3 scripts/build_readme.py | tail -3 || exit 1; else echo "SKIP README apps part (fast lane: the full lane runs it)"; fi
 # Engine behavior (deploy v1): the sample bundle built and run in pwsh text mode (started at the top), its layout and its lint.
 if [ -n "$et" ]; then
   if wait "$et"; then et=""; cat "$eo"; else et=""; cat "$eo"; echo "FAIL engine tests (tests/engine_test.sh)"; exit 1; fi

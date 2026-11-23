@@ -22,7 +22,7 @@ assert len(steps) == 3 and steps[0].startswith('1. ') and 'File > New' in steps[
 assert not any('<' in s or '&gt;' in s for s in steps), steps
 try:
     b.page_steps('no list here')
-    raise AssertionError('a page with no STEPS list must fail')
+    raise AssertionError('a page with no steps() list must fail')
 except RuntimeError:
     pass
 
