@@ -4,7 +4,7 @@ The Administrator, 2026-11-17. The kit's core is [code-standard.md](code-standar
 
 ## Settings
 
-Turned on in [.check](../.check) (docs/DECISIONS.md 2026-11-17; the lines moved there from `.code-standard.json` on 2026-11-18): `code-c2: full` (rule C2 full: full docs for each function longer than 10 lines), `code-c1-safety: on` (rule C1 safety, in the strict form below) and `code-max-line-chars: 200` (rule C4 line). Their starting debt is in the baseline and only shrinks. RADE's gate, [scripts/code_standard_gate.py](../scripts/code_standard_gate.py), enforces the rules of the next section; `python3 scripts/code_standard_gate.py --test` proves it (scripts/check.sh runs it).
+Turned on in [.check](../.check) (docs/DECISIONS.md 2026-11-17; the lines moved there from `.code-standard.json` on 2026-11-18): `code-c2: full` (rule C2 full: full docs for each function longer than 10 lines), `code-c1-safety: on` (rule C1 safety, in the strict form below) and `code-max-line-chars: 200` (rule C4 line). Their starting debt is in the baseline and only shrinks. The strict gate enforces the rules of the next section: from kit 11.0.1 the kit's [scripts/code_standard_strict.py](../scripts/code_standard_strict.py), turned on by `code-strict-gate: on` in `.check` (it replaced RADE's own scripts/code_standard_gate.py; docs/DECISIONS.md 2026-11-23); `python3 scripts/code_standard_strict.py --test` proves it (scripts/check.sh runs it).
 
 ## Stricter checked rules
 
@@ -29,4 +29,4 @@ Turned on in [.check](../.check) (docs/DECISIONS.md 2026-11-17; the lines moved 
 
 - Each rule's link to NIST SP 800-218 (SSDF) and the DISA Application Security and Development STIG: [standards-mapping.md](standards-mapping.md).
 - How a reviewer in another unit inspects a RADE app before it runs: [review-guide.md](review-guide.md).
-- Check in this repo: `python3 scripts/code_standard.py` (scripts/check.sh runs it, and the gate's `--test`, in both lanes).
+- Check in this repo: `python3 scripts/code_standard.py` (scripts/check.sh runs it, and the strict gate's `--test`, in both lanes).
