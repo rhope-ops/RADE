@@ -24,14 +24,14 @@ Usage: python3 engine/rade_build.py --app-root DIR [--manifest scripts/paste_bun
 """
 import base64, hashlib, json, re, sys, textwrap
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent)); import rade_hash, rade_tokens, rade_fields   # the bundle hash; the UI tokens and fonts (UI standard v1); the manifest field parts; all beside this file
+sys.path.insert(0, str(Path(__file__).resolve().parent)); import rade_hash, rade_tokens, rade_fields   # the bundle hash; the UI tokens and fonts (UI standard v1); the manifest field parts
 from rade_fields import q, hand_part, restore_part, BACKUP_RE
 from rade_parts import (WINDOW_FILE, ENGINE_DIR, ENGINE_PARTS, WINDOW_PARTS, WINDOW_SLOT, indent, file_sha, engine_text, ENGINE, BASE_CHECKS, CHECK_IDS, START_RE,
     WIN_RESERVED, word_list, BANNER, SHARED_RE, SHARED_LINE, shared_blocks, window_values, site_values, logo_path, SCRIPT_EXTS, ends_in, collect_problems, part_lines)   # engine/rade_parts.py
 
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
 LOGO = ENGINE_ROOT / logo_path()   # RADE's own logo (engine/window.json "logo"): the window and its title-bar icon (Fulcrum, the PFM, 2026-11-20)
-UI_FILES = [ENGINE_ROOT / 'engine/rade_ui.ps1', ENGINE_ROOT / 'engine/rade_ui_text.ps1']   # in this order; the shared UI file: theme tokens, builders and the layout self-check (R28; docs/engine.md "How an app gets the engine")
+UI_FILES = [ENGINE_ROOT / 'engine/rade_ui.ps1', ENGINE_ROOT / 'engine/rade_ui_text.ps1']   # in this order; the shared UI file (R28; docs/engine.md "How an app gets the engine")
 ROOT = None   # the application repo root (--app-root)
 TEXT = {'.ps1', '.json', '.txt', '.md', '.csv'}
 
@@ -105,7 +105,8 @@ def app_lines(b):
         mk = a.get('marker')   # the app's install record on the site (one row of its own list); plain names (a command line, a CAML query)
         marker = '$null'
         if mk:
-            assert re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ]*', mk['list']) and re.fullmatch(r'[A-Za-z0-9]+', mk['key']) and re.fullmatch(r'[A-Za-z0-9_]+', mk['field']), 'app %r: marker list, key and field hold letters and digits only' % a['name']
+            assert (re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ]*', mk['list']) and re.fullmatch(r'[A-Za-z0-9]+', mk['key'])
+                    and re.fullmatch(r'[A-Za-z0-9_]+', mk['field'])), 'app %r: marker list, key and field hold letters and digits only' % a['name']
             assert mode == 'deploy' and 'site-rights' in need, 'app %r: a marker needs mode deploy and a step that needs site-rights' % a['name']
             marker = '@{ List = %s; Key = %s; Field = %s }' % (q(mk['list']), q(mk['key']), q(mk['field']))
         start = a.get('start', '')   # (R28) the app's start script, a plain relative .ps1 path in its install folder; Start runs it after the checks
@@ -211,7 +212,8 @@ def file_parts(b):
 def step_lines(b):
     """Return the $steps lines of the bundle, one per manifest step (kind "guide": a step the PFM does in another
     program, with guide lines, an address to open and a marker file on Done)."""
-    steps = ['$steps += @{ Name = %s; Title = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s; Makes = @(%s); After = @(%s); Optional = $%s; Help = %s }'
+    steps = ['$steps += @{ Name = %s; Title = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; '
+             'Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s; Makes = @(%s); After = @(%s); Optional = $%s; Help = %s }'
              % (q(s['name']), q(s.get('title', '')), q(s['dir']), q(s['file']), 'true' if step_default(s) else 'false',
                 q(s.get('ask', {}).get('param', '')), q(s.get('ask', {}).get('prompt', '')), q(s.get('screenOnly', '')),
                 int(s.get('minutes', 30)), q(s.get('args', '')), q(s.get('note', '')), q(s.get('kind', 'script')),
@@ -302,8 +304,8 @@ def bundle_body(b, ui_text):
     rel = q('https://raw.githubusercontent.com/' + APP['repo'] + '/main/rade-release.json')
     parts = [
         ('Settings', ['$goUrl = %s' % go, '$releaseUrl = %s' % rel, "$webAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) RADE'",
-                      "$logoPng = '%s'" % logo, '$scriptExts = @(' + ', '.join(q(x) for x in SCRIPT_EXTS) + ')', "$appLogoPng = '%s'" % app_logo, rade_tokens.font_lines(), '$ownPatterns = @(' + ', '.join(q(p) for p in APP['own']) + ')', '$round = %s' % q(b['round']),
-                      '$appFolder = %s' % q(APP['folder']), "$usersRoot = 'C:\\Users'"]),
+                      "$logoPng = '%s'" % logo, '$scriptExts = @(' + ', '.join(q(x) for x in SCRIPT_EXTS) + ')', "$appLogoPng = '%s'" % app_logo, rade_tokens.font_lines(),
+                      '$ownPatterns = @(' + ', '.join(q(p) for p in APP['own']) + ')', '$round = %s' % q(b['round']), '$appFolder = %s' % q(APP['folder']), "$usersRoot = 'C:\\Users'"]),
         ('Shared blocks (%d): each is written back into the files that name it' % len(shared), ['$shared = @{}'] + shared),
         ('Files written to this computer (%d)' % len(b['files']), ['$files = @()'] + files),
         ('Steps (%d), downloads, results to collect, clean-up' % len(b['steps']),
@@ -339,7 +341,8 @@ def build(b):
     body = bundle_body(b, ui_text)
     build_id = hashlib.sha256(body.encode('ascii')).hexdigest()[:8]
     modes = {a.get('mode', 'test') for a in b.get('apps', [])} or {'test'}
-    sends = ' on this computer. It sends nothing.' if modes == {'deploy'} else ', then opens an Outlook draft with them (never sent; a deploy makes no draft).' if 'deploy' in modes else ', then opens an Outlook draft with them (never sent).'
+    sends = (' on this computer. It sends nothing.' if modes == {'deploy'} else ', then opens an Outlook draft with them (never sent; a deploy makes no draft).'
+             if 'deploy' in modes else ', then opens an Outlook draft with them (never sent).')
     head = ('<#\n  RADE, round bundle: %s.\n'
             '  GENERATED by the RADE engine (%s engine/rade_build.py, sha256 %s; engine/rade_ui.ps1, sha256 %s; engine/rade_ui_text.ps1, sha256 %s) from %s; do not edit.\n'
             '%s'
@@ -348,7 +351,8 @@ def build(b):
             '  C:\\Users\\<DODID>\\OneDrive - United States Air Force\\RADE\\%s (replacing older copies), runs the steps,\n'
             '  and saves its results in Rounds\\%s%s No download, no admin rights.\n'
             '  To read it: the Contents list below gives the line of each part and file; each part starts with a "# ====" line.\n'
-            '#>\n$buildId = \'%s\'\n$engineRelease = %d\n' % (b['title'], site_values()['@@RADE_REPO@@'], file_sha('engine/rade_build.py'), file_sha('engine/rade_ui.ps1'), file_sha('engine/rade_ui_text.ps1'), MANIFEST, part_lines(), APP['folder'], b['round'], sends, build_id, ENGINE_RELEASE))
+            '#>\n$buildId = \'%s\'\n$engineRelease = %d\n' % (b['title'], site_values()['@@RADE_REPO@@'], file_sha('engine/rade_build.py'), file_sha('engine/rade_ui.ps1'),
+                file_sha('engine/rade_ui_text.ps1'), MANIFEST, part_lines(), APP['folder'], b['round'], sends, build_id, ENGINE_RELEASE))
     return rade_hash.add_line(head + contents(head, body) + body)
 
 
