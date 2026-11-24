@@ -1,0 +1,4 @@
+session_id,written_at,source,agent_id,type,model,status,usd,input,output,cache_read,cache_write,started_at,ended_at,session_usd
+62cbd889-1c7f-55eb-9fe6-f8b7ef817d55,2026-11-24T23:48:26.418Z,main,,,,,5.755055799999999,139,47314,10363286,143798,,,6.051613199999999
+62cbd889-1c7f-55eb-9fe6-f8b7ef817d55,2026-11-24T23:48:26.418Z,subagent,ad7d5dfd061908143,reviewer,claude-opus-5-5,running,0.1523394,4,1483,16092,23889,2026-11-24T23:48:08.536Z,,6.051613199999999
+62cbd889-1c7f-55eb-9fe6-f8b7ef817d55,2026-11-24T23:48:26.418Z,subagent,a39e21b79a160d5c5,reviewer,claude-opus-5-5,running,0.144218,4,632,16110,25668,2026-11-24T23:48:08.552Z,,6.051613199999999
