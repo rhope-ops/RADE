@@ -1,4 +1,4 @@
-![RADE: Test, deploy, enjoy](https://repository-images.githubusercontent.com/1457939479/f568bdbc-a8b6-4c15-b151-da1b3b9bffc3)
+![RADE: Test, deploy, enjoy](docs/assets/RADE-social-preview.png)
 
 # RADE
 <p><b>Redacted Application Deployment Engine</b></p>
