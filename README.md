@@ -31,7 +31,7 @@ Deploy and test applications on a locked-down work computer from one pasted Powe
 
 ### 🔺 The script
 
-RADE has no script of its own. Each application's README has an **Open the script** link to its script, and the steps to run it are at the top of that script. The script you copy is the RADE wrapper with the application inside it: RADE checks the computer, installs the application, and then the application runs without RADE.
+RADE has no script of its own. You copy the script from the README of an application, for example its **Open the script** link. That script is the RADE wrapper with the application inside it. RADE checks the computer and installs the application. Then the application runs without RADE.
 
 ---
 
