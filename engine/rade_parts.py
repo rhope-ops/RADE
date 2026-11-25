@@ -184,7 +184,8 @@ def part_lines():
 # the same words as the RADE page (index.html steps()). ASCII only, and never "#>" (it would end the header comment).
 RUN_STEPS = ('  HOW TO RUN THIS SCRIPT (on a work computer):\n'
              '  1. On this page, press Ctrl+A, then press Ctrl+C.\n'
-             '  2. Open the Start menu, type ISE, then open Windows PowerShell ISE as yourself (not "Run as administrator").\n'
+             '  2. Open the Start menu and type ISE. Click Windows PowerShell ISE (not the x86 one). Do not click Run as administrator.\n'
              '  3. In Windows PowerShell ISE, click File > New.\n'
-             '  4. Click in the white script pane, press Ctrl+V, then press F5.\n'
-             '  5. The RADE window opens. Do what each card in the window tells you.\n\n')
+             '  4. Click in the new empty tab in the top pane, then press Ctrl+V.\n'
+             '  5. Wait until the end of the script shows in the top pane. Then press F5.\n'
+             '  6. If no RADE window opens in 1 minute, copy the red text from the bottom pane and send it to the person who gave you this link.\n\n')
