@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Check RADE manifests against schemas/rade-manifest.schema.json, plus the cross-references a schema cannot express.
 Usage: python3 scripts/check_manifest.py [manifest.json ...]   (default: schemas/examples/*.json)
-Pass = last line "MANIFEST files=N fail=0". Needs jsonschema (PyPI) 4.x.
+Pass = last line "MANIFEST files=N fail=0". Needs jsonschema (PyPI) 4.x: pip install --require-hashes --no-deps -r requirements.txt (hash-pinned).
 """
 import json, sys
 from pathlib import Path
 try:
     from jsonschema import Draft202012Validator
 except ImportError:
-    sys.exit('FAIL jsonschema is missing: pip install "jsonschema>=4,<5"')
+    sys.exit('FAIL jsonschema is missing: pip install --require-hashes --no-deps -r requirements.txt')
 
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = json.loads((ROOT / 'schemas/rade-manifest.schema.json').read_text())
