@@ -311,6 +311,8 @@ Called before each step with the step and its number, or $null.
 function Invoke-Uninstall([string]$Base, [scriptblock]$Tick, [scriptblock]$OnStep) {
   $site = Test-UninstallSite $Base
   if (-not $site.Ok) { return @{ State = 'refused'; Path = ''; Lines = @($site.Lines) } }
+  $blk = Get-InstalledBlock $script:app   # a record RADE must not write (newer, another app's, unreadable): no step runs
+  if ($blk) { return @{ State = 'refused'; Path = ''; Lines = @(('Uninstall cannot run: ' + $blk + '.'), 'Nothing was changed.') } }
   $bk = Invoke-Backup $Base $Tick
   $noBk = @('Uninstall removed nothing: the backup did not save every list.', 'Nothing on the site changed. Select "Uninstall" again.')
   if ($bk.State -ne 'done') { return @{ State = 'no-backup'; Path = ''; Lines = @($noBk + @($bk.Lines)) } }
@@ -342,7 +344,7 @@ function Invoke-Uninstall([string]$Base, [scriptblock]$Tick, [scriptblock]$OnSte
     elseif ($noRec) { 'Every Uninstall step is done, but RADE could not save the install record.' }
     else { 'Uninstall stopped at "' + $stop + '". ' + $done + ' of ' + $all.Count + ' steps done.' })
   $tail = $(if ($whole) { 'Your local files and the backups stay on this computer.' }
-    elseif ($noRec) { 'Select "Uninstall" again: its steps find nothing left to remove, and RADE tries the record again.' }
+    elseif ($noRec) { 'Select "Uninstall" again: RADE saves a backup, runs the steps again and tries to save the record.' }
     else { 'Read the report, fix the cause, then select "Uninstall" again. The backups stay on this computer.' })
   $p = ''
   try { $p = Join-Path (Join-Path $Base 'Uninstall') ('uninstall-' + $stamp + '.txt'); Write-FileWhole $p ((@($head, '') + $lines + @('', 'Log:') + @($log) -join "`r`n") + "`r`n") } catch { $p = '' }
@@ -365,6 +367,11 @@ function Get-InstalledAppName {
   return @($out | Sort-Object -Unique)
 }
 
+# Says whether a record key's folder part is a plain app folder name: letters, digits, space, ".", "_", "-", starting
+# and ending with a letter, digit, "_" or "-" (so Windows cannot trim it to another name), and not Config or Backups.
+# Takes the name; gives back $true or $false.
+function Test-RadeAppName([string]$Name) { return ($Name -cmatch '^[A-Za-z0-9]([A-Za-z0-9 ._-]*[A-Za-z0-9_-])?$' -and $Name -notin 'Config', 'Backups') }
+
 <#
 .SYNOPSIS
 Gives the app folders RADE made in the RADE folder: the folder part of each record's key, and this paste's folder.
@@ -382,7 +389,7 @@ function Get-RadeAppDir {
     if ($k -match '^([^/]+)/') { $names += $Matches[1] } }
   # Only a plain folder name (letters, digits, space, ".", "_", "-"; not "." or ".."), and only a folder right under RADE.
   $root = [System.IO.Path]::GetFullPath((Get-RadePath)).TrimEnd('\', '/')
-  $plain = @($names | Where-Object { $_ -match '^[A-Za-z0-9]([A-Za-z0-9 ._-]*[A-Za-z0-9_-])?$' -and $_ -ne 'Config' } | Sort-Object -Unique)
+  $plain = @($names | Where-Object { Test-RadeAppName $_ } | Sort-Object -Unique)
   return @($plain | ForEach-Object { [System.IO.Path]::GetFullPath((Join-Path $root $_)) } |
     Where-Object { (Split-Path -Parent $_).TrimEnd('\', '/') -eq $root -and (Split-Path -Leaf $_) -ne 'Config' -and (Test-Path -LiteralPath $_ -PathType Container) })
 }

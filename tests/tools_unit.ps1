@@ -436,6 +436,9 @@ $null = New-Item -ItemType Directory -Path (Join-Path $Dir 'RADE\Config\installe
 $odd = @(Get-RadeAppDir | ForEach-Object { Split-Path -Leaf $_ })
 Assert-Case 'remove RADE: a key with ".." or "Config." names no folder; a plain one names its folder' (-not ($odd -contains '..') -and -not ($odd -like 'Config*') -and ($odd -contains 'Other') -and
   @($odd | Where-Object { -not (Test-Path -LiteralPath (Join-Path (Join-Path $Dir 'RADE') $_)) }).Count -eq 0)
+$okNames = @('SampleApp', '90-161.Z', 'App_1', 'A b') | Where-Object { Test-RadeAppName $_ }
+$noNames = @('..', '.', './x', 'Config', 'config', 'Config.', 'x.', 'x ', ' x', '.git', 'Backups', 'C:', '') | Where-Object { Test-RadeAppName $_ }
+Assert-Case 'remove RADE: the app folder name test takes plain names only (no trim to another name, not Config or Backups)' (@($okNames).Count -eq 4 -and @($noNames).Count -eq 0)
 $null = Invoke-RemoveRade
 Assert-Case 'remove RADE: nothing outside the RADE folder is touched' (Test-Path -LiteralPath (Join-Path $Dir 'keep.txt'))
 Write-Host ('TOOLS-UNIT pass=' + $script:pass + ' fail=' + $script:fail)
