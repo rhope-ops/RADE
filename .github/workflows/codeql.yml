@@ -1,6 +1,6 @@
 name: codeql
-# CodeQL code scanning of the Python code (engine/, scripts/, tests/): tool retirement plan P4a (the Maintainer,
-# 2026-11-23; kit docs/reviews/2026-11-23-tr-wd-standard-replacements.md trial 1). It finds a class that bandit does
+# CodeQL code scanning of the Python code that git tracks (engine/, scripts/, tests/; the kit package scripts are the
+# kit's to scan): tool retirement plan P4a (the Maintainer, 2026-11-23; kit docs/reviews/2026-11-23-tr-wd-standard-replacements.md trial 1). It finds a class that bandit does
 # not (for example py/redos). CodeQL has no PowerShell support, so the engine's PowerShell stays with PSScriptAnalyzer.
 # Pull requests and manual runs only, never on push (Actions minutes), as security.yml. Public repo: code scanning is free.
 on:
