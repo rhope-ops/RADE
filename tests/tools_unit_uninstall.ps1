@@ -51,8 +51,10 @@ Assert-Case 'uninstall: the step env holds RADE_MODE=uninstall only during the r
 Assert-Case 'uninstall: a whole Uninstall removes the saved progress of the round (review of PR 194)' (-not (Test-Path -LiteralPath $sp))
 # A record of a newer RADE: Uninstall runs no step and says why (review of PR 194).
 $recPath = (Read-InstalledRaw $key).Path; $recText = [System.IO.File]::ReadAllText($recPath); [System.IO.File]::WriteAllText($recPath, $recText.Replace('rade-installed/2', 'rade-installed/9'))
-$u = Invoke-Uninstall $base $null $null; [System.IO.File]::WriteAllText($recPath, $recText)
-Assert-Case 'uninstall: a record of a newer RADE stops it before the backup and any step' ($u.State -eq 'refused' -and ($u.Lines -join ' ') -like '*may not change `[newer`]*')
+$nbA = @(Get-ChildItem -LiteralPath (Join-Path $base 'Backups') -Directory).Count; Remove-Item -LiteralPath (Join-Path $base 'U01') -Recurse -Force
+$u = Invoke-Uninstall $base $null $null; [System.IO.File]::WriteAllText($recPath, $recText); $nbB = @(Get-ChildItem -LiteralPath (Join-Path $base 'Backups') -Directory).Count
+Assert-Case 'uninstall: a record of a newer RADE stops it before the backup and any step' ($u.State -eq 'refused' -and ($u.Lines -join ' ') -like '*a newer RADE installed*' -and
+  $nbB -eq $nbA -and -not (Test-Path -LiteralPath (Join-Path $base 'U01')))
 # ---- Remove RADE (engine-v40, E3 b, option A): off while an app is installed; then RADE's own files go, Backups stay.
 $keepRec = [System.IO.File]::ReadAllText((Read-InstalledRaw $key).Path)
 $script:app.Uninstall = @(); $null = Save-Installed 'PASSED' $true @{ 'T01-make' = @{ state = 'PASSED'; made = @() } }

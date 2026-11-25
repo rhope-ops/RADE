@@ -1,4 +1,5 @@
-# RADE test: the Maintenance tools Diagnose, Back up and Restore (engine/ps/13-maintenance.ps1), on the engine parts themselves
+# RADE test: the Maintenance tools Diagnose, Back up and Restore (engine/ps/13-maintenance.ps1; Uninstall and Remove RADE in
+# part 2, tools_unit_uninstall.ps1, run at the end), on the engine parts themselves
 # (no bundle, no window), with the fake PnP.PowerShell of tests/fake-pnp (no SharePoint, no network).
 # Run by tests/resume_test.sh: pwsh -NoProfile -File tests/tools_unit.ps1 <scratch folder>.
 # Prints one PASS or FAIL line for each case, then "TOOLS-UNIT pass=N fail=M".

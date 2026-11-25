@@ -312,9 +312,7 @@ function Invoke-Uninstall([string]$Base, [scriptblock]$Tick, [scriptblock]$OnSte
   $site = Test-UninstallSite $Base
   if (-not $site.Ok) { return @{ State = 'refused'; Path = ''; Lines = @($site.Lines) } }
   $blk = Get-InstalledBlock $script:app   # a record RADE must not write (newer, another app's, unreadable): no step runs
-  if ($blk) { $why = 'Uninstall cannot run: the install record of ' + $script:app.Name + ' on this computer is one RADE may not change'
-    $why += ' [' + (Read-InstalledRaw (Get-InstalledKey $script:app)).State + '].'
-    return @{ State = 'refused'; Path = ''; Lines = @($why, 'Nothing was changed. Ask for help in the Teams channel.') } }
+  if ($blk) { return @{ State = 'refused'; Path = ''; Lines = @(('Uninstall cannot run: ' + $blk + '.'), 'Nothing was changed.') } }   # the record's own reason and what to do
   $bk = Invoke-Backup $Base $Tick
   $noBk = @('Uninstall removed nothing: the backup did not save every list.', 'Nothing on the site changed. Select "Uninstall" again.')
   if ($bk.State -ne 'done') { return @{ State = 'no-backup'; Path = ''; Lines = @($noBk + @($bk.Lines)) } }
