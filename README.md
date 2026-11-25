@@ -18,7 +18,7 @@ Deploy and test applications on a locked-down work computer from one pasted Powe
 <tr><td><b>Credentials:</b></td><td>CAC sign-on in a browser window for each run; nothing is stored.</td></tr> <!-- source: engine/ps/16-site-scripts.ps1, Connect-PnPOnline -UseWebLogin -->
 <tr><td><b>Access:</b></td><td>only sees what your account can see; only accepts a DAF SharePoint address.</td></tr> <!-- source: docs/engine.md "Guardrails", Site address -->
 <tr><td><b>Boundary:</b></td><td>nothing leaves DoD365, except the test-round results e-mail (masked counts, sent by hand) until the test rounds end.</td></tr> <!-- source: AGENTS.md "DoD365 boundary" -->
-<tr><td><b>Verifiable:</b></td><td>read the commented code as plain text before you paste it; the window warns when the script does not match its hash.</td></tr> <!-- source: engine/ps/window/05-alignment.ps1 (ScriptWarn); the README "Open as .txt" link -->
+<tr><td><b>Verifiable:</b></td><td>read the commented code as plain text before you paste it; the window warns when the script does not match its hash.</td></tr> <!-- source: engine/ps/window/05-alignment.ps1 (ScriptWarn); each application README "Open the script" link (a .txt file) -->
 <tr><td><b>Accessible:</b></td><td>paste and run via ISE; no code download, no admin rights, no policy change.</td></tr> <!-- source: AGENTS.md "No code fetch at run time"; 90-161.Z ISSM ruling 2026-11-13 -->
 <tr><td><b>Maintenance:</b></td><td>Diagnose, Back up and Restore from the application's card.</td></tr> <!-- source: docs/engine.md "Maintenance run types" -->
 <tr><td><b>Independent:</b></td><td>delete RADE and the application still works.</td></tr> <!-- source: docs/engine.md "RADE and the app", After the install -->
@@ -29,35 +29,9 @@ Deploy and test applications on a locked-down work computer from one pasted Powe
 
 ---
 
-### 🔺 Applications
+### 🔺 The script
 
-<!-- >>> apps: generated from apps.json by scripts/build_readme.py --write (do not edit) -->
-## 90\-161.Z
-
-**Test round R42**
-
-### Copy the script for 90\-161.Z.
-
-Round R42 r1: window r15 with scroll bar room, an endorser answer, a small sign\-in window, and Restore of fake rows.
-
-`90161Z-R42-round-r1.ps1`<br>
-1,438,762 bytes, 16,305 lines<br>
-Script check: `bb3d8429fde2...70f0`, the stored hash ([.sha256.json](https://github.com/rhope-ops/90-161.Z/blob/main/scripts/gov/paste/90161Z-R42-round-r1.ps1.sha256.json)). The RADE window shows the same value in its title bar.
-
-| Link | What to do |
-| --- | --- |
-| **[Copy script](https://github.com/rhope-ops/90-161.Z/blob/main/scripts/gov/paste/90161Z-R42-round-r1.ps1)** | Select "Copy raw file" (the copy button at the top right of the code). Then do the steps below. |
-| **[Open as .txt](https://raw.githubusercontent.com/rhope-ops/90-161.Z/main/scripts/gov/paste/90161Z-R42-round-r1.ps1)** | The script as plain text, to read before you paste. Ctrl+S saves it as a .txt file; Ctrl+A, then Ctrl+C copies it. |
-| **[Tasks for this application](https://github.com/rhope-ops/90-161.Z)** | The 90\-161.Z repository: its tasks and round scripts. |
-
-If one link is blocked on your network, try the other.
-
-1. Start menu: type ISE and open Windows PowerShell ISE as yourself (not "Run as administrator").
-2. File > New. Click in the white script pane. Press Ctrl+V, then F5.
-3. The RADE window opens. Do what it says.
-
-For help, ask in the Teams channel **RHOPE-OPS**.
-<!-- <<< apps -->
+RADE has no script of its own. You copy the script from the README of an application, for example its **Open the script** link. That script is the RADE wrapper with the application inside it. RADE checks the computer and installs the application. Then the application runs without RADE.
 
 ---
 
