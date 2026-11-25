@@ -10,7 +10,8 @@ bundle after line N, as a paste that stops short does. Checks:
   3. such a parse-clean cut never holds a line of the body: it ends before "$script:PasteBody = {" or after its "}";
   4. run in pwsh, with a marker line as the body's first statement: a cut at 50 % ends with an error and runs nothing; a cut
      right before the last line (". $script:PasteBody") runs nothing and prints nothing; the whole copy runs the body
-     (on this computer the body stops at the NIPR check, which prints its one message)..
+     (on this computer the body stops at the NIPR check, which prints its one message);
+  5. a run from text with no file (a script block, as a console paste) still reads its whole text: Script check says "checked".
 The rounds of tests/engine_test.sh run the whole guarded bundle.
 Output: one PASS or FAIL line per check, then "GUARD pass=N fail=M"; exit 1 on a failure. Needs Python 3 and pwsh 7.
 Network: none
@@ -110,6 +111,13 @@ def main():
         code, out = run_cut(tmp, marked, len(marked))
         check('the whole copy runs the body (here: the NIPR stop, as on a computer that is not on NIPR)',
               out.split('\n')[0] == 'BODY RAN' and 'This application cannot be installed in your environment.' in out, out[-300:])
+        # A run with no file and no ISE pane: the text as one script block (as a console paste is). Its runner copy and
+        # Script check read the whole text through $script:PasteOuter (engine/ps/05-installed.ps1).
+        f = tmp / 'whole-text.ps1'
+        f.write_text('\n'.join(lines) + '\n', encoding='ascii')
+        r = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', ". ([scriptblock]::Create([IO.File]::ReadAllText('%s'))); Write-Output $script:scriptCheck.Line" % f],
+                           capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=120)
+        check('a run with no file reads its whole text (Script check says checked)', '(checked)' in r.stdout, (r.stdout + r.stderr)[-300:])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     bad = RESULTS.count(False)
