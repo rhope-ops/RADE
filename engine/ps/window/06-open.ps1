@@ -67,7 +67,7 @@ $ui.TourCards = @(
   @{ S = 'RADE does most steps. Some steps are yours.'; P = @('When RADE does a step, the bottom right shows its progress. Keep the window open.', 'A yellow line at the top: RADE waits for you. The card says what to do.') },
   @{ S = 'A step that you do has up to three answers.'; P = @('"Done": you did the step and it worked.', '"It failed": the step did not work. RADE then asks what the error said.', '"Skip": you did not do the step. A card shows only the answers that fit its step.') },
   @{ S = 'The results stay on this computer.'; P = @('RADE writes a report into its results folder. RADE sends nothing.', 'After a test round RADE makes an e-mail draft with the results. You read it, and you send it.') },
-  @{ S = 'The Record shows everything.'; P = @('Select "Record" or press F2 to see all checks, steps, files and the log.', 'Select "Help" or press F1 to see this tour again.') })
+  @{ S = 'Details shows everything.'; P = @('Select "Details" or press F2 to see all checks, steps, files and the log.', 'Select "Help" or press F1 to see this tour again.') })
 # The cards that "Help (F1)" can leave and show again: no step or check runs on them, and none waits inside the engine.
 $ui.HelpViews = @('choose', 'maint', 'tools', 'toolres', 'restmark', 'restpick', 'restconfirm', 'site', 'fail', 'need', 'ready', 'nodrive', 'done', 'review', 'stopped', 'noapps', 'booterr')
 # Shows card $I of the tour (0 = the first). "Next" and "Back" move; "Skip the tour" and the last card's button end it.
@@ -242,7 +242,7 @@ $ui.VReady = {
     $n++; $est += (Get-StepWeight $ui.Hist $steps[$k]).Seconds; if (-not $you -and $steps[$k].Kind -eq 'guide') { $you = 'Step ' + $n + ' needs you.' }
   }
   $ids = @($script:appChecks); $warn = @($ids | Where-Object { $script:checkResults[$_].State -eq 'WARNING' })
-  $w1 = ''; if ($warn.Count) { $w1 = 'Warning: ' + (Get-CheckDef $warn[0]).Name + '. ' + $script:checkResults[$warn[0]].Detail + $(if ($warn.Count -gt 1) { ' (and ' + ($warn.Count - 1) + ' more in the Record)' } else { '' }) }
+  $w1 = ''; if ($warn.Count) { $w1 = 'Warning: ' + (Get-CheckDef $warn[0]).Name + '. ' + $script:checkResults[$warn[0]].Detail + $(if ($warn.Count -gt 1) { ' (and ' + ($warn.Count - 1) + ' more in Details)' } else { '' }) }
   # The saved site, by name, before anything is written (the Administrator, 2026-11-15): the steps use it with no
   # question, so a wrong site must show here. On the card only: a card's text never enters the log or the report.
   $siteName = ''; if ((& $ui.NeedSite) -and (Test-SiteUrl (Get-SiteUrl (Get-BasePath)))) { $siteName = ([string](Get-SiteUrl (Get-BasePath))).TrimEnd('/') -replace '^.*/', '' }

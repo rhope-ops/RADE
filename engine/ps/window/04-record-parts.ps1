@@ -10,11 +10,11 @@ foreach ($w in @(36, 30, 34)) { [void]$ui.Rec.ColumnStyles.Add((New-Object Syste
 [void]$ui.Rec.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('AutoSize'))); [void]$ui.Rec.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent', 100)))
 $ui.RecHead = New-Object System.Windows.Forms.FlowLayoutPanel
 $ui.RecHead.AutoSize = $true; $ui.RecHead.WrapContents = $false; $ui.RecHead.BackColor = $ui.C.White; $ui.RecHead.Margin = (& $ui.Pad 0 0 0 4); & $ui.Ring $ui.RecHead
-$ui.RecClose = & $ui.Btn 'compact'; $ui.RecClose.Text = 'Back (Esc)'; $ui.RecClose.AccessibleName = 'Close the Record (Esc)'
-$ui.RecTitle = & $ui.Label $ui.F.Body $ui.C.Navy 9; $ui.RecTitle.Margin = (& $ui.Pad 10 9 0 0); $ui.RecTitle.Text = 'Record'; $ui.RecTitle.Visible = $true
+$ui.RecClose = & $ui.Btn 'compact'; $ui.RecClose.Text = 'Back (Esc)'; $ui.RecClose.AccessibleName = 'Close Details (Esc)'
+$ui.RecTitle = & $ui.Label $ui.F.Body $ui.C.Navy 9; $ui.RecTitle.Margin = (& $ui.Pad 10 9 0 0); $ui.RecTitle.Text = 'Details'; $ui.RecTitle.Visible = $true
 # R33 (the PFM, 19 Nov 26): the check list and the step list are drawn, so they cannot be selected; Copy all puts the whole
 # Record (the checks with each detail, the steps, the files and the log) on the clipboard as plain text ($ui.RecAll).
-$ui.RecCopy = & $ui.Btn 'compact'; $ui.RecCopy.Text = 'Copy all'; $ui.RecCopy.AccessibleName = 'Copy the whole Record as text'
+$ui.RecCopy = & $ui.Btn 'compact'; $ui.RecCopy.Text = 'Copy all'; $ui.RecCopy.AccessibleName = 'Copy all of Details as text'
 [void]$ui.RecHead.Controls.Add($ui.RecClose); [void]$ui.RecHead.Controls.Add($ui.RecCopy); [void]$ui.RecHead.Controls.Add($ui.RecTitle)
 $ui.RecChecks = New-Object System.Windows.Forms.Panel
 $ui.RecChecks.Dock = 'Top'; $ui.RecChecks.BackColor = $ui.C.White; $ui.RecChecks.AccessibleRole = 'StaticText'; $ui.RecChecks.AccessibleName = 'Checks'

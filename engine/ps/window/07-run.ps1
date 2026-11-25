@@ -168,9 +168,9 @@ $ui.VDone = {
     # The first step that needs review, with its help line from the manifest; the rest is in the Record.
     $one = ''; $what = ''; $more = 0
     for ($k = 0; $k -lt $sum.Count; $k++) { if ([string]$sum[$k] -match ': (NEEDS REVIEW|FAILED) ') { if ($one) { $more++ } else { $one = [string]$sum[$k]; if ($k + 1 -lt $sum.Count -and [string]$sum[$k + 1] -match '^\s+What to do: ') { $what = ([string]$sum[$k + 1]).Trim() } } } }
-    if (-not $one) { $one = 'A file, the clean-up or a result file needs review. The Record shows which.' }
+    if (-not $one) { $one = 'A file, the clean-up or a result file needs review. Details shows which.' }
     & $ui.SetCard @{ View = 'review'; Light = 'bad'; Kicker = 'Needs review'; Right = 'Needs review'; Sentence = $(if ($dep) { 'The install is not complete.' } else { 'The round needs review.' })
-      P = @(($one + $(if ($more) { ' (and ' + $more + ' more in the Record)' } else { '' })), $what, $(if ($dep) { 'Steps that passed stay done. If you paste the block again, RADE runs only what is left.' } else { $mail }))
+      P = @(($one + $(if ($more) { ' (and ' + $more + ' more in Details)' } else { '' })), $what, $(if ($dep) { 'Steps that passed stay done. If you paste the block again, RADE runs only what is left.' } else { $mail }))
       Help = $(if ($dep) { Get-HelpLine } else { '' }); Note = $(if ($dep) { '"Copy summary" puts the report on the clipboard. Paste it in the channel. Nothing was sent.' } else { '' })
       Buttons = @(@{ Text = 'Copy summary'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Open results folder'; Act = { & $ui.Open } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } })
       Test = (-not $dep); Back = { & $ui.VReady } }

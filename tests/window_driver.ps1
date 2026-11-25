@@ -293,7 +293,7 @@ function global:Step-RadeTools([string]$V) {
   (Get-RadeMain).PerformClick()
 }
 function global:Push-RadeButton([string]$Text) {
-  if ($Text -eq 'Record' -and $ui.RecB.Shown) { $ui.RecB.PerformClick(); return }   # B7: the Record is the link "Record (F2)"
+  if ($Text -eq 'Details' -and $ui.RecB.Shown) { $ui.RecB.PerformClick(); return }   # B7: the Record is the link "Details (F2)"
   if ($Text -in 'Back', 'Back (Esc)' -and $ui.BackB.Shown) { $ui.BackB.PerformClick(); return }   # B6: the one Back pattern
   foreach ($b in $ui.B) { if ($b.Shown -and $b.Text -eq $Text) { $b.PerformClick(); return } }
   throw ('the test user found no button "' + $Text + '" in view ' + $ui.View)
@@ -355,7 +355,7 @@ function global:Push-RadeButton([string]$Text) {
     if ($global:RadeT.Record -and -not $global:RadeT.Opened) {
       $global:RadeT.Opened = $true
       $script:checkResults['ps'] = @{ State = 'PASSED'; Detail = 'Last check: 14 Nov 26'; Fix = 'Version [5.1]'; Saved = $true }   # a reused check, as Get-SavedCheck gives it
-      Push-RadeButton 'Record'
+      Push-RadeButton 'Details'
       $ui.Form.Repaint()
       $all = New-Object 'System.Collections.Generic.List[System.Windows.Forms.Control]'; $ui.Rec.Walk($all)   # the Record's controls: each one that takes the focus has a ring
       foreach ($c in $all) { $t = $c.GetType().Name; if ($t -in 'Button', 'TextBox', 'CheckBox' -and -not ($c.Parent -and $c.Parent.Events.ContainsKey('Paint'))) { Write-Host ('WIN NOFOCUS ' + $t + ' "' + $c.Text + '" in the Record') } }

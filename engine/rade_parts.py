@@ -176,3 +176,15 @@ def part_lines():
     rels = ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS]
     rows = [' '.join('%s, sha256 %s;' % (r, file_sha(r)) for r in rels[k:k + 4]) for k in range(0, len(rels), 4)]
     return '  Engine parts, in run order:\n' + ''.join('    %s\n' % r for r in rows)
+
+
+# The run steps (90-161.Z R43 E1, the PFM, 2026-11-25): the first lines of every bundle after its hash line, so a person
+# who opens the .txt copy from a link sees how to run it before the code. They are in the .ps1 too: the two files are
+# the same bytes (engine/rade_hash.py text_copy). ASD-STE100, one action per step (AGENTS.md "Instructions people follow");
+# the same words as the RADE page (index.html steps()). ASCII only, and never "#>" (it would end the header comment).
+RUN_STEPS = ('  HOW TO RUN THIS SCRIPT (on a work computer):\n'
+             '  1. On this page, press Ctrl+A, then press Ctrl+C.\n'
+             '  2. Open the Start menu, type ISE, then open Windows PowerShell ISE as yourself (not "Run as administrator").\n'
+             '  3. In Windows PowerShell ISE, click File > New.\n'
+             '  4. Click in the white script pane, press Ctrl+V, then press F5.\n'
+             '  5. The RADE window opens. Do what each card in the window tells you.\n\n')
