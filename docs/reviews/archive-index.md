@@ -5,7 +5,6 @@ Files taken out of docs/reviews/ by the archive step (.claude/skills/audit/SKILL
 | Path | Link | Date | Reason |
 |---|---|---|---|
 | docs/reviews/2026-11-14-window-ui-audit.md | https://github.com/rhope-ops/RADE/blob/2ca2ca84efd38c891afd1e60e12ed21bb1c80b57/docs/reviews/2026-11-14-window-ui-audit.md | 2026-11-25 | closed evidence or older record; AGE wait waived (the Maintainer, "do it now") |
-| docs/reviews/2026-11-15-r21-window-notes.md | https://github.com/rhope-ops/RADE/blob/8328a041d63ed5961e0bd6e1e2aa6da6a87652df/docs/reviews/2026-11-15-r21-window-notes.md | 2026-11-25 | closed evidence or older record; AGE wait waived (the Maintainer, "do it now") |
 | docs/reviews/2026-11-16-handoff-detail.md | https://github.com/rhope-ops/RADE/blob/8511a2ee1c9b388e09f162fc55338ce1efe425a6/docs/reviews/2026-11-16-handoff-detail.md | 2026-11-25 | closed evidence or older record; AGE wait waived (the Maintainer, "do it now") |
 | docs/reviews/2026-11-17-code-baseline.md | https://github.com/rhope-ops/RADE/blob/e30df6cfd1b444550431fcc26222124e3285eaa5/docs/reviews/2026-11-17-code-baseline.md | 2026-11-25 | closed evidence or older record; AGE wait waived (the Maintainer, "do it now") |
 | docs/reviews/2026-11-17-test-speed-audit.md | https://github.com/rhope-ops/RADE/blob/f1c792142936179fcd15f2fc46c2cec7e02b4712/docs/reviews/2026-11-17-test-speed-audit.md | 2026-11-25 | closed evidence or older record; AGE wait waived (the Maintainer, "do it now") |
