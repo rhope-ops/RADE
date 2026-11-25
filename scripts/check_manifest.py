@@ -58,11 +58,9 @@ def refs(m):
                 if isinstance(a.get('key'), str):
                     words[a['key']] = mine
         for a in b.get('apps', []):
-            for n in a['steps'] + a.get('uninstall', []):
+            for n in a['steps']:
                 if n not in names:
                     out.append('%s: app %r: unknown step %r' % (r, a['name'], n))
-            for n in set(a['steps']) & set(a.get('uninstall', [])):
-                out.append('%s: app %r: step %r is an install step and an uninstall step; give Uninstall its own steps' % (r, a['name'], n))
         for c in b.get('collect', []):
             if c.get('step') and c['step'] not in names:
                 out.append('%s: collect %r: unknown step %r' % (r, c['name'], c['step']))

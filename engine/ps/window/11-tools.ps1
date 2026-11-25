@@ -80,7 +80,7 @@ $ui.VRestorePick = {
   dry-run and confirm cards ($ui.RestoreSite). Takes no parameter.
   #>
   $appPath = Get-BasePath; $siteCheck = Test-RestoreSite $appPath
-  if ($siteCheck.NeedMark) { $ui.MarkNext = $ui.VRestorePick; & $ui.VRestoreMark; return }
+  if ($siteCheck.NeedMark) { $ui.MarkNext = $ui.VRestorePick; $ui.MarkBack = $ui.ToolsBack; & $ui.VRestoreMark; return }
   if (-not $siteCheck.Ok) { & $ui.ToolResult 'Restore' @{ State = 'refused'; Path = ''; Lines = $siteCheck.Lines }; return }
   $ui.RestoreSite = [string]$siteCheck.Name; $marked = [bool]$script:app.Restore.Local   # Ok with "local": the site is marked
   $ui.RestoreSets = @(Get-BackupSet $appPath)
@@ -92,6 +92,11 @@ $ui.VRestorePick = {
   & $ui.SetCard @{ View = 'restpick'; Kicker = [string]$ui.Kick.Text; Sentence = 'Which backup does Restore use?'
     P = @('Restore first runs a dry run on the site and shows what it would put back. Nothing is written before you confirm.')
     Options = $rows; OnOption = { param($j) & $ui.RestorePlan $j }; Buttons = $buttons; Back = { & $ui.VTools $ui.MaintVerb } } }
+
+# The Back target of the mark card from Restore (engine-v40): the Maintenance screen. Takes nothing.
+$ui.ToolsBack = { & $ui.VTools $ui.MaintVerb }
+# The Back target of the mark card from Uninstall (engine-v40): the Maintenance card. Takes nothing.
+$ui.MaintBack = { & $ui.VMaint $ui.MaintInst }
 
 # The "Remove test-site mark" button (engine-v33; the Administrator, 2026-11-21): a secondary button on the backup card
 # and on the no-backup result card of a marked site. Takes nothing; gives back the button table.
@@ -119,7 +124,7 @@ $ui.VRestoreMark = {
   & $ui.SetCard @{ View = 'restmark'; Light = 'you'; Kicker = [string]$ui.Kick.Text; Sentence = 'Is the saved site a test site?'
     P = @('Restore and Uninstall change only a test site. To mark the saved site as one, type its name: the part of its address after the last /.', $where)
     Field = @{ Label = 'Site name'; Text = ''; Name = 'The site name, to mark the saved site as a test site'; Max = 200 }; Focus = 'field'
-    Buttons = @(@{ Text = 'Mark as test site'; Kind = 'primary'; Act = { & $ui.RestoreMarkGo } }); Back = { & $ui.VTools $ui.MaintVerb } } }
+    Buttons = @(@{ Text = 'Mark as test site'; Kind = 'primary'; Act = { & $ui.RestoreMarkGo } }); Back = $(if ($ui.MarkBack) { $ui.MarkBack } else { { & $ui.VTools $ui.MaintVerb } }) } }
 
 # Restore, the mark card's button: checks the typed name against the saved site (without case; a pasted full address
 # counts too), saves the mark, then shows card 1. Takes nothing.
@@ -197,7 +202,8 @@ $ui.VUninstall = {
   #>
   if ($ui.Busy) { return }
   $siteCheck = Test-UninstallSite (Get-BasePath)
-  if ($siteCheck.NeedMark) { $ui.MarkNext = $ui.VUninstall; & $ui.VRestoreMark; return }
+  # The mark card goes on to this card, and its Back returns to the Maintenance card.
+  if ($siteCheck.NeedMark) { $ui.MarkNext = $ui.VUninstall; $ui.MarkBack = $ui.MaintBack; & $ui.VRestoreMark; return }
   if (-not $siteCheck.Ok) { & $ui.ToolResult 'Uninstall' @{ State = 'refused'; Path = ''; Lines = @($siteCheck.Lines) }; return }
   $ui.UninstallSite = [string]$siteCheck.Name; $all = @($script:app.Uninstall); $n = @($script:app.Backup).Count
   $rows = @(for ($i = 0; $i -lt $all.Count; $i++) { $st = $steps[[int]$all[$i]]
@@ -232,3 +238,42 @@ $ui.UninstallGo = {
   finally { $ui.Busy = $false }
   if ($ui.Form.IsDisposed -or $script:closing) { return }
   & $ui.ToolResult 'Uninstall' $res }
+
+$ui.VRemoveRade = {
+  <#
+  .SYNOPSIS
+  Remove RADE from this computer, its first card (engine-v40; 90-161.Z R43 E3 b, the PFM, 2026-11-25: option A).
+  .DESCRIPTION
+  While any app is installed (view rmblock) the card names those apps and says to uninstall them first; nothing can be
+  removed. Else the confirm card (view rmrade): what goes to the Recycle Bin and what stays, the box "Type RADE to
+  confirm" and the dark red button "Remove RADE". Takes no parameter.
+  #>
+  if ($ui.Busy) { return }
+  $apps = @(Get-InstalledAppName)
+  if ($apps.Count) { & $ui.SetCard @{ View = 'rmblock'; Light = 'bad'; Sentence = 'Uninstall these apps first.'
+      P = @('Remove RADE is off while an app is installed. Uninstall each app from its Maintenance card, then select "Remove RADE" again.'); Lines = $apps
+      Buttons = @(@{ Text = 'Done'; Kind = 'primary'; Act = { & $ui.VChoose } }); Back = { & $ui.VChoose } }; return }
+  $what = 'RADE moves these to the Recycle Bin: RADE\Config, the RADE runner, the RADE shortcut, and the files in each app folder. The Backups folders stay.'
+  & $ui.SetCard @{ View = 'rmrade'; Light = 'you'; Sentence = 'Remove RADE from this computer?'
+    P = @('No app is installed.', $what, 'To use RADE again later, paste a RADE script again.')
+    Field = @{ Label = 'Type RADE to confirm'; Text = ''; Name = 'The word RADE, to confirm Remove RADE' }; Focus = 'field'
+    Buttons = @(@{ Text = 'Remove RADE'; Kind = 'danger'; Act = { & $ui.RemoveRadeGo } }); Back = { & $ui.VChoose } } }
+
+$ui.RemoveRadeGo = {
+  <#
+  .SYNOPSIS
+  Remove RADE, the run: checks the typed word, moves the files (Invoke-RemoveRade, part 13), shows the result card.
+  .DESCRIPTION
+  The word must be RADE, in capitals. The result card's one button closes RADE. Takes no parameter.
+  #>
+  if ($ui.Busy) { return }
+  if ($ui.Field.Text.Trim() -cne 'RADE') { & $ui.Say1 'Type RADE in capital letters.'; return }
+  $ui.Busy = $true; $res = $null
+  try { $res = Invoke-RemoveRade }
+  catch { $res = @{ State = 'review'; Path = ''; Lines = @(('Remove RADE stopped with an error [' + $_.Exception.GetType().Name + '].'), 'Close RADE, then open the Recycle Bin to see what moved.') } }
+  finally { $ui.Busy = $false }
+  if ($res.State -eq 'blocked') { & $ui.VRemoveRade; return }   # an app was installed in the meantime
+  $sent = $(if ($res.State -eq 'done') { 'RADE is removed from this computer.' } else { 'RADE did not remove everything.' })
+  & $ui.SetCard @{ View = 'toolres'; Light = $(if ($res.State -eq 'done') { '' } else { 'bad' }); Sentence = $sent
+    P = @($res.Lines | Select-Object -First 2); Lines = @($res.Lines | Select-Object -Skip 2)
+    Buttons = @(@{ Text = 'Close RADE'; Kind = 'primary'; Act = { $ui.Form.Close() } }) } }

@@ -46,6 +46,12 @@ function global:Save-RadeUninstall([string]$bp, [string]$nm) {
       '1 of 2 lists were not saved.') }
   Save-RadeCard 'toolres-uninstall-nobackup'
   $script:app.Uninstall = $keepU
+  # Remove RADE (engine-v40, E3 b): the block card (this app is installed here) and the confirm card (drawn as is: no run).
+  & $ui.VRemoveRade; Save-RadeCard 'rmblock'
+  $what = 'RADE moves these to the Recycle Bin: RADE\Config, the RADE runner, the RADE shortcut, and the files in each app folder. The Backups folders stay.'
+  & $ui.SetCard @{ View = 'rmrade'; Light = 'you'; Sentence = 'Remove RADE from this computer?'; P = @('No app is installed.', $what, 'To use RADE again later, paste a RADE script again.')
+    Field = @{ Label = 'Type RADE to confirm'; Text = ''; Name = 'The word RADE, to confirm Remove RADE' }; Focus = 'field'; Buttons = @(@{ Text = 'Remove RADE'; Kind = 'danger'; Act = {} }); Back = { & $ui.VChoose } }
+  Save-RadeCard 'rmrade'
 }
 
 function global:Save-RadeRestore {

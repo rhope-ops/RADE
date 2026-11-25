@@ -334,11 +334,67 @@ function Invoke-Uninstall([string]$Base, [scriptblock]$Tick, [scriptblock]$OnSte
   finally { $script:stepEnvExtra = $null }
   $whole = ($done -eq $all.Count)
   $left = $all.Count - $done - 1; if (-not $whole -and $left -gt 0) { $lines += ('Not run: ' + $left + ' step(s) after "' + $stop + '".') }
-  $sv = Save-Uninstalled $whole; if ($sv) { $lines += ('NOTE: the install record could not be saved: ' + $sv) }
+  $sv = Save-Uninstalled $whole; if ($sv) { $lines += ('NOTE: the install record could not be saved: ' + $sv); $whole = $false }   # the record still says installed
+  # A whole Uninstall ends saved progress of this round too: a later install must not resume and keep steps whose items are gone.
+  if ($whole) { $cs = Clear-RoundState $Base; if ($cs) { $lines += ('NOTE: the saved progress of this round could not be removed: ' + $cs) } }
   $head = $(if ($whole) { $script:app.Name + ' is uninstalled from the test site. ' + $done + ' of ' + $all.Count + ' steps done.' }
     else { 'Uninstall stopped at "' + $stop + '". ' + $done + ' of ' + $all.Count + ' steps done.' })
   $tail = $(if ($whole) { 'Your local files and the backups stay on this computer.' } else { 'Read the report, fix the cause, then select "Uninstall" again. The backups stay on this computer.' })
   $p = ''
   try { $p = Join-Path (Join-Path $Base 'Uninstall') ('uninstall-' + $stamp + '.txt'); Write-FileWhole $p ((@($head, '') + $lines + @('', 'Log:') + @($log) -join "`r`n") + "`r`n") } catch { $p = '' }
   return @{ State = $(if ($whole) { 'done' } else { 'review' }); Path = $p; Lines = @(@($head, $tail) + $lines) }
+}
+
+# ---- Remove RADE from this computer (engine-v40; 90-161.Z R43 E3 b, the PFM, 2026-11-25: option A, "block"). Off while
+# any app is installed: the card names those apps. Then RADE's own local files go to the Recycle Bin: RADE\Config,
+# RADE\rade-runner.ps1, the RADE shortcut that starts that runner, and in each app folder everything but Backups.
+
+# Gives the names of the apps that this computer's records show as installed (any paste, any engine). A record that
+# cannot be read counts too: RADE cannot tell, so it blocks. Takes nothing; gives back the names (sorted, unique).
+function Get-InstalledAppName {
+  $recDir = Get-RadeConfigFile 'installed'; $out = @()
+  if (-not (Test-Path -LiteralPath $recDir -PathType Container)) { return @() }
+  foreach ($f in @(Get-ChildItem -LiteralPath $recDir -File -Filter '*.json' -ErrorAction SilentlyContinue)) {
+    $j = $null; try { $j = [System.IO.File]::ReadAllText($f.FullName) | ConvertFrom-Json } catch { $j = $null }
+    if (-not $j -or -not [string]$j.key) { $out += 'an app whose record RADE cannot read'; continue }
+    if ($null -ne $j.installed -or [string]$j.schema -ne ('rade-installed/' + $installedSchema)) { $out += ((([string]$j.key) -split '/', 2)[-1] -replace '@[^@]*$', '') } }
+  return @($out | Sort-Object -Unique)
+}
+
+# Gives the app folders RADE made in the RADE folder: the folder part of each record's key, and this paste's folder,
+# when the folder is there. Never Config, never a folder no record names. Takes nothing; gives back full paths.
+function Get-RadeAppDir {
+  $names = @($appFolder); $recDir = Get-RadeConfigFile 'installed'
+  foreach ($f in @(Get-ChildItem -LiteralPath $recDir -File -Filter '*.json' -ErrorAction SilentlyContinue)) {
+    try { $k = [string](([System.IO.File]::ReadAllText($f.FullName) | ConvertFrom-Json).key) } catch { $k = '' }   # a record it cannot read names no folder
+    if ($k -match '^([^/\\:*?"<>|]+)/') { $names += $Matches[1] } }
+  $root = Get-RadePath
+  return @($names | Where-Object { $_ -and $_ -ne 'Config' } | Sort-Object -Unique | ForEach-Object { Join-Path $root $_ } | Where-Object { Test-Path -LiteralPath $_ -PathType Container })
+}
+
+<#
+.SYNOPSIS
+Remove RADE from this computer: moves RADE's own local files to the Recycle Bin, when no app is installed.
+.DESCRIPTION
+Order: the RADE shortcut (only one that starts RADE's own runner; its folder is read from Config first), each app
+folder's items except Backups, the runner, then RADE\Config. Writes nothing on a site. A file that cannot move is named;
+the rest still goes.
+.OUTPUTS
+@{ State; Lines; Path }: State is blocked, done or review; Path is ''.
+#>
+function Invoke-RemoveRade {
+  $apps = @(Get-InstalledAppName)
+  if ($apps.Count) { return @{ State = 'blocked'; Path = ''; Lines = @(@('Uninstall these apps first:') + @($apps | ForEach-Object { '- ' + $_ })) } }
+  $root = Get-RadePath; $runner = Join-Path $root 'rade-runner.ps1'; $items = @(); $bad = @()
+  $sd = Get-ShortcutDir; $lnk = $(if ($sd) { Join-Path $sd 'RADE.lnk' } else { '' })
+  if ($lnk -and (Test-Path -LiteralPath $lnk -PathType Leaf)) {   # only RADE's own shortcut: it starts the runner
+    try { $arg = [string](New-Object -ComObject WScript.Shell).CreateShortcut($lnk).Arguments
+      if ($arg.Contains('"' + $runner + '"')) { $items += @{ P = $lnk; F = $false; N = 'the RADE shortcut' } } } catch { $null = $_ } }   # a shortcut it cannot read is not RADE's: it stays
+  foreach ($d in @(Get-RadeAppDir)) { foreach ($c in @(Get-ChildItem -LiteralPath $d -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'Backups' })) {
+      $items += @{ P = $c.FullName; F = [bool]$c.PSIsContainer; N = ((Split-Path -Leaf $d) + '\' + $c.Name) } } }
+  if (Test-Path -LiteralPath $runner -PathType Leaf) { $items += @{ P = $runner; F = $false; N = 'the RADE runner' } }
+  $cfg = Join-Path $root 'Config'; if (Test-Path -LiteralPath $cfg -PathType Container) { $items += @{ P = $cfg; F = $true; N = 'RADE\Config' } }
+  foreach ($i in $items) { try { Move-ToRecycleBin $i.P -Folder:$i.F } catch { $bad += ('Not moved: ' + $i.N + ' [' + $_.Exception.GetType().Name + ']') } }
+  $head = $(if ($bad.Count) { [string]$bad.Count + ' of ' + $items.Count + ' items did not move to the Recycle Bin.' } else { [string]$items.Count + ' items are in the Recycle Bin.' })
+  return @{ State = $(if ($bad.Count) { 'review' } else { 'done' }); Path = ''; Lines = @(@($head, 'The Backups folders stay. To get an item back, open the Recycle Bin.') + $bad) }
 }

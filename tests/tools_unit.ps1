@@ -10,7 +10,7 @@ param([Parameter(Mandatory = $true)][string]$Dir)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 foreach ($p in '01-base', '02-config', '03-files', '04-steps', '05-installed', '07-checks', '16-site-scripts', '08-saved-checks', '13-maintenance', '14-restore',
-  '15-restore-run') { . (Join-Path $root ('engine/ps/' + $p + '.ps1')) }
+  '15-restore-run', '12-resume') { . (Join-Path $root ('engine/ps/' + $p + '.ps1')) }
 # What a bundle sets before the engine: fake data only.
 $round = 'R01'; $buildId = 'abcd1234'; $engineRelease = 30; $appFolder = 'SampleApp'; $sitePrefix = 'https://usaf.dps.mil/sites/'
 $script:appChecks = @(); $script:runLog = New-Object System.Collections.Generic.List[string]
@@ -399,6 +399,7 @@ $u = Invoke-Uninstall $base $null $null; $e = Read-Installed $key; $env:RADE_FAK
 Assert-Case 'uninstall: a step that is not done stops it; the record stays installed, NEEDS REVIEW' ($u.State -eq 'review' -and $e.installed -and $e.lastRun.state -eq 'NEEDS REVIEW' -and
   @($u.Lines | Where-Object { $_ -like 'Not run: 1 step(s) after "Remove the lists".' }).Count -eq 1 -and $e.steps.Contains('T01-make'))
 # Every step done: the steps see RADE_MODE=uninstall and the made list; the record is not installed, keeps the history.
+$sp = Get-RoundStatePath $base; $null = New-Item -ItemType Directory -Path (Split-Path -Parent $sp) -Force; Set-Content -LiteralPath $sp -Value '{}'   # saved progress of an install round
 $u = Invoke-Uninstall $base $null $null
 $e = Read-Installed $key; $raw = (Read-InstalledRaw $key).Json; $rep = $(if ($u.Path) { Get-Content -LiteralPath $u.Path -Raw } else { '' })
 Assert-Case 'uninstall: every step done clears installed and the steps, lastRun UNINSTALLED' ($u.State -eq 'done' -and -not $e.installed -and $e.steps.Count -eq 0 -and
@@ -408,4 +409,17 @@ Assert-Case 'uninstall: the steps got RADE_MODE=uninstall and RADE_MADE (the rep
 $nBk = @(Get-ChildItem -LiteralPath (Join-Path $base 'Backups') -Directory).Count
 Assert-Case 'uninstall: the step file came from the paste; the backups stay' ((Test-Path -LiteralPath (Join-Path $base 'U01\remove.ps1')) -and $nBk -ge 3)
 Assert-Case 'uninstall: the step env holds RADE_MODE=uninstall only during the run' ($null -eq $script:stepEnvExtra -and (Get-StepEnv $base $steps[1]).RADE_MODE -eq 'deploy')
+Assert-Case 'uninstall: a whole Uninstall removes the saved progress of the round (review of PR 194)' (-not (Test-Path -LiteralPath $sp))
+# ---- Remove RADE (engine-v40, E3 b, option A): off while an app is installed; then RADE's own files go, Backups stay.
+$keepRec = [System.IO.File]::ReadAllText((Read-InstalledRaw $key).Path)
+$script:app.Uninstall = @(); $null = Save-Installed 'PASSED' $true @{ 'T01-make' = @{ state = 'PASSED'; made = @() } }
+$rr = Invoke-RemoveRade
+$cfgThere = Test-Path -LiteralPath (Join-Path $Dir 'RADE\Config')
+Assert-Case 'remove RADE: blocked while an app is installed; the card names it' ($rr.State -eq 'blocked' -and ($rr.Lines -join ' ') -like '*Sample app*' -and $cfgThere)
+[System.IO.File]::WriteAllText((Read-InstalledRaw $key).Path, $keepRec)   # back to the uninstalled record
+Set-Content -LiteralPath (Join-Path $Dir 'RADE\rade-runner.ps1') -Value '# runner'; $null = New-Item -ItemType Directory -Path (Join-Path $Dir 'RADE\Other') -Force
+$rr = Invoke-RemoveRade; $left = @(Get-ChildItem -LiteralPath $base -Force | ForEach-Object { $_.Name })
+Assert-Case 'remove RADE: Config, the runner and the app files go; Backups stays' ($rr.State -eq 'done' -and -not (Test-Path -LiteralPath (Join-Path $Dir 'RADE\Config')) -and
+  -not (Test-Path -LiteralPath (Join-Path $Dir 'RADE\rade-runner.ps1')) -and ($left -join ',') -eq 'Backups')
+Assert-Case 'remove RADE: a folder that no record names stays' (Test-Path -LiteralPath (Join-Path $Dir 'RADE\Other'))
 Write-Host ('TOOLS-UNIT pass=' + $script:pass + ' fail=' + $script:fail)

@@ -51,7 +51,9 @@ $ui.VChoose = {
   & $ui.SetCard @{ View = 'choose'; Sentence = $(if ($dep) { 'Which application do you want to install?' } else { 'Which application do you want to run?' })
     P = @($(if ($nr) { 'A newer round, ' + $nr + ', is in the repository. Close this window and run ' + $nr + ' instead.' } else { '' })); Options = $list; OnOption = { param($j) & $ui.Pick $j }
     PageLink = [bool](@($ui.Newer.Values | Where-Object { $_ }).Count)
-    Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Kind = 'primary'; Act = { & $ui.Boot } } } else { $null })); Foot = $(if ($dep) { '' } else { Get-LastRoundText $ui.Hist }) } }
+    Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Kind = 'primary'; Act = { & $ui.Boot } } } else { $null }),
+      $(if ($dep) { @{ Text = 'Remove RADE'; Kind = ''; Act = { & $ui.VRemoveRade } } } else { $null }))   # engine-v40 (E3 b): deploy bundles only
+    Foot = $(if ($dep) { '' } else { Get-LastRoundText $ui.Hist }) } }
 # Shows "Checking this computer", runs the base checks and then shows Choose; shows the error card when they stop. Takes
 # nothing.
 $ui.Boot = {

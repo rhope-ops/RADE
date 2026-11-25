@@ -57,7 +57,7 @@ RADE has no script of its own. You copy the script from the README of an applica
 | Diagnose | Read-only checks; each finding names its fix | No |
 | Back up | Saves each of the application's lists to your computer | No |
 | Restore | Puts missing rows back, from the Recycle Bin or a backup | Yes: a dry run with counts, then you type the application name |
-| Uninstall | Not built yet | — |
+| Uninstall | Backs up, then runs the application's own Uninstall steps; test sites only. Your local files and backups stay | Yes: you type the application name |
 
 ---
 
@@ -70,7 +70,8 @@ RADE has no script of its own. You copy the script from the README of an applica
 | Do a step that the platform does not let a script do (for example a Power Automate import) | RADE shows numbered steps; do them, then select Done or It failed. |
 | Restore on a site that is not a test site | Restore runs only on the application's test sites. |
 | Restore a person who is not on the site | That field stays empty; fill it in by hand. |
-| Uninstall | Not built yet. Ask in the Teams channel. |
+| Uninstall on a site that is not a test site | Uninstall runs only on the application's test sites. |
+| Remove RADE while an application is installed | Uninstall each application first; then select Remove RADE on the Choose screen. |
 
 ---
 
