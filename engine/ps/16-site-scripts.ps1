@@ -53,8 +53,8 @@ public static void Start(int width, int height, int watchMs, int tickMs, bool si
   Stop();   // a watch that still runs from an earlier call ends first
   lock (gate) { w = width; h = height; one = signInOnly; left = System.Math.Max(1, watchMs / System.Math.Max(1, tickMs));
     if (one) { using (System.Diagnostics.Process me = System.Diagnostics.Process.GetCurrentProcess()) {
-      foreach (System.Diagnostics.ProcessThread t in me.Threads) { EnumThreadWindows((uint)t.Id, mark, System.IntPtr.Zero); } } } }
-  timer = new System.Threading.Timer(Tick, null, tickMs, tickMs); }
+      foreach (System.Diagnostics.ProcessThread t in me.Threads) { EnumThreadWindows((uint)t.Id, mark, System.IntPtr.Zero); } } }
+    timer = new System.Threading.Timer(Tick, null, tickMs, tickMs); } }
 // Ends the watch now (no more ticks). Safe to call when no watch runs.
 public static void Stop() { lock (gate) { left = 0; if (timer != null) { timer.Dispose(); timer = null; } } }
 // Marks one window that exists at the start (signInOnly): it is never sized.
