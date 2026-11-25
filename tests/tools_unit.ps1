@@ -356,9 +356,10 @@ $env:RADE_SIGNIN_TEST = '1'; $sbErr = $null
 # Item 10 (follow-ups 2): -WhatIf starts nothing (no helper type yet); -SignInOnly starts too (the app path), and
 # Stop-SignInSize ends the watch (twice: a second stop with no watch is no error).
 try { . ([scriptblock]::Create($signInSize)); $SignInWatchMs = 300; Start-SignInSize -WhatIf; $wiType = [bool]('RadeSignIn.Size2' -as [type])
-  Start-SignInSize; Start-Sleep -Milliseconds 600; Start-SignInSize -SignInOnly
-  $tf = [RadeSignIn.Size2].GetField('timer', [Reflection.BindingFlags]'NonPublic,Static'); $runs = $null -ne $tf.GetValue($null)
-  Stop-SignInSize; $stopped = $null -eq $tf.GetValue($null); Stop-SignInSize; Start-Sleep -Milliseconds 300 } catch { $sbErr = $_ }
+  # The timer is read by reflection (no user32 here: -SignInOnly stops at its window list, so the plain start is the one checked).
+  Start-SignInSize; $tf = [RadeSignIn.Size2].GetField('timer', [Reflection.BindingFlags]'NonPublic,Static'); $runs = $null -ne $tf.GetValue($null)
+  Stop-SignInSize; $stopped = $null -eq $tf.GetValue($null); Stop-SignInSize
+  Start-SignInSize; Start-Sleep -Milliseconds 600; Start-SignInSize -SignInOnly; Start-Sleep -Milliseconds 300 } catch { $sbErr = $_ }
 Assert-Case 'sign-in window size: Stop-SignInSize ends the watch (its timer is gone; item 10)' ($null -eq $sbErr -and $runs -and $stopped)
 $env:RADE_SIGNIN_TEST = $null
 Assert-Case 'sign-in window size: -WhatIf compiles and starts nothing (item 10)' ($null -eq $sbErr -and -not $wiType)
