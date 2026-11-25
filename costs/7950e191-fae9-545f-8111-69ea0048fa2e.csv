@@ -1,0 +1,2 @@
+session_id,written_at,source,agent_id,type,model,status,usd,input,output,cache_read,cache_write,started_at,ended_at,session_usd
+7950e191-fae9-545f-8111-69ea0048fa2e,2026-11-25T01:00:11.973Z,main,,,,,0.4781028,16,2530,581520,98637,,,0.4781028
