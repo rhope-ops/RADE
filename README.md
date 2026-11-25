@@ -34,20 +34,20 @@ Deploy and test applications on a locked-down work computer from one pasted Powe
 <!-- >>> apps: generated from apps.json by scripts/build_readme.py --write (do not edit) -->
 ## 90\-161.Z
 
-**Test round R41**
+**Test round R42**
 
 ### Copy the script for 90\-161.Z.
 
-Round R41 r1: window r14 with your test site lists (read only), every screen, an endorser answer by list form, and RADE Restore of fake rows.
+Round R42 r1: window r15 with scroll bar room, an endorser answer, a small sign\-in window, and Restore of fake rows.
 
-`90161Z-R41-round-r2.ps1`<br>
-1,434,549 bytes, 16,251 lines<br>
-Script check: `b9b8a8f96b26...4faa`, the stored hash ([.sha256.json](https://github.com/rhope-ops/90-161.Z/blob/main/scripts/gov/paste/90161Z-R41-round-r2.ps1.sha256.json)). The RADE window shows the same value in its title bar.
+`90161Z-R42-round-r1.ps1`<br>
+1,438,762 bytes, 16,305 lines<br>
+Script check: `bb3d8429fde2...70f0`, the stored hash ([.sha256.json](https://github.com/rhope-ops/90-161.Z/blob/main/scripts/gov/paste/90161Z-R42-round-r1.ps1.sha256.json)). The RADE window shows the same value in its title bar.
 
 | Link | What to do |
 | --- | --- |
-| **[Copy script](https://github.com/rhope-ops/90-161.Z/blob/main/scripts/gov/paste/90161Z-R41-round-r2.ps1)** | Select "Copy raw file" (the copy button at the top right of the code). Then do the steps below. |
-| **[Open as .txt](https://raw.githubusercontent.com/rhope-ops/90-161.Z/main/scripts/gov/paste/90161Z-R41-round-r2.ps1)** | The script as plain text, to read before you paste. Ctrl+S saves it as a .txt file; Ctrl+A, then Ctrl+C copies it. |
+| **[Copy script](https://github.com/rhope-ops/90-161.Z/blob/main/scripts/gov/paste/90161Z-R42-round-r1.ps1)** | Select "Copy raw file" (the copy button at the top right of the code). Then do the steps below. |
+| **[Open as .txt](https://raw.githubusercontent.com/rhope-ops/90-161.Z/main/scripts/gov/paste/90161Z-R42-round-r1.ps1)** | The script as plain text, to read before you paste. Ctrl+S saves it as a .txt file; Ctrl+A, then Ctrl+C copies it. |
 | **[Tasks for this application](https://github.com/rhope-ops/90-161.Z)** | The 90\-161.Z repository: its tasks and round scripts. |
 
 If one link is blocked on your network, try the other.
