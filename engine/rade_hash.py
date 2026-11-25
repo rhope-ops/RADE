@@ -21,6 +21,19 @@ import re
 from pathlib import Path
 
 HASH_LINE = '# @@BUNDLE-HASH %s @@\n'
+# The paste guard (tool retirement plan P4a, approved by the Maintainer 2026-11-23; kit docs/reviews/2026-11-23-tr-wd-standard-replacements.md
+# trial 2). The build puts all the text after the header comment into one script block and runs it only from the last
+# lines of the bundle (engine/rade_build.py build: GUARD_START after the header comment, GUARD_END at the end). A paste
+# that is cut short has no closing brace (a parse error: nothing runs) or stops before the last lines (nothing runs).
+# The guard prints nothing, so a good run shows the same lines as before (docs/engine.md "Guardrails": the NIPR stop
+# prints only its one message). The hash compare stays display only
+# (Get-ScriptCheck; docs/specs/bundle-hash.md D5: no stop until a work-computer round proves the paste).
+GUARD_START = ("# ==== Paste guard, start (GENERATED): the text to the guard end is one script block; only the guard end runs it.\n"
+               "$script:PasteBody = {\n")
+GUARD_END = ("}\n"
+             "# ==== Paste guard, end (GENERATED): the script block above runs only from here, so a cut paste runs nothing.\n"
+             "$script:PasteOuter = $MyInvocation   # the whole text (engine/ps/05-installed.ps1 reads it when no file or ISE pane holds it)\n"
+             ". $script:PasteBody\n")
 # The end of the hashed text: the line ends and blank lines after the last line of code (R41: a paste in Windows
 # PowerShell ISE drops the final line end; the Administrator, 2026-11-21). They are left out and one LF stands in their place.
 TRAIL = re.compile(r'(?:\n[ \t]*)+\Z')

@@ -231,7 +231,9 @@ function Get-PowerShellExe {
 $script:selfText = ''
 try { if ($PSCommandPath -and (Test-Path -LiteralPath $PSCommandPath -PathType Leaf)) { $script:selfText = [System.IO.File]::ReadAllText($PSCommandPath) } } catch { $null = $_ }
 if (-not $script:selfText) { try { if ($psISE -and $psISE.CurrentFile) { $script:selfText = [string]$psISE.CurrentFile.Editor.Text } } catch { $null = $_ } }
-if (-not $script:selfText) { try { $script:selfText = [string]$MyInvocation.MyCommand.ScriptBlock } catch { $null = $_ } }
+# In the paste guard (engine/rade_hash.py) this code runs inside the guard's script block, so $MyInvocation is that block's:
+# the guard end saves the whole text's invocation as $script:PasteOuter.
+if (-not $script:selfText) { try { $inv = $(if ($script:PasteOuter) { $script:PasteOuter } else { $MyInvocation }); $script:selfText = [string]$inv.MyCommand.ScriptBlock } catch { $null = $_ } }
 <#
 .SYNOPSIS
 The bundle's own hash check: the line to show, the short form and whether the text matches its first line.
