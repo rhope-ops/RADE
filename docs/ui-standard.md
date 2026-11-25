@@ -33,6 +33,6 @@ engine/fonts holds the three files: a Latin subset of the Sofia Sans release fil
 | Contrast of every pair, and the page's colors | `python3 scripts/ui_tokens.py` (scripts/check.local.sh) |
 | The token block is current | every build (engine/rade_tokens.py `check_tokens`) |
 | B1, B3 to B5, B10 on each card the window shows | the self-check, in a test round and in the Windows job |
-| 100, 125, 150 and 200 %, and a contrast theme | tests/window_real.py: the runs `deploy-*`, `test-small`, `long-*` (100 %), `device125-full`, `device150-half`, `device200-full`, `contrast-full` (a test copy turns `$ui.HighOn` on; the job's own theme stays) |
+| 100, 125, 150, 175 and 200 %, and a contrast theme | tests/window_real.py: the runs `deploy-*`, `test-small`, `long-*` (100 %), `device125-full`, `device150-half`, `device175-full`, `device200-full`, `contrast-full` (a test copy turns `$ui.HighOn` on; the job's own theme stays) |
 | Inventory | `RADE_INVENTORY` = a file: one JSON line per control of each card (card, scale, kind, name, screen box, colors, accessible name, button kind); the Windows job keeps `inventory.jsonl` of each run with its pictures |
-| Not proven in the cloud | a real Windows contrast theme and real 125 % or 200 % scaling on a work computer: a test round is the last proof |
+| Not proven in the cloud | a real Windows contrast theme and real 125 %, 175 % or 200 % scaling on a work computer: a test round is the last proof |

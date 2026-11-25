@@ -45,10 +45,11 @@ RUNS = [
     # 1920 x 1080 screen (956 x 1081 real pixels). The job's screen draws at 100 %, so the test copy of the bundle makes the
     # form scale by 1.5 and reports 144 dpi (DEVICE_150 below); the fonts then grow by 1.5 as they do on that computer.
     ("device150-half", 0, "done", "0", "956x1081", False),
-    # UI standard v1 (the Administrator, 2026-11-20; docs/ui-standard.md "Proof"): the same test round at 125 % and 200 %
+    # UI standard v1 (the Administrator, 2026-11-20; docs/ui-standard.md "Proof"): the same test round at 125 %, 175 % and 200 %
     # (scaled as the 150 % run is: device()), and once with a Windows contrast theme on (CONTRAST: the window takes the
     # system colors from its first frame; the job's theme itself stays as it is).
     ("device125-full", 0, "done", "0", "", False),
+    ("device175-full", 0, "done", "0", "", False),   # 175 % (tool retirement plan P4a, the Maintainer, 2026-11-23)
     ("device200-full", 0, "done", "0", "", False),
     ("contrast-full", 0, "done", "0", "", False),
 ]
@@ -252,9 +253,9 @@ def restore_why(lines):
 
 
 def swaps_for(name):
-    """The swaps of a run's test copy, by the start of its name: device150-, device125-, device200- (the scale) or contrast-.
+    """The swaps of a run's test copy, by the start of its name: device150-, device125-, device175-, device200- (the scale) or contrast-.
     200 % on the job's 1920 x 1080 screen is 960 x 540 at 100 %, smaller than 1020 x 616, so its text may scroll too (main)."""
-    for k, v in (("device150-", DEVICE_150), ("device125-", device(1.25)), ("device200-", device(2)), ("contrast-", CONTRAST)):
+    for k, v in (("device150-", DEVICE_150), ("device125-", device(1.25)), ("device175-", device(1.75)), ("device200-", device(2)), ("contrast-", CONTRAST)):
         if name.startswith(k):
             return v
     return ()
