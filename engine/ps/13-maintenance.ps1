@@ -334,12 +334,16 @@ function Invoke-Uninstall([string]$Base, [scriptblock]$Tick, [scriptblock]$OnSte
   finally { $script:stepEnvExtra = $null }
   $whole = ($done -eq $all.Count)
   $left = $all.Count - $done - 1; if (-not $whole -and $left -gt 0) { $lines += ('Not run: ' + $left + ' step(s) after "' + $stop + '".') }
-  $sv = Save-Uninstalled $whole; if ($sv) { $lines += ('NOTE: the install record could not be saved: ' + $sv); $whole = $false }   # the record still says installed
+  $sv = Save-Uninstalled $whole; $noRec = [bool]($sv -and $whole)
+  if ($sv) { $lines += ('NOTE: the install record could not be saved: ' + $sv); $whole = $false }   # the record still says installed
   # A whole Uninstall ends saved progress of this round too: a later install must not resume and keep steps whose items are gone.
   if ($whole) { $cs = Clear-RoundState $Base; if ($cs) { $lines += ('NOTE: the saved progress of this round could not be removed: ' + $cs) } }
   $head = $(if ($whole) { $script:app.Name + ' is uninstalled from the test site. ' + $done + ' of ' + $all.Count + ' steps done.' }
+    elseif ($noRec) { 'Every Uninstall step is done, but RADE could not save the install record.' }
     else { 'Uninstall stopped at "' + $stop + '". ' + $done + ' of ' + $all.Count + ' steps done.' })
-  $tail = $(if ($whole) { 'Your local files and the backups stay on this computer.' } else { 'Read the report, fix the cause, then select "Uninstall" again. The backups stay on this computer.' })
+  $tail = $(if ($whole) { 'Your local files and the backups stay on this computer.' }
+    elseif ($noRec) { 'Select "Uninstall" again: its steps find nothing left to remove, and RADE tries the record again.' }
+    else { 'Read the report, fix the cause, then select "Uninstall" again. The backups stay on this computer.' })
   $p = ''
   try { $p = Join-Path (Join-Path $Base 'Uninstall') ('uninstall-' + $stamp + '.txt'); Write-FileWhole $p ((@($head, '') + $lines + @('', 'Log:') + @($log) -join "`r`n") + "`r`n") } catch { $p = '' }
   return @{ State = $(if ($whole) { 'done' } else { 'review' }); Path = $p; Lines = @(@($head, $tail) + $lines) }
@@ -361,8 +365,16 @@ function Get-InstalledAppName {
   return @($out | Sort-Object -Unique)
 }
 
-# Gives the app folders RADE made in the RADE folder: the folder part of each record's key, and this paste's folder,
-# when the folder is there. Never Config, never a folder no record names. Takes nothing; gives back full paths.
+<#
+.SYNOPSIS
+Gives the app folders RADE made in the RADE folder: the folder part of each record's key, and this paste's folder.
+.DESCRIPTION
+Only a plain name (letters, digits, space, ".", "_", "-"; it starts and ends with a letter, digit, "_" or "-", so
+Windows cannot trim it to another name), never Config, and only a folder that is there, right under the RADE folder
+(review of PR 194: a key "../x" named the OneDrive folder). A folder that no record names is never given.
+.OUTPUTS
+The full paths of the app folders.
+#>
 function Get-RadeAppDir {
   $names = @($appFolder); $recDir = Get-RadeConfigFile 'installed'
   foreach ($f in @(Get-ChildItem -LiteralPath $recDir -File -Filter '*.json' -ErrorAction SilentlyContinue)) {
@@ -370,9 +382,9 @@ function Get-RadeAppDir {
     if ($k -match '^([^/]+)/') { $names += $Matches[1] } }
   # Only a plain folder name (letters, digits, space, ".", "_", "-"; not "." or ".."), and only a folder right under RADE.
   $root = [System.IO.Path]::GetFullPath((Get-RadePath)).TrimEnd('\', '/')
-  $plain = @($names | Where-Object { $_ -match '^[A-Za-z0-9][A-Za-z0-9 ._-]*$' -and $_ -notmatch '^\.+$' -and $_ -ne 'Config' } | Sort-Object -Unique)
+  $plain = @($names | Where-Object { $_ -match '^[A-Za-z0-9]([A-Za-z0-9 ._-]*[A-Za-z0-9_-])?$' -and $_ -ne 'Config' } | Sort-Object -Unique)
   return @($plain | ForEach-Object { [System.IO.Path]::GetFullPath((Join-Path $root $_)) } |
-    Where-Object { (Split-Path -Parent $_).TrimEnd('\', '/') -eq $root -and (Test-Path -LiteralPath $_ -PathType Container) })
+    Where-Object { (Split-Path -Parent $_).TrimEnd('\', '/') -eq $root -and (Split-Path -Leaf $_) -ne 'Config' -and (Test-Path -LiteralPath $_ -PathType Container) })
 }
 
 <#
