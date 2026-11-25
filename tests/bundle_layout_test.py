@@ -68,8 +68,10 @@ def check_run_steps(text):
     """Check 1b (90-161.Z R43 E1): the numbered run steps are the first lines after the hash line, ASCII, and never end the header."""
     lines = text.split('\n')
     head = text[:text.index('\n#>\n')]
-    check(lines[1] == '<#' and lines[2].strip() == 'HOW TO RUN THIS SCRIPT (on a work computer):' and lines[3].strip().startswith('1. '),
-          'run steps: the first lines after the hash line')
+    check(lines[1] == '<#' and lines[3].strip() == 'HOW TO RUN THIS SCRIPT (on a work computer):' and lines[4].strip().startswith('1. '),
+          'run steps: the first lines after the hash line and the GENERATED line')
+    # engine-v41 (90-161.Z R43): the kit code standard C6 needs GENERATED and its source in the first 15 lines of a generated file.
+    check(any('GENERATED' in l and ' from ' in l for l in lines[:15]), 'run steps: a GENERATED line with its source is in the first 15 lines')
     check(head.isascii() and '#>' not in head[3:], 'run steps: ASCII, and no "#>" inside the header')
     check('\n         . $script:PasteBody\n' in head and lines[-2] == '. $script:PasteBody', 'run steps: step 5 names the real last line of the bundle')
 
