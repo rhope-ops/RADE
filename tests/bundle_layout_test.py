@@ -162,6 +162,26 @@ def check_catch_reasons():
     check(silent == SILENT_CATCHES, 'discarded-error catches with no reason: %d of %d (constant %d)%s' % (silent, total, SILENT_CATCHES, note))
 
 
+def check_uninstall_field():
+    """Check 6 (engine-v40; 90-161.Z R43 E3): the manifest field "uninstall" gives its step numbers, and the build stops
+    for an install step named as an Uninstall step, an unknown step, or an app without mode deploy and "restore"."""
+    sys.path.insert(0, str(ROOT / 'engine'))
+    import rade_fields
+    b = {'steps': [{'name': 'T01'}, {'name': 'U01'}, {'name': 'U02', 'after': ['U01']}]}
+    good = {'name': 'App', 'steps': ['T01'], 'mode': 'deploy', 'restore': {'testSites': 'local'}, 'backup': ['L'], 'uninstall': ['U01']}
+    check(rade_fields.uninstall_part(good, b) == '@(1)' and rade_fields.uninstall_part(dict(good, uninstall=[]), b) == '@()',
+          'uninstall: the step numbers, or @() for none')
+    for why, a in (('an install step', dict(good, uninstall=['T01'])), ('an unknown step', dict(good, uninstall=['U09'])),
+                   ('no restore', {k: v for k, v in good.items() if k != 'restore'}), ('not deploy', dict(good, mode='test')),
+                   ('a step with "after"', dict(good, uninstall=['U02']))):
+        try:
+            rade_fields.uninstall_part(a, b)
+            stopped = False
+        except AssertionError:
+            stopped = True
+        check(stopped, 'uninstall: the build stops for %s' % why)
+
+
 def main():
     """Build the test app and run the checks."""
     with tempfile.TemporaryDirectory() as d:
@@ -176,6 +196,7 @@ def main():
         if bundle:
             check_same_bytes(app, bundle.read_bytes())
         check_build_stops(Path(d), app)
+        check_uninstall_field()
     check_catch_reasons()
     print('LAYOUT pass=%d fail=%d' % (RESULTS.count(True), RESULTS.count(False)))
     return 0 if all(RESULTS) else 1

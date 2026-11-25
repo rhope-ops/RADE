@@ -51,7 +51,9 @@ $ui.VChoose = {
   & $ui.SetCard @{ View = 'choose'; Sentence = $(if ($dep) { 'Which application do you want to install?' } else { 'Which application do you want to run?' })
     P = @($(if ($nr) { 'A newer round, ' + $nr + ', is in the repository. Close this window and run ' + $nr + ' instead.' } else { '' })); Options = $list; OnOption = { param($j) & $ui.Pick $j }
     PageLink = [bool](@($ui.Newer.Values | Where-Object { $_ }).Count)
-    Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Kind = 'primary'; Act = { & $ui.Boot } } } else { $null })); Foot = $(if ($dep) { '' } else { Get-LastRoundText $ui.Hist }) } }
+    Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Kind = 'primary'; Act = { & $ui.Boot } } } else { $null }),
+      $(if ($dep) { @{ Text = 'Remove RADE'; Kind = ''; Act = { & $ui.VRemoveRade } } } else { $null }))   # engine-v40 (E3 b): deploy bundles only
+    Foot = $(if ($dep) { '' } else { Get-LastRoundText $ui.Hist }) } }
 # Shows "Checking this computer", runs the base checks and then shows Choose; shows the error card when they stop. Takes
 # nothing.
 $ui.Boot = {
@@ -116,7 +118,7 @@ $ui.VMaint = { param($Inst)
   $ui.MaintInst = $Inst   # Back on the Maintenance screen shows this card again
   # Maintenance (the Administrator, 2026-11-14; docs/engine.md "Maintenance run types"): shown for an application that is
   # installed. UI standard v1 (the Administrator, 2026-11-20): the card has Start, "Maintenance" (its own screen,
-  # $ui.VTools: Update or Repair, Diagnose, Back up, Restore) and Uninstall set apart; Uninstall has no engine function yet.
+  # $ui.VTools: Update or Repair, Diagnose, Back up, Restore) and Uninstall set apart (engine-v40: $ui.VUninstall, part 11).
   $on = ''; try { $on = $dot + 'installed ' + ([datetime][string]$Inst.at).ToString('d MMM yy', [System.Globalization.CultureInfo]::InvariantCulture) } catch { $null = $_ }
   $verb = 'Install ' + $script:app.Version
   try { $c = ([version][string]$script:app.Version).CompareTo([version][string]$Inst.version); if ($c -gt 0) { $verb = 'Update to ' + $script:app.Version } elseif ($c -eq 0) { $verb = 'Repair' } } catch { $null = $_ }
@@ -124,11 +126,13 @@ $ui.VMaint = { param($Inst)
   # It runs the checks first (Start comes only after they pass: AGENTS.md "RADE and the app"), then starts the application.
   $ui.StartAfter = $false; $startB = $null; $startMain = $false
   if ([string]$script:app.Start -and (Get-StartPath)) { $startMain = ([string]$Inst.version -eq [string]$script:app.Version); $startB = @{ Text = 'Start ' + $script:app.Name; Kind = $(if ($startMain) { 'primary' } else { '' }); Act = { $ui.StartAfter = $true; & $ui.Checks $false } } }
+  # Uninstall (engine-v40): dark red and on for an app with Uninstall steps, else not available (answer 4A).
+  $ui.UninstallB = $(if (@($script:app.Uninstall).Count) { @{ Text = 'Uninstall'; Kind = 'danger'; Act = { & $ui.VUninstall } } } else { @{ Text = 'Uninstall'; Kind = 'dangeroff' } })
   $ui.MaintVerb = $verb   # read when the button is clicked (a scriptblock does not keep this card's local variables)
   & $ui.SetCard @{ View = 'maint'; Kicker = ($script:app.Name + ' ' + $Inst.version + $on); Sentence = 'Maintenance'
     P = @(('Maintenance holds ' + $verb + ', Diagnose, Back up and Restore.'), $(if ($startB) { 'Start runs the checks, then opens ' + $script:app.Name + '.' } else { '' }))
-    Note = 'Uninstall is not in this version of RADE yet.'
-    Buttons = @(@{ Text = 'Uninstall'; Kind = 'dangeroff' }, $startB, @{ Text = 'Maintenance'; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.VTools $ui.MaintVerb } })   # Uninstall first: away from the primary   # B5: 1 primary + 3 others at most
+    Note = $(if (@($script:app.Uninstall).Count) { '' } else { $script:app.Name + ' has no Uninstall steps.' })   # answer 4A of the PFM (2026-11-25)
+    Buttons = @($ui.UninstallB, $startB, @{ Text = 'Maintenance'; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.VTools $ui.MaintVerb } })   # Uninstall first: away from the primary   # B5: 1 primary + 3 others at most
     Back = { & $ui.VChoose } } }
 # The Maintenance screen (the Administrator, 2026-11-20): Update or Repair (works: the checks, then the install run),
 # and the list of Diagnose and Back up (engine-v30) and Restore (engine-v31; docs/engine.md "Maintenance run types").

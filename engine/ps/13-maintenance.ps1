@@ -211,3 +211,212 @@ function Invoke-Backup([string]$Base, [scriptblock]$Tick) {
   $head = $(if ($bad) { [string]$bad + ' of ' + $lists.Count + ' lists were not saved.' } else { 'All ' + $lists.Count + ' lists were saved.' })
   return @{ State = $(if ($bad) { 'failed' } else { 'done' }); Path = $dir; Lines = @(@($head, 'Nothing on the site changed.') + $lines) }
 }
+
+# ---- Uninstall (engine-v40; 90-161.Z R43 E3, the PFM, 2026-11-25; docs/engine.md "Maintenance run types"). RADE gives
+# the mode, the card and the record; the app gives the steps (manifest "uninstall": its own steps, never the install
+# steps). Test sites only (the Restore gate, Test-RestoreSite). Back up first: a backup that misses a list stops it
+# before any step. The steps run with RADE_MODE=uninstall and RADE_MADE (the made list as a JSON file). Local files and
+# the Backups folder stay. Answers 1A, 2A, 4A of the PFM (2026-11-25).
+
+# Says whether Uninstall may run on the saved site: the Restore test-site gate, with Uninstall's own words. Takes the
+# app folder; gives back the Test-RestoreSite table (Ok, Site, Name, NeedMark, Lines).
+function Test-UninstallSite([string]$Base) {
+  $c = Test-RestoreSite $Base
+  $c.Lines = @($c.Lines | ForEach-Object { ([string]$_) -replace 'does not use Restore in this version', 'names no test sites, so Uninstall cannot run' -replace '\bRestore\b', 'Uninstall' })
+  return $c
+}
+
+<#
+.SYNOPSIS
+Writes the files of the Uninstall steps (their script or hand-step file) into the app folder.
+.DESCRIPTION
+A step that came with this paste can then run when the installed version is older. Only those files are written: the
+rest of the app's local copy stays as it is.
+.PARAMETER Base
+The RADE app folder.
+.OUTPUTS
+The number of files written.
+#>
+function Write-UninstallFile([string]$Base) {
+  $n = 0; $utf8Bom = New-Object System.Text.UTF8Encoding $true
+  foreach ($k in @($script:app.Uninstall)) { $s = $steps[[int]$k]; if (-not $s.File) { continue }
+    foreach ($f in @($files | Where-Object { $_.Dir -eq $s.Dir -and $_.Name -eq $s.File })) {
+      $dir = Join-Path $Base $f.Dir; if (-not (Test-Path -LiteralPath $dir -PathType Container)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
+      $path = Join-Path $dir $f.Name
+      if ($f.Kind -eq 'text') { [System.IO.File]::WriteAllText($path, (((Expand-SharedBlock $f.Data) -replace "`r?`n", "`r`n") + "`r`n"), $utf8Bom) }
+      else { [System.IO.File]::WriteAllBytes($path, [System.Convert]::FromBase64String(($f.Data -replace '\s', ''))) }
+      $n++ } }
+  return $n
+}
+
+# Writes the made list of the install record (every step's "made" items: kind and name, no address) to
+# Uninstall\made-<time>.json in the app folder, for the steps (RADE_MADE). Takes the app folder and the time stamp;
+# gives back the file path.
+function Save-UninstallMade([string]$Base, [string]$Stamp) {
+  $e = Read-Installed (Get-InstalledKey $script:app); $made = @()
+  if ($e -and $e.steps) { foreach ($n in @($e.steps.Keys)) { foreach ($m in @($e.steps[$n].made)) {
+        if ($m) { $made += [ordered]@{ step = [string]$n; kind = [string]$m.kind; name = [string]$m.name } } } } }
+  $p = Join-Path (Join-Path $Base 'Uninstall') ('made-' + $Stamp + '.json')
+  Write-FileWhole $p (ConvertTo-Json -InputObject @{ schema = 'rade-made/1'; app = [string]$script:app.Name; made = @($made) } -Depth 5)
+  return $p
+}
+
+<#
+.SYNOPSIS
+Writes the result of an Uninstall run to the app's install record (answer 2A of the PFM, 2026-11-25).
+.DESCRIPTION
+Every Uninstall step done: "installed" is cleared (the app shows as not installed), "uninstalled" keeps the version,
+the time and the made list that the steps removed, "steps" is cleared (a new install runs every step again) and
+"lastRun" reads UNINSTALLED. Not every step done: "installed" and "steps" stay, and "lastRun" reads NEEDS REVIEW, so
+Maintenance offers Uninstall again. Never writes a record of a newer RADE or of another app (S1, S2).
+.PARAMETER Whole
+$true when every Uninstall step is done.
+.OUTPUTS
+'' or the reason the record could not be saved.
+#>
+function Save-Uninstalled([bool]$Whole) {
+  try {
+    $key = Get-InstalledKey $script:app; $raw = Read-InstalledRaw $key
+    $blk = Get-InstalledBlock $script:app; if ($blk) { return $blk }
+    if ($raw.State -ne 'ok') { return 'there is no install record to change' }
+    $old = Read-Installed $key; if (-not $old) { return 'the install record could not be read' }
+    $at = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
+    $ver = $(if ($old.installed) { [string]$old.installed.version } else { [string]$script:app.Version })
+    $run = [ordered]@{ version = $ver; build = [string]$buildId; round = [string]$round; at = $at; state = $(if ($Whole) { 'UNINSTALLED' } else { 'NEEDS REVIEW' }) }
+    $doc = [ordered]@{ schema = 'rade-installed/' + $installedSchema; about = [string]$raw.Json.about; key = $key; installed = $old.installed; lastRun = $run; steps = $old.steps }
+    if ($Whole) { $made = @(); foreach ($n in @($old.steps.Keys)) { foreach ($m in @($old.steps[$n].made)) { if ($m) { $made += $m } } }
+      $doc.installed = $null; $doc.steps = [ordered]@{}; $doc.uninstalled = [ordered]@{ version = $ver; at = $at; made = @($made) } }
+    Write-FileWhole $raw.Path ($doc | ConvertTo-Json -Depth 9)
+    return ''
+  } catch { return (ConvertTo-Masked $_.Exception.Message) }
+}
+
+<#
+.SYNOPSIS
+Uninstall: the gate, a fresh backup, then the app's Uninstall steps in order, the record and one report file.
+.DESCRIPTION
+Stops before any step when the site is not a test site or the backup missed a list. A script step runs as a child
+process with the step contract and RADE_MODE=uninstall, RADE_MADE (Invoke-RoundStep); a script step that only prints
+SKIP found nothing to remove and counts as done. A hand step shows its card (Invoke-GuideStep); Skip there is not done.
+The first step that is not done stops the run: the steps after it do not run (they can need it).
+.PARAMETER Base
+The RADE app folder.
+.PARAMETER Tick
+Run while a child script runs (keeps the window alive), or $null.
+.PARAMETER OnStep
+Called before each step with the step and its number, or $null.
+.OUTPUTS
+@{ State; Lines; Path }: State is refused, no-backup, done or review; Path is the report file or ''.
+#>
+function Invoke-Uninstall([string]$Base, [scriptblock]$Tick, [scriptblock]$OnStep) {
+  $site = Test-UninstallSite $Base
+  if (-not $site.Ok) { return @{ State = 'refused'; Path = ''; Lines = @($site.Lines) } }
+  $blk = Get-InstalledBlock $script:app   # a record RADE must not write (newer, another app's, unreadable): no step runs
+  if ($blk) { return @{ State = 'refused'; Path = ''; Lines = @(('Uninstall cannot run: ' + $blk + '.'), 'Nothing was changed.') } }   # the record's own reason and what to do
+  $bk = Invoke-Backup $Base $Tick
+  $noBk = @('Uninstall removed nothing: the backup did not save every list.', 'Nothing on the site changed. Select "Uninstall" again.')
+  if ($bk.State -ne 'done') { return @{ State = 'no-backup'; Path = ''; Lines = @($noBk + @($bk.Lines)) } }
+  $stamp = Get-ToolStamp; $log = New-Object System.Collections.Generic.List[string]
+  # The log callback of the steps: each line masked, kept for the report. Takes the line.
+  $say = { param($t) $log.Add((ConvertTo-Masked ([string]$t))) }
+  $lines = @(('Test site: ' + $site.Name), ('Backup: ' + (Split-Path -Leaf $bk.Path) + ' (' + @($script:app.Backup).Count + ' lists)'))
+  $extra = @{ RADE_MODE = 'uninstall'; RADE_MADE = '' }
+  try { $null = Write-UninstallFile $Base; $extra.RADE_MADE = Save-UninstallMade $Base $stamp } catch { & $say ('NOTE: the made list or a step file could not be saved: ' + $_.Exception.Message) }
+  $all = @($script:app.Uninstall); $done = 0; $stop = ''
+  $script:stepEnvExtra = $extra
+  try { for ($i = 0; $i -lt $all.Count; $i++) { $st = $steps[[int]$all[$i]]
+      if ($OnStep) { & $OnStep $st ($i + 1) $all.Count }
+      & $say ''; & $say ('Uninstall step ' + ($i + 1) + ' of ' + $all.Count + ': ' + $st.Name)
+      $t0 = Get-Date
+      $r = $(if ($st.Kind -eq 'guide') { Invoke-GuideStep $Base $st $say } else { Invoke-RoundStep $Base $st $say $(if ($Tick) { $Tick } else { {} }) '' })
+      $state = Get-StepState $r; $ok = ($state -eq 'PASSED' -or ($state -eq 'SKIPPED' -and $st.Kind -ne 'guide' -and -not $r.Skipped))
+      $lines += Get-StepLine $st $r ((Get-Date) - $t0).TotalSeconds
+      if ($ok) { $done++; continue }
+      $stop = Get-StepTitle $st; break } }
+  finally { $script:stepEnvExtra = $null }
+  $whole = ($done -eq $all.Count)
+  $left = $all.Count - $done - 1; if (-not $whole -and $left -gt 0) { $lines += ('Not run: ' + $left + ' step(s) after "' + $stop + '".') }
+  $sv = Save-Uninstalled $whole; $noRec = [bool]($sv -and $whole)
+  if ($sv) { $lines += ('NOTE: the install record could not be saved: ' + $sv); $whole = $false }   # the record still says installed
+  # A whole Uninstall ends saved progress of this round too: a later install must not resume and keep steps whose items are gone.
+  if ($whole) { $cs = Clear-RoundState $Base; if ($cs) { $lines += ('NOTE: the saved progress of this round could not be removed: ' + $cs) } }
+  $head = $(if ($whole) { $script:app.Name + ' is uninstalled from the test site. ' + $done + ' of ' + $all.Count + ' steps done.' }
+    elseif ($noRec) { 'Every Uninstall step is done, but RADE could not save the install record.' }
+    else { 'Uninstall stopped at "' + $stop + '". ' + $done + ' of ' + $all.Count + ' steps done.' })
+  $tail = $(if ($whole) { 'Your local files and the backups stay on this computer.' }
+    elseif ($noRec) { 'Select "Uninstall" again: RADE saves a backup, runs the steps again and tries to save the record.' }
+    else { 'Read the report, fix the cause, then select "Uninstall" again. The backups stay on this computer.' })
+  $p = ''
+  try { $p = Join-Path (Join-Path $Base 'Uninstall') ('uninstall-' + $stamp + '.txt'); Write-FileWhole $p ((@($head, '') + $lines + @('', 'Log:') + @($log) -join "`r`n") + "`r`n") } catch { $p = '' }
+  return @{ State = $(if ($whole) { 'done' } else { 'review' }); Path = $p; Lines = @(@($head, $tail) + $lines) }
+}
+
+# ---- Remove RADE from this computer (engine-v40; 90-161.Z R43 E3 b, the PFM, 2026-11-25: option A, "block"). Off while
+# any app is installed: the card names those apps. Then RADE's own local files go to the Recycle Bin: RADE\Config,
+# RADE\rade-runner.ps1, the RADE shortcut that starts that runner, and in each app folder everything but Backups.
+
+# Gives the names of the apps that this computer's records show as installed (any paste, any engine). A record that
+# cannot be read counts too: RADE cannot tell, so it blocks. Takes nothing; gives back the names (sorted, unique).
+function Get-InstalledAppName {
+  $recDir = Get-RadeConfigFile 'installed'; $out = @()
+  if (-not (Test-Path -LiteralPath $recDir -PathType Container)) { return @() }
+  foreach ($f in @(Get-ChildItem -LiteralPath $recDir -File -Filter '*.json' -ErrorAction SilentlyContinue)) {
+    $j = $null; try { $j = [System.IO.File]::ReadAllText($f.FullName) | ConvertFrom-Json } catch { $j = $null }
+    if (-not $j -or -not [string]$j.key) { $out += 'an app whose record RADE cannot read'; continue }
+    if ($null -ne $j.installed -or [string]$j.schema -ne ('rade-installed/' + $installedSchema)) { $out += ((([string]$j.key) -split '/', 2)[-1] -replace '@[^@]*$', '') } }
+  return @($out | Sort-Object -Unique)
+}
+
+# Says whether a record key's folder part is a plain app folder name: letters, digits, space, ".", "_", "-", starting
+# and ending with a letter, digit, "_" or "-" (so Windows cannot trim it to another name), and not Config or Backups.
+# Takes the name; gives back $true or $false.
+function Test-RadeAppName([string]$Name) { return ($Name -cmatch '^[A-Za-z0-9]([A-Za-z0-9 ._-]*[A-Za-z0-9_-])?$' -and $Name -notin 'Config', 'Backups') }
+
+<#
+.SYNOPSIS
+Gives the app folders RADE made in the RADE folder: the folder part of each record's key, and this paste's folder.
+.DESCRIPTION
+Only a plain name (letters, digits, space, ".", "_", "-"; it starts and ends with a letter, digit, "_" or "-", so
+Windows cannot trim it to another name), never Config, and only a folder that is there, right under the RADE folder
+(review of PR 194: a key "../x" named the OneDrive folder). A folder that no record names is never given.
+.OUTPUTS
+The full paths of the app folders.
+#>
+function Get-RadeAppDir {
+  $names = @($appFolder); $recDir = Get-RadeConfigFile 'installed'
+  foreach ($f in @(Get-ChildItem -LiteralPath $recDir -File -Filter '*.json' -ErrorAction SilentlyContinue)) {
+    try { $k = [string](([System.IO.File]::ReadAllText($f.FullName) | ConvertFrom-Json).key) } catch { $k = '' }   # a record it cannot read names no folder
+    if ($k -match '^([^/]+)/') { $names += $Matches[1] } }
+  # Only a plain folder name (letters, digits, space, ".", "_", "-"; not "." or ".."), and only a folder right under RADE.
+  $root = [System.IO.Path]::GetFullPath((Get-RadePath)).TrimEnd('\', '/')
+  $plain = @($names | Where-Object { Test-RadeAppName $_ } | Sort-Object -Unique)
+  return @($plain | ForEach-Object { [System.IO.Path]::GetFullPath((Join-Path $root $_)) } |
+    Where-Object { (Split-Path -Parent $_).TrimEnd('\', '/') -eq $root -and (Split-Path -Leaf $_) -ne 'Config' -and (Test-Path -LiteralPath $_ -PathType Container) })
+}
+
+<#
+.SYNOPSIS
+Remove RADE from this computer: moves RADE's own local files to the Recycle Bin, when no app is installed.
+.DESCRIPTION
+Order: the RADE shortcut (only one that starts RADE's own runner; its folder is read from Config first), each app
+folder's items except Backups, the runner, then RADE\Config. Writes nothing on a site. A file that cannot move is named;
+the rest still goes.
+.OUTPUTS
+@{ State; Lines; Path }: State is blocked, done or review; Path is ''.
+#>
+function Invoke-RemoveRade {
+  $apps = @(Get-InstalledAppName)
+  if ($apps.Count) { return @{ State = 'blocked'; Path = ''; Lines = @(@('Uninstall these apps first:') + @($apps | ForEach-Object { '- ' + $_ })) } }
+  $root = Get-RadePath; $runner = Join-Path $root 'rade-runner.ps1'; $items = @(); $bad = @()
+  $sd = Get-ShortcutDir; $lnk = $(if ($sd) { Join-Path $sd 'RADE.lnk' } else { '' })
+  if ($lnk -and (Test-Path -LiteralPath $lnk -PathType Leaf)) {   # only RADE's own shortcut: it starts the runner
+    try { $arg = [string](New-Object -ComObject WScript.Shell).CreateShortcut($lnk).Arguments
+      if ($arg.Contains('"' + $runner + '"')) { $items += @{ P = $lnk; F = $false; N = 'the RADE shortcut' } } } catch { $null = $_ } }   # a shortcut it cannot read is not RADE's: it stays
+  foreach ($d in @(Get-RadeAppDir)) { foreach ($c in @(Get-ChildItem -LiteralPath $d -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'Backups' })) {
+      $items += @{ P = $c.FullName; F = [bool]$c.PSIsContainer; N = ((Split-Path -Leaf $d) + '\' + $c.Name) } } }
+  if (Test-Path -LiteralPath $runner -PathType Leaf) { $items += @{ P = $runner; F = $false; N = 'the RADE runner' } }
+  $cfg = Join-Path $root 'Config'; if (Test-Path -LiteralPath $cfg -PathType Container) { $items += @{ P = $cfg; F = $true; N = 'RADE\Config' } }
+  foreach ($i in $items) { try { Move-ToRecycleBin $i.P -Folder:$i.F } catch { $bad += ('Not moved: ' + $i.N + ' [' + $_.Exception.GetType().Name + ']') } }
+  $head = $(if ($bad.Count) { [string]$bad.Count + ' of ' + $items.Count + ' items did not move to the Recycle Bin.' } else { [string]$items.Count + ' items are in the Recycle Bin.' })
+  return @{ State = $(if ($bad.Count) { 'review' } else { 'done' }); Path = ''; Lines = @(@($head, 'The Backups folders stay. To get an item back, open the Recycle Bin.') + $bad) }
+}

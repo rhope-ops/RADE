@@ -339,11 +339,12 @@ function Get-SiteRightsCheck([string]$Base, [string]$Site, [scriptblock]$Tick) {
   if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'No site address' ('Complete the "Site address" box first (it starts with ' + $sitePrefix + ')') }
   else {
     $r = Invoke-ChildScript $rightsScript ('-Site "' + $Site + '"' + (Get-MarkerArg)) 300 $Tick
-    $have = @{}; $adm = 'unknown'; $mk = ''
+    $have = @{}; $adm = 'unknown'; $mk = ''; $signLine = ''
     foreach ($l in $r.Lines) {
       if ($l -match '^RIGHT (\w+) (True|False)$') { $have[$Matches[1]] = ($Matches[2] -eq 'True') }
       if ($l -match '^ADMIN (True|False|unknown)$') { $adm = $Matches[1] }
       if ($l -match '^MARKER (none|unknown|found [0-9.]+)$') { $mk = $Matches[1] }
+      if ($l -match '^(SIGNIN seconds=\d+ watch=(on|off))$') { $signLine = $Matches[1] }   # R43 E4: the sign-in time
     }
     $admText = 'Site collection administrator: ' + $(switch ($adm) { 'True' { 'yes' } 'False' { 'no' } default { 'not read' } }) + ' (shown only, not required)'
     if (-not $have.Count) {
@@ -359,6 +360,7 @@ function Get-SiteRightsCheck([string]$Base, [string]$Site, [scriptblock]$Tick) {
       elseif ((Test-FirstInstall) -and $mk -ne 'none') { $one = Format-CheckResult 'FAILED' 'The install record on the site could not be read' 'Select "Sign in and check site rights" again' }
       else { $one = Format-CheckResult 'PASSED' ('Rights: ' + ($got -join ', ') + '. ' + $admText) '' }
     }
+    if ($signLine) { $one.Detail = [string]$one.Detail + '. ' + $signLine }   # R43 E4: shown in Details and the report
   }
   return $one
 }

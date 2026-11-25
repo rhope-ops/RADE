@@ -16,6 +16,44 @@ function Start-Process { param($FilePath, $ArgumentList, $WorkingDirectory) Writ
 $global:RadeT = @{ Seen = ''; N = 0; Out = [string]$env:RADE_T_OUT; App = [int]$env:RADE_T_APP; Hand = [string]$env:RADE_T_HAND; Tour = ($env:RADE_T_TOUR -eq '1'); Size = [string]$env:RADE_T_SIZE
   Forced = $false; Opened = $false; Lay = 0; SignIn = $false; Sized = $false; T0 = (Get-Date); Env = $false }
 
+function global:Save-RadeUninstall([string]$bp, [string]$nm) {
+  <#
+  .SYNOPSIS
+  Draws the Uninstall cards once (engine-v40; 90-161.Z R43 E3), for the PFM's preview.
+  .DESCRIPTION
+  The Maintenance card with Uninstall on, the confirm card, a wrong typed name and three result cards. The saved site
+  must be marked as a test site (Save-RadeRestore does it). The steps are two of the app's own, as stand-ins: nothing
+  runs. The app's Uninstall list is put back after.
+  .PARAMETER bp
+  The app folder.
+  .PARAMETER nm
+  The saved site's name.
+  #>
+  # Uninstall (engine-v40; 90-161.Z R43 E3): the Maintenance card with Uninstall on, the confirm card, a wrong typed
+  # name and the result cards (the site is marked above; the steps are two of the app's own, as stand-ins: no run here).
+  $keepU = $script:app.Uninstall; $script:app.Uninstall = @(@($script:app.Steps) | Select-Object -First 2)
+  & $ui.VMaint $ui.MaintInst; Save-RadeCard 'maint-uninstall'
+  & $ui.VUninstall; Save-RadeCard 'unconfirm'
+  Write-Host ('WIN uninstall-confirm view=' + $ui.View + ' danger=' + [bool]@($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Uninstall' -and $ui.Kinds[$_] -eq 'danger' }).Count)
+  $ui.Field.Text = 'wrong name'; & $ui.UninstallGo; Save-RadeCard 'unconfirm-wrongname'
+  & $ui.ToolResult 'Uninstall' @{ State = 'done'; Path = (Join-Path $bp 'Uninstall\uninstall-20261125-140000.txt'); Lines = @('Sample app (deploy) is uninstalled from the test site. 2 of 2 steps done.',
+      'Your local files and the backups stay on this computer.', ('Test site: ' + $nm), 'Backup: 20261125-135900 (2 lists)', 'U01: PASSED (2 passed, 0 failed, exit code 0) in 12s', 'U02: PASSED (confirmed by you) in 1m 5s') }
+  Save-RadeCard 'toolres-uninstall'
+  & $ui.ToolResult 'Uninstall' @{ State = 'review'; Path = (Join-Path $bp 'Uninstall\uninstall-20261125-141000.txt'); Lines = @('Uninstall stopped at "Remove the lists". 0 of 2 steps done.',
+      'Read the report, fix the cause, then select "Uninstall" again. The backups stay on this computer.', ('Test site: ' + $nm), 'U01: NEEDS REVIEW (1 passed, 1 failed, exit code 0) in 9s', 'Not run: 1 step(s) after "Remove the lists".') }
+  Save-RadeCard 'toolres-uninstall-review'
+  & $ui.ToolResult 'Uninstall' @{ State = 'no-backup'; Path = ''; Lines = @('Uninstall removed nothing: the backup did not save every list.', 'Nothing on the site changed. Select "Uninstall" again.',
+      '1 of 2 lists were not saved.') }
+  Save-RadeCard 'toolres-uninstall-nobackup'
+  $script:app.Uninstall = $keepU
+  # Remove RADE (engine-v40, E3 b): the block card (this app is installed here) and the confirm card (drawn as is: no run).
+  & $ui.VRemoveRade; Save-RadeCard 'rmblock'
+  $what = 'RADE moves these to the Recycle Bin: RADE\Config, the RADE runner, the RADE shortcut, and the files in each app folder. The Backups folders stay.'
+  & $ui.SetCard @{ View = 'rmrade'; Light = 'you'; Sentence = 'Remove RADE from this computer?'; P = @('No app is installed.', $what, 'To use RADE again later, paste a RADE script again.')
+    Field = @{ Label = 'Type RADE to confirm'; Text = ''; Name = 'The word RADE, to confirm Remove RADE' }; Focus = 'field'; Buttons = @(@{ Text = 'Remove RADE'; Kind = 'danger'; Act = {} }); Back = { & $ui.VChoose } }
+  Save-RadeCard 'rmrade'
+}
+
 function global:Save-RadeRestore {
   <#
   .SYNOPSIS
@@ -65,6 +103,7 @@ function global:Save-RadeRestore {
   Save-RestoreMark $bp $nm; Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force -ErrorAction Stop   # a failure stops the run with its error
   & $ui.VRestorePick; Save-RadeCard 'toolres-nobackup-marked'
   Write-Host ('WIN restore-nobackup-button view=' + $ui.View + ' shown=' + [bool]@($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Remove test-site mark' }).Count)
+  Save-RadeUninstall $bp $nm   # the site is marked here
   Get-ChildItem -LiteralPath $cfg -Filter '*-site.txt' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notin $had } | Remove-Item -Force
   if ($keepMark) { [System.IO.File]::WriteAllBytes($mk, $keepMark) } else { Remove-Item -LiteralPath $mk -Force -ErrorAction SilentlyContinue }
   Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force -ErrorAction SilentlyContinue; $script:app.Backup = $keep.B; $script:app.Restore = $keep.R

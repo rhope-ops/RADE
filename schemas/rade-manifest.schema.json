@@ -726,6 +726,16 @@
           },
           "description": "Optional (the Administrator, 2026-11-20). The titles of the app's own SharePoint lists that the Maintenance tool \"Back up\" saves (JSON plus a CSV copy, on this computer). RADE never finds lists itself; an app that names none gets \"names no lists to back up\". From engine-v31 a title may hold parentheses."
         },
+        "uninstall": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional (engine-v40; 90-161.Z R43 E3, the PFM, 2026-11-25). The app's own Uninstall steps, by step name, in run order: steps of this bundle that are not in this app's \"steps\" (a script that does not read RADE_MODE would install again). Kind script or guide, with no \"after\" or \"ask\". The Maintenance card's Uninstall runs them after a typed app name and a fresh Back up, on a test site only (the \"restore\" test sites), with RADE_MODE=uninstall and RADE_MADE (a JSON file with the made list of the install record). Needs mode deploy and \"restore\". Without it the Uninstall button is not available."
+        },
         "restore": {
           "type": "object",
           "additionalProperties": false,

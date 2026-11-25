@@ -147,8 +147,11 @@ function Get-StepEnv([string]$Base, $Step) {
       $s = $e.steps[[string]$Step.Name]; if ($s -and [string]$s.version -eq [string]$script:app.Version) { $last = [string]$s.state }
     }
   }
-  return [ordered]@{ RADE_CONTRACT = '1'; RADE_MODE = [string]$script:app.Mode; RADE_APP = [string]$script:app.Name; RADE_APP_VERSION = [string]$script:app.Version
+  $o = [ordered]@{ RADE_CONTRACT = '1'; RADE_MODE = [string]$script:app.Mode; RADE_APP = [string]$script:app.Name; RADE_APP_VERSION = [string]$script:app.Version
     RADE_INSTALLED_VERSION = $inst; RADE_STEP_LAST = $last; RADE_SITE = $(if (Test-SiteUrl (Get-SiteUrl $Base)) { [string](Get-SiteUrl $Base) } else { '' }) }
+  # Uninstall (engine-v40) sets RADE_MODE=uninstall and RADE_MADE for its own steps only (Invoke-Uninstall, part 13).
+  if ($script:stepEnvExtra) { foreach ($k in @($script:stepEnvExtra.Keys)) { $o[[string]$k] = [string]$script:stepEnvExtra[$k] } }
+  return $o
 }
 function ConvertTo-MadeName([string]$Name, [string]$Site) {
   # A made item's name goes into the record: no address, no ID, one line, 200 characters at most.

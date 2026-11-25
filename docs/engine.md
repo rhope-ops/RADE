@@ -116,6 +116,8 @@ The PFM, 2026-11-20 (every app pauses and resumes when the user closes the windo
 - Disruptions: Exit or the window's X during a step asks first, as before; the run stops and the state of the last finished step stays. Windows PowerShell or ISE closed, or the computer restarted: the state of the last finished step stays. CAC removed: a step result line or error line that says the sign-in failed (`$signInLost`: smart card, "sign-in failed", "authentication failed" or "was cancelled" and the like) makes the step INTERRUPTED, not NEEDS REVIEW; the round stops there and the window shows "Insert your CAC, then select Resume." with a Resume button that runs that step again.
 - Not verified on a device: the Recycle Bin move, the window's Resume and Paused cards, and a CAC removed during a real sign-in (the words Windows and PnP.PowerShell print then are not known yet).
 
+Sign-in time (engine-v40; 90-161.Z R43 E4, the PFM, 2026-11-25: a timed pair of the rights check, with and without the sign-in window watch): the rights check's detail ends with `SIGNIN seconds=<N> watch=on` (or `watch=off`), the seconds from the watch start to the end of `Connect-PnPOnline`; it shows in Details, the report and `rade-checks-last.txt`. The environment variable `RADE_SIGNIN_WATCH=0` makes `Start-SignInSize` return at once (no watch) in every child script that RADE starts from that PowerShell. `watch=` tells what happened: `on` only when the watch started; `off` with the switch, and also when the helper could not start (not Windows, Constrained Language Mode, a compile error). The rights check result is saved for 7 days, so the second check of the pair needs "Run checks again".
+
 ## Step contract
 
 What RADE and a step script give each other (the Administrator, 2026-11-14: the contract comes before the safe second run and the undo list). A script that does not use the contract still runs.
@@ -126,7 +128,8 @@ What RADE and a step script give each other (the Administrator, 2026-11-14: the 
 |---|---|---|
 | Parameter | `-Id`, `-NoPause` | The profile folder name; no pause at the end. Plus the step's fixed `args` and its `ask` folder. |
 | Environment | `RADE_CONTRACT` | `1` (the contract version). |
-| Environment | `RADE_MODE` | `test`, `deploy` or `drift`. |
+| Environment | `RADE_MODE` | `test`, `deploy` or `drift`; `uninstall` for the app's Uninstall steps (engine-v40). |
+| Environment | `RADE_MADE` | Uninstall steps only (engine-v40): the path of a JSON file (`rade-made/1`: `app`, `made`: step, kind, name) with the made list of the install record. |
 | Environment | `RADE_APP`, `RADE_APP_VERSION` | The chosen app and the version this bundle installs (empty in a test). |
 | Environment | `RADE_INSTALLED_VERSION` | The version now installed, or empty (deploy only). |
 | Environment | `RADE_STEP_LAST` | This step's last state at this version: `PASSED`, `NEEDS REVIEW`, `SKIPPED` or empty (deploy only). |
@@ -175,7 +178,7 @@ After the owner's test rounds end, the test branch and its results e-mail (draft
 
 ## Maintenance run types
 
-Decided by the Administrator, 2026-11-14: RADE offers Install, Diagnose, Restore and Uninstall as run types and keeps the record right for each (version, step states, made list); the app supplies what each needs. Built from engine-v30: Diagnose and Back up (below); from engine-v31: Restore (below); Uninstall is not built yet.
+Decided by the Administrator, 2026-11-14: RADE offers Install, Diagnose, Restore and Uninstall as run types and keeps the record right for each (version, step states, made list); the app supplies what each needs. Built from engine-v30: Diagnose and Back up (below); from engine-v31: Restore (below); from engine-v40: Uninstall (below).
 
 Decided by the Administrator, 2026-11-14 (changed 2026-11-20, UI standard v1: the card has Start, Maintenance and Uninstall, and "Maintenance" opens its own screen with the other actions; [window-design.md](window-design.md) "Cards"): the screen has the title "Maintenance", is shown for an app that is installed, and has five actions:
 
@@ -207,6 +210,22 @@ Built in engine-v31 (the Administrator, 2026-11-20 and 2026-11-21; plan [reviews
 | The site must be as the dry run saw it (the same missing and Recycle Bin rows per list, by a hash of their IDs) | as the dry run | none | Changed: no row is written |
 | R1 the Recycle Bin, then new rows in dependency order (R5: a list whose lookup reads another restored list comes after it; a lookup to a row made new points to its new ID) | the backup's JSON files | Missing rows only; a row on the list is never changed; a row made after the backup stays (the Administrator, 2026-11-21) | A row it cannot write is counted; the old-to-new ID pairs are saved after each row in `Backups\~restore-map-<site hash>.json` (one for each site and every backup: each row made new links its old ID to the new one, and all IDs linked step by step are one row; a row is on the list, or in the Recycle Bin, when any of its IDs is), so a later run from any backup never makes a row twice |
 | R7 (counts only): the rows on each list after | the named lists | none | A count that differs is a finding |
+
+Built in engine-v40 (90-161.Z R43 E3; the PFM, 2026-11-25: answers 1A, 2A, 4A; code `Invoke-Uninstall` in engine/ps/13-maintenance.ps1, cards in engine/ps/window/11-tools.ps1): Uninstall, from the Maintenance card. RADE gives the mode, the card and the record; the app gives the steps (manifest `uninstall`: its own steps by name, in run order, never install steps, kind script or guide with no `after` or `ask`; it needs mode deploy and `restore`). Without `uninstall` the button is not available, with the note "<app> has no Uninstall steps.". It removes nothing on this computer: the app's local files and the Backups folder stay.
+
+Remove RADE from this computer (engine-v40; 90-161.Z R43 E3 b, the PFM, 2026-11-25: option A; code `Invoke-RemoveRade` in engine/ps/13-maintenance.ps1): the button "Remove RADE" on the Choose screen of a deploy bundle. While any record in RADE\Config\installed shows an app as installed (any paste; a record RADE cannot read counts too), the card (view `rmblock`) names those apps and says "Uninstall these apps first."; nothing is removed. Else the confirm card (view `rmrade`): the person types `RADE`, then RADE moves to the Recycle Bin: the RADE shortcut (only one that starts RADE's own runner), every item of each app folder that a record names (or this paste's folder) except Backups, RADE\rade-runner.ps1 and RADE\Config. A folder that no record names stays. Nothing on a site changes. Later (the PFM's option B, after app Uninstall passes R43): one run that uninstalls each app first.
+
+| Step | Reads | Writes | Fails safely |
+|---|---|---|---|
+| Gate: the saved site must be a test site, with the same test as Restore (`restore.testSites`, or the "local" mark; a site with no mark gets the mark card first) | The saved site address, the mark | none | Not a test site: the result card says so; nothing runs |
+| Confirm (view `unconfirm`): "Test site: <name>", what runs, the steps by title (a hand step says "you do this step"), what stays; the user types the app name (exact, with its capitals); the button "Uninstall" is dark red | — | — | A wrong name: one line, nothing runs |
+| A fresh backup (as Back up) | The `backup` lists | `Backups\<time>` | Not every list saved: no step runs (result "Uninstall removed nothing.") |
+| The files of the Uninstall steps, from this paste (so a step can run when the installed version is older), and the made list for `RADE_MADE` | the record | those step files; `Uninstall\made-<time>.json` | A file that cannot be written is one note in the report |
+| The Uninstall steps, in order: a script with the step contract and `RADE_MODE=uninstall`; a hand step as its card | what each step reads | what each step removes (the app's own lists, flows and settings) | The first step that is not done stops the run (the steps after it can need it); a script step that only prints SKIP found nothing to remove and counts as done; Skip on a hand step is not done |
+| The record (RADE\Config\installed) | the record | Every step done: `installed` cleared (the app shows as not installed), `steps` cleared (a new install runs every step), `lastRun` UNINSTALLED, `uninstalled`: version, time and the made list. Else `installed` and `steps` stay, `lastRun` NEEDS REVIEW, and Maintenance offers Uninstall again | A record of a newer RADE or of another app is not written (S1, S2) |
+| The report: `Uninstall\uninstall-<time>.txt` in the app folder (masked; the e-mail draft never attaches it) | — | that file | — |
+
+The site's install record row (manifest `marker`) is in the app's own list: the app's Uninstall steps remove it with that list. Window only: text mode has no Maintenance screen.
 
 Field values go back in the form PnP takes: a person by its site user ID (R6 is not built: a person not on the site is not resolved), a link as "url, description", managed metadata by its term ID, several choices as a list, a date in ISO form; a place (Geolocation) is not written. The child script prints counts, error types and a short hash only, never a site, name, ID or value. Limits: the Recycle Bin read stops at 5,000 items (a row past that comes back as a new row); a run stopped by closing RADE does not put the pause switch back (the next Restore stops with "on already"; set it back by hand). Before each new row RADE saves a pending mark; a row whose write was not confirmed (an error after the write, a stop) is never made again: the dry run names it for a hand check. A record that cannot be saved stops new rows. The record is in the user's app folder (OneDrive), so one person runs Restore for a site, from one RADE folder (the Administrator, 2026-11-21; the confirm card says so): another account, or a lost app folder, does not have the record; a list deleted and made again under the same title must not be restored from an older backup (old links would match other rows).
 

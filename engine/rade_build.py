@@ -25,10 +25,9 @@ Usage: python3 engine/rade_build.py --app-root DIR [--manifest scripts/paste_bun
 import base64, hashlib, json, re, sys, textwrap
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent)); import rade_hash, rade_tokens, rade_fields   # the bundle hash; the UI tokens and fonts (UI standard v1); the manifest field parts
-from rade_fields import q, hand_part, restore_part, BACKUP_RE
-from rade_parts import (WINDOW_FILE, ENGINE_DIR, ENGINE_PARTS, WINDOW_PARTS, WINDOW_SLOT, indent, file_sha, engine_text, ENGINE, BASE_CHECKS, CHECK_IDS, START_RE,
-    WIN_RESERVED, word_list, BANNER, SHARED_RE, SHARED_LINE, shared_blocks, window_values, site_values, logo_path, SCRIPT_EXTS, ends_in, collect_problems, part_lines,
-    run_steps)   # engine/rade_parts.py
+from rade_fields import q, hand_part, restore_part, uninstall_part, BACKUP_RE
+from rade_parts import (WINDOW_FILE, ENGINE_DIR, ENGINE_PARTS, WINDOW_PARTS, WINDOW_SLOT, indent, file_sha, engine_text, ENGINE, BASE_CHECKS, CHECK_IDS, START_RE, run_steps,
+    WIN_RESERVED, word_list, BANNER, SHARED_RE, SHARED_LINE, shared_blocks, window_values, site_values, logo_path, SCRIPT_EXTS, ends_in, collect_problems, part_lines)
 
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
 LOGO = ENGINE_ROOT / logo_path()   # RADE's own logo (engine/window.json "logo"): the window and its title-bar icon (Fulcrum, the PFM, 2026-11-20)
@@ -116,8 +115,9 @@ def app_lines(b):
         # (2026-11-21, R39) a title may hold parentheses ("Name (Form 1)"): no quote, "|" or path sign, so it stays safe in a command line and a file name
         ok = all(re.fullmatch(BACKUP_RE, n) for n in backup) and not {n.upper() for n in backup} & WIN_RESERVED
         assert ok and len({n.lower() for n in backup}) == len(backup), 'app %r: backup: unique plain titles (letters, digits, space, "_", "-", "(", ")"), not a name Windows reserves' % a['name']
-        out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s; Marker = %s; Start = %s; Backup = @(%s); Restore = %s }'
-                   % (q(a['name']), q(a['summary']), ', '.join(map(str, idx)), ', '.join(map(q, checks)), q(mode), q(version), marker, q(start), ', '.join(map(q, backup)), restore_part(a)))
+        out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s; Marker = %s; Start = %s; Backup = @(%s); Restore = %s; Uninstall = %s }'
+                   % (q(a['name']), q(a['summary']), ', '.join(map(str, idx)), ', '.join(map(q, checks)), q(mode), q(version), marker, q(start),
+                      ', '.join(map(q, backup)), restore_part(a), uninstall_part(a, b)))
     return out
 
 

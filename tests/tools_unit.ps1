@@ -1,4 +1,5 @@
-# RADE test: the Maintenance tools Diagnose, Back up and Restore (engine/ps/13-maintenance.ps1), on the engine parts themselves
+# RADE test: the Maintenance tools Diagnose, Back up and Restore (engine/ps/13-maintenance.ps1; Uninstall and Remove RADE in
+# part 2, tools_unit_uninstall.ps1, run at the end), on the engine parts themselves
 # (no bundle, no window), with the fake PnP.PowerShell of tests/fake-pnp (no SharePoint, no network).
 # Run by tests/resume_test.sh: pwsh -NoProfile -File tests/tools_unit.ps1 <scratch folder>.
 # Prints one PASS or FAIL line for each case, then "TOOLS-UNIT pass=N fail=M".
@@ -10,7 +11,7 @@ param([Parameter(Mandatory = $true)][string]$Dir)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 foreach ($p in '01-base', '02-config', '03-files', '04-steps', '05-installed', '07-checks', '16-site-scripts', '08-saved-checks', '13-maintenance', '14-restore',
-  '15-restore-run') { . (Join-Path $root ('engine/ps/' + $p + '.ps1')) }
+  '15-restore-run', '12-resume') { . (Join-Path $root ('engine/ps/' + $p + '.ps1')) }
 # What a bundle sets before the engine: fake data only.
 $round = 'R01'; $buildId = 'abcd1234'; $engineRelease = 30; $appFolder = 'SampleApp'; $sitePrefix = 'https://usaf.dps.mil/sites/'
 $script:appChecks = @(); $script:runLog = New-Object System.Collections.Generic.List[string]
@@ -361,8 +362,20 @@ try { . ([scriptblock]::Create($signInSize)); $SignInWatchMs = 300; Start-SignIn
   Stop-SignInSize; $stopped = $null -eq $tf.GetValue($null); Stop-SignInSize
   Start-SignInSize; Start-Sleep -Milliseconds 600; Start-SignInSize -SignInOnly; Start-Sleep -Milliseconds 300 } catch { $sbErr = $_ }
 Assert-Case 'sign-in window size: Stop-SignInSize ends the watch (its timer is gone; item 10)' ($null -eq $sbErr -and $runs -and $stopped)
+# R43 E4: RADE_SIGNIN_WATCH=0 starts no watch (no timer, the flag stays off); without it the watch starts and the flag is on.
+$env:RADE_SIGNIN_WATCH = '0'; Start-SignInSize; $offRuns = $null -ne $tf.GetValue($null); $offFlag = $script:signInWatchOn
+$env:RADE_SIGNIN_WATCH = $null; Start-SignInSize; $onFlag = $script:signInWatchOn; Stop-SignInSize
+Assert-Case 'sign-in window size: RADE_SIGNIN_WATCH=0 starts no watch; the flag tells what happened (R43 E4)' (-not $offRuns -and -not $offFlag -and $onFlag)
 $env:RADE_SIGNIN_TEST = $null
 Assert-Case 'sign-in window size: -WhatIf compiles and starts nothing (item 10)' ($null -eq $sbErr -and -not $wiType)
 Assert-Case 'sign-in window size: the helper compiles, starts (also with -SignInOnly) and stops (E3, item 10)' ($null -eq $sbErr -and [bool]('RadeSignIn.Size2' -as [type]) -and
   $signInSize -match '(?m)^# ---- RADE sign-in window size \(start' -and $signInSize -match '(?m)^# ---- RADE sign-in window size \(end\)' -and $signInSize -notmatch 'EnumWindows\(')
+# R43 E4 (the PFM, 2026-11-25): the rights check gives its sign-in time; RADE_SIGNIN_WATCH=0 turns the window watch off.
+$script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Marker = $null }
+$env:RADE_SIGNIN_TEST = '1'; $sr1 = Get-SiteRightsCheck $base 'https://usaf.dps.mil/sites/fake' $null   # the child compiles and starts the watch here
+$env:RADE_SIGNIN_WATCH = '0'; $sr2 = Get-SiteRightsCheck $base 'https://usaf.dps.mil/sites/fake' $null; $env:RADE_SIGNIN_WATCH = $null; $env:RADE_SIGNIN_TEST = $null
+Assert-Case 'sign-in time: the rights check detail ends with "SIGNIN seconds=N watch=on", and "watch=off" with RADE_SIGNIN_WATCH=0' (
+  [string]$sr1.Detail -match 'SIGNIN seconds=\d+ watch=on$' -and [string]$sr2.Detail -match 'SIGNIN seconds=\d+ watch=off$')
+# Uninstall and Remove RADE (engine-v40): their cases are in tools_unit_uninstall.ps1, run here in this scope (they use the fake site and the app above).
+. (Join-Path $PSScriptRoot 'tools_unit_uninstall.ps1')
 Write-Host ('TOOLS-UNIT pass=' + $script:pass + ' fail=' + $script:fail)
