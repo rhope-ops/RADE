@@ -333,7 +333,7 @@ def contents(head, body):
 
 def build(b):
     """Return the whole bundle text for one manifest bundle: the hash line (engine/rade_hash.py), the header (what it is, how to
-    run it, its sources), the contents list and the body. The build id is the first 8 hex of the body's SHA-256."""
+    run it, its sources), the contents list and the body, in the paste guard (engine/rade_hash.py GUARD_START, GUARD_END). The build id is the first 8 hex of the body's SHA-256."""
     bad = collect_problems(b)
     if bad:
         sys.exit('\n'.join(bad))
@@ -351,9 +351,9 @@ def build(b):
             '  C:\\Users\\<DODID>\\OneDrive - United States Air Force\\RADE\\%s (replacing older copies), runs the steps,\n'
             '  and saves its results in Rounds\\%s%s No download, no admin rights.\n'
             '  To read it: the Contents list below gives the line of each part and file; each part starts with a "# ====" line.\n'
-            '#>\n$buildId = \'%s\'\n$engineRelease = %d\n' % (b['title'], site_values()['@@RADE_REPO@@'], file_sha('engine/rade_build.py'), file_sha('engine/rade_ui.ps1'),
-                file_sha('engine/rade_ui_text.ps1'), MANIFEST, part_lines(), APP['folder'], b['round'], sends, build_id, ENGINE_RELEASE))
-    return rade_hash.add_line(head + contents(head, body) + body)
+            '#>\n%s$buildId = \'%s\'\n$engineRelease = %d\n' % (b['title'], site_values()['@@RADE_REPO@@'], file_sha('engine/rade_build.py'), file_sha('engine/rade_ui.ps1'),
+                file_sha('engine/rade_ui_text.ps1'), MANIFEST, part_lines(), APP['folder'], b['round'], sends, rade_hash.GUARD_START, build_id, ENGINE_RELEASE))
+    return rade_hash.add_line(head + contents(head, body) + body.rstrip('\n') + '\n' + rade_hash.GUARD_END)   # GUARD_START is in head
 
 
 # Text lengths (the Administrator, 2026-11-15; docs/window-design.md "Text lengths"). The most characters of each text an
@@ -442,7 +442,7 @@ ENGINE_SHA = hashlib.sha256(b''.join(rel.encode() + b'\0' + (ENGINE_ROOT / rel).
                                      + ['engine/rade_ui.ps1', 'engine/rade_ui_text.ps1', 'engine/window.json', 'apps.json', logo_path()] + rade_tokens.FILES)).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
-ENGINE_RELEASE = 37
+ENGINE_RELEASE = 38
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':
