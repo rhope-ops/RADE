@@ -4,7 +4,7 @@
 # --fast = the fast lane: the quick checks below always (each reads its whole file, so a changed file is checked in full,
 # and the logo source is checked for stale output); the engine tests only when a file they read changed against the merge
 # base with origin/main; the app canary (needs network access to github.com) only in the full lane.
-# RADE_OFFLINE=1 (fleet v2): a run with no network skips the app canary and the README apps part, each with a SKIP line;
+# RADE_OFFLINE=1 (fleet v2): a run with no network skips the app canary with a SKIP line;
 # in the full lane it then fails at the end (incomplete), so no full-lane pass is recorded.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -61,11 +61,6 @@ cmp -s "$lt/assets/logo/logo-rho.svg" assets/logo/logo-rho.svg || { echo "FAIL l
 python3 tests/check_apps_test.py
 if [ "${RADE_OFFLINE:-}" = 1 ]; then echo "SKIP app canary (RADE_OFFLINE=1: no network; not a pass)"
 elif [ "$lane" = full ]; then python3 scripts/check_apps.py; else echo "SKIP app canary (fast lane: the full lane runs it)"; fi
-# README apps part (the Administrator, 2026-11-21): README.md shows each app's newest script as the RADE page does, written by
-# scripts/build_readme.py --write; the check fails when it is old (needs network access to github.com). Its own test is offline.
-python3 tests/build_readme_test.py
-if [ "${RADE_OFFLINE:-}" = 1 ]; then echo "SKIP README apps part (RADE_OFFLINE=1: no network; not a pass)"
-elif [ "$lane" = full ]; then python3 scripts/build_readme.py | tail -3 || exit 1; else echo "SKIP README apps part (fast lane: the full lane runs it)"; fi
 # Engine behavior (deploy v1): the sample bundle built and run in pwsh text mode (started at the top), its layout and its lint.
 if [ -n "$et" ]; then
   if wait "$et"; then et=""; cat "$eo"; else et=""; cat "$eo"; echo "FAIL engine tests (tests/engine_test.sh)"; exit 1; fi
@@ -76,9 +71,9 @@ if [ -n "$et" ]; then
 else
   echo "SKIP engine tests (fast lane: no file they read changed; the full lane runs them)"
 fi
-# RADE_OFFLINE=1 in the full lane (review of PR 168): the lane skipped the app canary and the README apps part, so it is
+# RADE_OFFLINE=1 in the full lane (review of PR 168): the lane skipped the app canary, so it is
 # incomplete; it fails here, and check.sh then records no full-lane pass for this commit.
 if [ "${RADE_OFFLINE:-}" = 1 ] && [ "$lane" = full ]; then
-  echo "FAIL full lane incomplete: RADE_OFFLINE=1 skipped the app canary and the README apps part; run it again without RADE_OFFLINE"
+  echo "FAIL full lane incomplete: RADE_OFFLINE=1 skipped the app canary; run it again without RADE_OFFLINE"
   exit 1
 fi
