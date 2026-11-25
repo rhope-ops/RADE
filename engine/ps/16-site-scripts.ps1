@@ -21,6 +21,8 @@ $signInSize = @'
 # An app script that opens its own window calls Start-SignInSize -SignInOnly (follow-ups 2 item 10, the Maintainer,
 # 2026-11-25): the windows that already exist are left as they are, and only the first new window (the sign-in window)
 # is sized; then the watch stops. With no switch, each new window in the 2 minutes is sized (the engine's child scripts).
+# Such a script also calls Stop-SignInSize when Connect-PnPOnline returns (in a finally block): a sign-in that showed no
+# window then leaves no watch behind that could size the script's own next window.
 # Windows PowerShell 5.1, no module. When the helper cannot be compiled (Constrained Language Mode) or the calls fail,
 # nothing changes and the sign-in goes on as before.
 $SignInW = 480; $SignInH = 360; $SignInWatchMs = 120000; $SignInTickMs = 100
@@ -48,16 +50,19 @@ static System.Collections.Generic.HashSet<long> seen = new System.Collections.Ge
 // signInOnly: every window of this process that exists now (shown or not) is marked as seen, and the watch stops after it
 // has sized one new window, so an app's own window is never sized.
 public static void Start(int width, int height, int watchMs, int tickMs, bool signInOnly) {
+  Stop();   // a watch that still runs from an earlier call ends first
   lock (gate) { w = width; h = height; one = signInOnly; left = System.Math.Max(1, watchMs / System.Math.Max(1, tickMs));
     if (one) { using (System.Diagnostics.Process me = System.Diagnostics.Process.GetCurrentProcess()) {
       foreach (System.Diagnostics.ProcessThread t in me.Threads) { EnumThreadWindows((uint)t.Id, mark, System.IntPtr.Zero); } } } }
   timer = new System.Threading.Timer(Tick, null, tickMs, tickMs); }
+// Ends the watch now (no more ticks). Safe to call when no watch runs.
+public static void Stop() { lock (gate) { left = 0; if (timer != null) { timer.Dispose(); timer = null; } } }
 // Marks one window that exists at the start (signInOnly): it is never sized.
 static bool Mark(System.IntPtr hw, System.IntPtr l) { seen.Add(hw.ToInt64()); return true; }
 // One tick: a tick that starts while the last one still runs is skipped (the timer can overlap), so seen has one writer.
 static void Tick(object state) {
   if (!System.Threading.Monitor.TryEnter(gate)) { return; }
-  try { if (--left < 0) { timer.Dispose(); return; }
+  try { if (--left < 0) { if (timer != null) { timer.Dispose(); timer = null; } return; }
     using (System.Diagnostics.Process me = System.Diagnostics.Process.GetCurrentProcess()) {
       foreach (System.Diagnostics.ProcessThread t in me.Threads) { EnumThreadWindows((uint)t.Id, each, System.IntPtr.Zero); } } }
   catch { }
@@ -79,6 +84,12 @@ static bool Each(System.IntPtr hw, System.IntPtr l) {
     }
     [RadeSignIn.Size2]::Start($SignInW, $SignInH, $SignInWatchMs, $SignInTickMs, [bool]$SignInOnly)
   } catch { $null = $_ }   # no helper: the sign-in window keeps its own size
+}
+function Stop-SignInSize {
+  [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'None')]
+  param()
+  if (-not $PSCmdlet.ShouldProcess('the sign-in window watch of this process', 'Stop')) { return }
+  try { if ('RadeSignIn.Size2' -as [type]) { [RadeSignIn.Size2]::Stop() } } catch { $null = $_ }   # no watch: nothing to stop
 }
 # ---- RADE sign-in window size (end)
 '@
