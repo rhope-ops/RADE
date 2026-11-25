@@ -65,8 +65,10 @@ Do this only after parts 2 and 3: the checks run the repo's code, build every ap
 On a throwaway computer or virtual machine with git, Python 3 and PowerShell 7 (the checks are code from the repo too, so do not run them on a computer you depend on):
 
 ```bash
-git clone https://github.com/rhope-ops/RADE && cd RADE && scripts/check.sh
+git clone https://github.com/rhope-ops/RADE && cd RADE && scripts/check.sh --kit-install && scripts/check.sh
 ```
+
+`scripts/check.sh --kit-install` installs the kit package `archimedes-kit` at the commit in `.check.lock`, and writes the kit scripts that git does not keep. The package is code from the repo `rhope-ops/archimedes_lever`. Parts 2 and 3 do not cover it. Without the package, the checks fail and show the line `FAIL  kit package`.
 
 Pass = the last line is `CHECK PASS`. It runs the code standard check (`python3 scripts/code_standard.py`), the personal-data and secret scan, the engine tests and the build of every app. Do the same in the app's repo.
 

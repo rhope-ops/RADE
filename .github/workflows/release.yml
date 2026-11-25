@@ -1,7 +1,9 @@
 name: release
 # Signed engine release (the Administrator, 2026-11-15; docs/engine.md "How an app gets the engine").
-# Manual runs only, from main. It runs the repo checks, lists every file the engine reads with its SHA-256
-# (scripts/engine_files.py), signs that list as a build attestation (keyless, no secret), and makes the tag and release.
+# Manual runs only, from main. Job "checks" (read-only token) checks the tag and runs the repo checks; it installs the
+# kit package (package mode), so third-party code runs only there. Job "release" needs it and runs no package code: it
+# lists every file the engine reads with its SHA-256 (scripts/engine_files.py), signs that list as a build attestation
+# (keyless, no secret), and makes the tag and release.
 on:
   workflow_dispatch:
     inputs:
@@ -11,14 +13,11 @@ on:
 permissions:
   contents: read
 jobs:
-  release:
+  checks:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: write
-      id-token: write
-      attestations: write
-      artifact-metadata: write
+      contents: read
     steps:
       - name: Run from main only
         run: |
@@ -39,8 +38,35 @@ jobs:
         run: |
           built="$(sed -n 's/^ENGINE_RELEASE = \([0-9][0-9]*\)$/\1/p' engine/rade_build.py)"
           [ "${TAG#engine-v}" = "$built" ] || { echo "FAIL the tag $TAG has number ${TAG#engine-v}, but ENGINE_RELEASE in engine/rade_build.py is $built"; exit 1; }
+      - name: Install the linters
+        run: pip install ruff==0.17.6 pylint==4.1.4 shellcheck-py==0.9.0.6
+      - name: Kit package (package mode; writes the kit scripts that git does not track)
+        run: scripts/check.sh --kit-install
       - name: Repo checks (self-tests and engine tests)
         run: scripts/check.sh
+  release:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Run from main only
+        run: |
+          [ "$GITHUB_REF" = "refs/heads/main" ] || { echo "FAIL run this workflow from main, not $GITHUB_REF"; exit 1; }
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Tag is new and well formed (again; "re-run failed jobs" can run this job alone)
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$TAG" =~ ^engine-v[0-9]+$ ]] || { echo "FAIL the tag must be engine-v and a number"; exit 1; }
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then echo "FAIL the tag $TAG exists"; exit 1; fi
       - name: Engine file list
         run: |
           python3 scripts/engine_files.py > rade-engine.sha256
