@@ -46,7 +46,14 @@ def check(name, good, detail=''):
 
 
 def build(tmp):
-    """Build the sample bundle in a copy of the fixture app under `tmp`; return its lines (LF line ends)."""
+    """Build the sample bundle in a copy of the fixture app.
+
+    Args:
+        tmp: an empty folder; the copy of the app goes in tmp/app.
+
+    Returns:
+        The lines of the built bundle (split at LF). Exits with a FAIL line when the build fails.
+    """
     app = tmp / 'app'
     shutil.copytree(ROOT / 'tests/fixture-app', app)
     (app / 'scripts').mkdir(exist_ok=True)
