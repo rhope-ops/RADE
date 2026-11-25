@@ -61,6 +61,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Tag is new and well formed (again; "re-run failed jobs" can run this job alone)
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$TAG" =~ ^engine-v[0-9]+$ ]] || { echo "FAIL the tag must be engine-v and a number"; exit 1; }
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then echo "FAIL the tag $TAG exists"; exit 1; fi
       - name: Engine file list
         run: |
           python3 scripts/engine_files.py > rade-engine.sha256
