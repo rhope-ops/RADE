@@ -9,7 +9,7 @@ characters in UNICODES and loses its OpenType layout tables (GDI, which draws Wi
 about 43 KB in place of about 190 KB, so a bundle carries about 170 KB of base64, not 770 KB.
 
 Usage: python3 scripts/build_fonts.py SOURCE_DIR   (SOURCE_DIR holds the files of SOURCES, downloaded by hand)
-Needs: fontTools 4.55.3 from PyPI (pinned with its hash in requirements.txt: pip install --require-hashes --no-deps -r requirements.txt), only to make the files again; no check needs it.
+Needs: fontTools 4.55.3 from PyPI (pinned with its hash in requirements.txt: pip install --require-hashes -r requirements.txt), only to make the files again; no check needs it.
 Run target: Python 3 on Linux or Windows.
 Network: none (the source files are downloaded by hand from raw.githubusercontent.com, checked by SHA-256 here).
 Writes: engine/fonts/*.ttf (then name each in engine/ui-tokens.json "faces" and run python3 engine/rade_tokens.py --write).
