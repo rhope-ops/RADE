@@ -39,6 +39,10 @@ jobs:
         run: |
           built="$(sed -n 's/^ENGINE_RELEASE = \([0-9][0-9]*\)$/\1/p' engine/rade_build.py)"
           [ "${TAG#engine-v}" = "$built" ] || { echo "FAIL the tag $TAG has number ${TAG#engine-v}, but ENGINE_RELEASE in engine/rade_build.py is $built"; exit 1; }
+      - name: Install the linters
+        run: pip install ruff==0.17.6 pylint==4.1.4 shellcheck-py==0.9.0.6
+      - name: Kit package (package mode; writes the kit scripts that git does not track)
+        run: scripts/check.sh --kit-install
       - name: Repo checks (self-tests and engine tests)
         run: scripts/check.sh
       - name: Engine file list

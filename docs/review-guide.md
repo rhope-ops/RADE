@@ -68,7 +68,7 @@ On a throwaway computer or virtual machine with git, Python 3 and PowerShell 7 (
 git clone https://github.com/rhope-ops/RADE && cd RADE && scripts/check.sh --kit-install && scripts/check.sh
 ```
 
-`scripts/check.sh --kit-install` installs the kit package `archimedes-kit` at the commit in `.check.lock`, and writes the kit scripts that git does not keep. Without it, the checks stop at `FAIL  kit package`.
+`scripts/check.sh --kit-install` installs the kit package `archimedes-kit` at the commit in `.check.lock`, and writes the kit scripts that git does not keep. The package is code from the repo `rhope-ops/archimedes_lever`: parts 2 and 3 do not cover it. Without the package, the checks fail and show the line `FAIL  kit package`.
 
 Pass = the last line is `CHECK PASS`. It runs the code standard check (`python3 scripts/code_standard.py`), the personal-data and secret scan, the engine tests and the build of every app. Do the same in the app's repo.
 

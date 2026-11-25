@@ -20,6 +20,8 @@ jobs:
           python-version: "3.12"
       - name: Install bandit
         run: pip install bandit==1.9.4
+      - name: Kit package (package mode; writes the kit scripts that git does not track, so bandit scans them)
+        run: scripts/check.sh --kit-install
       - name: Scan the engine and scripts (medium severity and higher)
         run: bandit -r engine/ scripts/ -ll
   gitleaks:
