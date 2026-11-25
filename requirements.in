@@ -1,4 +1,5 @@
 # Direct Python packages of RADE (tool retirement plan P4a, the Maintainer, 2026-11-23). Source of requirements.txt:
 # (pip-tools 7.7.0, Python 3.12) python3.12 -m piptools compile --generate-hashes --strip-extras --allow-unsafe -o requirements.txt requirements.in
+# SBOM of requirements.txt (cyclonedx-bom 7.2.1): cyclonedx-py requirements requirements.txt --of JSON --sv 1.6 --output-reproducible --output-file requirements.cdx.json
 fonttools==4.55.3   # scripts/build_fonts.py (build only)
 jsonschema>=4,<5   # scripts/check_manifest.py, scripts/check_apps.py, tests/check_apps_test.py, tests/engine_marker.sh
