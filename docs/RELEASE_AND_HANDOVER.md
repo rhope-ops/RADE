@@ -17,8 +17,8 @@ Do these steps only after GitHub shows the engine pull request as **Merged**. Th
 7. Click the green button **Run workflow**. You see a new run at the top of the list of runs. If it is not there, it shows after a page reload. Go on.
 8. On the list of runs, look at the new run. Wait until the run stops: it shows a green check mark or a red cross (about 5 minutes). Do not start a second run until then.
 9. If the run shows a green check mark, the release is made. Go on with "Check the release".
-10. If the run shows a red cross, the release is not made. Click the run. You see the job **release** with a red cross. Go on.
-11. Click the job **release**. You see the log of the job. Write down the line that starts with `FAIL`, or the last red line if no line starts with `FAIL`.
+10. If the run shows a red cross, the release is not made. Click the run. You see the jobs **checks** and **release**. One of them has a red cross. Go on.
+11. Click the job with the red cross. You see the log of the job. Write down the line that starts with `FAIL`, or the last red line if no line starts with `FAIL`.
 12. In the Teams channel **RHOPE-OPS**, send the line that you wrote down. You see your message in the channel. Do not start a second run. The task is complete: the release waits for a fix.
 
 ## Check the release
