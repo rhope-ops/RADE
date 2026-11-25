@@ -353,8 +353,11 @@ foreach ($c in $kids) { $perr = $null
   Assert-Case ('sign-in window size block in: ' + $c.N) ($c.T.Contains($signInSize.TrimEnd()) -and -not $c.T.Contains('# <RADE sign-in window size>') -and $sign -gt 0 -and $sign -lt $conn) }
 # E3: the block compiles and its timer starts and stops with no error off Windows (no user32 here: each tick fails quietly).
 $env:RADE_SIGNIN_TEST = '1'; $sbErr = $null
-try { . ([scriptblock]::Create($signInSize)); $SignInWatchMs = 300; Start-SignInSize; Start-Sleep -Milliseconds 600 } catch { $sbErr = $_ }
+# Item 10 (follow-ups 2): -WhatIf starts nothing (no helper type yet); -SignInOnly starts too (the app path).
+try { . ([scriptblock]::Create($signInSize)); $SignInWatchMs = 300; Start-SignInSize -WhatIf; $wiType = [bool]('RadeSignIn.Size2' -as [type])
+  Start-SignInSize; Start-Sleep -Milliseconds 600; Start-SignInSize -SignInOnly; Start-Sleep -Milliseconds 600 } catch { $sbErr = $_ }
 $env:RADE_SIGNIN_TEST = $null
-Assert-Case 'sign-in window size: the helper compiles and starts (E3)' ($null -eq $sbErr -and [bool]('RadeSignIn.Size' -as [type]) -and
+Assert-Case 'sign-in window size: -WhatIf compiles and starts nothing (item 10)' ($null -eq $sbErr -and -not $wiType)
+Assert-Case 'sign-in window size: the helper compiles and starts, also with -SignInOnly (E3, item 10)' ($null -eq $sbErr -and [bool]('RadeSignIn.Size2' -as [type]) -and
   $signInSize -match '(?m)^# ---- RADE sign-in window size \(start' -and $signInSize -match '(?m)^# ---- RADE sign-in window size \(end\)' -and $signInSize -notmatch 'EnumWindows\(')
 Write-Host ('TOOLS-UNIT pass=' + $script:pass + ' fail=' + $script:fail)
