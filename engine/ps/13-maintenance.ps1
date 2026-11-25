@@ -367,9 +367,12 @@ function Get-RadeAppDir {
   $names = @($appFolder); $recDir = Get-RadeConfigFile 'installed'
   foreach ($f in @(Get-ChildItem -LiteralPath $recDir -File -Filter '*.json' -ErrorAction SilentlyContinue)) {
     try { $k = [string](([System.IO.File]::ReadAllText($f.FullName) | ConvertFrom-Json).key) } catch { $k = '' }   # a record it cannot read names no folder
-    if ($k -match '^([^/\\:*?"<>|]+)/') { $names += $Matches[1] } }
-  $root = Get-RadePath
-  return @($names | Where-Object { $_ -and $_ -ne 'Config' } | Sort-Object -Unique | ForEach-Object { Join-Path $root $_ } | Where-Object { Test-Path -LiteralPath $_ -PathType Container })
+    if ($k -match '^([^/]+)/') { $names += $Matches[1] } }
+  # Only a plain folder name (letters, digits, space, ".", "_", "-"; not "." or ".."), and only a folder right under RADE.
+  $root = [System.IO.Path]::GetFullPath((Get-RadePath)).TrimEnd('\', '/')
+  $plain = @($names | Where-Object { $_ -match '^[A-Za-z0-9][A-Za-z0-9 ._-]*$' -and $_ -notmatch '^\.+$' -and $_ -ne 'Config' } | Sort-Object -Unique)
+  return @($plain | ForEach-Object { [System.IO.Path]::GetFullPath((Join-Path $root $_)) } |
+    Where-Object { (Split-Path -Parent $_).TrimEnd('\', '/') -eq $root -and (Test-Path -LiteralPath $_ -PathType Container) })
 }
 
 <#

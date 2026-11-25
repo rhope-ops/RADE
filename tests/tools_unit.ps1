@@ -422,4 +422,13 @@ $rr = Invoke-RemoveRade; $left = @(Get-ChildItem -LiteralPath $base -Force | For
 Assert-Case 'remove RADE: Config, the runner and the app files go; Backups stays' ($rr.State -eq 'done' -and -not (Test-Path -LiteralPath (Join-Path $Dir 'RADE\Config')) -and
   -not (Test-Path -LiteralPath (Join-Path $Dir 'RADE\rade-runner.ps1')) -and ($left -join ',') -eq 'Backups')
 Assert-Case 'remove RADE: a folder that no record names stays' (Test-Path -LiteralPath (Join-Path $Dir 'RADE\Other'))
+# A record whose key names a folder outside RADE ("..") or an odd name: no folder outside RADE is touched.
+$null = New-Item -ItemType Directory -Path (Join-Path $Dir 'RADE\Config\installed') -Force; Set-Content -LiteralPath (Join-Path $Dir 'keep.txt') -Value 'x'
+'{"schema":"rade-installed/2","key":"../x","installed":null}' | Set-Content -LiteralPath (Join-Path $Dir 'RADE\Config\installed\aaaaaaaaaaaa.json')
+'{"schema":"rade-installed/2","key":"Other/y","installed":null}' | Set-Content -LiteralPath (Join-Path $Dir 'RADE\Config\installed\bbbbbbbbbbbb.json')
+$odd = @(Get-RadeAppDir | ForEach-Object { Split-Path -Leaf $_ })
+Assert-Case 'remove RADE: a key with ".." names no folder; a plain one names its folder under RADE' (-not ($odd -contains '..') -and ($odd -contains 'Other') -and
+  @($odd | Where-Object { -not (Test-Path -LiteralPath (Join-Path (Join-Path $Dir 'RADE') $_)) }).Count -eq 0)
+$null = Invoke-RemoveRade
+Assert-Case 'remove RADE: nothing outside the RADE folder is touched' (Test-Path -LiteralPath (Join-Path $Dir 'keep.txt'))
 Write-Host ('TOOLS-UNIT pass=' + $script:pass + ' fail=' + $script:fail)
