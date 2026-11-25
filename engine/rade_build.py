@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent)); import rade_hash, rade
 from rade_fields import q, hand_part, restore_part, BACKUP_RE
 from rade_parts import (WINDOW_FILE, ENGINE_DIR, ENGINE_PARTS, WINDOW_PARTS, WINDOW_SLOT, indent, file_sha, engine_text, ENGINE, BASE_CHECKS, CHECK_IDS, START_RE,
     WIN_RESERVED, word_list, BANNER, SHARED_RE, SHARED_LINE, shared_blocks, window_values, site_values, logo_path, SCRIPT_EXTS, ends_in, collect_problems, part_lines,
-    RUN_STEPS)   # engine/rade_parts.py
+    run_steps)   # engine/rade_parts.py
 
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
 LOGO = ENGINE_ROOT / logo_path()   # RADE's own logo (engine/window.json "logo"): the window and its title-bar icon (Fulcrum, the PFM, 2026-11-20)
@@ -352,7 +352,7 @@ def build(b):
             '  C:\\Users\\<DODID>\\OneDrive - United States Air Force\\RADE\\%s (replacing older copies), runs the steps,\n'
             '  and saves its results in Rounds\\%s%s No download, no admin rights.\n'
             '  To read it: the Contents list below gives the line of each part and file; each part starts with a "# ====" line.\n'
-            '#>\n%s$buildId = \'%s\'\n$engineRelease = %d\n' % (RUN_STEPS, b['title'], site_values()['@@RADE_REPO@@'], file_sha('engine/rade_build.py'), file_sha('engine/rade_ui.ps1'),
+            '#>\n%s$buildId = \'%s\'\n$engineRelease = %d\n' % (run_steps(), b['title'], site_values()['@@RADE_REPO@@'], file_sha('engine/rade_build.py'), file_sha('engine/rade_ui.ps1'),
                 file_sha('engine/rade_ui_text.ps1'), MANIFEST, part_lines(), APP['folder'], b['round'], sends, rade_hash.GUARD_START, build_id, ENGINE_RELEASE))
     return rade_hash.add_line(head + contents(head, body) + body.rstrip('\n') + '\n' + rade_hash.GUARD_END)   # GUARD_START is in head
 

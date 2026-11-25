@@ -180,12 +180,24 @@ def part_lines():
 
 # The run steps (90-161.Z R43 E1, the PFM, 2026-11-25): the first lines of every bundle after its hash line, so a person
 # who opens the .txt copy from a link sees how to run it before the code. They are in the .ps1 too: the two files are
-# the same bytes (engine/rade_hash.py text_copy). ASD-STE100, one action per step (AGENTS.md "Instructions people follow");
-# the same words as the RADE page (index.html steps()). ASCII only, and never "#>" (it would end the header comment).
+# the same bytes (engine/rade_hash.py text_copy). ASD-STE100, one action per step (AGENTS.md "Instructions people follow";
+# two fresh-reader tests, docs/reviews/2026-11-25-fresh-reader.md). Step 5 names the last line of every bundle
+# (rade_hash.GUARD_END). ASCII only, and never "#>" (it would end the header comment): tests/bundle_layout_test.py.
+# The RADE page (index.html steps()) has its own shorter copy for its Copy button.
 RUN_STEPS = ('  HOW TO RUN THIS SCRIPT (on a work computer):\n'
-             '  1. On this page, press Ctrl+A, then press Ctrl+C.\n'
-             '  2. Open the Start menu and type ISE. Click Windows PowerShell ISE (not the x86 one). Do not click Run as administrator.\n'
-             '  3. In Windows PowerShell ISE, click File > New.\n'
-             '  4. Click in the new empty tab in the top pane, then press Ctrl+V.\n'
-             '  5. Wait until the end of the script shows in the top pane. Then press F5.\n'
-             '  6. If no RADE window opens in 1 minute, copy the red text from the bottom pane and send it to the person who gave you this link.\n\n')
+             '  1. Click in the text on this page, then press Ctrl+A, then press Ctrl+C.\n'
+             '  2. Open the Start menu and type ISE. Click Windows PowerShell ISE.\n'
+             '     Do not click Windows PowerShell ISE (x86). Do not click Run as administrator.\n'
+             '  3. In Windows PowerShell ISE, click File > New. A new tab (for example Untitled2.ps1) opens.\n'
+             '  4. Click in the top pane (the script pane) under the new tab, then press Ctrl+V.\n'
+             '  5. Wait until this line shows at the bottom of the script pane, then press F5:\n'
+             '         . $script:PasteBody\n'
+             '  6. Wait until the RADE window opens, then do the steps in that window.\n'
+             '     If it is not open after 1 minute, click RADE on the taskbar.\n'
+             '  7. If RADE is not on the taskbar, ask for help in the Teams channel %s.\n'
+             '     Do not paste the red text from Windows PowerShell ISE in Teams: it can show your folder names.\n\n')
+
+
+def run_steps():
+    """Return the run steps for the bundle header, with the Teams channel name from apps.json (site_values)."""
+    return RUN_STEPS % site_values()['@@HELP@@']

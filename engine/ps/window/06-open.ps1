@@ -270,7 +270,7 @@ $ui.VReady = {
     P = @(('Writes to ' + $plan.Shown + ': ' + $new + ' new files, ' + $rep + ' replaced, ' + $rec + ' moved to the Recycle Bin.'),
       ([string]$n + $(if ($n -eq 1) { ' step' } else { ' steps' }) + ', about ' + [math]::Max(1, [int][math]::Round($est / 60)) + ' min. ' + $you + $(if ($done) { ' ' + $done + ' already done for this version and off.' } else { '' })),
       $(if (Test-WordOpen) { 'Word is open. Save your documents and close Word before you start.' } else { '' }), $w1, $rsNote)
-    Buttons = @($resB, $startB, $runB,   # B7: the Record is the link "Record (F2)"; B4: one primary (Resume when it shows)
+    Buttons = @($resB, $startB, $runB,   # B7: Details is the link "Details (F2)"; B4: one primary (Resume when it shows)
       $(if ($siteName) { @{ Text = 'Change the site address'; Act = { & $ui.VSite } } } else { $null }))
     Foot = $(if ($siteName) { 'Site: ' + $siteName } else { '' })
     Field = $(if ($dep -and -not (Test-ShortcutMade)) { @{ Label = 'RADE shortcut in'; Text = (Get-ShortcutDir); Name = 'Folder for the RADE shortcut'; Button = 'Browse'; Act = { & $ui.BrowseDir } } } else { $null })
