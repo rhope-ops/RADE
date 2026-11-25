@@ -365,6 +365,12 @@ $env:RADE_SIGNIN_TEST = $null
 Assert-Case 'sign-in window size: -WhatIf compiles and starts nothing (item 10)' ($null -eq $sbErr -and -not $wiType)
 Assert-Case 'sign-in window size: the helper compiles, starts (also with -SignInOnly) and stops (E3, item 10)' ($null -eq $sbErr -and [bool]('RadeSignIn.Size2' -as [type]) -and
   $signInSize -match '(?m)^# ---- RADE sign-in window size \(start' -and $signInSize -match '(?m)^# ---- RADE sign-in window size \(end\)' -and $signInSize -notmatch 'EnumWindows\(')
+# R43 E4 (the PFM, 2026-11-25): the rights check gives its sign-in time; RADE_SIGNIN_WATCH=0 turns the window watch off.
+$script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Marker = $null }
+$sr1 = Get-SiteRightsCheck $base 'https://usaf.dps.mil/sites/fake' $null
+$env:RADE_SIGNIN_WATCH = '0'; $sr2 = Get-SiteRightsCheck $base 'https://usaf.dps.mil/sites/fake' $null; $env:RADE_SIGNIN_WATCH = $null
+Assert-Case 'sign-in time: the rights check detail ends with "SIGNIN seconds=N watch=on", and "watch=off" with RADE_SIGNIN_WATCH=0' (
+  [string]$sr1.Detail -match 'SIGNIN seconds=\d+ watch=on$' -and [string]$sr2.Detail -match 'SIGNIN seconds=\d+ watch=off$')
 # ---- Uninstall (engine-v40; 90-161.Z R43 E3): the gate, the backup first, the steps with RADE_MODE=uninstall and
 # RADE_MADE, the stop at the first step that is not done, and the record (answer 2A: whole = not installed, history kept).
 $stepMinutes = 5; $script:dodid = 'fake'; $signInLost = 'smart ?card'

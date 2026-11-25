@@ -30,6 +30,7 @@ function Start-SignInSize {
   [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'None')]
   param([switch]$SignInOnly)
   if (-not $PSCmdlet.ShouldProcess('the sign-in window of this process', 'Set its size')) { return }   # -WhatIf: no timer
+  if ($env:RADE_SIGNIN_WATCH -eq '0') { return }   # R43 E4 (the PFM, 2026-11-25): the timed pair; RADE_SIGNIN_WATCH=0 turns the watch off
   if ($env:OS -ne 'Windows_NT' -and $env:RADE_SIGNIN_TEST -ne '1') { return }   # Windows only (the cloud test sets RADE_SIGNIN_TEST to compile it)
   try {
     if (-not ('RadeSignIn.Size2' -as [type])) {   # Size2: Start takes signInOnly (a process that holds the old Size keeps it)
@@ -107,8 +108,10 @@ try {
   if (-not $mod.Count) { 'RESULT no-pnp'; exit 3 }
   $pin = @($mod | Where-Object { [string]$_.Version -eq '1.12.0' }); if ($pin.Count) { $mod = $pin }   # the tested version first (2.x needs PowerShell 7)
   $null = & { Import-Module PnP.PowerShell -RequiredVersion $mod[0].Version -DisableNameChecking } *>&1
+  $signT0 = Get-Date   # R43 E4: the time of the sign-in, with the watch on or off (RADE_SIGNIN_WATCH=0)
   Start-SignInSize   # E3: the CAC sign-in window opens at about 480 x 360, centered (the block above)
   $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1
+  'SIGNIN seconds=' + [int]((Get-Date) - $signT0).TotalSeconds + ' watch=' + $(if ($env:RADE_SIGNIN_WATCH -eq '0') { 'off' } else { 'on' })
   $script:web = $null
   $null = & { $script:web = Get-PnPWeb -Includes EffectiveBasePermissions -ErrorAction Stop } *>&1
   $p = $script:web.EffectiveBasePermissions
