@@ -4,7 +4,7 @@
 # bundle with the settings in PSScriptAnalyzerSettings.psd1 (the ones rhope-ops/90-161.Z uses on its own bundles, plus parse errors):
 # Error and Warning, Windows PowerShell 5.1 syntax, Write-Host allowed. Linting the joined bundle (not each engine/ps part alone) avoids false "unused variable" findings
 # for a value one part sets and another reads.
-# Usage: scripts/lint.sh. Pass = last line "LINT findings=0"; exit 1 on any finding.
+# It also lints the sign-in window size block alone (an app copies it). Usage: scripts/lint.sh. Pass = last line "LINT findings=0"; exit 1 on any finding.
 # Needs: pwsh 7 and PSScriptAnalyzer: in the module path (the GitHub runner has it), or at $PSSA (default
 # /opt/psmods/PSScriptAnalyzer/PSScriptAnalyzer.psd1; setup: rhope-ops/90-161.Z docs/dev-setup.md).
 set -euo pipefail
@@ -19,6 +19,11 @@ pwsh -NoProfile -Command '
 $ErrorActionPreference = "Stop"
 if (Test-Path -LiteralPath $env:PSSA) { Import-Module $env:PSSA } else { Import-Module PSScriptAnalyzer -ErrorAction SilentlyContinue }
 if (-not (Get-Command Invoke-ScriptAnalyzer -ErrorAction SilentlyContinue)) { "LINT FAIL: PSScriptAnalyzer is not installed (set PSSA or install the module)"; exit 1 }
+# The sign-in window size block alone, as an app copies it into its own task scripts (engine/ps/16-site-scripts.ps1
+# $signInSize; follow-ups 2 item 10): it must pass with no exemption.
+$src = [IO.File]::ReadAllText("engine/ps/16-site-scripts.ps1"); $q = [char]39; $m = [regex]::Match($src, "(?s)\`$signInSize = @" + $q + "\r?\n(.*?)\r?\n" + $q + "@")
+if (-not $m.Success) { "LINT FAIL: no sign-in window size block in engine/ps/16-site-scripts.ps1"; exit 1 }
+[IO.File]::WriteAllText((Join-Path $env:LINT_DIR "signin-size-block.ps1"), $m.Groups[1].Value + "`n")
 $files = @(Get-ChildItem -Path $env:LINT_DIR -Filter *.ps1)
 $all = foreach ($f in $files) { Invoke-ScriptAnalyzer -Path $f.FullName -Settings $env:LINT_SETTINGS }
 $all | Format-Table RuleName, Severity, Line, Message -AutoSize -Wrap | Out-String -Width 220
