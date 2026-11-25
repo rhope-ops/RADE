@@ -141,3 +141,7 @@ The Record (F2, or its links): three columns. Checks by group (Local, Network, A
 Not in the window yet: bundle size in the summary, engine version and sha256 in the window, a JSON results block (RADE 2026-11-14, engine work row); the Maintenance action Uninstall.
 
 - **A paste that does not fit** (R7, the Administrator, 2026-11-19). A text answer takes 10,000 characters. When a pasted text is longer than the room left in the one-line box, the box keeps what fits and the gray note line under the box (`$ui.Note`, the line of `$ui.Say1`; Small, gray) says, in plain words, how many characters did not fit: "The paste was too long: 1,234 characters did not fit." ("1 character did not fit." for one). The count has a thousands comma. A paste that fits clears the note. Candidates not taken: a red line (the window has no error color for a note); a pop-up (stops the user); no note (the old behavior, a silent cut). Text mode asks no question, so it has no limit to report. Proof: the WIN lines `paste` and `paste-cut` ([tests/window_driver.ps1](../tests/window_driver.ps1)).
+
+## Planned changes
+
+- "Record (F2)" becomes "Details (F2)", everywhere the window names it (bottom line, Ready and Done buttons, cards, help text). The screen holds the checks, the step boxes, the files and the log, so "Record" and "Log" are too narrow (the Maintainer, 2026-11-25, in a 90-161.Z session; 90-161.Z PR 245). Next engine release; a UI text change, so show a preview first.
