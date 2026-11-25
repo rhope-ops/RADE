@@ -84,7 +84,7 @@ $ui.VRecord = {
   & $mk 'STEPS' $ui.F.SmallB $ui.C.Gray
   if (-not $ui.Picked) { & $mk 'Choose an application first.' $ui.F.Small $ui.C.Gray }
   else {
-    if (-not $ui.Edit) { & $mk $(if ($ui.Running) { 'The run has started: the boxes are locked.' } else { 'To change the boxes, go to "Ready" and select "Record (F2)".' }) $ui.F.Small $ui.C.Gray }
+    if (-not $ui.Edit) { & $mk $(if ($ui.Running) { 'The run has started: the boxes are locked.' } else { 'To change the boxes, go to "Ready" and select "Details (F2)".' }) $ui.F.Small $ui.C.Gray }
     $list = @(); if ($cleanup.Count) { $list += -1 }; $list += @($script:appSteps); $n = 0
     foreach ($k in $list) {
       $cb = New-Object System.Windows.Forms.CheckBox
@@ -109,7 +109,7 @@ $ui.VRecord = {
   }
   if ($ui.Log.Count -or $ui.Running) { $t += @('', 'LOG'); $t += @($ui.Log) }
   $ui.RecText.Text = ($t -join "`r`n") + "`r`n"   # ends with a line break: a live log line is added below
-  $ui.RecTitle.Text = 'Record' + $(if ($ui.Picked) { $dot + $script:app.Name } else { '' })
+  $ui.RecTitle.Text = 'Details' + $(if ($ui.Picked) { $dot + $script:app.Name } else { '' })
   & $ui.RecFit
   $ui.Card.Visible = $false; $ui.Rec.Visible = $true; & $ui.RecTall; $ui.RecChecks.Invalidate(); $ui.RecB.Visible = $false; $ui.TourB.Visible = $false; $ui.BackB.Visible = $false; $ui.FeedB.Visible = $false
   try { [void]$ui.RecClose.Focus() } catch { $null = $_ } }

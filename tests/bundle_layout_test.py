@@ -64,6 +64,16 @@ def check_contents(text):
     check({'Part', 'File', 'Engine'} <= set(kinds), 'contents: lists parts, files and engine parts')
 
 
+def check_run_steps(text):
+    """Check 1b (90-161.Z R43 E1): the numbered run steps are the first lines after the hash line, ASCII, and never end the header."""
+    lines = text.split('\n')
+    head = text[:text.index('\n#>\n')]
+    check(lines[1] == '<#' and lines[2].strip() == 'HOW TO RUN THIS SCRIPT (on a work computer):' and lines[3].strip().startswith('1. '),
+          'run steps: the first lines after the hash line')
+    check(head.isascii() and '#>' not in head[3:], 'run steps: ASCII, and no "#>" inside the header')
+    check('\n         . $script:PasteBody\n' in head and lines[-2] == '. $script:PasteBody', 'run steps: step 5 names the real last line of the bundle')
+
+
 def check_shared(text, want):
     """Checks 2 and 3: one $shared entry, one SHARED line per script, and pwsh puts the block back exactly."""
     check(text.count("$shared['demo-common-") == 1 and text.count('# @@SHARED demo-common-') == 2,
@@ -161,6 +171,7 @@ def main():
         bundle = next((app / 'scripts/gov/paste').glob('*.ps1'), None)
         text = bundle.read_text(encoding='ascii') if bundle else ''
         check_contents(text)
+        check_run_steps(text)
         check_shared(text, want)
         if bundle:
             check_same_bytes(app, bundle.read_bytes())
