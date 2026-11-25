@@ -49,21 +49,25 @@ $ui.ToolResult = {
   Its result: Invoke-Diagnose (Lines, Path, Findings), Invoke-Backup or Invoke-Restore (State, Lines, Path).
   #>
   param([string]$Name, $Res)
-  $diag = ($Name -eq 'Diagnose'); $bad = $(if ($diag) { [int]$Res.Findings -gt 0 } else { [string]$Res.State -in 'failed', 'refused', 'changed', 'unmark-failed' })
+  $diag = ($Name -eq 'Diagnose'); $bad = $(if ($diag) { [int]$Res.Findings -gt 0 } else { [string]$Res.State -in 'failed', 'refused', 'changed', 'unmark-failed', 'no-backup', 'review' })
   $st = [string]$Res.State
   $sent = $(if ($diag -and $bad) { 'Diagnose found ' + $Res.Findings + ' thing(s) to fix.' } elseif ($diag) { 'Diagnose found nothing to fix.' }
     elseif ($Name -eq 'Restore') { $(switch ($st) { 'done' { 'Restore put the missing rows back.' } 'refused' { 'Restore cannot run here.' } 'none' { 'Restore has no backup to use.' }
         'changed' { 'Restore wrote nothing: the site changed after the dry run.' } default { 'Restore did not finish.' } }) }
+    elseif ($Name -eq 'Uninstall') { $(switch ($st) { 'done' { $script:app.Name + ' is uninstalled.' } 'refused' { 'Uninstall cannot run here.' } 'no-backup' { 'Uninstall removed nothing.' }
+        'review' { 'Uninstall did not finish.' } default { 'Uninstall stopped with an error.' } }) }
     elseif ($st -eq 'done') { 'Back up saved the lists.' } elseif ($st -eq 'none') { 'Back up has no lists to save.' }
     elseif ($st -eq 'no-site') { 'Back up saved nothing.' } else { 'Back up did not save everything.' })
   if ($Name -eq 'Restore' -and $st -eq 'unmarked') { $sent = 'The test-site mark is removed.' }
   if ($Name -eq 'Restore' -and $st -eq 'unmark-failed') { $sent = 'The test-site mark was not removed.' }
   $lines = @($Res.Lines); $path = $(if ($Res.Path) { [string]$Res.Path } else { $null })
   $buttons = @(@{ Text = 'Done'; Kind = 'primary'; Act = { & $ui.VTools $ui.MaintVerb } })
+  # Uninstall (engine-v40): after a whole Uninstall the app is not installed, so Done goes to Choose; else to the Maintenance card.
+  if ($Name -eq 'Uninstall') { $buttons = @(@{ Text = 'Done'; Kind = 'primary'; Act = $(if ($st -eq 'done') { { & $ui.VChoose } } else { { & $ui.VMaint $ui.MaintInst } }) }) }
   if ($Res.Unmark) { $buttons = @(& $ui.UnmarkButton) + $buttons }   # a marked site with no backup (engine-v33)
   & $ui.SetCard @{ View = 'toolres'; Light = $(if ($bad) { 'bad' } else { '' }); Kicker = [string]$ui.Kick.Text; Sentence = $sent
     P = @($lines | Select-Object -First 2); Lines = @($lines | Select-Object -Skip 2); Path = $path
-    Buttons = $buttons; Back = { & $ui.VTools $ui.MaintVerb } }
+    Buttons = $buttons; Back = $(if ($Name -eq 'Uninstall') { $buttons[0].Act } else { { & $ui.VTools $ui.MaintVerb } }) }
   & $ui.ToFront }
 
 $ui.VRestorePick = {
@@ -76,7 +80,7 @@ $ui.VRestorePick = {
   dry-run and confirm cards ($ui.RestoreSite). Takes no parameter.
   #>
   $appPath = Get-BasePath; $siteCheck = Test-RestoreSite $appPath
-  if ($siteCheck.NeedMark) { & $ui.VRestoreMark; return }
+  if ($siteCheck.NeedMark) { $ui.MarkNext = $ui.VRestorePick; & $ui.VRestoreMark; return }
   if (-not $siteCheck.Ok) { & $ui.ToolResult 'Restore' @{ State = 'refused'; Path = ''; Lines = $siteCheck.Lines }; return }
   $ui.RestoreSite = [string]$siteCheck.Name; $marked = [bool]$script:app.Restore.Local   # Ok with "local": the site is marked
   $ui.RestoreSets = @(Get-BackupSet $appPath)
@@ -111,9 +115,9 @@ $ui.VRestoreMark = {
   The card does not show the name: the person types it, so the mark says they know which site this is. The mark is
   stored only on this computer, next to the site address (Config). Takes no parameter.
   #>
-  $where = "The mark stays on this computer only, in the app's Config folder. Restore refuses every site without it."
+  $where = "The mark stays on this computer only, in the app's Config folder. Restore and Uninstall refuse every site without it."
   & $ui.SetCard @{ View = 'restmark'; Light = 'you'; Kicker = [string]$ui.Kick.Text; Sentence = 'Is the saved site a test site?'
-    P = @('Restore writes only to a test site. To mark the saved site as one, type its name: the part of its address after the last /.', $where)
+    P = @('Restore and Uninstall change only a test site. To mark the saved site as one, type its name: the part of its address after the last /.', $where)
     Field = @{ Label = 'Site name'; Text = ''; Name = 'The site name, to mark the saved site as a test site'; Max = 200 }; Focus = 'field'
     Buttons = @(@{ Text = 'Mark as test site'; Kind = 'primary'; Act = { & $ui.RestoreMarkGo } }); Back = { & $ui.VTools $ui.MaintVerb } } }
 
@@ -126,7 +130,7 @@ $ui.RestoreMarkGo = {
   if (-not $siteCheck.Name -or $typed -ne $siteCheck.Name) { & $ui.Say1 'That is not the name of the saved site. Type the part of its address after the last /.'; return }
   try { Save-RestoreMark $appPath $siteCheck.Name }
   catch { & $ui.Say1 ('The mark could not be saved [' + $_.Exception.GetType().Name + ']. Nothing was changed.'); return }
-  & $ui.VRestorePick }
+  if ($ui.MarkNext) { & $ui.MarkNext } else { & $ui.VRestorePick } }   # Restore's backup card, or Uninstall's confirm card
 
 $ui.RestorePlan = {
   <#
@@ -181,3 +185,50 @@ $ui.RestoreGo = {
   finally { $ui.Busy = $false; $ui.RestoreDry = $null }
   if ($ui.Form.IsDisposed -or $script:closing) { return }
   & $ui.ToolResult 'Restore' $res }
+
+$ui.VUninstall = {
+  <#
+  .SYNOPSIS
+  Uninstall, the confirm card (view unconfirm; engine-v40, 90-161.Z R43 E3, the PFM, 2026-11-25).
+  .DESCRIPTION
+  Test sites only (the Restore gate: a site that only lacks the local mark goes to the mark card first, then back here).
+  The card names the test site, the backup, the app's Uninstall steps (a hand step says so) and what stays; the person
+  types the app name, then "Uninstall" (dark red: the one destructive action) runs it. Takes no parameter.
+  #>
+  if ($ui.Busy) { return }
+  $siteCheck = Test-UninstallSite (Get-BasePath)
+  if ($siteCheck.NeedMark) { $ui.MarkNext = $ui.VUninstall; & $ui.VRestoreMark; return }
+  if (-not $siteCheck.Ok) { & $ui.ToolResult 'Uninstall' @{ State = 'refused'; Path = ''; Lines = @($siteCheck.Lines) }; return }
+  $ui.UninstallSite = [string]$siteCheck.Name; $all = @($script:app.Uninstall); $n = @($script:app.Backup).Count
+  $rows = @(for ($i = 0; $i -lt $all.Count; $i++) { $st = $steps[[int]$all[$i]]
+      ([string]($i + 1) + '. ' + (Get-StepTitle $st) + $(if ($st.Kind -eq 'guide') { ' (you do this step)' } else { '' })) })
+  $what = 'RADE first backs up ' + $n + ' list(s). Then it runs these ' + $all.Count + ' steps of ' + $script:app.Name + '.'
+  $what += ' They remove what the install made on the site. Your local files and the backups stay on this computer.'
+  & $ui.SetCard @{ View = 'unconfirm'; Light = 'you'; Kicker = [string]$ui.Kick.Text; Sentence = ('Uninstall ' + $script:app.Name + ' from the test site?')
+    P = @(('Test site: ' + $ui.UninstallSite), $what); Lines = $rows
+    Field = @{ Label = ('Type ' + $script:app.Name + ' to confirm'); Text = ''; Name = 'The app name, to confirm Uninstall' }; Focus = 'field'
+    Buttons = @(@{ Text = 'Uninstall'; Kind = 'danger'; Act = { & $ui.UninstallGo } }); Back = { & $ui.VMaint $ui.MaintInst } } }
+
+$ui.UninstallGo = {
+  <#
+  .SYNOPSIS
+  Uninstall, the run: checks the typed app name, runs Invoke-Uninstall (part 13), then shows the result card.
+  .DESCRIPTION
+  The name must match exactly, capitals too. The run card names each step; a hand step shows its own card. Takes no
+  parameter.
+  #>
+  if ($ui.Busy) { return }
+  if ($ui.Field.Text.Trim() -cne [string]$script:app.Name) { & $ui.Say1 ('Type the app name as shown: ' + $script:app.Name); return }
+  $siteLine = 'Test site: ' + $ui.UninstallSite
+  # The run card with one sentence: what Uninstall does now. Takes the sentence.
+  $card = { param($Text) & $ui.SetCard @{ View = 'toolrun'; Kicker = [string]$ui.Kick.Text; Sentence = $Text; P = @($siteLine, 'Do not close RADE. A sign-in window may open.') } }
+  & $card 'Uninstall is saving a backup.'
+  $ui.Busy = $true; [System.Windows.Forms.Application]::DoEvents(); $res = $null
+  # Before each step: the run card names it. Takes the step, its number and the count.
+  $onStep = { param($St, $I, $N) & $card ('Uninstall step ' + $I + ' of ' + $N + ': ' + (Get-StepTitle $St)); [System.Windows.Forms.Application]::DoEvents() }
+  try { $res = Invoke-Uninstall (Get-BasePath) { [System.Windows.Forms.Application]::DoEvents() } $onStep }
+  catch { $why = 'Uninstall stopped with an error [' + $_.Exception.GetType().Name + '].'
+    $res = @{ State = 'failed'; Path = ''; Lines = @($why, 'Select "Uninstall" again: its steps remove only what is still there.') } }
+  finally { $ui.Busy = $false }
+  if ($ui.Form.IsDisposed -or $script:closing) { return }
+  & $ui.ToolResult 'Uninstall' $res }

@@ -75,3 +75,30 @@ def restore_part(a):
         assert re.fullmatch(r'[A-Za-z0-9 _-]{1,40}', pz['on']), 'app %r: restore.pause.on: a plain value' % a['name']
         pause = '@{ List = %s; Title = %s; Field = %s; On = %s }' % (q(pz['list']), q(pz['title']), q(pz['field']), q(pz['on']))
     return '@{ TestSites = @(%s); Local = %s; Pause = %s }' % ('' if local else ', '.join(map(q, sites)), '$true' if local else '$false', pause)
+
+
+def uninstall_part(a, b):
+    """The manifest field "uninstall" of an app (engine-v40; 90-161.Z R43 E3, the PFM, 2026-11-25) as PowerShell.
+
+    The app's own Uninstall steps, by name, in run order: steps of the bundle that are not install steps of the app
+    (a script that does not read RADE_MODE would install again). Uninstall runs only on a test site (the Restore gate)
+    and backs up first, so the app needs "restore" (and so "backup"), and mode deploy (it changes the install record).
+
+    Args:
+        a: the manifest app entry.
+        b: the manifest bundle (its "steps").
+
+    Returns:
+        '@()' when the app has no "uninstall" field, else '@(<step index>, ...)'. A bad field stops the build.
+    """
+    names = [s['name'] for s in b['steps']]
+    un = a.get('uninstall', [])
+    if not un:
+        return '@()'
+    assert len(set(un)) == len(un) and all(n in names for n in un), 'app %r: uninstall: unique names of steps of this bundle' % a['name']
+    assert not set(un) & set(a['steps']), 'app %r: uninstall: a step is an install step too (%s); give Uninstall its own steps' % (a['name'], ', '.join(sorted(set(un) & set(a['steps']))))
+    assert a.get('mode') == 'deploy' and a.get('restore'), 'app %r: uninstall needs mode deploy and "restore" (its test sites; Uninstall backs up first)' % a['name']
+    for n in un:
+        s = b['steps'][names.index(n)]
+        assert not s.get('after') and not s.get('ask'), 'app %r: uninstall step %r: no "after" or "ask" (Uninstall runs its steps in order and stops at the first that is not done)' % (a['name'], n)
+    return '@(%s)' % ', '.join(str(names.index(n)) for n in un)
