@@ -52,6 +52,8 @@ $ui.LinkLine.Size = New-Object System.Drawing.Size(1, 12); $ui.LinkLine.BackColo
 # The application row, once an application is chosen (L1): its logo (when it has one) and a column like the RADE column:
 # the application name in the word style, and under it the manifest's application.subtitle (for example "Kanon, a bullet,
 # Publications and Forms Management"); without a subtitle, the name only. Hidden on boot and on Choose ($ui.ShowAppRow).
+# An application with no logo has no row of its own: its name stands under RADE in the tagline's place (the window keeps
+# the height of engine-v42; the Windows job's smallest window had no room for a second row).
 $ui.AppRow = & $ui.LogoRow; $ui.AppRow.Visible = $false
 $ui.AppLogo = & $ui.LogoPic $appLogoPng 'Application logo'; if ($ui.AppLogo) { [void]$ui.AppRow.Controls.Add($ui.AppLogo) }
 $ac = & $ui.HeadCol 'Application' 'Application subtitle'

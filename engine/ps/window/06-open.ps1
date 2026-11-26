@@ -97,6 +97,7 @@ $ui.InitSel = { $ui.Sel = @{}; foreach ($k in $script:appSteps) { $ui.Sel[[int]$
 # takes the row's height: the first card after the choice is measured before the next fit (Windows job, 18 Nov 26: the
 # row at 76 needed 23 px in a 98 px block). Takes whether to show it.
 $ui.ShowAppRow = { param([bool]$On)
+  if (-not $ui.AppLogo) { $ui.TagL.Text = $(if ($On) { [string]$ui.AppWordL.Text } else { $ui.Tagline }); $On = $false }   # no application logo: the name stands under RADE (one row, the window keeps its height)
   $sub = [bool]($On -and [string]$ui.AppL.Text)   # no subtitle: the name only, with no line under it
   $ui.AppRule.Visible = $sub; $ui.AppL.Visible = $sub
   if ($On) { & $ui.InkFit $ui.AppWordL; & $ui.InkFit $ui.AppL }   # before the window has its scale: the next fit sizes them
