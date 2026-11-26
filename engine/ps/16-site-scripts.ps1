@@ -224,7 +224,9 @@ public static void Begin(int tickMs) { End(false); lock (gate) { t0 = System.Dat
 // Ends the report: waits until no tick runs, then, with final, prints one last line (the state at the end).
 public static void End(bool final) {
   System.Threading.Timer tm; lock (gate) { tm = timer; timer = null; }
-  if (tm != null) { using (System.Threading.ManualResetEvent done = new System.Threading.ManualResetEvent(false)) { if (tm.Dispose(done)) { done.WaitOne(2000); } } }
+  // The event is closed only when the last tick has ended: a tick that runs past 2 s signals it later, and a closed event
+  // would then end this process (review of PR 201). In that rare case the event stays open until the process ends.
+  if (tm != null) { System.Threading.ManualResetEvent done = new System.Threading.ManualResetEvent(false); if (!tm.Dispose(done) || done.WaitOne(2000)) { done.Dispose(); } }
   if (final) { lock (gate) { Look(true); } } }
 // One timer tick: a tick that starts while another look runs is skipped; a tick after End prints nothing.
 static void Tick(object state) {
