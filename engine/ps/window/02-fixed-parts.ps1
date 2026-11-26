@@ -59,6 +59,23 @@ $ui.HeadCol = {
   $s = & $ui.InkText $ui.F.Small $ui.C.Gray $SubName $true; $s.Margin = (& $ui.Pad 0 $ui.Z.G1 0 0); $s.Visible = $true   # a long subtitle: cut with "..."; its widest size follows the window ($ui.Fit)
   foreach ($x in @($top, $r, $s)) { [void]$c.Controls.Add($x) }
   @{ Col = $c; Word = $w; Rule = $r; Sub = $s; Ver = $v } }
+# VerBad (name spot L2, the PFM, 2026-11-26): each text of the word row ends its ink inside its own panel (no cut), each
+# text after the word stands on the word's base line (1 px, scaled), and no ink of the row reaches the line under it
+# (R44: the "g" of "sign-in" was cut by the line). Takes the card, the texts of the row, word first, each
+# @{ N; Ink = @{ Bottom; Base; Panel } } in screen pixels ($ui.TextInk), and the line's top ($null: no line); gives back
+# the defect lines.
+$ui.VerBad = { param([string]$Card, [object[]]$Row, $RuleTop)
+  $out = @(); $tol = [math]::Max(1, (& $ui.Sc 1)); $w = $Row[0]
+  foreach ($t in $Row) { if ([int]$t.Ink.Bottom -gt [int]$t.Ink.Panel) { $out += ('LAYOUT ' + $Card + ' header ' + $t.N + ': its ink goes down to ' + $t.Ink.Bottom + ', its panel ends at ' + $t.Ink.Panel) }
+    if (-not [object]::ReferenceEquals($t, $w) -and [math]::Abs([int]$t.Ink.Base - [int]$w.Ink.Base) -gt $tol) { $out += ('LAYOUT ' + $Card + ' header ' + $t.N + ': its base line is at ' + $t.Ink.Base + ', the word''s is at ' + $w.Ink.Base) } }
+  $low = [int](@($Row | ForEach-Object { $_.Ink.Bottom }) | Measure-Object -Maximum).Maximum
+  if ($null -ne $RuleTop -and $low -gt [int]$RuleTop) { $out += ('LAYOUT ' + $Card + ' header line: at ' + $RuleTop + ', the ink of the word row goes down to ' + $low) }
+  return $out }
+# Name spot L2: where the whole ink of an ink-tight text ends, as Windows draws the text with no panel around it ($ui.InkOf),
+# and its base line, both on the screen; Panel is where its panel ends. Takes the panel and its screen rectangle; gives
+# back @{ Bottom; Base; Panel } (Bottom is the panel's end when the text cannot be measured).
+$ui.TextInk = { param($P, $R) $fi = & $ui.FontInk $P.Font; $y0 = [int]$R.Top - [int]$fi.Top; $b = $null; if ([string]$P.Text) { $b = & $ui.InkOf ([string]$P.Text) $P.Font }
+  @{ Bottom = $(if ($b) { $y0 + [int]$b.Bottom } else { [int]$R.Bottom }); Base = $y0 + [int]$fi.Base; Panel = [int]$R.Bottom } }
 # The RADE column: the word RADE and, under it at all times, the tagline (L1, the PFM, 2026-11-26: "RADE (new line) Test,
 # deploy, enjoy"; it replaces 2026-11-19, where a chosen application's name took the tagline's place).
 $hc = & $ui.HeadCol 'RADE' 'Test, deploy, enjoy'
