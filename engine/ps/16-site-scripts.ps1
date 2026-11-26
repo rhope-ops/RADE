@@ -217,19 +217,28 @@ public delegate bool WinProc(System.IntPtr h, System.IntPtr l);
 public struct Rect { public int L, T, R, B; }
 static System.Threading.Timer timer; static object gate = new object(); static System.DateTime t0; static string last = "";
 static int n, owned, mins, hung, front, bw, bh; static long fg; static WinProc each = Each;
-// Starts the report: one look now, then one every tickMs, until End.
-public static void Begin(int tickMs) { End(false); lock (gate) { t0 = System.DateTime.Now; last = ""; timer = new System.Threading.Timer(Look, null, 0, tickMs); } }
-// Ends the report; with final, one last line (the state at the end).
-public static void End(bool final) { lock (gate) { if (timer != null) { timer.Dispose(); timer = null; } } if (final) { Look(null); } }
-static void Look(object state) {
+// Starts the report: one look now, then one every tickMs, until End. The timer starts outside the lock, so the first look runs.
+public static void Begin(int tickMs) { End(false); lock (gate) { t0 = System.DateTime.Now; last = ""; }
+  System.Threading.Timer tm = new System.Threading.Timer(Tick, null, System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+  lock (gate) { timer = tm; } tm.Change(0, tickMs); }
+// Ends the report: waits until no tick runs, then, with final, prints one last line (the state at the end).
+public static void End(bool final) {
+  System.Threading.Timer tm; lock (gate) { tm = timer; timer = null; }
+  if (tm != null) { using (System.Threading.ManualResetEvent done = new System.Threading.ManualResetEvent(false)) { if (tm.Dispose(done)) { done.WaitOne(2000); } } }
+  if (final) { lock (gate) { Look(true); } } }
+// One timer tick: a tick that starts while another look runs is skipped; a tick after End prints nothing.
+static void Tick(object state) {
   if (!System.Threading.Monitor.TryEnter(gate)) { return; }
+  try { if (timer != null) { Look(false); } } finally { System.Threading.Monitor.Exit(gate); } }
+// Reads the windows of this process and prints a line when the state changed since the last line, or when force is set.
+// The caller holds gate.
+static void Look(bool force) {
   try { n = 0; owned = 0; mins = 0; hung = 0; front = 0; bw = 0; bh = 0; fg = GetForegroundWindow().ToInt64();
     using (System.Diagnostics.Process me = System.Diagnostics.Process.GetCurrentProcess()) {
       foreach (System.Diagnostics.ProcessThread t in me.Threads) { EnumThreadWindows((uint)t.Id, each, System.IntPtr.Zero); } }
     string s = "windows=" + n + " owned=" + owned + " min=" + mins + " size=" + bw + "x" + bh + " hung=" + hung + " front=" + front;
-    if (s != last || state == null) { last = s; System.Console.Out.WriteLine("SIGNIN-WIN t=" + (int)(System.DateTime.Now - t0).TotalSeconds + " " + s); System.Console.Out.Flush(); } }
-  catch { }
-  finally { System.Threading.Monitor.Exit(gate); } }
+    if (s != last || force) { last = s; System.Console.Out.WriteLine("SIGNIN-WIN t=" + (int)(System.DateTime.Now - t0).TotalSeconds + " " + s); System.Console.Out.Flush(); } }
+  catch { } }
 static bool Each(System.IntPtr hw, System.IntPtr l) {
   if (!IsWindowVisible(hw)) { return true; }
   n++; if (GetWindow(hw, 4) != System.IntPtr.Zero) { owned++; } if (IsIconic(hw)) { mins++; } if (IsHungAppWindow(hw)) { hung++; } if (hw.ToInt64() == fg) { front = 1; }

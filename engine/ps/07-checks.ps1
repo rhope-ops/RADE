@@ -166,7 +166,7 @@ function Write-SiteMarker([string]$Base, [bool]$Whole) {
   $null = Get-SignInNote 'Install record' $r.Lines   # engine-v43 S2, S3: the sign-in lines in the run log
   $w = ''; foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $w = $Matches[1] } }
   if ($w -in 'added', 'updated') { return ('Install record on the site: ' + $where + ' now holds version ' + $script:app.Version + ' and the date' + $(if ($Whole) { '' } else { ', marked partial' }) + ' (' + $w + ').') }
-  $why = $(switch ($w) { 'no-list' { 'the list was not found' } 'no-pnp' { 'the SharePoint tool is not installed' } default { 'the sign-in or the write did not finish' } })
+  $why = $(switch ($w) { 'no-list' { 'the list was not found' } 'no-pnp' { 'the SharePoint tool is not installed' } default { $(if ($r.Stage -eq 'signin') { 'the sign-in did not finish in ' + [int]($signInStageSeconds / 60) + ' minutes, so RADE stopped it' } else { 'the sign-in or the write did not finish' }) } })   # engine-v43 S1
   return ('NOTE: the install record on the site (' + $where + ') was not written: ' + $why + '.' + $again)
 }
 function Split-Sentence([string]$Text) {

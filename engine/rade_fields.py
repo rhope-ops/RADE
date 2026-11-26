@@ -39,7 +39,9 @@ def qx(s):
         if run:
             parts.append(q(run))
             run = ''
-        parts.append('[string][char]0x%04X' % ord(c))
+        o = ord(c)
+        units = [o] if o < 0x10000 else [0xD800 + ((o - 0x10000) >> 10), 0xDC00 + ((o - 0x10000) & 0x3FF)]   # UTF-16, as .NET strings hold it
+        parts.extend('[string][char]0x%04X' % u for u in units)
     if run:
         parts.append(q(run))
     return '(' + ' + '.join(parts) + ')'

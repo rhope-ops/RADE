@@ -267,10 +267,11 @@ $ui.Measure = { param([string]$Card)
   # 4 px, the subtitle, measured on the ink Windows drew; the two columns share the edge when both rows start at one x.
   $cols = @(& $ui.HeadCols)
   if ($ui.WordL.Visible) { foreach ($c in $cols) { $nw = & $ui.NameOf $c.W
-      if ($c.Sub) { $out += & $ui.HeadBad $Card @{ N = $nw; X = (& $tx $c.W) } @{ N = (& $ui.NameOf $c.S); X = (& $tx $c.S) } }
+      if (-not $c.Sub) { continue }   # a name with no subtitle has no line and nothing under it to measure
+      $out += & $ui.HeadBad $Card @{ N = $nw; X = (& $tx $c.W) } @{ N = (& $ui.NameOf $c.S); X = (& $tx $c.S) }
       $rw = & $sr $c.W; $rr = & $sr $c.R; $ra = & $sr $c.S; $wi = & $ui.InkBox $c.W; $ai = & $ui.InkBox $c.S
       $out += & $ui.HeadRuleBad $Card @{ WordBottom = $rw.Top + $wi.Bottom; WordLeft = $rw.Left + $wi.Left; WordW = $wi.Right - $wi.Left; RuleTop = $rr.Top; RuleBottom = $rr.Bottom; RuleLeft = $rr.Left; RuleW = $rr.Width
-        AppTop = $(if ($c.Sub -and [string]$c.S.Text -cmatch '[A-Z0-9bdfhklt]') { $ra.Top + $ai.Top } else { $null }) } (& $ui.Sc $ui.Z.G1) }
+        AppTop = $(if ([string]$c.S.Text -cmatch '[A-Z0-9bdfhklt]') { $ra.Top + $ai.Top } else { $null }) } (& $ui.Sc $ui.Z.G1) }
     if ((& $ui.HeadPair) -and $cols.Count -gt 1) { $out += & $ui.HeadBad $Card @{ N = 'WordL'; X = (& $tx $ui.WordL) } @{ N = (& $ui.NameOf $ui.AppWordL); X = (& $tx $ui.AppWordL) } } }
   if ($ui.FieldRow.Visible -and $ui.FieldAbove -and -not $ui.RecOn) { $rl = & $sr $ui.FieldL; $rb = & $sr $ui.FieldBox   # L3: the label above its box
     $out += & $ui.AboveBad $Card @{ LabelBottom = $rl.Bottom; BoxTop = $rb.Top; BoxLeft = $rb.Left; BoxW = $rb.Width; Edge = (& $tx $ui.FieldL); TextW = ($ui.ContentW - (& $ui.Sc 10)) } }
