@@ -10,7 +10,7 @@ function Initialize-RoundRun([bool]$Clean, [bool[]]$Selected, [scriptblock]$Say,
   $script:ranSteps = @()
   $script:roundBad = $false
   $script:runLog = New-Object System.Collections.Generic.List[string]
-  $script:helped = @{}
+  $script:helped = @{}; $script:blockedSteps = @()   # engine-v46: the steps a script policy blocked 2 times (end card)
   $run = @{ SayRaw = $Say; Base = (Resolve-Base); Started = (Get-Date); Deploy = (Test-Deploy); Prior = (Get-StepPrior) }   # Prior is empty in a test round
   $run.Hist = Read-RoundHistory $run.Base
   # Line 1 is the e-mail subject (PFM 13 Nov); PASSED or NEEDS REVIEW is added at the end (R06; words R13).

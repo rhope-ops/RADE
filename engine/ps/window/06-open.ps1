@@ -91,17 +91,18 @@ $ui.OpenTour = {
 $ui.TourB.Add_Click({ & $ui.OpenTour })
 # Resets what the user chose: each step to its default, clean-up on, no step states. Takes nothing.
 $ui.InitSel = { $ui.Sel = @{}; foreach ($k in $script:appSteps) { $ui.Sel[[int]$k] = [bool](Get-StepDefault $k) }; $ui.Clean = $true; $ui.StepState = @{} }
-# Shows or hides the application row of the logo block (its logo, its name and subtitle) and the link line above it (only
-# when both logos are there). L1 (the PFM, 2026-11-26): boot and Choose show the RADE row only. The texts are as tall
+# Shows or hides the application row of the logo block (its logo, its name and subtitle). L1 (the PFM, 2026-11-26): boot
+# and Choose show the RADE row only. Name spot L3 (engine-v46, the PFM, 2026-11-26): once an application with a logo is
+# chosen, its row takes the RADE row's place (the title bar keeps the RADE icon, name and engine). The texts are as tall
 # as their ink before the row shows, and the window lays out once more so the logo block (docked, sized by the window)
 # takes the row's height: the first card after the choice is measured before the next fit (Windows job, 18 Nov 26: the
 # row at 76 needed 23 px in a 98 px block). Takes whether to show it.
 $ui.ShowAppRow = { param([bool]$On)
   if (-not $ui.AppLogo) { $ui.TagL.Text = $(if ($On) { [string]$script:app.Name } else { $ui.Tagline }); $On = $false }   # no application logo: the name stands under RADE (one row, the window keeps its height)
   $sub = [bool]($On -and [string]$ui.AppL.Text)   # no subtitle: the name only, with no line under it
-  $ui.AppRule.Visible = $sub; $ui.AppL.Visible = $sub; $ui.AppVerL.Visible = [bool]($On -and [string]$ui.AppVerL.Text)   # L2: the version text beside the word
-  if ($On) { & $ui.InkFit $ui.AppVerL; & $ui.WordRoom; & $ui.InkFit $ui.AppL }   # before the window has its scale: the next fit sizes them
-  $ui.AppRow.Visible = $On; $ui.LinkLine.Visible = ($On -and $ui.Logo -and $ui.AppLogo)
+  $ui.AppRule.Visible = $sub; $ui.AppL.Visible = $sub
+  if ($On) { & $ui.InkFit $ui.AppWordL; & $ui.InkFit $ui.AppL }   # before the window has its scale: the next fit sizes them
+  $ui.RadeRowOn = -not $On; $ui.TopRow.Visible = $ui.RadeRowOn; $ui.AppRow.Visible = $On   # L3: one row: RADE's or the application's
   & $ui.FitHead; if ($ui.AppLogo) { & $ui.AlignRow (& $ui.RowParts 'AppRow') 0 }   # the application column is centered on its logo
   try { $ui.Form.PerformLayout() } catch { $null = $_ }   # no form yet (text mode): nothing to lay out
   if ($ui.AppLogo) { $ui.AppLogo.AccessibleName = $(if ($On -and $ui.Picked) { $script:app.Name + ' logo' } else { 'Application logo' }) } }
@@ -111,7 +112,7 @@ $ui.Pick = { param([int]$J)
   Select-App $J; $ui.Picked = $true
   # The base checks are not run twice, except the ones whose answer can change at any time ($checkNoSave: Word open, disk, write).
   foreach ($id in $script:appChecks) { if ($ui.BaseRes.ContainsKey($id) -and $checkNoSave -notcontains $id -and $ui.BaseRes[$id].State -in 'PASSED', 'WARNING') { $script:checkResults[$id] = $ui.BaseRes[$id] } }
-  $ui.AppWordL.Text = (Get-AppWord); $ui.AppVerL.Text = (Get-AppVersionText); $ui.AppL.Text = (Get-AppSubtitle); & $ui.ShowAppRow $true   # L2 (the PFM, 2026-11-26): the word ("Kanon"), the version text, under the line the name and the subtitle
+  $ui.AppWordL.Text = (Get-AppWord).ToUpperInvariant(); $ui.AppL.Text = (Get-AppSubtitle); & $ui.ShowAppRow $true   # L3 (the PFM, 2026-11-26): the word in capitals ("KANON"), under the line the name and the subtitle
   & $ui.InitSel
   $e = $null; if (Test-Deploy) { $e = (Read-Installed (Get-InstalledKey $script:app)) }
   if ($e -and $e.installed) { & $ui.VMaint $e.installed } else { & $ui.Checks $false } }
@@ -121,7 +122,6 @@ $ui.VMaint = { param($Inst)
   # Maintenance (the Administrator, 2026-11-14; docs/engine.md "Maintenance run types"): shown for an application that is
   # installed. UI standard v1 (the Administrator, 2026-11-20): the card has Start, "Maintenance" (its own screen,
   # $ui.VTools: Update or Repair, Diagnose, Back up, Restore) and Uninstall set apart (engine-v40: $ui.VUninstall, part 11).
-  $on = ''; try { $on = $dot + 'installed ' + ([datetime][string]$Inst.at).ToString('d MMM yy', [System.Globalization.CultureInfo]::InvariantCulture) } catch { $null = $_ }
   $verb = 'Install ' + $script:app.Version
   try { $c = ([version][string]$script:app.Version).CompareTo([version][string]$Inst.version); if ($c -gt 0) { $verb = 'Update to ' + $script:app.Version } elseif ($c -eq 0) { $verb = 'Repair' } } catch { $null = $_ }
   # Start (R28 fix: the PFM found no Start button): the installed application with a start script can be started from here too.
@@ -131,7 +131,7 @@ $ui.VMaint = { param($Inst)
   # Uninstall (engine-v40): dark red and on for an app with Uninstall steps, else not available (answer 4A).
   $ui.UninstallB = $(if (@($script:app.Uninstall).Count) { @{ Text = 'Uninstall'; Kind = 'danger'; Act = { & $ui.VUninstall } } } else { @{ Text = 'Uninstall'; Kind = 'dangeroff' } })
   $ui.MaintVerb = $verb   # read when the button is clicked (a scriptblock does not keep this card's local variables)
-  & $ui.SetCard @{ View = 'maint'; Kicker = ((Get-AppDisplay) + ' - ' + $Inst.version + $on); Sentence = 'Maintenance'
+  & $ui.SetCard @{ View = 'maint'; Kicker = ((Get-AppWord) + ' ' + [string][char]0x2022 + ' ' + $Inst.version); Sentence = 'Maintenance'
     P = @(('Maintenance holds ' + $verb + ', Diagnose, Back up and Restore.'), $(if ($startB) { 'Start runs the checks, then opens ' + $script:app.Name + '.' } else { '' }))
     Note = $(if (@($script:app.Uninstall).Count) { '' } else { $script:app.Name + ' has no Uninstall steps.' })   # answer 4A of the PFM (2026-11-25)
     Buttons = @($ui.UninstallB, $startB, @{ Text = 'Maintenance'; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.VTools $ui.MaintVerb } })   # Uninstall first: away from the primary   # B5: 1 primary + 3 others at most

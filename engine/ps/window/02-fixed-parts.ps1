@@ -26,42 +26,39 @@ $ui.LogoPic = { param([string]$Png, [string]$Name)
   } catch { $null } }   # no logo: the row shows its text only
 $ui.TopRow = & $ui.LogoRow
 $ui.Logo = & $ui.LogoPic $logoPng 'RADE logo'; if ($ui.Logo) { [void]$ui.TopRow.Controls.Add($ui.Logo) }
-# One text column of the logo block (L1; name spot L2): the help is in the block.
+# One text column of the logo block (L1; name spot L3): the help is in the block.
 $ui.HeadCol = {
   <#
   .SYNOPSIS
-  Makes one text column of the logo block: a word, a thin line under it and a subtitle, and optionally a version text.
+  Makes one text column of the logo block: a word, a thin line under it and a subtitle.
   .DESCRIPTION
   L1 (the PFM, 2026-11-26): a word (15 pt bold navy), under it a thin line as wide as the word's ink and the subtitle
   (small, gray), 4 px, 1 px, 4 px ink to ink (L2, 2026-11-19; $ui.FitHead). The word and the subtitle draw their own
-  text ink-tight ($ui.InkText in engine/rade_ui_text.ps1). Name spot L2 (engine-v45; the PFM, 2026-11-26): a column with
-  a version text has a word row: the word, which keeps room for descenders, and the version text (Small gray) on the
-  word's base line ($ui.FitHead); the line then comes under the lowest ink of that row.
+  text ink-tight ($ui.InkText in engine/rade_ui_text.ps1). A word that keeps room for descenders (the application
+  column; R44: the "g" of "sign-in" was cut by the line) puts the line under that room. Name spot L3 (engine-v46; the
+  PFM, 2026-11-26): no version text beside the word (the engine-v45 L2 version text is gone).
   .PARAMETER WordName
   The word's screen-reader name.
   .PARAMETER SubName
   The subtitle's screen-reader name.
-  .PARAMETER VerName
-  The version text's screen-reader name; '' (the default) for a column with no version text.
+  .PARAMETER Desc
+  $true: the word keeps room for descenders.
   .OUTPUTS
-  @{ Col; Word; Rule; Sub; Ver }: Ver is $null without a version text.
+  @{ Col; Word; Rule; Sub }.
   #>
-  param([string]$WordName, [string]$SubName, [string]$VerName = '')
+  param([string]$WordName, [string]$SubName, [bool]$Desc = $false)
   $c = New-Object System.Windows.Forms.FlowLayoutPanel
   $c.AutoSize = $true; $c.AutoSizeMode = 'GrowAndShrink'; $c.FlowDirection = 'TopDown'; $c.WrapContents = $false
   $c.Margin = (& $ui.Pad 0 0 0 0); $c.Padding = (& $ui.Pad 0 0 0 0); $c.BackColor = $ui.C.White
-  $w = & $ui.InkText $ui.F.Word $ui.C.Navy $WordName ([bool]$VerName); $w.Visible = $true; $v = $null; $top = $w
-  if ($VerName) { $top = & $ui.Flow 0; $top.AutoSizeMode = 'GrowAndShrink'; $top.Visible = $true   # the word row: the word, then the version text
-    $v = & $ui.InkText $ui.F.Small $ui.C.Gray $VerName $true; $v.Margin = (& $ui.Pad $ui.Z.G2 0 0 0); $v.Visible = $true
-    [void]$top.Controls.Add($w); [void]$top.Controls.Add($v) }
+  $w = & $ui.InkText $ui.F.Word $ui.C.Navy $WordName $Desc; $w.Visible = $true
   $r = New-Object System.Windows.Forms.Panel
   $r.Size = New-Object System.Drawing.Size(40, 1); $r.BackColor = $ui.C.Edge; $r.Margin = (& $ui.Pad 0 $ui.Z.G1 0 0); $r.Visible = $true
   $s = & $ui.InkText $ui.F.Small $ui.C.Gray $SubName $true; $s.Margin = (& $ui.Pad 0 $ui.Z.G1 0 0); $s.Visible = $true   # a long subtitle: cut with "..."; its widest size follows the window ($ui.Fit)
-  foreach ($x in @($top, $r, $s)) { [void]$c.Controls.Add($x) }
-  @{ Col = $c; Word = $w; Rule = $r; Sub = $s; Ver = $v } }
-# VerBad (name spot L2, the PFM, 2026-11-26): each text of the word row ends its ink inside its own panel (no cut), each
-# text after the word stands on the word's base line (1 px, scaled), and no ink of the row reaches the line under it
-# (R44: the "g" of "sign-in" was cut by the line). Takes the card, the texts of the row, word first, each
+  foreach ($x in @($w, $r, $s)) { [void]$c.Controls.Add($x) }
+  @{ Col = $c; Word = $w; Rule = $r; Sub = $s } }
+# VerBad (name spot L2, the PFM, 2026-11-26; L3 keeps it for the word alone): each text of the word row ends its ink
+# inside its own panel (no cut), each text after the word stands on the word's base line (1 px, scaled), and no ink of
+# the row reaches the line under it (R44: the "g" of "sign-in" was cut by the line). Takes the card, the texts of the row, word first, each
 # @{ N; Ink = @{ Bottom; Base; Panel } } in screen pixels ($ui.TextInk), and the line's top ($null: no line); gives back
 # the defect lines.
 $ui.VerBad = { param([string]$Card, [object[]]$Row, $RuleTop)
@@ -76,32 +73,23 @@ $ui.VerBad = { param([string]$Card, [object[]]$Row, $RuleTop)
 # back @{ Bottom; Base; Panel } (Bottom is the panel's end when the text cannot be measured).
 $ui.TextInk = { param($P, $R) $fi = & $ui.FontInk $P.Font; $y0 = [int]$R.Top - [int]$fi.Top; $b = $null; if ([string]$P.Text) { $b = & $ui.InkOf ([string]$P.Text) $P.Font }
   @{ Bottom = $(if ($b) { $y0 + [int]$b.Bottom } else { [int]$R.Bottom }); Base = $y0 + [int]$fi.Base; Panel = [int]$R.Bottom } }
-# Name spot L2 (the PFM, 2026-11-26): the application word ends with "..." where the version text beside it still fits
-# before the window's inset (Tag.Max0: the word's widest size alone, set by $ui.Fit), then gets its size. It asks whether
-# the version text is meant to show (its text, and an application logo: only then the row exists), not Visible: Windows
-# Forms reads Visible as $false while the hidden row holds it (review of PR 203). Takes nothing.
-$ui.WordRoom = { $w = $ui.AppWordL; $m0 = [int]$w.Tag.Max0
-  if ($m0 -gt 0) { $w.Tag.MaxW = $(if ([string]$ui.AppVerL.Text -and $ui.AppLogo) { [math]::Max((& $ui.Sc 60), $m0 - $ui.AppVerL.Width - $ui.AppVerL.Margin.Left) } else { $m0 }) }
-  & $ui.InkFit $w }
 # The RADE column: the word RADE and, under it at all times, the tagline (L1, the PFM, 2026-11-26: "RADE (new line) Test,
 # deploy, enjoy"; it replaces 2026-11-19, where a chosen application's name took the tagline's place).
 $hc = & $ui.HeadCol 'RADE' 'Test, deploy, enjoy'
 $ui.TitleCol = $hc.Col; $ui.WordL = $hc.Word; $ui.HeadRule = $hc.Rule; $ui.TagL = $hc.Sub
 $ui.WordL.Text = 'RADE'; $ui.TagL.Text = $ui.Tagline; [void]$ui.TopRow.Controls.Add($ui.TitleCol)
-# The link line: 1 px gray, 12 px long, on the middle of the logos ("something minimal"); shown with the application row
-# when both logos are there.
-$ui.LinkLine = New-Object System.Windows.Forms.Panel
-$ui.LinkLine.Size = New-Object System.Drawing.Size(1, 12); $ui.LinkLine.BackColor = $ui.C.Gray; $ui.LinkLine.Margin = (& $ui.Pad 32 4 0 4); $ui.LinkLine.Visible = $false
-# The application row, once an application is chosen (L1): its logo (when it has one) and a column like the RADE column:
-# the application name in the word style, and under it the manifest's application.subtitle (for example "Kanon, a bullet,
-# Publications and Forms Management"); without a subtitle, the name only. Hidden on boot and on Choose ($ui.ShowAppRow).
+# The application row, once an application is chosen (L1; name spot L3, engine-v46, the PFM, 2026-11-26): its logo (when
+# it has one) and a column like the RADE column: the application's word in capitals ("KANON"), and under the line
+# "<name> <bullet> <subtitle>" ("90-161.Z <bullet> Publications and Forms Management"); without a subtitle, the name only.
+# Hidden on boot and on Choose; with an application logo it takes the RADE row's place ($ui.ShowAppRow).
 # An application with no logo has no row of its own: its name stands under RADE in the tagline's place (the window keeps
 # the height of engine-v42; the Windows job's smallest window had no room for a second row).
 $ui.AppRow = & $ui.LogoRow; $ui.AppRow.Visible = $false
 $ui.AppLogo = & $ui.LogoPic $appLogoPng 'Application logo'; if ($ui.AppLogo) { [void]$ui.AppRow.Controls.Add($ui.AppLogo) }
-$ac = & $ui.HeadCol 'Application' 'Application subtitle' 'Application version and round'
-$ui.AppCol = $ac.Col; $ui.AppWordL = $ac.Word; $ui.AppRule = $ac.Rule; $ui.AppL = $ac.Sub; $ui.AppVerL = $ac.Ver; [void]$ui.AppRow.Controls.Add($ui.AppCol)
-foreach ($c in @($ui.TopRow, $ui.LinkLine, $ui.AppRow)) { [void]$ui.Top.Controls.Add($c) }
+$ac = & $ui.HeadCol 'Application' 'Application subtitle' $true
+$ui.AppCol = $ac.Col; $ui.AppWordL = $ac.Word; $ui.AppRule = $ac.Rule; $ui.AppL = $ac.Sub; [void]$ui.AppRow.Controls.Add($ui.AppCol)
+foreach ($c in @($ui.TopRow, $ui.AppRow)) { [void]$ui.Top.Controls.Add($c) }
+$ui.RadeRowOn = $true   # L3: the RADE row shows until an application with a logo is chosen ($ui.ShowAppRow)
 $ui.Bottom = New-Object System.Windows.Forms.TableLayoutPanel
 $ui.Bottom.Dock = 'Bottom'; $ui.Bottom.Height = 46; $ui.Bottom.AutoSize = $true; $ui.Bottom.AutoSizeMode = 'GrowAndShrink'; $ui.Bottom.MinimumSize = New-Object System.Drawing.Size(0, 46); $ui.Bottom.ColumnCount = 5; $ui.Bottom.RowCount = 1; $ui.Bottom.Padding = (& $ui.Pad ($ui.Z.Inset - $ui.Z.M) 3 $ui.Z.Inset 3); $ui.Bottom.BackColor = $ui.C.White
 foreach ($cs in @('AutoSize', 'AutoSize', 'AutoSize', 'Percent', 'AutoSize')) { [void]$ui.Bottom.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle($cs, 100))) }
