@@ -7,7 +7,7 @@ $ui.Light = New-Object System.Windows.Forms.Panel
 $ui.Light.Dock = 'Top'; $ui.Light.Height = 6; $ui.Light.BackColor = $ui.C.White; $ui.Light.AccessibleRole = 'StaticText'; $ui.Light.AccessibleName = 'Status light: off'
 $ui.Light.Add_Paint({ try { $pn = New-Object System.Drawing.Pen($ui.C.Navy, [single]1); $_.Graphics.DrawLine($pn, 0, ($this.ClientSize.Height - 1), $this.ClientSize.Width, ($this.ClientSize.Height - 1)); $pn.Dispose() } catch { $null = $_ } })   # a 1 px navy line: the light is a part of the screen, 3 to 1 against white also when it is off
 # The logo block (the Administrator, 2026-11-18; docs/window-design.md "Fixed parts"): the RADE row (logo and the word
-# RADE), and once an application is chosen, a short link line and the application row (its logo and its name in gray).
+# RADE); once an application with a logo is chosen, the application row in its place (engine-v46, name spot L3).
 # Both logos are 64 px, the baseline size. The block is as tall as its rows (R28 N9: no fixed heights).
 $ui.Top = New-Object System.Windows.Forms.FlowLayoutPanel
 $ui.Top.Dock = 'Top'; $ui.Top.AutoSize = $true; $ui.Top.AutoSizeMode = 'GrowAndShrink'; $ui.Top.FlowDirection = 'TopDown'; $ui.Top.WrapContents = $false

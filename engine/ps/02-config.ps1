@@ -121,7 +121,8 @@ $helpRules = @(
   @{ Re = 'ran longer than'; Text = 'A step ran too long. Close Word (check the taskbar), then press Run again. If it happens twice, send the results as they are.' },
   @{ Re = 'LABEL (FAIL|not set)'; Text = 'The sensitivity label was not set. Keep the Config folder; see "Sensitivity label" in the repository (go.md).' },
   # engine-v46 (90-161.Z R45 finding 1): a script policy block, before the general rule below (its text was wrong for it).
-  @{ Re = 'running scripts is disabled|is not digitally signed'; Text = 'Windows did not let a step script run (its script policy). RADE runs it once more. If the step still fails, send the results as they are.' },
+  @{ Re = 'running scripts is disabled|is not digitally signed'; Covers = 'denied|UnauthorizedAccess'
+    Text = 'Windows did not let a step script run (its script policy). RADE runs it once more. If the step still fails, send the results as they are.' },
   @{ Re = 'denied|UnauthorizedAccess'; Text = 'Windows blocked a file. Check that the RADE folder is in your own OneDrive and not read-only, then run again.' },
   @{ Re = 'Outlook draft could not be created'; Text = 'Open Outlook (classic), then press Make e-mail draft. Or send by hand: the results folder is open and the summary is on the clipboard.' },
   @{ Re = 'FORMAT-FAIL'; Text = 'The renderer found a format problem. Send the results as they are; Claude fixes it.' },
@@ -133,7 +134,9 @@ $helpRules = @(
 # else an empty text. Takes the log line; marks the problem as helped.
 function Get-WhatToDo([string]$Line) {
   foreach ($h in $helpRules) {
-    if ($Line -match $h.Re -and -not $script:helped.ContainsKey($h.Re)) { $script:helped[$h.Re] = $true; return ('What to do: ' + $h.Text) }
+    if ($Line -match $h.Re -and -not $script:helped.ContainsKey($h.Re)) { $script:helped[$h.Re] = $true
+      if ($h.Covers) { $script:helped[[string]$h.Covers] = $true }   # engine-v46: a more exact rule keeps the general one quiet
+      return ('What to do: ' + $h.Text) }
   }
   return ''
 }

@@ -152,7 +152,7 @@ $ui.Open = { if ($script:resultsDir) { Start-Process -FilePath 'explorer.exe' -A
 # back the paragraph, or '' when no step was blocked.
 $ui.BlockedText = { $b = @($script:blockedSteps | Where-Object { $_ })
   if (-not $b.Count) { return '' }
-  return ('Windows blocked the script of ' + $(if ($b.Count -eq 1) { 'the step "' + $b[0] + '"' } else { $b.Count + ' steps: "' + ($b -join '", "') + '"' }) + ' 2 times. Details shows the policy line.') }
+  return ('Windows blocked the script of ' + $(if ($b.Count -eq 1) { 'the step "' + $b[0] + '"' } else { [string]$b.Count + ' steps: "' + ($b -join '", "') + '"' }) + ' 2 times. Details shows the policy line.') }
 # Shows the card at the end of a run: Done when every step passed, else Needs review with the first problem. Copies the
 # summary and opens the folder in a test round. Takes nothing.
 $ui.VDone = {

@@ -74,24 +74,43 @@ function Get-NowText([string]$Line) {
   return ($(if ($Matches[1] -eq 'PASS') { 'Checked: ' } elseif ($Matches[1] -eq 'SKIP') { 'Skipped: ' } else { 'Needs review: ' }) + $what)
 }
 
-# Runs one step script as a child PowerShell (Invoke-RoundStepOnce) and, when Windows blocked the script by its script
-# policy before the script printed a line, logs the policy of each scope and runs it once more after 5 seconds
-# (engine-v46; 90-161.Z R45 finding 1: one step was blocked once, the same file ran a few seconds later). A step blocked
-# 2 times is named in $script:blockedSteps for the end card. Takes and returns what Invoke-RoundStepOnce does, with
-# Blocked ($true after 2 blocks).
+<#
+.SYNOPSIS
+Runs one step script as a child PowerShell, and once more when Windows' script policy blocked it.
+.DESCRIPTION
+engine-v46 (90-161.Z R45 finding 1: one step was blocked once; the same file ran a few seconds later). When the first run
+printed no line and Windows did not load the script (Test-PolicyBlock), RADE logs the policy of each scope, waits 5
+seconds and runs the step once more, unless the window is closing. A step blocked 2 times is named in
+$script:blockedSteps for the end card.
+.PARAMETER Base
+The RADE app folder.
+.PARAMETER Step
+The step.
+.PARAMETER Say
+The log callback.
+.PARAMETER Tick
+The tick callback (moves the window's bars).
+.PARAMETER Answer
+The person's answer, or ''.
+.OUTPUTS
+What Invoke-RoundStepOnce gives, with Blocked ($true after 2 blocks).
+#>
 function Invoke-RoundStep([string]$Base, $Step, [scriptblock]$Say, [scriptblock]$Tick, [string]$Answer) {
   $r = Invoke-RoundStepOnce $Base $Step $Say $Tick $Answer
-  if (-not (Test-PolicyBlock $r)) { return $r }
+  if (-not (Test-PolicyBlock $r) -or $script:closing) { return $r }   # the window is closing: no second run
   & $Say ('    BLOCKED: Windows did not let this step''s script run (script policy). ' + (Get-PolicyLine) + '. RADE runs it once more in 5 seconds.')
-  $until = (Get-Date).AddSeconds(5); while ((Get-Date) -lt $until) { & $Tick; Start-Sleep -Milliseconds 30 }   # the bars keep moving while RADE waits
+  $until = (Get-Date).AddSeconds(5); while ((Get-Date) -lt $until -and -not $script:closing) { & $Tick; Start-Sleep -Milliseconds 30 }   # the bars keep moving while RADE waits
+  if ($script:closing) { return $r }   # Exit during the wait (review of PR 206): the step does not start again
   $r = Invoke-RoundStepOnce $Base $Step $Say $Tick $Answer
   if (Test-PolicyBlock $r) { $r.Blocked = $true; $script:blockedSteps += [string]$Step.Name; & $Say ('    BLOCKED again: ' + (Get-PolicyLine) + '.') }
-  else { & $Say '    The second run of this step started.' }
+  else { & $Say '    The second run of this step was not blocked.' }
   return $r
 }
-# Says whether a step result is a script policy block: the script printed no result line and its error output says that
-# Windows did not load it (running scripts is disabled, or not digitally signed). Takes the result; gives back $true or $false.
-function Test-PolicyBlock($R) { return [bool]($R.Pass + $R.Skip -eq 0 -and [string]$R.Err -match 'running scripts is disabled|is not digitally signed|PSSecurityException') }
+# Says whether a step result is a script policy block: the script printed no line at all (so it did no work: review of
+# PR 206, a step that printed FAIL or MADE lines and then failed to load a module is not run again) and its error output
+# says that Windows did not load it (running scripts is disabled, or not digitally signed). Takes the result; gives back
+# $true or $false.
+function Test-PolicyBlock($R) { return [bool]([int]$R.Lines -eq 0 -and [string]$R.Err -match 'running scripts is disabled|is not digitally signed|PSSecurityException') }
 # Gives one line with the script policy of each scope that has one ("Get-ExecutionPolicy -List"; numbers and words only),
 # for the log of a blocked step. Takes nothing.
 function Get-PolicyLine {
@@ -116,11 +135,12 @@ The tick callback (moves the window's bars).
 .PARAMETER Answer
 The person's answer, or ''.
 .OUTPUTS
-@{ Pass; Fail; Skip; Exit; Made; Fallback; SignIn; Err (the masked error output); Blocked ($false here) }.
+@{ Pass; Fail; Skip; Exit; Made; Fallback; SignIn; Err (the masked error output); Blocked ($false here); Lines (the
+output lines read) }.
 #>
 function Invoke-RoundStepOnce([string]$Base, $Step, [scriptblock]$Say, [scriptblock]$Tick, [string]$Answer) {
   $psi = Get-StepStartInfo $Base $Step $Answer $Say
-  $r = @{ Pass = 0; Fail = 0; Skip = 0; Exit = $null; Made = @(); Fallback = ''; SignIn = $false; Err = ''; Blocked = $false }
+  $r = @{ Pass = 0; Fail = 0; Skip = 0; Exit = $null; Made = @(); Fallback = ''; SignIn = $false; Err = ''; Blocked = $false; Lines = 0 }
   $siteNow = [string](Get-SiteUrl $Base)
   $p = [System.Diagnostics.Process]::Start($psi)
   $script:child = $p
@@ -136,6 +156,7 @@ function Invoke-RoundStepOnce([string]$Base, $Step, [scriptblock]$Say, [scriptbl
     if (-not $lineTask.IsCompleted) { break }
     $line = $lineTask.Result
     if ($null -eq $line) { break }
+    $r.Lines++   # engine-v46: a step that printed any line did work (Test-PolicyBlock)
     Add-StepLine $line $Step $r $siteNow $Say
     $lineTask = $p.StandardOutput.ReadLineAsync()
   }

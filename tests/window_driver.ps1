@@ -223,6 +223,10 @@ function global:Show-RadeR29bRules {
   $vOk = @(& $ui.VerBad 'fixture' $okR 40) + @(& $ui.VerBad 'fixture' @($okR[0]) $null); $vNo = @(& $ui.VerBad 'fixture' $noR 40)
   Write-Host ('WIN rule l2 ver-ok=' + $vOk.Count + ' ver-off=' + $vNo.Count + ' ~ ' + (@($vNo) -join ' ~ '))
   Write-Host ('WIN rule head=' + $hd.Count + ' tick-ok=' + $tg.Count + ' tick-off=' + $tb.Count + ' ~ ' + (@($hd) + @($tb) -join ' ~ '))
+  # engine-v46 (review of PR 206): the end card's line for steps a script policy blocked, with 0, 1 and 2 steps.
+  $keepB = $script:blockedSteps; $script:blockedSteps = @(); $b0 = & $ui.BlockedText; $script:blockedSteps = @('A'); $b1 = & $ui.BlockedText
+  $script:blockedSteps = @('A', 'B'); $b2 = & $ui.BlockedText; $script:blockedSteps = $keepB
+  Write-Host ('WIN blocked-text 0=[' + $b0 + '] 1=[' + $b1 + '] 2=[' + $b2 + ']')
 }
 <#
 .SYNOPSIS
