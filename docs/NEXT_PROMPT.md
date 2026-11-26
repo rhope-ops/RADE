@@ -7,4 +7,4 @@ Updated: 2026-11-26 14:08 Central by Claude (engine-v44 and engine-v45 released)
 - Engine: v35 R42 E1-E5 (DECISIONS 2026-11-21); v34 .txt copy; v33 mark remove; v32 local test site; v31 Restore; older: [releases](https://github.com/rhope-ops/RADE/releases). Not on a device: resume cards, CAC words, tools. Open: detail 17-25.
 - Plan: [intro, Fulcrum](reviews/2026-11-21-plan-intro-fulcrum.md), v35+, R42.
 - R44: engine-v42 ([plan](reviews/2026-11-26-plan-r44-engine-v42.md)): PR, previews, review, release.yml, tag to 90-161.Z. Next logo item: SVG in application.logo. Open from R43: "RADE page" texts; Remove RADE option B.
-- engine-v44 (#202, 58b8f1f) and engine-v45 name spot L2 (#203, 7643769; productName, bundle label; the PFM approved) released 2026-11-26; tags sent to 90-161.Z. Open: text mode in the ISE child or shortcut closes its console at the end ("Press Enter to close" needs the Maintainer); 150 % proof of L2 on a work computer.
+- engine-v44 (#202) and engine-v45 L2 (#203) released 2026-11-26, tags sent to 90-161.Z. Open: ISE child/shortcut text mode closes its console at the end; L2 150 % proof on a work computer.
