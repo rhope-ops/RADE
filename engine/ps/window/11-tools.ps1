@@ -10,6 +10,9 @@
 # Credentials: none.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
+# The line on a card while a child may show the CAC sign-in window (R44 E4: in R43 no sign-in window showed in front).
+$ui.SignInHint = 'A sign-in window may open. If you do not see it, press Alt+Tab.'
+
 # The rows of the Maintenance screen. Diagnose and Back up (engine-v30); Restore (engine-v31) for an app that names it.
 $ui.ToolRows = {
   $n = @($script:app.Backup).Count; $lists = $(if ($n -eq 1) { '1 list' } elseif ($n) { [string]$n + ' lists' } else { 'No lists named' })
@@ -29,7 +32,7 @@ $ui.RunTool = {
   if ($J -eq 2 -and -not $ui.Busy) { & $ui.VRestorePick; return }
   if ($J -notin 0, 1 -or $ui.Busy) { return }
   $name = $(if ($J -eq 0) { 'Diagnose' } else { 'Back up' })
-  $what = $(if ($J -eq 0) { 'Read-only. Nothing is changed.' } else { 'Reads the lists and saves them on this computer. Nothing on the site changes. A sign-in window may open.' })
+  $what = $(if ($J -eq 0) { 'Read-only. Nothing is changed.' } else { 'Reads the lists and saves them on this computer. Nothing on the site changes. ' + $ui.SignInHint })
   & $ui.SetCard @{ View = 'toolrun'; Kicker = [string]$ui.Kick.Text; Sentence = ($name + ' is running.'); P = @($what) }
   $ui.Busy = $true; [System.Windows.Forms.Application]::DoEvents(); $res = $null
   try { $bp = Get-BasePath
@@ -148,7 +151,7 @@ $ui.RestorePlan = {
   if ($ui.Busy -or $Row -ge @($ui.RestoreSets).Count) { return }
   $ui.RestoreDir = [string]$ui.RestoreSets[$Row].Path
   $siteLine = 'Test site: ' + $ui.RestoreSite
-  & $ui.SetCard @{ View = 'toolrun'; Kicker = [string]$ui.Kick.Text; Sentence = 'The Restore dry run is running.'; P = @($siteLine, 'Reads the site. Nothing is written. A sign-in window may open.') }
+  & $ui.SetCard @{ View = 'toolrun'; Kicker = [string]$ui.Kick.Text; Sentence = 'The Restore dry run is running.'; P = @($siteLine, 'Reads the site. Nothing is written. ' + $ui.SignInHint) }
   $ui.Busy = $true; [System.Windows.Forms.Application]::DoEvents(); $dry = $null
   try { $dry = Invoke-RestorePlan (Get-BasePath) $ui.RestoreDir { [System.Windows.Forms.Application]::DoEvents() } }
   catch { $dry = @{ State = 'failed'; Lines = @(('The dry run stopped with an error [' + $_.Exception.GetType().Name + '].'), 'Nothing was changed.') } }
@@ -227,7 +230,7 @@ $ui.UninstallGo = {
   if ($ui.Field.Text.Trim() -cne [string]$script:app.Name) { & $ui.Say1 ('Type the app name as shown: ' + $script:app.Name); return }
   $siteLine = 'Test site: ' + $ui.UninstallSite
   # The run card with one sentence: what Uninstall does now. Takes the sentence.
-  $card = { param($Text) & $ui.SetCard @{ View = 'toolrun'; Kicker = [string]$ui.Kick.Text; Sentence = $Text; P = @($siteLine, 'Do not close RADE. A sign-in window may open.') } }
+  $card = { param($Text) & $ui.SetCard @{ View = 'toolrun'; Kicker = [string]$ui.Kick.Text; Sentence = $Text; P = @($siteLine, 'Do not close RADE. ' + $ui.SignInHint) } }
   & $card 'Uninstall is saving a backup.'
   $ui.Busy = $true; [System.Windows.Forms.Application]::DoEvents(); $res = $null
   # Before each step: the run card names it. Takes the step, its number and the count.
@@ -253,7 +256,7 @@ $ui.VRemoveRade = {
   if ($apps.Count) { & $ui.SetCard @{ View = 'rmblock'; Light = 'bad'; Sentence = 'Uninstall these apps first.'
       P = @('Remove RADE is off while an app is installed. Uninstall each app from its Maintenance card, then select "Remove RADE" again.'); Lines = $apps
       Buttons = @(@{ Text = 'Done'; Kind = 'primary'; Act = { & $ui.VChoose } }); Back = { & $ui.VChoose } }; return }
-  $what = 'RADE moves these to the Recycle Bin: RADE\Config, the RADE runner, the RADE shortcut, and the files in each app folder. The Backups folders stay.'
+  $what = 'RADE moves these to the Recycle Bin: RADE\Config, the RADE runners, the shortcuts RADE made, and the files in each app folder. The Backups folders stay.'
   & $ui.SetCard @{ View = 'rmrade'; Light = 'you'; Sentence = 'Remove RADE from this computer?'
     P = @('No app is installed.', $what, 'To use RADE again later, paste a RADE script again.')
     Field = @{ Label = 'Type RADE to confirm'; Text = ''; Name = 'The word RADE, to confirm Remove RADE' }; Focus = 'field'

@@ -277,12 +277,12 @@ $ui.VReady = {
     Buttons = @($resB, $startB, $runB,   # B7: Details is the link "Details (F2)"; B4: one primary (Resume when it shows)
       $(if ($siteName) { @{ Text = 'Change the site address'; Act = { & $ui.VSite } } } else { $null }))
     Foot = $(if ($siteName) { 'Site: ' + $siteName } else { '' })
-    Field = $(if ($dep -and -not (Test-ShortcutMade)) { @{ Label = 'RADE shortcut in'; Text = (Get-ShortcutDir); Name = 'Folder for the RADE shortcut'; Button = 'Browse'; Act = { & $ui.BrowseDir } } } else { $null })
+    Field = $(if ($dep -and -not (Test-ShortcutMade)) { @{ Label = 'Shortcut in'; Text = (Get-ShortcutDir); Name = 'Folder for the shortcut'; Button = 'Browse'; Act = { & $ui.BrowseDir } } } else { $null })
     Back = { & $ui.VChoose } }
   if ($ui.StartAfter) { $ui.StartAfter = $false; if ($startB) { & $ui.StartApp } else { & $ui.Say1 ('The checks passed, but ' + $script:app.Name + ' cannot be started: it is not recorded as installed, or its start file was not found. Select "Install" to install it again.') } } }   # Start on Maintenance: the checks passed, so the application starts
-# R29 N8 (the PFM, 17 Nov 26): the install asks where the RADE shortcut goes; the box starts with the Desktop folder.
+# R29 N8 (the PFM, 17 Nov 26): the install asks where the app's shortcut goes (engine-v42: one for each app); the box starts with the Desktop folder.
 $ui.BrowseDir = {
   $pick = New-Object System.Windows.Forms.FolderBrowserDialog
-  try { $pick.Description = 'Choose the folder for the RADE shortcut.'; $pick.ShowNewFolderButton = $true; $v = $ui.Field.Text.Trim(); if ($v -and (Test-Path -LiteralPath $v -PathType Container)) { $pick.SelectedPath = $v }
+  try { $pick.Description = 'Choose the folder for the shortcut.'; $pick.ShowNewFolderButton = $true; $v = $ui.Field.Text.Trim(); if ($v -and (Test-Path -LiteralPath $v -PathType Container)) { $pick.SelectedPath = $v }
     if ([string]$pick.ShowDialog($ui.Form) -eq 'OK') { $ui.Field.Text = [string]$pick.SelectedPath } } catch { & $ui.Say1 'The folder window could not open. Type the folder in the box.' } finally { $pick.Dispose() } }
 

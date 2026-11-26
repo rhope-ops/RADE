@@ -150,41 +150,7 @@ function Test-WebReach([string]$Url) {
     return @{ Ok = $false; Why = 'network error [' + $e.GetType().Name + ']' }
   }
 }
-function Invoke-ChildScript([string]$Text, [string]$ArgText, [int]$Seconds, [scriptblock]$Tick) {
-  # Runs a short embedded check script as a child powershell.exe, the way steps run: with no -ExecutionPolicy setting
-  # (fleet v2, DEC 3: Group Policy governs). The script is written to the Windows temp folder and deleted at once.
-  # Returns the exit code and the output lines.
-  $exe = 'powershell.exe'
-  if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) { $exe = 'pwsh' }
-  $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('@@PREFIX@@-check-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.ps1')
-  $res = @{ Exit = -1; Lines = @(); Why = '' }
-  try {
-    [System.IO.File]::WriteAllText($tmp, $Text, (New-Object System.Text.UTF8Encoding $true))
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $exe
-    $psi.Arguments = '-NoProfile -File "' + $tmp + '"' + $(if ($ArgText) { ' ' + $ArgText } else { '' })
-    $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true
-    $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
-    # A PowerShell started with -ExecutionPolicy hands that setting to its child processes in this variable (an old RADE
-    # shortcut sets "Bypass"): take only that value out, as Get-StepStartInfo does, else a check would say "ran" where a
-    # step cannot. Any other value a person set stays.
-    if ($psi.EnvironmentVariables['PSExecutionPolicyPreference'] -ceq 'Bypass') { $psi.EnvironmentVariables.Remove('PSExecutionPolicyPreference') }
-    $p = [System.Diagnostics.Process]::Start($psi)
-    $script:child = $p   # Exit stops a check too (review R17)
-    $outTask = $p.StandardOutput.ReadToEndAsync(); $errTask = $p.StandardError.ReadToEndAsync()
-    $deadline = (Get-Date).AddSeconds($Seconds)
-    while (-not $p.WaitForExit(30)) {
-      if ($Tick) { & $Tick }
-      if ((Get-Date) -gt $deadline) { try { $p.Kill() } catch { $null = $_ }; $res.Why = 'it ran longer than ' + $Seconds + ' seconds'; break }
-    }
-    $p.WaitForExit()
-    $res.Exit = $p.ExitCode
-    $res.Lines = @(([string]$outTask.Result) -split "`r?`n" | Where-Object { $_ })
-    if (-not $res.Why -and ([string]$errTask.Result).Trim()) { $res.Why = 'it wrote error output' }
-  } catch { $res.Why = $_.Exception.GetType().Name }
-  finally { $script:child = $null; try { if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force } } catch { $null = $_ } }
-  return $res
-}
+# Invoke-ChildScript (runs an embedded child script; R44 E4 stage limits): part 16, engine/ps/16-site-scripts.ps1.
 # The sign-in window size block, the rights check script and the install record on the site: part 16, engine/ps/16-site-scripts.ps1.
 $rightWords = @{ ViewListItems = 'read items'; AddListItems = 'add items'; EditListItems = 'edit items'; ManageLists = 'manage lists'; ManageWeb = 'manage the site'; ManagePermissions = 'manage permissions' }
 $rightsNeeded = @('ManageLists', 'ManageWeb', 'ManagePermissions')   # what T16 site setup and list set-up use

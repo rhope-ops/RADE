@@ -88,7 +88,7 @@ $ui.StartApp = {
 # window callbacks and shows Done, Needs review or Stopped. Takes nothing.
 $ui.Run = {
   $ui.LinkDir = ''; $ui.FieldAsked = $false
-  if ($ui.View -eq 'ready' -and $ui.FieldRow.Visible -and $ui.FieldL.Text -eq 'RADE shortcut in') {   # R29 N8: the folder for the RADE shortcut
+  if ($ui.View -eq 'ready' -and $ui.FieldRow.Visible -and $ui.FieldL.Text -eq 'Shortcut in') {   # R29 N8: the folder for the app's shortcut (the label is the key: 06-open.ps1)
     $d = $ui.Field.Text.Trim().Trim('"')
     if ($d -and -not (Test-Path -LiteralPath $d -PathType Container)) { & $ui.Say1 'That folder was not found. Select "Browse" to choose a folder, or empty the box for no shortcut.'; $script:resume = $null; return }
     $ui.LinkDir = $d; $ui.FieldAsked = $true; if ($d) { Save-ShortcutDir $d } }

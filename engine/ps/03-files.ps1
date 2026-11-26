@@ -1,5 +1,6 @@
 # RADE engine part 03, files: the clean-up plan and the move to the Recycle Bin, the folder inventory,
-# saving the bundle's files, downloading data files (checked by SHA-256) and the environment a step is given. Uses 01 and 02.
+# saving the bundle's files, downloading data files (checked by SHA-256), the environment a step is given and the
+# shortcut icon file (engine-v42; Save-AppIcon, used by Add-DesktopIcon in part 05). Uses 01 and 02.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
 function Test-OurFile([string]$Name) {
@@ -162,4 +163,47 @@ function ConvertTo-MadeName([string]$Name, [string]$Site) {
   $t = $t -replace '[A-Za-z0-9.-]+\.[A-Za-z]{2,}/sites/\S*', '<SITE>' -replace '\s+', ' '
   $t = $t.Trim(); if ($t.Length -gt 200) { $t = $t.Substring(0, 200) }
   return $t
+}
+<#
+.SYNOPSIS
+Makes the bytes of an .ico file from PNG images, one entry for each image (Windows Vista and later read PNG entries).
+.PARAMETER Png
+The PNG images, each as a byte array.
+.PARAMETER Size
+The side in pixels of each image, in the same order (1 to 256).
+.OUTPUTS
+The bytes of the .ico file.
+#>
+function ConvertTo-IcoByte([object[]]$Png, [int[]]$Size) {
+  $ms = New-Object System.IO.MemoryStream; $bw = New-Object System.IO.BinaryWriter($ms)
+  try { $n = $Png.Count; $bw.Write([uint16]0); $bw.Write([uint16]1); $bw.Write([uint16]$n)   # header: reserved, type 1 (icon), count
+    $off = 6 + 16 * $n
+    for ($i = 0; $i -lt $n; $i++) { $s = $Size[$i]; $b = [byte]$(if ($s -ge 256) { 0 } else { $s })   # 0 means 256
+      $bw.Write($b); $bw.Write($b); $bw.Write([byte]0); $bw.Write([byte]0); $bw.Write([uint16]1); $bw.Write([uint16]32)
+      $bw.Write([uint32]([byte[]]$Png[$i]).Length); $bw.Write([uint32]$off); $off += ([byte[]]$Png[$i]).Length }
+    foreach ($p in $Png) { $bw.Write([byte[]]$p) }
+    $bw.Flush(); return , $ms.ToArray() } finally { $bw.Dispose() }
+}
+<#
+.SYNOPSIS
+Writes the chosen app's shortcut icon as one .ico file (R44 E1).
+.DESCRIPTION
+The app's logo (else RADE's) at 16, 32, 48 and 256 px, centered on a clear square, each a PNG entry. Needs
+System.Drawing; never an error.
+.PARAMETER Path
+The path of the .ico file.
+.OUTPUTS
+$true when the file is written, else $false.
+#>
+function Save-AppIcon([string]$Path) {
+  try { $src = $(if ([string]$appLogoPng) { [string]$appLogoPng } else { [string]$logoPng })
+    $img = New-Object System.Drawing.Bitmap((New-Object System.IO.MemoryStream(, [System.Convert]::FromBase64String($src))))
+    $pngs = @(); $sizes = @(16, 32, 48, 256)
+    try { foreach ($s in $sizes) { $bm = New-Object System.Drawing.Bitmap($s, $s, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb); $g = [System.Drawing.Graphics]::FromImage($bm)
+        try { $g.InterpolationMode = 'HighQualityBicubic'; $g.SmoothingMode = 'HighQuality'; $g.PixelOffsetMode = 'HighQuality'; $g.Clear([System.Drawing.Color]::Transparent)
+          $k = [math]::Min($s / [double]$img.Width, $s / [double]$img.Height); $w = [int][math]::Round($img.Width * $k); $h = [int][math]::Round($img.Height * $k)
+          $g.DrawImage($img, [int](($s - $w) / 2), [int](($s - $h) / 2), $w, $h)
+          $ps = New-Object System.IO.MemoryStream; $bm.Save($ps, [System.Drawing.Imaging.ImageFormat]::Png); $pngs += , $ps.ToArray(); $ps.Dispose() }
+        finally { $g.Dispose(); $bm.Dispose() } } } finally { $img.Dispose() }
+    [System.IO.File]::WriteAllBytes($Path, (ConvertTo-IcoByte $pngs $sizes)); return $true } catch { return $false }
 }
