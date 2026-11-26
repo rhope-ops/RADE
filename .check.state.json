@@ -41,7 +41,6 @@
     "tests/engine_test.sh::js": 1,
     "tests/engine_test.sh::ok": 1,
     "tests/fake-pnp/PnP.PowerShell/1.12.0/PnP.PowerShell.psm1::Add-PnPListItem": 1,
-    "tests/fake-pnp/PnP.PowerShell/1.12.0/PnP.PowerShell.psm1::Connect-PnPOnline": 1,
     "tests/fake-pnp/PnP.PowerShell/1.12.0/PnP.PowerShell.psm1::Get-FakeState": 1,
     "tests/fake-pnp/PnP.PowerShell/1.12.0/PnP.PowerShell.psm1::Get-PnPList": 1,
     "tests/fake-pnp/PnP.PowerShell/1.12.0/PnP.PowerShell.psm1::Get-PnPListItem": 1,
@@ -113,7 +112,6 @@
     "engine/ps/07-checks.ps1::Get-ProgramCheck": 1,
     "engine/ps/07-checks.ps1::Get-SiteRightsCheck": 1,
     "engine/ps/07-checks.ps1::Invoke-Check": 1,
-    "engine/ps/07-checks.ps1::Invoke-ChildScript": 1,
     "engine/ps/07-checks.ps1::Test-WebReach": 1,
     "engine/ps/07-checks.ps1::Write-SiteMarker": 1,
     "engine/ps/08-saved-checks.ps1::Get-SavedCheck": 1,
@@ -175,7 +173,6 @@
     "tests/window_real_driver.ps1::global:Step-Rade": 1
    },
    "duplicate": {},
-   "file_size": {},
    "generated": {},
    "header": {},
    "length": {
