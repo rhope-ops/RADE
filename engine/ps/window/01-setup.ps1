@@ -36,6 +36,16 @@ if ($script:native) {
     if ($aw -eq 0) { $script:dpiOld = [Rade.Dpi]::SetThreadDpiAwarenessContext([IntPtr](-2)); if ($script:dpiOld -ne [IntPtr]::Zero) { $script:dpiThread = 'unaware>system' } }   # -2 = DPI_AWARENESS_CONTEXT_SYSTEM_AWARE
   } catch { $script:dpiThread = 'n/a' }   # before Windows 10 1607 (no such function) or no compiler: the window runs as before
 }
+# engine-v46 (the PFM, 2026-11-26: the taskbar showed a PowerShell icon): the RADE process gets its own taskbar identity
+# (an AppUserModelID) before any window exists, so Windows gives the RADE window its own taskbar button with the window's
+# icon (the RADE logo), not a button in the PowerShell group. Not in ISE (the window then runs inside ISE, and the
+# identity would move ISE's own windows too). A separate type (Rade.Aumid): a paste again in one session must not fail.
+# $script:taskbarId is "own" when Windows took it, else "n/a".
+$script:taskbarId = 'n/a'
+if ($script:native -and [string]$Host.Name -ne 'Windows PowerShell ISE Host') {
+  try { Add-Type -Namespace Rade -Name Aumid -MemberDefinition '[DllImport("shell32.dll", CharSet = CharSet.Unicode)] public static extern int SetCurrentProcessExplicitAppUserModelID(string id);' -ErrorAction Stop
+    if ([Rade.Aumid]::SetCurrentProcessExplicitAppUserModelID('RhopeOps.RADE.Window') -eq 0) { $script:taskbarId = 'own' } } catch { $script:taskbarId = 'n/a' }   # no compiler or an old Windows: the PowerShell group, as before
+}
 [System.Windows.Forms.Application]::EnableVisualStyles()
 $ui = @{ View = ''; Running = $false; Busy = $false; RecOn = $false; Edit = $false; Answer = ''; Acts = @(); Back = $null; OnOpt = $null; FieldDo = $null
   Log = (New-Object System.Collections.Generic.List[string]); Summary = @(); Sel = @{}; Clean = $true; StepState = @{}; Plan = $null; Picked = $false

@@ -273,7 +273,10 @@ function Invoke-IseWindow {
   $path = Join-Path ([System.IO.Path]::GetTempPath()) ('@@PREFIX@@-window-' + $buildId + '.ps1')
   try { [System.IO.File]::WriteAllText($path, [string]$script:selfText, (New-Object System.Text.UTF8Encoding $true))
     $env:RADE_FROM_ISE = $path
-    try { $pr = Start-Process -FilePath (Get-PowerShellExe) -ArgumentList ('-NoProfile -STA -WindowStyle Hidden -File "' + $path + '"') -PassThru }   # engine-v44: no blank console (the PFM, 2026-11-26)
+    # engine-v46 (the PFM, 2026-11-26: the PowerShell window still showed): Start-Process -WindowStyle Hidden makes Windows
+    # create the console hidden, so it never flashes; engine-v44 hid it only after PowerShell had started. The console
+    # still exists, so text mode can show it (Show-RadeConsole, part 11).
+    try { $pr = Start-Process -FilePath (Get-PowerShellExe) -ArgumentList ('-NoProfile -STA -WindowStyle Hidden -File "' + $path + '"') -WindowStyle Hidden -PassThru }
     finally { Remove-Item -LiteralPath 'Env:RADE_FROM_ISE' -ErrorAction SilentlyContinue }   # the child has its own copy; ISE keeps none
     if ($pr) { $null = $pr.Handle }   # Windows PowerShell 5.1 keeps the exit code only when the handle is held
     # A child that a policy blocks or that fails at once ends within a moment: RADE then stays in ISE (as StartApp does).
@@ -315,7 +318,7 @@ function Get-ScriptCheck {
 }
 $script:scriptCheck = Get-ScriptCheck
 # ---- One shortcut for each app (engine-v42; 90-161.Z R44 E1; plan docs/reviews/2026-11-21-plan-intro-fulcrum.md step 7).
-# RADE is never installed by itself, so the shortcut belongs to the installed app: its name is "<display> - <version>",
+# RADE is never installed by itself, so the shortcut belongs to the installed app: its name is the app's word (Get-ShortcutName),
 # its icon is made from the app's logo, and it opens that app's own runner copy, RADE\runners\<key>.ps1 (the app's last
 # passed deploy paste; <key> = 12 hex of "<app folder>/<app name>"). A deploy of a second app does not change the first
 # app's shortcut. The one shortcut "RADE" and the one runner rade-runner.ps1 of engine-v41 and before go to the Recycle Bin.
@@ -329,16 +332,13 @@ function Get-AppWord { if ([string]$appProduct) { return [string]$appProduct }; 
 # Management"), else the subtitle alone (L1); '' when there is nothing to show. Takes nothing.
 function Get-AppSubtitle { $s = [string]$appSubtitle; if (-not [string]$appProduct) { return $s }
   if ($s) { return ([string]$script:app.Name + ' ' + [string][char]0x2022 + ' ' + $s) }; return [string]$script:app.Name }
-# The Small gray text beside the word: "<version> <dot> <round> <label>"; from the shortcut (no round) the version only.
-# Takes nothing.
-function Get-AppVersionText { $v = [string]$script:app.Version; if (Test-RunnerStart) { return $v }
-  $r = ([string]$round + $(if ([string]$roundLabel) { ' ' + [string]$roundLabel } else { '' })); if (-not $v) { return $r }; return ($v + ' ' + [string][char]0x00B7 + ' ' + $r) }
 # Says whether RADE runs from an app's runner copy in RADE\runners (opened by its shortcut: no round, R44 E2). Takes nothing.
 function Test-RunnerStart {
   try { return [bool]($script:startFile -and (Split-Path -Parent $script:startFile) -eq (Join-Path (Get-RadePath) 'runners')) } catch { return $false }   # no RADE folder: not a runner
 }
-# Gives the name of the chosen app's shortcut, without ".lnk": "<display> - <version>". Takes nothing.
-function Get-ShortcutName { return ((Get-AppDisplay) + ' - ' + [string]$script:app.Version) }
+# Gives the name of the chosen app's shortcut, without ".lnk": the app's word (application.productName, "Kanon"), else
+# the app name; no version (engine-v46, the PFM, 2026-11-26; engine-v42 to v45: "<display> - <version>"). Takes nothing.
+function Get-ShortcutName { return (Get-AppWord) }
 # Gives the path of the chosen app's runner copy, RADE\runners\<key>.ps1 (the folder may not be there yet). Takes nothing.
 function Get-RunnerPath { return (Join-Path (Join-Path (Get-RadePath) 'runners') ((Get-ShortHash ($appFolder + '/' + [string]$script:app.Name)) + '.ps1')) }
 # Gives the path of the file that holds the full path of the chosen app's shortcut (RADE\runners\<key>.lnk.txt). Takes nothing.
@@ -402,7 +402,7 @@ function Clear-OldRadeShortcut([string]$Dir) {
   try { if (Test-Path -LiteralPath $old -PathType Leaf) { Move-ToRecycleBin $old } } catch { $null = $_ }   # an old runner that stays does no harm
 }
 function Add-DesktopIcon([string]$Dir) {
-  # The chosen app's shortcut "<display> - <version>" in the folder the user chose on the install card ($Dir; R29), else
+  # The chosen app's shortcut (Get-ShortcutName) in the folder the user chose on the install card ($Dir; R29), else
   # the folder of the app's last shortcut, else the saved shortcut folder or the Desktop; no administrator rights
   # (WScript.Shell). It is made again at each passed deploy (its icon, and a repair of old settings); the shortcut of an
   # older version of this app goes to the Recycle Bin. Returns the plain line the Done card shows, or '' when there is nothing to say.
@@ -413,7 +413,9 @@ function Add-DesktopIcon([string]$Dir) {
     $isDesk = (-not $desk -or $desk -eq (Get-DesktopDir))
     if (-not $desk -or -not (Test-Path -LiteralPath $desk -PathType Container)) { return $(if ($isDesk) { 'RADE could not find your Desktop folder, so it made no desktop shortcut. Open RADE from the RADE page instead.' } else { 'RADE could not find the folder you chose, so it made no shortcut. Open RADE from the RADE page instead.' }) }
     Clear-OldRadeShortcut $desk
-    $lnk = Join-Path $desk ($name + '.lnk'); $args1 = '-NoProfile -STA -WindowStyle Minimized -File "' + $runner + '"'
+    # engine-v46 (the PFM, 2026-11-26): -WindowStyle Hidden, so the console of the shortcut's PowerShell goes away at
+    # its start (a shortcut cannot start it hidden: WindowStyle 7 keeps that first moment minimized). Text mode shows it.
+    $lnk = Join-Path $desk ($name + '.lnk'); $args1 = '-NoProfile -STA -WindowStyle Hidden -File "' + $runner + '"'
     $sh = New-Object -ComObject WScript.Shell
     if ((Test-Path -LiteralPath $lnk) -and $lnk -ne $was -and -not ([string]$sh.CreateShortcut($lnk).Arguments).Contains('"' + $runner + '"')) {
       return ('A shortcut named "' + $name + '" that RADE did not make is in that folder, so RADE did not change it.') }   # never another program's shortcut

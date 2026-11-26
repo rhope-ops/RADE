@@ -147,6 +147,12 @@ $ui.Copy = {
   try { [System.Windows.Forms.Clipboard]::SetText($t); & $ui.Say1 'Copied.' } catch { & $ui.Say1 'The clipboard is busy. Select the button again.' } }
 # Opens the results folder in Explorer, when there is one. Takes nothing.
 $ui.Open = { if ($script:resultsDir) { Start-Process -FilePath 'explorer.exe' -ArgumentList ('"' + $script:resultsDir + '"') } }
+# engine-v46 (the PFM, 2026-11-26: "I got no notification that a script was blocked"): the end card names each step
+# whose script Windows blocked 2 times (Invoke-RoundStep), also when it is not the first problem. Takes nothing; gives
+# back the paragraph, or '' when no step was blocked.
+$ui.BlockedText = { $b = @($script:blockedSteps | Where-Object { $_ })
+  if (-not $b.Count) { return '' }
+  return ('Windows blocked the script of ' + $(if ($b.Count -eq 1) { 'the step "' + $b[0] + '"' } else { [string]$b.Count + ' steps: "' + ($b -join '", "') + '"' }) + ' 2 times. Details shows the policy line.') }
 # Shows the card at the end of a run: Done when every step passed, else Needs review with the first problem. Copies the
 # summary and opens the folder in a test round. Takes nothing.
 $ui.VDone = {
@@ -172,7 +178,7 @@ $ui.VDone = {
     for ($k = 0; $k -lt $sum.Count; $k++) { if ([string]$sum[$k] -match ': (NEEDS REVIEW|FAILED) ') { if ($one) { $more++ } else { $one = [string]$sum[$k]; if ($k + 1 -lt $sum.Count -and [string]$sum[$k + 1] -match '^\s+What to do: ') { $what = ([string]$sum[$k + 1]).Trim() } } } }
     if (-not $one) { $one = 'A file, the clean-up or a result file needs review. Details shows which.' }
     & $ui.SetCard @{ View = 'review'; Light = 'bad'; Kicker = 'Needs review'; Right = 'Needs review'; Sentence = $(if ($dep) { 'The install is not complete.' } else { 'The round needs review.' })
-      P = @(($one + $(if ($more) { ' (and ' + $more + ' more in Details)' } else { '' })), $what, $(if ($dep) { 'Steps that passed stay done. If you paste the block again, RADE runs only what is left.' } else { $mail }))
+      P = @(($one + $(if ($more) { ' (and ' + $more + ' more in Details)' } else { '' })), $what, (& $ui.BlockedText), $(if ($dep) { 'Steps that passed stay done. If you paste the block again, RADE runs only what is left.' } else { $mail }))
       Help = $(if ($dep) { Get-HelpLine } else { '' }); Note = $(if ($dep) { '"Copy summary" puts the report on the clipboard. Paste it in the channel. Nothing was sent.' } else { '' })
       Buttons = @(@{ Text = 'Copy summary'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Open results folder'; Act = { & $ui.Open } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } })
       Test = (-not $dep); Back = { & $ui.VReady } }

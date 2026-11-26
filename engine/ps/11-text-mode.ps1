@@ -6,8 +6,8 @@
 .SYNOPSIS
 Shows this process's console window again (engine-v44, review of the hidden ISE child).
 .DESCRIPTION
-The ISE child (Invoke-IseWindow, part 05) starts with -WindowStyle Hidden, so no blank console shows while the RADE
-window is open. When the window cannot open there, text mode runs in that console: it must show, or its questions wait
+The ISE child (Invoke-IseWindow, part 05) and, from engine-v46, the app's shortcut start with -WindowStyle Hidden, so
+no blank console shows while the RADE window is open. When the window cannot open there, text mode runs in that console: it must show, or its questions wait
 where nobody can see them. Only the console of this process is shown; nothing else is read or changed. Windows only;
 a failure (no console, Constrained Language Mode) changes nothing.
 .OUTPUTS
@@ -28,7 +28,7 @@ function Show-RadeConsole {
 }
 
 try {
-  if ($env:RADE_HOST -eq 'child') { Show-RadeConsole }   # the hidden ISE child: its console shows for text mode
+  if ($env:RADE_HOST -in 'child', 'shortcut') { Show-RadeConsole }   # a hidden console (ISE child, shortcut): it shows for text mode
   $script:textMode = $true
   # Writes a line to the run log and the console. Takes the line; gives back nothing.
   $say = { param($t) Add-RunLog $t; Write-Host $t }

@@ -362,8 +362,24 @@ try { . ([scriptblock]::Create($signInSize))
   # A stand-in for the PnP sign-in that returns at once (this case tests the lines only). Takes the address; gives nothing.
   function Connect-PnPOnline { [CmdletBinding()] param($Url, [switch]$UseWebLogin) }
   $cLines = @(Connect-RadeSite 'https://usaf.dps.mil/sites/fake'); Remove-Item Function:\Connect-PnPOnline } catch { $sbErr = $_ }
-Assert-Case 'sign-in block (engine-v44): Connect-RadeSite prints STAGE signin, SIGNIN seconds=N and STAGE none' ($null -eq $sbErr -and
-  @($cLines).Count -eq 3 -and $cLines[0] -eq 'STAGE signin' -and $cLines[1] -match '^SIGNIN seconds=\d+$' -and $cLines[2] -eq 'STAGE none')
+# engine-v46 (90-161.Z R45 finding 2): the process becomes DPI-aware before the sign-in and says so (not Windows here: no).
+Assert-Case 'sign-in block (engine-v44, v46): Connect-RadeSite prints STAGE signin, SIGNIN-DPI aware=, SIGNIN seconds=N and STAGE none' ($null -eq $sbErr -and
+  @($cLines).Count -eq 4 -and $cLines[0] -eq 'STAGE signin' -and $cLines[1] -match '^SIGNIN-DPI aware=(yes|was|no|off)$' -and
+  $cLines[2] -match '^SIGNIN seconds=\d+$' -and $cLines[3] -eq 'STAGE none')
+# engine-v46 (90-161.Z R45 finding 1): a script policy block is a result with no PASS or SKIP line and an error that says
+# Windows did not load the script; a step that printed a line, or failed another way, is not one. The policy line names
+# each scope. RADE_SIGNIN_DPI=0 turns the DPI setting off.
+$pb1 = Test-PolicyBlock @{ Pass = 0; Skip = 0; Lines = 0; Err = "File C:\x.ps1 cannot be`nloaded because running scripts is disabled on this system.`n" }
+$pb2 = Test-PolicyBlock @{ Pass = 1; Skip = 0; Lines = 1; Err = 'running scripts is disabled' }
+# Review of PR 206: a step that printed lines did work, so no second run.
+$pb4 = Test-PolicyBlock @{ Pass = 0; Skip = 0; Fail = 2; Lines = 3; Made = @(@{ kind = 'list'; name = 'Tasks' }); Err = 'Helper.psm1 is not digitally signed' }
+$script:helped = @{}; $h1 = Get-WhatToDo 'loaded because running scripts is disabled on this system.'
+$h2 = Get-WhatToDo '+ FullyQualifiedErrorId : UnauthorizedAccess'
+$pb3 = Test-PolicyBlock @{ Pass = 0; Skip = 0; Lines = 0; Err = 'Access to the path is denied. UnauthorizedAccess' }
+$pl = Get-PolicyLine; $env:RADE_SIGNIN_DPI = '0'; $dOff = Set-SignInDpiAware; Remove-Item Env:\RADE_SIGNIN_DPI
+Assert-Case 'policy block (engine-v46): only a script Windows did not load that printed nothing; one help line; the policy line; DPI off' (
+  $pb1 -and -not $pb2 -and -not $pb3 -and -not $pb4 -and $h1 -match 'script policy' -and -not $h2 -and
+  $pl -match '^Policy: .+; in effect: \S+$' -and $dOff -eq 'SIGNIN-DPI aware=off')
 # R43 E4 (the PFM, 2026-11-25): the rights check gives its sign-in time (engine-v44: no watch= part).
 $script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Marker = $null }
 $env:RADE_SIGNIN_TEST = '1'; $sr1 = Get-SiteRightsCheck $base 'https://usaf.dps.mil/sites/fake' $null; $env:RADE_SIGNIN_TEST = $null

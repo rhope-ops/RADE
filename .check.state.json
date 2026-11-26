@@ -86,7 +86,6 @@
     "engine/ps/04-steps.ps1::Get-RoundPlan": 1,
     "engine/ps/04-steps.ps1::Get-StepStartInfo": 1,
     "engine/ps/04-steps.ps1::Invoke-GuideStep": 1,
-    "engine/ps/04-steps.ps1::Invoke-RoundStep": 1,
     "engine/ps/04-steps.ps1::Save-RoundDraft": 1,
     "engine/ps/05-installed.ps1::Add-DesktopIcon": 1,
     "engine/ps/05-installed.ps1::Get-InstalledText": 1,

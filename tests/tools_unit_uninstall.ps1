@@ -100,8 +100,8 @@ Assert-Case 'back up (R44 E4): the stage words name the list' ((Get-StageText 'l
   (Get-StageText 'site' @()) -eq 'the site check' -and (Get-StageText 'list 9' @('A')) -eq 'the stage "list 9"')
 # ---- One shortcut for each app (engine-v42; 90-161.Z R44 E1): names, the runner path, the .ico container, Remove RADE.
 $appDisplay = 'Sample - Kanon'; $keepVer = $script:app.Version; $script:app.Version = '0.1.0'
-Assert-Case 'shortcut (R44 E1): the name is "<display> - <version>"; without a display name, the app name' ((Get-ShortcutName) -eq 'Sample - Kanon - 0.1.0' -and
-  $(& { $appDisplay = ''; (Get-ShortcutName) -eq ([string]$script:app.Name + ' - 0.1.0') }))
+Assert-Case 'shortcut (engine-v46): the name is the app word, no version; the display name is not in it' ((Get-ShortcutName) -eq [string]$script:app.Name -and
+  $(& { $appProduct = 'Kanon'; (Get-ShortcutName) -eq 'Kanon' }))
 $rp = Get-RunnerPath
 Assert-Case 'shortcut (R44 E1): the runner copy is RADE\runners\<12 hex>.ps1, one for each app' ((Split-Path -Parent $rp) -eq (Join-Path (Join-Path $Dir 'RADE') 'runners') -and
   (Split-Path -Leaf $rp) -match '^[0-9a-f]{12}\.ps1$' -and
@@ -132,22 +132,22 @@ Start-Sleep -Seconds 1; $script:app.Backup = @('Sample Tasks'); $b5 = Invoke-Bac
 Assert-Case 'back up (R44 E4): a site check that fails is named as the site check' ($b5.State -eq 'failed' -and
   $b5.Lines[0] -eq 'Back up saved nothing: RADE could not read which site the sign-in connected to.')
 $fk.PSObject.Properties.Remove('webError'); Set-Fake $fk
-# R44 E2 (the PFM's Q1 answer, 2026-11-26): opened from a runner copy (the shortcut), the title has no round; the
-# shortcut is named "<display> - <version>"; engine-v43 L1: the subtitle comes from application.subtitle.
+# R44 E2 (the PFM's Q1 answer, 2026-11-26): opened from a runner copy (the shortcut), the title has no round; engine-v46
+# (the PFM, 2026-11-26): the shortcut is the app's word, with no version; engine-v43 L1: the subtitle comes from
+# application.subtitle.
 $appDisplay = 'Sample - Kanon'; $keepVer = $script:app.Version; $script:app.Version = '0.1.0'; $keepStart = $script:startFile
 $script:startFile = Join-Path (Join-Path (Join-Path $Dir 'RADE') 'runners') 'aaaaaaaaaaaa.ps1'; $r1 = Test-RunnerStart
 $script:startFile = ''; $r2 = Test-RunnerStart; $script:startFile = Join-Path $Dir 'other.ps1'; $r3 = Test-RunnerStart
-$dv = Get-ShortcutName; $appSubtitle = 'Kanon ' + [char]0x2022 + ' Forms'; $sb = Get-AppSubtitle; $appSubtitle = ''; $s0 = Get-AppSubtitle
-Assert-Case 'title and names (R44 E2, L1): a runner copy start is known; a paste or another file is not; "<display> - <version>"; the subtitle' ($r1 -and -not $r2 -and -not $r3 -and
-  $dv -eq 'Sample - Kanon - 0.1.0' -and $sb -eq ('Kanon ' + [char]0x2022 + ' Forms') -and $s0 -eq '')
-# engine-v45 name spot L2 (the PFM, 2026-11-26): the word is productName, else the app name; under the line "<name> <bullet>
-# <subtitle>" with a productName; beside the word "<version> <dot> <round> <label>", and the version only from the shortcut.
-$keepRound = $round; $round = 'R44'; $appProduct = 'Kanon'; $appSubtitle = 'Forms'; $roundLabel = 'sign-in test'; $script:startFile = ''
-$w1 = Get-AppWord; $u1 = Get-AppSubtitle; $v1 = Get-AppVersionText; $roundLabel = ''; $v2 = Get-AppVersionText; $appSubtitle = ''; $u2 = Get-AppSubtitle
-$script:startFile = Join-Path (Join-Path (Join-Path $Dir 'RADE') 'runners') 'aaaaaaaaaaaa.ps1'; $v3 = Get-AppVersionText; $script:startFile = ''
-$appProduct = ''; $appSubtitle = 'Forms'; $w0 = Get-AppWord; $u0 = Get-AppSubtitle; $appSubtitle = ''; $round = $keepRound
-$b = [string][char]0x2022; $d = [string][char]0x00B7
-Assert-Case 'name spot L2: word, version text and the line under the word' ($w1 -eq 'Kanon' -and $u1 -eq ([string]$script:app.Name + ' ' + $b + ' Forms') -and
-  $v1 -eq ('0.1.0 ' + $d + ' R44 sign-in test') -and $v2 -eq ('0.1.0 ' + $d + ' R44') -and $u2 -eq [string]$script:app.Name -and $v3 -eq '0.1.0' -and
-  $w0 -eq [string]$script:app.Name -and $u0 -eq 'Forms')
+$appProduct = 'Kanon'; $dv = Get-ShortcutName; $appProduct = ''; $dn = Get-ShortcutName
+$appSubtitle = 'Kanon ' + [char]0x2022 + ' Forms'; $sb = Get-AppSubtitle; $appSubtitle = ''; $s0 = Get-AppSubtitle
+Assert-Case 'title and names (R44 E2, L1, engine-v46): a runner copy start is known; a paste or another file is not; the shortcut is the word; the subtitle' ($r1 -and -not $r2 -and -not $r3 -and
+  $dv -eq 'Kanon' -and $dn -eq [string]$script:app.Name -and $sb -eq ('Kanon ' + [char]0x2022 + ' Forms') -and $s0 -eq '')
+# Name spot L3 (engine-v46, the PFM, 2026-11-26): the word is productName, else the app name; under the line "<name>
+# <bullet> <subtitle>" with a productName; no version text (Get-AppVersionText of engine-v45 is gone).
+$appProduct = 'Kanon'; $appSubtitle = 'Forms'
+$w1 = Get-AppWord; $u1 = Get-AppSubtitle; $appSubtitle = ''; $u2 = Get-AppSubtitle
+$appProduct = ''; $appSubtitle = 'Forms'; $w0 = Get-AppWord; $u0 = Get-AppSubtitle; $appSubtitle = ''
+$b = [string][char]0x2022; $gone = -not (Get-Command Get-AppVersionText -ErrorAction SilentlyContinue)
+Assert-Case 'name spot L3: the word and the line under it; no version text' ($w1 -eq 'Kanon' -and $u1 -eq ([string]$script:app.Name + ' ' + $b + ' Forms') -and
+  $u2 -eq [string]$script:app.Name -and $w0 -eq [string]$script:app.Name -and $u0 -eq 'Forms' -and $gone)
 $appDisplay = ''; $script:app.Version = $keepVer; $script:startFile = $keepStart

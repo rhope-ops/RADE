@@ -55,10 +55,8 @@
         },
         "label": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 24,
-          "pattern": "^[^\\u0000-\\u001f'\"`$]+$",
-          "description": "Optional (engine-v45, name spot L2; the PFM, 2026-11-26). A few words for the round, for example \"sign-in test\". The window shows \"<version> \u00b7 <round> <label>\" beside the application's word in the logo block; without it, \"<version> \u00b7 <round>\". At most 24 characters; no quotes, no $ and no control characters."
+          "description": "Ignored from engine-v46 (name spot L3: no round text beside the word; the PFM, 2026-11-26). Kept so a manifest written for engine-v45 still builds."
         },
         "title": {
           "type": "string",
@@ -835,7 +833,7 @@
         "displayName": {
           "type": "string",
           "pattern": "^[A-Za-z0-9]([A-Za-z0-9 ._-]{0,58}[A-Za-z0-9])?$",
-          "description": "Optional (engine-v42; 90-161.Z R44 E2, the PFM, 2026-11-25). The name a person sees for the installed app, for example \"90-161.Z - Kanon\". The shortcut is named \"<displayName> - <version>\". Without it, the app name is used. The app name (apps \"name\") stays the install key, the folder name and the Uninstall confirm text. Letters, digits, spaces, \".\", \"_\" and \"-\" only, so it is a valid file name."
+          "description": "Optional (engine-v42; 90-161.Z R44 E2, the PFM, 2026-11-25). The name a person sees for the installed app, for example \"90-161.Z - Kanon\". From engine-v46 the shortcut and the Maintenance card use application.productName (else the app name); displayName stays in the shortcut tooltip and the Done line (It opens RADE for <displayName>). Without it, the app name is used. The app name (apps \"name\") stays the install key, the folder name and the Uninstall confirm text. Letters, digits, spaces, \".\", \"_\" and \"-\" only, so it is a valid file name."
         },
         "productName": {
           "type": "string",

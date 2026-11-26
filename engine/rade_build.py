@@ -308,7 +308,7 @@ def bundle_body(b, ui_text):
                       "$logoPng = '%s'" % logo, '$scriptExts = @(' + ', '.join(q(x) for x in SCRIPT_EXTS) + ')', "$appLogoPng = '%s'" % app_logo, rade_tokens.font_lines(),
                       '$ownPatterns = @(' + ', '.join(q(p) for p in APP['own']) + ')', '$round = %s' % q(b['round']), '$appFolder = %s' % q(APP['folder']),
                       '$appDisplay = %s' % q(APP.get('displayName', '')),
-                      rade_fields.name_spot(APP, b), "$usersRoot = 'C:\\Users'"]),
+                      rade_fields.name_spot(APP), "$usersRoot = 'C:\\Users'"]),
         ('Shared blocks (%d): each is written back into the files that name it' % len(shared), ['$shared = @{}'] + shared),
         ('Files written to this computer (%d)' % len(b['files']), ['$files = @()'] + files),
         ('Steps (%d), downloads, results to collect, clean-up' % len(b['steps']),
@@ -445,7 +445,7 @@ ENGINE_SHA = hashlib.sha256(b''.join(rel.encode() + b'\0' + (ENGINE_ROOT / rel).
                                      + ['engine/rade_ui.ps1', 'engine/rade_ui_text.ps1', 'engine/window.json', 'apps.json', logo_path()] + rade_tokens.FILES)).hexdigest()
 # The number of the next engine release (tag engine-v<N>); raise it before each release (docs/engine.md "Releases").
 # The saved runner copy is replaced only by a bundle with a higher number (the Administrator, 2026-11-17).
-ENGINE_RELEASE = 45
+ENGINE_RELEASE = 46
 APP, MANIFEST = None, None
 
 if __name__ == '__main__':

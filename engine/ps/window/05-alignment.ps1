@@ -31,16 +31,16 @@ $ui.FitStepEdge = { $sd = & $ui.Sc 8; & $ui.SetLeft $ui.StepRow ([int]$ui.EdgeX 
 $ui.FitHead = {
   <#
   .SYNOPSIS
-  Puts the ink of each column of the logo block on one edge, sizes the lines and puts a version text on its base line.
+  Puts the ink of each column of the logo block on one edge and sizes the lines.
   .DESCRIPTION
   R29b V1, L1 (the PFM, 2026-11-26): in each column the word and its subtitle start their ink on one edge, and when both
   rows start at the same x (both logos, or neither) the two columns share that edge. Each part sits at the same x in its
   row and draws its text ink-tight ($ui.InkText); what is left of a difference (measured) moves each to the largest. L2:
-  the line under a word is as wide as the word's ink and starts where it starts. Name spot L2 (engine-v45): a version
-  text beside the word gets the top margin that puts its base line on the word's ($ui.VerTop).
+  the line under a word is as wide as the word's ink and starts where it starts. Name spot L3 (engine-v46): no version
+  text beside the word, and once an application with a logo is chosen only its column shows.
   .OUTPUTS
-  Nothing. Changes the left margins of the words, the lines and the subtitles, the widths of the lines and the top margin
-  of a version text. Before the window has a handle nothing can be measured: the next fit sets them.
+  Nothing. Changes the left margins of the words, the lines and the subtitles and the widths of the lines. Before the
+  window has a handle nothing can be measured: the next fit sets them.
   #>
   try {
     $cols = @(& $ui.HeadCols); $same = & $ui.HeadPair; $all = @()
@@ -50,16 +50,12 @@ $ui.FitHead = {
       & $ui.SetLeft $c.W ($e - $c.IW); if ($c.Sub) { & $ui.SetLeft $c.S ($e - $c.IS) }
       # R34: the width comes from the ink Windows drew in the panel ($ui.InkBox, the measure of the self-check), not from the
       # panel's width: at 150 % in ISE the panel was 114 wide and the drawn word 93 (each card had the defect).
-      & $ui.SetLeft $c.R $e; $rw = & $ui.RuleW $c.W; if ($c.R.Width -ne $rw) { $c.R.Width = $rw }
-      if ($c.V) { $mt = & $ui.VerTop $c.W $c.V; $m = $c.V.Margin   # name spot L2: the version text on the word's base line
-        if ($m.Top -ne $mt) { $c.V.Margin = New-Object System.Windows.Forms.Padding($m.Left, $mt, $m.Right, $m.Bottom) } } } } catch { $null = $_ } }   # no measure (no window handle yet): the next fit sets the edges
-# Name spot L2: the top margin that puts a version text's base line on the word's base line (both panels start at the top
-# of the capitals: $ui.InkFit). Takes the word's and the version text's panels; gives back pixels (0 at least).
-$ui.VerTop = { param($W, $V) $fw = & $ui.FontInk $W.Font; $fv = & $ui.FontInk $V.Font; [int][math]::Max(0, ([int]$fw.Base - [int]$fw.Top) - ([int]$fv.Base - [int]$fv.Top)) }
-# The columns of the logo block that show: the RADE column, and the application column when its row shows. Each is
-# @{ W (word); R (line); S (subtitle); Sub (the subtitle shows); V (the version text beside the word, or $null) }. Takes nothing.
-$ui.HeadCols = { $o = @(@{ W = $ui.WordL; R = $ui.HeadRule; S = $ui.TagL; Sub = $true; V = $null })
-  if ($ui.AppRow.Visible) { $o += @{ W = $ui.AppWordL; R = $ui.AppRule; S = $ui.AppL; Sub = [bool]($ui.AppL.Visible -and [string]$ui.AppL.Text); V = $(if ($ui.AppVerL -and $ui.AppVerL.Visible -and [string]$ui.AppVerL.Text) { $ui.AppVerL } else { $null }) } }
+      & $ui.SetLeft $c.R $e; $rw = & $ui.RuleW $c.W; if ($c.R.Width -ne $rw) { $c.R.Width = $rw } } } catch { $null = $_ } }   # no measure (no window handle yet): the next fit sets the edges
+# The columns of the logo block that show: the RADE column while its row shows ($ui.RadeRowOn; L3: an application with a
+# logo hides it), and the application column when its row shows. Each is @{ W (word); R (line); S (subtitle); Sub (the
+# subtitle shows) }. Takes nothing.
+$ui.HeadCols = { $o = @(); if ($ui.RadeRowOn) { $o += @{ W = $ui.WordL; R = $ui.HeadRule; S = $ui.TagL; Sub = $true } }
+  if ($ui.AppRow.Visible) { $o += @{ W = $ui.AppWordL; R = $ui.AppRule; S = $ui.AppL; Sub = [bool]($ui.AppL.Visible -and [string]$ui.AppL.Text) } }
   $o }
 # The width of the line under a word: the width of the word's drawn ink, measured once for each text, font and panel
 # size. Takes the word's panel; gives back the width in pixels (at least 1).
@@ -71,7 +67,7 @@ $ui.RuleW = { param($W) $f = $W.Font; $k = 'rule|' + [string]$W.Text + '|' + $f.
   return $v }   # no measure (no window handle yet): the next fit sets the edges
 # Whether the application row shows and starts its text at the same x as the RADE row (both logos, or neither), so both
 # columns share one edge. Takes nothing; gives back $true or $false.
-$ui.HeadPair = { [bool]($ui.AppRow.Visible -and ([bool]$ui.Logo -eq [bool]$ui.AppLogo)) }
+$ui.HeadPair = { [bool]($ui.RadeRowOn -and $ui.AppRow.Visible -and ([bool]$ui.Logo -eq [bool]$ui.AppLogo)) }
 # The x of a control inside one of its parents (the sum of the lefts on the way up). Takes the control and the parent;
 # gives back the pixels.
 $ui.LeftIn = { param($C, $P) $x = 0; $c = $C; while ($c -and -not [object]::ReferenceEquals($c, $P)) { $x += [int]$c.Left; $c = $c.Parent }; $x }
@@ -281,11 +277,10 @@ $ui.Measure = { param([string]$Card)
   # L1, L2: in each column of the logo block the word and its subtitle start on one edge, with the word, 4 px, the line,
   # 4 px, the subtitle, measured on the ink Windows drew; the two columns share the edge when both rows start at one x.
   $cols = @(& $ui.HeadCols)
-  if ($ui.WordL.Visible) { foreach ($c in $cols) { $nw = & $ui.NameOf $c.W; $rw = & $sr $c.W
-      # Name spot L2: a word that keeps room for descenders (the application column) and its version text. The ink is the
-      # text's whole ink as Windows draws it with no panel around it ($ui.TextInk), so a panel or a line that cuts it shows.
+  if ($ui.WordL.Visible -or $ui.AppWordL.Visible) { foreach ($c in $cols) { $nw = & $ui.NameOf $c.W; $rw = & $sr $c.W
+      # Name spot L2, L3: a word that keeps room for descenders (the application column). The ink is the text's whole ink
+      # as Windows draws it with no panel around it ($ui.TextInk), so a panel or a line that cuts it shows.
       $row = $null; if ($c.W.Tag.Desc) { $row = @(@{ N = $nw; Ink = (& $ui.TextInk $c.W $rw) })
-        if ($c.V) { $rv = & $sr $c.V; $row += @{ N = (& $ui.NameOf $c.V); Ink = (& $ui.TextInk $c.V $rv) } }
         $out += & $ui.VerBad $Card $row $(if ($c.Sub) { (& $sr $c.R).Top } else { $null }) }
       if (-not $c.Sub) { continue }   # a name with no subtitle has no line and nothing under it to measure
       $out += & $ui.HeadBad $Card @{ N = $nw; X = (& $tx $c.W) } @{ N = (& $ui.NameOf $c.S); X = (& $tx $c.S) }
@@ -338,7 +333,7 @@ $ui.LogScale = {
   try { $p = Get-RadeConfigFile 'rade-window-scale.txt'; $d = Split-Path -Parent $p
     if (-not (Test-Path -LiteralPath $d -PathType Container)) { [void](New-Item -ItemType Directory -Path $d -Force) }
     $exe = 'n/a'; try { $exe = [System.Diagnostics.Process]::GetCurrentProcess().ProcessName } catch { $null = $_ }   # no name: the line says n/a
-    $line = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss') + ' host=' + ([string]$Host.Name -replace '\s', '') + ' exe=' + $exe + ' build=' + $buildId + ' ' + (& $ui.Scale)
+    $line = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss') + ' host=' + ([string]$Host.Name -replace '\s', '') + ' exe=' + $exe + ' rade=' + [string]$env:RADE_HOST + ' taskbar=' + [string]$script:taskbarId + ' build=' + $buildId + ' ' + (& $ui.Scale)   # engine-v46: the start (child, shortcut) and the taskbar identity of this window
     $old = @(); if (Test-Path -LiteralPath $p -PathType Leaf) { $old = @(Get-Content -LiteralPath $p | Where-Object { $_ }) }
     Write-FileWhole $p ((@(@($old) + @($line)) | Select-Object -Last $ui.ScaleKeep) -join "`r`n") } catch { $null = $_ } }   # not written: the round has no line of this window
 # The SCALE lines of the RADE windows shown since this window opened ($ui.OpenedAt), this one included, for the round's
