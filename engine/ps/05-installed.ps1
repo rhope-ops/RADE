@@ -322,9 +322,9 @@ $script:scriptCheck = Get-ScriptCheck
 
 # Gives the name a person sees for the chosen app: the manifest's application.displayName, else the app name. Takes nothing.
 function Get-AppDisplay { if ([string]$appDisplay) { return [string]$appDisplay }; return [string]$script:app.Name }
-# Gives the display name and the version as one text, "<display> - <version>" (the display name alone with no version).
-# The word spot, the Maintenance card and the shortcut use it (R44 E2). Takes nothing.
-function Get-AppDisplayVersion { return ((Get-AppDisplay) + $(if ([string]$script:app.Version) { ' - ' + [string]$script:app.Version } else { '' })) }
+# Gives the line under the application name in the logo block: the manifest's application.subtitle, or '' (L1, the PFM,
+# 2026-11-26). Takes nothing.
+function Get-AppSubtitle { return [string]$appSubtitle }
 # Says whether RADE runs from an app's runner copy in RADE\runners (opened by its shortcut: no round, R44 E2). Takes nothing.
 function Test-RunnerStart {
   try { return [bool]($script:startFile -and (Split-Path -Parent $script:startFile) -eq (Join-Path (Get-RadePath) 'runners')) } catch { return $false }   # no RADE folder: not a runner

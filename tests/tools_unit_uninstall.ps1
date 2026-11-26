@@ -87,7 +87,7 @@ $env:RADE_SIGNIN_TEST = '1'; Start-Sleep -Seconds 1; $b1 = Invoke-Backup $base $
 $env:RADE_SIGNIN_WATCH = '0'; Start-Sleep -Seconds 1; $b2 = Invoke-Backup $base $null; $env:RADE_SIGNIN_WATCH = $null; $env:RADE_SIGNIN_TEST = $null
 Assert-Case 'back up (R44 E4): the result gives the sign-in time, watch on, and off with RADE_SIGNIN_WATCH=0' ($b1.State -eq 'done' -and $b2.State -eq 'done' -and
   ($b1.Lines -join '|') -match 'The sign-in took \d+ seconds \(sign-in window size: on\)\.' -and ($b2.Lines -join '|') -match 'The sign-in took \d+ seconds \(sign-in window size: off\)\.' -and
-  (@($script:runLog) -join '|') -match 'Back up SIGNIN seconds=\d+ watch=off')
+  (@($script:runLog) -join '|') -match 'Back up SIGNIN seconds=\d+ watch=off host=')
 $fk | Add-Member -NotePropertyName webUrl -NotePropertyValue 'https://usaf.dps.mil/sites/other' -Force; Set-Fake $fk
 Start-Sleep -Seconds 1; $b3 = Invoke-Backup $base $null
 Assert-Case 'back up (R44 E4): a sign-in to another site reads nothing and says so' ($b3.State -eq 'failed' -and -not $b3.Path -and
@@ -134,12 +134,12 @@ Start-Sleep -Seconds 1; $script:app.Backup = @('Sample Tasks'); $b5 = Invoke-Bac
 Assert-Case 'back up (R44 E4): a site check that fails is named as the site check' ($b5.State -eq 'failed' -and
   $b5.Lines[0] -eq 'Back up saved nothing: RADE could not read which site the sign-in connected to.')
 $fk.PSObject.Properties.Remove('webError'); Set-Fake $fk
-# R44 E2 (the PFM's Q1 answer, 2026-11-26): opened from a runner copy (the shortcut), the title has no round; the word
-# spot and the Maintenance card show "<display> - <version>".
+# R44 E2 (the PFM's Q1 answer, 2026-11-26): opened from a runner copy (the shortcut), the title has no round; the
+# shortcut is named "<display> - <version>"; engine-v43 L1: the subtitle comes from application.subtitle.
 $appDisplay = 'Sample - Kanon'; $keepVer = $script:app.Version; $script:app.Version = '0.1.0'; $keepStart = $script:startFile
 $script:startFile = Join-Path (Join-Path (Join-Path $Dir 'RADE') 'runners') 'aaaaaaaaaaaa.ps1'; $r1 = Test-RunnerStart
 $script:startFile = ''; $r2 = Test-RunnerStart; $script:startFile = Join-Path $Dir 'other.ps1'; $r3 = Test-RunnerStart
-$dv = Get-AppDisplayVersion; $script:app.Version = ''; $dn = Get-AppDisplayVersion
-Assert-Case 'title and names (R44 E2): a runner copy start is known; a paste or another file is not; "<display> - <version>"' ($r1 -and -not $r2 -and -not $r3 -and
-  $dv -eq 'Sample - Kanon - 0.1.0' -and $dn -eq 'Sample - Kanon')
+$dv = Get-ShortcutName; $appSubtitle = 'Kanon ' + [char]0x2022 + ' Forms'; $sb = Get-AppSubtitle; $appSubtitle = ''; $s0 = Get-AppSubtitle
+Assert-Case 'title and names (R44 E2, L1): a runner copy start is known; a paste or another file is not; "<display> - <version>"; the subtitle' ($r1 -and -not $r2 -and -not $r3 -and
+  $dv -eq 'Sample - Kanon - 0.1.0' -and $sb -eq ('Kanon ' + [char]0x2022 + ' Forms') -and $s0 -eq '')
 $appDisplay = ''; $script:app.Version = $keepVer; $script:startFile = $keepStart

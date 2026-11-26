@@ -128,11 +128,7 @@ try {
   $pin = @($mod | Where-Object { [string]$_.Version -eq '1.12.0' }); if ($pin.Count) { $mod = $pin }
   $null = & { Import-Module PnP.PowerShell -RequiredVersion $mod[0].Version -DisableNameChecking } *>&1
   # R44 E4: STAGE lines let RADE stop a stage that takes too long and name it (Invoke-ChildScript -StageSeconds).
-  'STAGE signin'
-  $signT0 = Get-Date   # the time of the sign-in, with the watch on or off (RADE_SIGNIN_WATCH=0), as in the rights check
-  Start-SignInSize   # E3: the CAC sign-in window opens at about 480 x 360, centered (the block above)
-  try { $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1 } finally { Stop-SignInSize }   # R44 E4: no watch after the sign-in
-  'SIGNIN seconds=' + [int]((Get-Date) - $signT0).TotalSeconds + ' watch=' + $(if ($script:signInWatchOn) { 'on' } else { 'off' })
+  Connect-RadeSite $Site   # engine-v43 S1: STAGE signin, SIGNIN and SIGNIN-WIN lines (the block above)
   # R44 E4: the site check. The connection must be to the given site, else nothing is read (prints no address).
   'STAGE site'
   $script:web = $null
@@ -208,9 +204,8 @@ function Invoke-Backup([string]$Base, [scriptblock]$Tick) {
   $r = Invoke-ChildScript $backupScript ('-Site "' + $site + '" -Folder "' + $dir + '" -Lists "' + ($lists -join '|') + '"') $toolReadSeconds $Tick $toolStageSeconds
   $got = @{}; $res = ''
   foreach ($l in $r.Lines) { if ($l -match '^LIST (\d+) (.+)$') { $got[[int]$Matches[1]] = $Matches[2] } elseif ($l -match '^RESULT (\S+)') { $res = $Matches[1] } }
-  $sign = @($r.Lines | Where-Object { $_ -like 'SIGNIN *' } | Select-Object -First 1)   # R44 E4: the sign-in time, with the watch on or off
-  $signLine = ''; if ($sign.Count -and $sign[0] -match '^SIGNIN seconds=(\d+) watch=(on|off)$') {
-    Add-RunLog ('Back up ' + $sign[0]); $signLine = 'The sign-in took ' + $Matches[1] + ' seconds (sign-in window size: ' + $Matches[2] + ').' }
+  $note = Get-SignInNote 'Back up' $r.Lines   # R44 E4, engine-v43 S2, S3: the sign-in lines in the run log, with the host
+  $signLine = ''; if ($note -match '^SIGNIN seconds=(\d+) watch=(on|off)') { $signLine = 'The sign-in took ' + $Matches[1] + ' seconds (sign-in window size: ' + $Matches[2] + ').' }
   if ($res -ne 'done') { $why = $(switch ($res) { 'no-pnp' { 'the SharePoint tool is not installed' } 'not-connected' { 'the sign-in did not finish' }
         'wrong-site' { 'the sign-in connected to another site than the saved site address' }
         'site-unknown' { 'RADE could not read which site the sign-in connected to' }

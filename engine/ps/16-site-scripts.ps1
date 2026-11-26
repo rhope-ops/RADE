@@ -15,8 +15,8 @@ Runs an embedded child script as a child powershell.exe, the way steps run, and 
 .DESCRIPTION
 No -ExecutionPolicy setting (fleet v2, DEC 3: Group Policy governs). The script is written to the Windows temp folder and
 deleted at the end. With StageSeconds (R44 E4), RADE reads the output while the child runs: a line "STAGE <name>" starts a
-stage, and a stage that runs longer than StageSeconds stops the child; Stage then names it. Without it, the output is
-read at the end (the rights, install record and Restore children).
+stage, a stage that runs longer than StageSeconds stops the child (Stage then names it), and "STAGE none" ends the timed
+stage. Without it, the output is read at the end (the test child of the policy check).
 .PARAMETER Text
 The script text.
 .PARAMETER ArgText
@@ -55,7 +55,8 @@ function Invoke-ChildScript([string]$Text, [string]$ArgText, [int]$Seconds, [scr
     while ($true) {
       while ($rd -and $rd.IsCompleted) {   # the lines that are there now; a STAGE line starts a stage and its time limit
         $l = $rd.Result; if ($null -eq $l) { $rd = $null; break }
-        $got.Add($l); if ($l -match '^STAGE (.+)$') { $stage = $Matches[1].Trim(); $stageEnd = (Get-Date).AddSeconds($StageSeconds) }
+        $got.Add($l); if ($l -match '^STAGE (.+)$') { $stage = $Matches[1].Trim(); $stageEnd = (Get-Date).AddSeconds($StageSeconds)
+          if ($stage -eq 'none') { $stage = '' } }   # "STAGE none": no stage runs (engine-v43)
         $rd = $p.StandardOutput.ReadLineAsync() }
       if ($p.WaitForExit(30)) { break }
       if ($Tick) { & $Tick }
@@ -72,6 +73,32 @@ function Invoke-ChildScript([string]$Text, [string]$ArgText, [int]$Seconds, [scr
   } catch { $res.Why = $_.Exception.GetType().Name }
   finally { $script:child = $null; try { if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force } } catch { $null = $_ } }
   return $res
+}
+# engine-v43 S1 (the PFM, 2026-11-26): the time limit of the sign-in stage of the rights, install record and Restore children
+# (Back up keeps its own stage limit, $toolStageSeconds). A frozen sign-in then ends with its stage named: no force close.
+$signInStageSeconds = 180
+<#
+.SYNOPSIS
+Puts the sign-in lines of a child (SIGNIN, SIGNIN-WIN) into the run log with RADE's host, and gives the short note.
+.DESCRIPTION
+engine-v43 S2, S3: each line goes to the run log as "<name> <line> host=<host>" ($env:RADE_HOST: ise, child, shortcut or
+console; set by part 09). The note is the SIGNIN line with the host, else (a sign-in that did not finish) the last
+SIGNIN-WIN line with the host, else ''.
+.PARAMETER Name
+The child's name in the log (for example "Rights check").
+.PARAMETER Lines
+The child's output lines.
+.OUTPUTS
+The note, or ''.
+#>
+function Get-SignInNote([string]$Name, [object[]]$Lines) {
+  $hostTag = ' host=' + $(if ($env:RADE_HOST) { $env:RADE_HOST } else { 'unknown' })
+  $s = @($Lines | Where-Object { [string]$_ -match '^SIGNIN(-WIN)? ' })
+  foreach ($l in $s) { Add-RunLog ($Name + ' ' + $l + $hostTag) }
+  $done = @($s | Where-Object { [string]$_ -match '^SIGNIN seconds=' } | Select-Object -First 1)
+  if ($done.Count) { return ([string]$done[0] + $hostTag) }
+  if ($s.Count) { return ([string]$s[-1] + $hostTag) }
+  return ''
 }
 # Gives the words for a stage of the Back up child ("signin", "site", "list <n>"). Takes the stage and the list titles.
 function Get-StageText([string]$Stage, [object[]]$Lists) {
@@ -165,6 +192,71 @@ function Stop-SignInSize {
   if (-not $PSCmdlet.ShouldProcess('the sign-in window watch of this process', 'Stop')) { return }
   try { if ('RadeSignIn.Size2' -as [type]) { [RadeSignIn.Size2]::Stop() } } catch { $null = $_ }   # no watch: nothing to stop
 }
+# engine-v43 S2 (the PFM, 2026-11-26: R44 r1 froze at the sign-in with no data): while Connect-PnPOnline runs, a
+# background timer reads the windows of THIS process only, about every second, and prints one line at each change:
+# "SIGNIN-WIN t=<seconds> windows=<visible> owned=<visible with an owner> min=<minimized> size=<largest WxH>
+# hung=<not responding> front=<1 when the foreground window is one of them>". No title, no text, no other process.
+# The parent reads the lines while the child runs (Invoke-ChildScript -StageSeconds), so a frozen sign-in still reports.
+function Start-SignInReport {
+  [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'None')]
+  param()
+  if (-not $PSCmdlet.ShouldProcess('the windows of this process', 'Report their state')) { return }   # -WhatIf: no timer
+  if ($env:OS -ne 'Windows_NT' -and $env:RADE_SIGNIN_TEST -ne '1') { return }   # Windows only (the cloud test compiles it)
+  try {
+    if (-not ('RadeSignIn.Report1' -as [type])) {
+      Add-Type -Namespace RadeSignIn -Name Report1 -ErrorAction Stop -MemberDefinition @"
+public delegate bool WinProc(System.IntPtr h, System.IntPtr l);
+[System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool EnumThreadWindows(uint tid, WinProc f, System.IntPtr l);
+[System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsWindowVisible(System.IntPtr h);
+[System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsIconic(System.IntPtr h);
+[System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsHungAppWindow(System.IntPtr h);
+[System.Runtime.InteropServices.DllImport("user32.dll")] static extern System.IntPtr GetWindow(System.IntPtr h, uint cmd);
+[System.Runtime.InteropServices.DllImport("user32.dll")] static extern System.IntPtr GetForegroundWindow();
+[System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool GetWindowRect(System.IntPtr h, out Rect r);
+[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+public struct Rect { public int L, T, R, B; }
+static System.Threading.Timer timer; static object gate = new object(); static System.DateTime t0; static string last = "";
+static int n, owned, mins, hung, front, bw, bh; static long fg; static WinProc each = Each;
+// Starts the report: one look now, then one every tickMs, until End.
+public static void Begin(int tickMs) { End(false); lock (gate) { t0 = System.DateTime.Now; last = ""; timer = new System.Threading.Timer(Look, null, 0, tickMs); } }
+// Ends the report; with final, one last line (the state at the end).
+public static void End(bool final) { lock (gate) { if (timer != null) { timer.Dispose(); timer = null; } } if (final) { Look(null); } }
+static void Look(object state) {
+  if (!System.Threading.Monitor.TryEnter(gate)) { return; }
+  try { n = 0; owned = 0; mins = 0; hung = 0; front = 0; bw = 0; bh = 0; fg = GetForegroundWindow().ToInt64();
+    using (System.Diagnostics.Process me = System.Diagnostics.Process.GetCurrentProcess()) {
+      foreach (System.Diagnostics.ProcessThread t in me.Threads) { EnumThreadWindows((uint)t.Id, each, System.IntPtr.Zero); } }
+    string s = "windows=" + n + " owned=" + owned + " min=" + mins + " size=" + bw + "x" + bh + " hung=" + hung + " front=" + front;
+    if (s != last || state == null) { last = s; System.Console.Out.WriteLine("SIGNIN-WIN t=" + (int)(System.DateTime.Now - t0).TotalSeconds + " " + s); System.Console.Out.Flush(); } }
+  catch { }
+  finally { System.Threading.Monitor.Exit(gate); } }
+static bool Each(System.IntPtr hw, System.IntPtr l) {
+  if (!IsWindowVisible(hw)) { return true; }
+  n++; if (GetWindow(hw, 4) != System.IntPtr.Zero) { owned++; } if (IsIconic(hw)) { mins++; } if (IsHungAppWindow(hw)) { hung++; } if (hw.ToInt64() == fg) { front = 1; }
+  Rect r; if (GetWindowRect(hw, out r) && (r.R - r.L) * (r.B - r.T) > bw * bh) { bw = r.R - r.L; bh = r.B - r.T; }
+  return true; }
+"@
+    }
+    [RadeSignIn.Report1]::Begin(1000)
+  } catch { $null = $_ }   # no helper: the sign-in goes on without the report
+}
+function Stop-SignInReport {
+  [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'None')]
+  param()
+  if (-not $PSCmdlet.ShouldProcess('the window report of this process', 'Stop')) { return }
+  try { if ('RadeSignIn.Report1' -as [type]) { [RadeSignIn.Report1]::End($true) } } catch { $null = $_ }   # no report: nothing to stop
+}
+# engine-v43 S1: the one sign-in of a child script. Prints "STAGE signin" (the parent stops a stage that runs too long),
+# signs in with the CAC (PnP web login), prints "SIGNIN seconds=<n> watch=<on|off>" and "STAGE none" (no stage runs).
+# Throws when the sign-in fails, as Connect-PnPOnline does. Takes the site address.
+function Connect-RadeSite([string]$Site) {
+  'STAGE signin'
+  $t0 = Get-Date; Start-SignInReport; Start-SignInSize   # E3: the CAC sign-in window opens at about 480 x 360, centered
+  try { $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1 }
+  finally { Stop-SignInSize; Stop-SignInReport }   # R44 E4: no watch after the sign-in
+  'SIGNIN seconds=' + [int]((Get-Date) - $t0).TotalSeconds + ' watch=' + $(if ($script:signInWatchOn) { 'on' } else { 'off' })   # what happened, not what was asked
+  'STAGE none'
+}
 # ---- RADE sign-in window size (end)
 '@
 # Gives a child script's text with the sign-in window size block in place of its marker line. Takes the text; gives back the text.
@@ -181,10 +273,7 @@ try {
   if (-not $mod.Count) { 'RESULT no-pnp'; exit 3 }
   $pin = @($mod | Where-Object { [string]$_.Version -eq '1.12.0' }); if ($pin.Count) { $mod = $pin }   # the tested version first (2.x needs PowerShell 7)
   $null = & { Import-Module PnP.PowerShell -RequiredVersion $mod[0].Version -DisableNameChecking } *>&1
-  $signT0 = Get-Date   # R43 E4: the time of the sign-in, with the watch on or off (RADE_SIGNIN_WATCH=0)
-  Start-SignInSize   # E3: the CAC sign-in window opens at about 480 x 360, centered (the block above)
-  $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1
-  'SIGNIN seconds=' + [int]((Get-Date) - $signT0).TotalSeconds + ' watch=' + $(if ($script:signInWatchOn) { 'on' } else { 'off' })   # what happened, not what was asked
+  Connect-RadeSite $Site   # engine-v43 S1: STAGE, SIGNIN and SIGNIN-WIN lines (the block above)
   $script:web = $null
   $null = & { $script:web = Get-PnPWeb -Includes EffectiveBasePermissions -ErrorAction Stop } *>&1
   $p = $script:web.EffectiveBasePermissions
@@ -251,8 +340,7 @@ try {
   if (-not $mod.Count) { 'RESULT no-pnp'; exit 3 }
   $pin = @($mod | Where-Object { [string]$_.Version -eq '1.12.0' }); if ($pin.Count) { $mod = $pin }
   $null = & { Import-Module PnP.PowerShell -RequiredVersion $mod[0].Version -DisableNameChecking } *>&1
-  Start-SignInSize   # E3: the CAC sign-in window opens at about 480 x 360, centered (the block above)
-  $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1
+  Connect-RadeSite $Site   # engine-v43 S1: STAGE, SIGNIN and SIGNIN-WIN lines (the block above)
   $script:res = 'no-list'
   $null = & {
     $l = Get-PnPList -Identity $MarkerList -ErrorAction Stop

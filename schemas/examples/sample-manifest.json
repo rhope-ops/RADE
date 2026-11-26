@@ -2,6 +2,7 @@
   "_doc": "Fake sample for the RADE manifest schema. No real paths, names or sites.",
   "application": {
     "name": "Sample: Test App",
+    "subtitle": "Sample \u2022 Test subtitle",
     "folder": "SampleApp",
     "prefix": "SAMPLE",
     "repo": "example-org/sample-app",
