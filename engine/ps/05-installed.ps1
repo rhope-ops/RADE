@@ -273,7 +273,7 @@ function Invoke-IseWindow {
   $path = Join-Path ([System.IO.Path]::GetTempPath()) ('@@PREFIX@@-window-' + $buildId + '.ps1')
   try { [System.IO.File]::WriteAllText($path, [string]$script:selfText, (New-Object System.Text.UTF8Encoding $true))
     $env:RADE_FROM_ISE = $path
-    try { $pr = Start-Process -FilePath (Get-PowerShellExe) -ArgumentList ('-NoProfile -STA -WindowStyle Minimized -File "' + $path + '"') -PassThru }
+    try { $pr = Start-Process -FilePath (Get-PowerShellExe) -ArgumentList ('-NoProfile -STA -WindowStyle Hidden -File "' + $path + '"') -PassThru }   # engine-v44: no blank console (the PFM, 2026-11-26)
     finally { Remove-Item -LiteralPath 'Env:RADE_FROM_ISE' -ErrorAction SilentlyContinue }   # the child has its own copy; ISE keeps none
     if ($pr) { $null = $pr.Handle }   # Windows PowerShell 5.1 keeps the exit code only when the handle is held
     # A child that a policy blocks or that fails at once ends within a moment: RADE then stays in ISE (as StartApp does).

@@ -349,33 +349,23 @@ $kids = @(@{ N = 'Back up'; T = $backupScript }, @{ N = 'Restore'; T = $restoreS
 foreach ($c in $kids) { $perr = $null
   $null = [System.Management.Automation.Language.Parser]::ParseInput($c.T, [ref]$null, [ref]$perr)
   Assert-Case ('child script parses: ' + $c.N) (@($perr).Count -eq 0)
-  # E3: each child script that signs in holds the one sign-in window size block (no marker left) and starts it before the sign-in.
-  $sign = $c.T.IndexOf('Start-SignInSize   #'); $conn = $c.T.IndexOf('Connect-PnPOnline -Url')
-  Assert-Case ('sign-in window size block in: ' + $c.N) ($c.T.Contains($signInSize.TrimEnd()) -and -not $c.T.Contains('# <RADE sign-in window size>') -and $sign -gt 0 -and $sign -lt $conn) }
-# E3: the block compiles and its timer starts and stops with no error off Windows (no user32 here: each tick fails quietly).
-$env:RADE_SIGNIN_TEST = '1'; $sbErr = $null
-# Item 10 (follow-ups 2): -WhatIf starts nothing (no helper type yet); -SignInOnly starts too (the app path), and
-# Stop-SignInSize ends the watch (twice: a second stop with no watch is no error).
-try { . ([scriptblock]::Create($signInSize)); $SignInWatchMs = 300; Start-SignInSize -WhatIf; $wiType = [bool]('RadeSignIn.Size2' -as [type])
-  # The timer is read by reflection (no user32 here: -SignInOnly stops at its window list, so the plain start is the one checked).
-  Start-SignInSize; $tf = [RadeSignIn.Size2].GetField('timer', [Reflection.BindingFlags]'NonPublic,Static'); $runs = $null -ne $tf.GetValue($null)
-  Stop-SignInSize; $stopped = $null -eq $tf.GetValue($null); Stop-SignInSize
-  Start-SignInSize; Start-Sleep -Milliseconds 600; Start-SignInSize -SignInOnly; Start-Sleep -Milliseconds 300 } catch { $sbErr = $_ }
-Assert-Case 'sign-in window size: Stop-SignInSize ends the watch (its timer is gone; item 10)' ($null -eq $sbErr -and $runs -and $stopped)
-# R43 E4: RADE_SIGNIN_WATCH=0 starts no watch (no timer, the flag stays off); without it the watch starts and the flag is on.
-$env:RADE_SIGNIN_WATCH = '0'; Start-SignInSize; $offRuns = $null -ne $tf.GetValue($null); $offFlag = $script:signInWatchOn
-$env:RADE_SIGNIN_WATCH = $null; Start-SignInSize; $onFlag = $script:signInWatchOn; Stop-SignInSize
-Assert-Case 'sign-in window size: RADE_SIGNIN_WATCH=0 starts no watch; the flag tells what happened (R43 E4)' (-not $offRuns -and -not $offFlag -and $onFlag)
-$env:RADE_SIGNIN_TEST = $null
-Assert-Case 'sign-in window size: -WhatIf compiles and starts nothing (item 10)' ($null -eq $sbErr -and -not $wiType)
-Assert-Case 'sign-in window size: the helper compiles, starts (also with -SignInOnly) and stops (E3, item 10)' ($null -eq $sbErr -and [bool]('RadeSignIn.Size2' -as [type]) -and
-  $signInSize -match '(?m)^# ---- RADE sign-in window size \(start' -and $signInSize -match '(?m)^# ---- RADE sign-in window size \(end\)' -and $signInSize -notmatch 'EnumWindows\(')
-# R43 E4 (the PFM, 2026-11-25): the rights check gives its sign-in time; RADE_SIGNIN_WATCH=0 turns the window watch off.
+  # E3, engine-v44: each child script that signs in holds the one sign-in block (no marker left) and signs in through it.
+  $conn = $c.T.IndexOf('Connect-RadeSite $Site')
+  Assert-Case ('sign-in block in: ' + $c.N) ($c.T.Contains($signInSize.TrimEnd()) -and -not $c.T.Contains('# <RADE sign-in window size>') -and $conn -gt $c.T.IndexOf('function Connect-RadeSite')) }
+# engine-v44 (the PFM, 2026-11-26): RADE never touches the CAC sign-in window. The block keeps its two marker lines (an
+# app's build finds it by them), has no size watch and no SetWindowPos, and Connect-RadeSite still prints its lines.
+Assert-Case 'sign-in block (engine-v44): the marker lines stay; no size watch, no SetWindowPos, no RADE_SIGNIN_WATCH' (
+  $signInSize -match '(?m)^# ---- RADE sign-in window size \(start' -and $signInSize -match '(?m)^# ---- RADE sign-in window size \(end\)' -and
+  $signInSize -notmatch 'SetWindowPos|function Start-SignInSize|function Stop-SignInSize|RADE_SIGNIN_WATCH|Size2' -and $signInSize -notmatch 'EnumWindows\(')
+$sbErr = $null; $cLines = @()
+try { . ([scriptblock]::Create($signInSize)); function Connect-PnPOnline { [CmdletBinding()] param($Url, [switch]$UseWebLogin) }
+  $cLines = @(Connect-RadeSite 'https://usaf.dps.mil/sites/fake'); Remove-Item Function:\Connect-PnPOnline } catch { $sbErr = $_ }
+Assert-Case 'sign-in block (engine-v44): Connect-RadeSite prints STAGE signin, SIGNIN seconds=N and STAGE none' ($null -eq $sbErr -and
+  @($cLines).Count -eq 3 -and $cLines[0] -eq 'STAGE signin' -and $cLines[1] -match '^SIGNIN seconds=\d+$' -and $cLines[2] -eq 'STAGE none')
+# R43 E4 (the PFM, 2026-11-25): the rights check gives its sign-in time (engine-v44: no watch= part).
 $script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Marker = $null }
-$env:RADE_SIGNIN_TEST = '1'; $sr1 = Get-SiteRightsCheck $base 'https://usaf.dps.mil/sites/fake' $null   # the child compiles and starts the watch here
-$env:RADE_SIGNIN_WATCH = '0'; $sr2 = Get-SiteRightsCheck $base 'https://usaf.dps.mil/sites/fake' $null; $env:RADE_SIGNIN_WATCH = $null; $env:RADE_SIGNIN_TEST = $null
-Assert-Case 'sign-in time: the rights check detail ends with "SIGNIN seconds=N watch=on", and "watch=off" with RADE_SIGNIN_WATCH=0' (
-  [string]$sr1.Detail -match 'SIGNIN seconds=\d+ watch=on host=\S+$' -and [string]$sr2.Detail -match 'SIGNIN seconds=\d+ watch=off host=\S+$')
+$env:RADE_SIGNIN_TEST = '1'; $sr1 = Get-SiteRightsCheck $base 'https://usaf.dps.mil/sites/fake' $null; $env:RADE_SIGNIN_TEST = $null
+Assert-Case 'sign-in time: the rights check detail ends with "SIGNIN seconds=N host=..."' ([string]$sr1.Detail -match 'SIGNIN seconds=\d+ host=\S+$')
 # engine-v43 S1, S2 (the PFM, 2026-11-26): "STAGE none" ends the timed stage; a stage past its limit stops the child and is
 # named; the window report helper compiles (its lines need Windows: here it prints none).
 $st1 = Invoke-ChildScript "'STAGE signin'`r`n'STAGE none'`r`nStart-Sleep -Seconds 3`r`n'RESULT ok'`r`n" '' 60 $null 1
