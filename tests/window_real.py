@@ -51,6 +51,7 @@ RUNS = [
     ("device125-full", 0, "done", "0", "", False),
     ("device175-full", 0, "done", "0", "", False),   # 175 % (tool retirement plan P4a, the Maintainer, 2026-11-23)
     ("device200-full", 0, "done", "0", "", False),
+    ("device150-logo", 0, "done", "0", "956x1081", False),   # engine-v43 L1: an application logo and a subtitle (the 90-161.Z case)
     ("contrast-full", 0, "done", "0", "", False),
 ]
 # Swaps for a "device150-" run: the form's sizes are given at 64 dpi, so Windows Forms scales it by 1.5 on a 96 dpi screen,
@@ -118,10 +119,13 @@ def file_url(p):
     return pathlib.Path(p).resolve().as_uri()
 
 
-def bundle(t, long, keep=None, swaps=()):
+def bundle(t, long, keep=None, swaps=(), logo=False):
     app = t / "app"
     shutil.copytree(ROOT / "tests" / "fixture-app", app)
     m = json.loads((ROOT / "schemas" / "examples" / "sample-manifest.json").read_text(encoding="utf-8"))
+    if logo:   # engine-v43 L1: the application row with its own logo and a subtitle, as 90-161.Z has them
+        shutil.copy(ROOT / "assets" / "logo" / "rho-fulcrum-128.png", app / "app-logo.png")
+        m["application"]["logo"] = "app-logo.png"
     qa = json.loads((ROOT / "tests" / "fixture-app" / "answers.json").read_text(encoding="utf-8"))   # the hand step's questions, as in tests/engine_test.sh
     for st in m["bundles"][0]["steps"]:
         if st["name"] in qa["titles"]:
@@ -298,7 +302,7 @@ def main():
     maint = 0
     for name, app, hand, tour, size, long in RUNS:
         t = pathlib.Path(tempfile.mkdtemp())
-        users = bundle(t, long, home if (shared := name.startswith("deploy-") or name.endswith("-maint")) else None, swaps_for(name))   # -maint: the installed app
+        users = bundle(t, long, home if (shared := name.startswith("deploy-") or name.endswith("-maint")) else None, swaps_for(name), name.endswith("-logo"))   # -maint: the installed app
         d = out / name; d.mkdir(parents=True, exist_ok=True)
         env = dict(os.environ, RADE_T_OUT=str(d), RADE_T_APP=str(app), RADE_T_HAND=hand, RADE_T_TOUR=tour, RADE_T_SIZE=size,
                    USERPROFILE=str(users / "test1234"), RADE_INVENTORY=str(d / "inventory.jsonl"))
