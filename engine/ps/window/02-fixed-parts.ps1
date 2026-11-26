@@ -29,17 +29,23 @@ $ui.Logo = & $ui.LogoPic $logoPng 'RADE logo'; if ($ui.Logo) { [void]$ui.TopRow.
 # One text column of the logo block (L1, the PFM, 2026-11-26): a word (15 pt bold navy), under it a thin line as wide as
 # the word's ink and the subtitle (small, gray), 4 px, 1 px, 4 px ink to ink (L2, 2026-11-19; $ui.FitHead). The word and
 # the subtitle draw their own text ink-tight ($ui.InkText in engine/rade_ui_text.ps1). Takes the word's and the
-# subtitle's screen-reader names; gives back @{ Col; Word; Rule; Sub }.
-$ui.HeadCol = { param([string]$WordName, [string]$SubName)
+# subtitle's screen-reader names, and the screen-reader name of a version text beside the word ('' for none). Name spot
+# L2 (engine-v45; the PFM, 2026-11-26): a column with a version text has a word row (the word, which keeps room for
+# descenders, and the version text, Small gray, on the word's base line; $ui.FitHead), and its line comes under the
+# lowest ink of that row. Gives back @{ Col; Word; Rule; Sub; Ver } (Ver is $null without a version text).
+$ui.HeadCol = { param([string]$WordName, [string]$SubName, [string]$VerName = '')
   $c = New-Object System.Windows.Forms.FlowLayoutPanel
   $c.AutoSize = $true; $c.AutoSizeMode = 'GrowAndShrink'; $c.FlowDirection = 'TopDown'; $c.WrapContents = $false
   $c.Margin = (& $ui.Pad 0 0 0 0); $c.Padding = (& $ui.Pad 0 0 0 0); $c.BackColor = $ui.C.White
-  $w = & $ui.InkText $ui.F.Word $ui.C.Navy $WordName $false; $w.Visible = $true
+  $w = & $ui.InkText $ui.F.Word $ui.C.Navy $WordName ([bool]$VerName); $w.Visible = $true; $v = $null; $top = $w
+  if ($VerName) { $top = & $ui.Flow 0; $top.AutoSizeMode = 'GrowAndShrink'; $top.Visible = $true   # the word row: the word, then the version text
+    $v = & $ui.InkText $ui.F.Small $ui.C.Gray $VerName $true; $v.Margin = (& $ui.Pad $ui.Z.G2 0 0 0); $v.Visible = $true
+    [void]$top.Controls.Add($w); [void]$top.Controls.Add($v) }
   $r = New-Object System.Windows.Forms.Panel
   $r.Size = New-Object System.Drawing.Size(40, 1); $r.BackColor = $ui.C.Edge; $r.Margin = (& $ui.Pad 0 $ui.Z.G1 0 0); $r.Visible = $true
   $s = & $ui.InkText $ui.F.Small $ui.C.Gray $SubName $true; $s.Margin = (& $ui.Pad 0 $ui.Z.G1 0 0); $s.Visible = $true   # a long subtitle: cut with "..."; its widest size follows the window ($ui.Fit)
-  foreach ($x in @($w, $r, $s)) { [void]$c.Controls.Add($x) }
-  @{ Col = $c; Word = $w; Rule = $r; Sub = $s } }
+  foreach ($x in @($top, $r, $s)) { [void]$c.Controls.Add($x) }
+  @{ Col = $c; Word = $w; Rule = $r; Sub = $s; Ver = $v } }
 # The RADE column: the word RADE and, under it at all times, the tagline (L1, the PFM, 2026-11-26: "RADE (new line) Test,
 # deploy, enjoy"; it replaces 2026-11-19, where a chosen application's name took the tagline's place).
 $hc = & $ui.HeadCol 'RADE' 'Test, deploy, enjoy'
@@ -56,8 +62,8 @@ $ui.LinkLine.Size = New-Object System.Drawing.Size(1, 12); $ui.LinkLine.BackColo
 # the height of engine-v42; the Windows job's smallest window had no room for a second row).
 $ui.AppRow = & $ui.LogoRow; $ui.AppRow.Visible = $false
 $ui.AppLogo = & $ui.LogoPic $appLogoPng 'Application logo'; if ($ui.AppLogo) { [void]$ui.AppRow.Controls.Add($ui.AppLogo) }
-$ac = & $ui.HeadCol 'Application' 'Application subtitle'
-$ui.AppCol = $ac.Col; $ui.AppWordL = $ac.Word; $ui.AppRule = $ac.Rule; $ui.AppL = $ac.Sub; [void]$ui.AppRow.Controls.Add($ui.AppCol)
+$ac = & $ui.HeadCol 'Application' 'Application subtitle' 'Application version and round'
+$ui.AppCol = $ac.Col; $ui.AppWordL = $ac.Word; $ui.AppRule = $ac.Rule; $ui.AppL = $ac.Sub; $ui.AppVerL = $ac.Ver; [void]$ui.AppRow.Controls.Add($ui.AppCol)
 foreach ($c in @($ui.TopRow, $ui.LinkLine, $ui.AppRow)) { [void]$ui.Top.Controls.Add($c) }
 $ui.Bottom = New-Object System.Windows.Forms.TableLayoutPanel
 $ui.Bottom.Dock = 'Bottom'; $ui.Bottom.Height = 46; $ui.Bottom.AutoSize = $true; $ui.Bottom.AutoSizeMode = 'GrowAndShrink'; $ui.Bottom.MinimumSize = New-Object System.Drawing.Size(0, 46); $ui.Bottom.ColumnCount = 5; $ui.Bottom.RowCount = 1; $ui.Bottom.Padding = (& $ui.Pad ($ui.Z.Inset - $ui.Z.M) 3 $ui.Z.Inset 3); $ui.Bottom.BackColor = $ui.C.White

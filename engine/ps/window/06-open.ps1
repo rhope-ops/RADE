@@ -99,8 +99,8 @@ $ui.InitSel = { $ui.Sel = @{}; foreach ($k in $script:appSteps) { $ui.Sel[[int]$
 $ui.ShowAppRow = { param([bool]$On)
   if (-not $ui.AppLogo) { $ui.TagL.Text = $(if ($On) { [string]$ui.AppWordL.Text } else { $ui.Tagline }); $On = $false }   # no application logo: the name stands under RADE (one row, the window keeps its height)
   $sub = [bool]($On -and [string]$ui.AppL.Text)   # no subtitle: the name only, with no line under it
-  $ui.AppRule.Visible = $sub; $ui.AppL.Visible = $sub
-  if ($On) { & $ui.InkFit $ui.AppWordL; & $ui.InkFit $ui.AppL }   # before the window has its scale: the next fit sizes them
+  $ui.AppRule.Visible = $sub; $ui.AppL.Visible = $sub; $ui.AppVerL.Visible = [bool]($On -and [string]$ui.AppVerL.Text)   # L2: the version text beside the word
+  if ($On) { & $ui.InkFit $ui.AppWordL; & $ui.InkFit $ui.AppVerL; & $ui.InkFit $ui.AppL }   # before the window has its scale: the next fit sizes them
   $ui.AppRow.Visible = $On; $ui.LinkLine.Visible = ($On -and $ui.Logo -and $ui.AppLogo)
   & $ui.FitHead; if ($ui.AppLogo) { & $ui.AlignRow (& $ui.RowParts 'AppRow') 0 }   # the application column is centered on its logo
   try { $ui.Form.PerformLayout() } catch { $null = $_ }   # no form yet (text mode): nothing to lay out
@@ -111,7 +111,7 @@ $ui.Pick = { param([int]$J)
   Select-App $J; $ui.Picked = $true
   # The base checks are not run twice, except the ones whose answer can change at any time ($checkNoSave: Word open, disk, write).
   foreach ($id in $script:appChecks) { if ($ui.BaseRes.ContainsKey($id) -and $checkNoSave -notcontains $id -and $ui.BaseRes[$id].State -in 'PASSED', 'WARNING') { $script:checkResults[$id] = $ui.BaseRes[$id] } }
-  $ui.AppWordL.Text = [string]$script:app.Name; $ui.AppL.Text = (Get-AppSubtitle); & $ui.ShowAppRow $true   # L1 (the PFM, 2026-11-26): "90-161.Z", under it the subtitle
+  $ui.AppWordL.Text = (Get-AppWord); $ui.AppVerL.Text = (Get-AppVersionText); $ui.AppL.Text = (Get-AppSubtitle); & $ui.ShowAppRow $true   # L2 (the PFM, 2026-11-26): the word ("Kanon"), the version text, under the line the name and the subtitle
   & $ui.InitSel
   $e = $null; if (Test-Deploy) { $e = (Read-Installed (Get-InstalledKey $script:app)) }
   if ($e -and $e.installed) { & $ui.VMaint $e.installed } else { & $ui.Checks $false } }

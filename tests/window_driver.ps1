@@ -215,6 +215,10 @@ function global:Show-RadeR29bRules {
   # R31 L1: the header row at the fixed top and a frame of its minimum height: no defect (also a card that had to move up); a header 30 px low and a frame 40 px short: 2 lines.
   $l1 = @(& $ui.FrameBad 'fixture' @{ Top = 96; WantTop = 96; H = 360; MinH = 360; Moved = $false }) + @(& $ui.FrameBad 'fixture' @{ Top = 0; WantTop = 96; H = 500; MinH = 360; Moved = $true }); $l1no = @(& $ui.FrameBad 'fixture' @{ Top = 126; WantTop = 96; H = 320; MinH = 360; Moved = $false })
   Write-Host ('WIN rule r31 head-ok=' + $l2.Count + ' head-off=' + $l2no.Count + ' above-ok=' + $l3.Count + ' above-off=' + $l3no.Count + ' frame-ok=' + $l1.Count + ' frame-off=' + $l1no.Count + ' ~ ' + (@($l2no) + @($l3no) + @($l1no) -join ' ~ '))
+  # Name spot L2 (the PFM, 2026-11-26): base lines 30 and 31, the word row's ink down to 35 and the line at 39: no defect;
+  # a version 3 px low and ink down to 40 over a line at 39 (the R44 "g"): 2 lines.
+  $vOk = @(& $ui.VerBad 'fixture' @{ WordBase = 30; VerBase = 31; InkBottom = 35; RuleTop = 39 }); $vNo = @(& $ui.VerBad 'fixture' @{ WordBase = 30; VerBase = 33; InkBottom = 40; RuleTop = 39 })
+  Write-Host ('WIN rule l2 ver-ok=' + $vOk.Count + ' ver-off=' + $vNo.Count + ' ~ ' + (@($vNo) -join ' ~ '))
   Write-Host ('WIN rule head=' + $hd.Count + ' tick-ok=' + $tg.Count + ' tick-off=' + $tb.Count + ' ~ ' + (@($hd) + @($tb) -join ' ~ '))
 }
 <#

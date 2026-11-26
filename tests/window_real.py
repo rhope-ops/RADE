@@ -126,6 +126,10 @@ def bundle(t, long, keep=None, swaps=(), logo=False):
     if logo:   # engine-v43 L1: the application row with its own logo and a subtitle, as 90-161.Z has them
         shutil.copy(ROOT / "assets" / "logo" / "rho-fulcrum-128.png", app / "app-logo.png")
         m["application"]["logo"] = "app-logo.png"
+        # engine-v45 name spot L2 (the PFM, 2026-11-26): the 90-161.Z case, with a descender in the round's words ("g").
+        m["application"]["productName"] = "Kanon"
+        m["application"]["subtitle"] = "Publications and Forms Management"
+        m["bundles"][0]["label"] = "sign-in test"
     qa = json.loads((ROOT / "tests" / "fixture-app" / "answers.json").read_text(encoding="utf-8"))   # the hand step's questions, as in tests/engine_test.sh
     for st in m["bundles"][0]["steps"]:
         if st["name"] in qa["titles"]:

@@ -47,6 +47,20 @@ def qx(s):
     return '(' + ' + '.join(parts) + ')'
 
 
+def name_spot(app, b):
+    """Return the bundle lines of the logo block's application row (engine-v45, name spot L2; the PFM, 2026-11-26).
+
+    Args:
+        app: the manifest's application object (productName and subtitle are optional).
+        b: the bundle (label is optional).
+
+    Returns:
+        One text with $appProduct, $appSubtitle and $roundLabel, each an ASCII PowerShell string ('' when not set).
+    """
+    return '\n'.join('$%s = %s' % (k, qx(v)) for k, v in (('appProduct', app.get('productName', '')), ('appSubtitle', app.get('subtitle', '')),
+                                                          ('roundLabel', b.get('label', ''))))
+
+
 def hand_part(s):
     """The fields "hide" and "answersOnly" of a guide step (docs/engine.md "Step contract") as a part of its $steps line.
 
