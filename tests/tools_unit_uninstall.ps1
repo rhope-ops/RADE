@@ -83,11 +83,9 @@ Assert-Case 'remove RADE: nothing outside the RADE folder is touched' (Test-Path
 # ---- Back up stall (engine-v42; 90-161.Z R44 E4): the sign-in time line, the site check and the stage time limit.
 Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake'   # Remove RADE above took RADE\Config, so the site address goes back
 $script:app.Backup = @('Sample Tasks'); $fk = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json
-$env:RADE_SIGNIN_TEST = '1'; Start-Sleep -Seconds 1; $b1 = Invoke-Backup $base $null
-$env:RADE_SIGNIN_WATCH = '0'; Start-Sleep -Seconds 1; $b2 = Invoke-Backup $base $null; $env:RADE_SIGNIN_WATCH = $null; $env:RADE_SIGNIN_TEST = $null
-Assert-Case 'back up (R44 E4): the result gives the sign-in time, watch on, and off with RADE_SIGNIN_WATCH=0' ($b1.State -eq 'done' -and $b2.State -eq 'done' -and
-  ($b1.Lines -join '|') -match 'The sign-in took \d+ seconds \(sign-in window size: on\)\.' -and ($b2.Lines -join '|') -match 'The sign-in took \d+ seconds \(sign-in window size: off\)\.' -and
-  (@($script:runLog) -join '|') -match 'Back up SIGNIN seconds=\d+ watch=off host=')
+$env:RADE_SIGNIN_TEST = '1'; Start-Sleep -Seconds 1; $b1 = Invoke-Backup $base $null; $env:RADE_SIGNIN_TEST = $null
+Assert-Case 'back up (R44 E4, engine-v44): the result gives the sign-in time; the run log has the SIGNIN line with the host' ($b1.State -eq 'done' -and
+  ($b1.Lines -join '|') -match 'The sign-in took \d+ seconds\.' -and (@($script:runLog) -join '|') -match 'Back up SIGNIN seconds=\d+ host=')
 $fk | Add-Member -NotePropertyName webUrl -NotePropertyValue 'https://usaf.dps.mil/sites/other' -Force; Set-Fake $fk
 Start-Sleep -Seconds 1; $b3 = Invoke-Backup $base $null
 Assert-Case 'back up (R44 E4): a sign-in to another site reads nothing and says so' ($b3.State -eq 'failed' -and -not $b3.Path -and

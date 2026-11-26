@@ -57,7 +57,7 @@ function global:Save-RadeUninstall([string]$bp, [string]$nm) {
   & $ui.SetCard @{ View = 'toolrun'; Kicker = 'MAINTENANCE'; Sentence = 'Back up is running.'; P = @('Reads the lists and saves them on this computer. Nothing on the site changes. ' + $ui.SignInHint) }
   Save-RadeCard 'toolrun-backup-hint'
   & $ui.ToolResult 'Back up' @{ State = 'done'; Path = (Join-Path $bp 'Backups\20261126-100000'); Lines = @('All 2 lists were saved.', 'Nothing on the site changed.',
-      'PASS: "Sample Tasks": 2 rows saved', 'PASS: "Sample Recs (Form 1)": 0 rows saved', 'The sign-in took 14 seconds (sign-in window size: on).') }
+      'PASS: "Sample Tasks": 2 rows saved', 'PASS: "Sample Recs (Form 1)": 0 rows saved', 'The sign-in took 14 seconds.') }
   Save-RadeCard 'toolres-backup-signin'
   & $ui.ToolResult 'Back up' @{ State = 'failed'; Path = ''; Lines = @('Back up saved nothing: the sign-in did not finish in 5 minutes, so RADE stopped it.', 'Nothing on the site changed.', 'Select "Back up" again.') }
   Save-RadeCard 'toolres-backup-stage'

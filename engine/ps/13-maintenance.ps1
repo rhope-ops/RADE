@@ -153,7 +153,7 @@ try {
   'RESULT done'; exit 0
 } catch { 'RESULT not-connected ' + $_.Exception.GetType().Name; exit 2 }
 '@
-$backupScript = Add-SignInSize $backupScript   # E3: the sign-in window size block (16-site-scripts.ps1)
+$backupScript = Add-SignInSize $backupScript   # E3: the sign-in block (16-site-scripts.ps1)
 
 # Gives the file name (no extension) of a saved list: its title with any sign a file name cannot hold made "_" (the
 # build allows letters, digits, space, "_", "-", "(" and ")", so this changes nothing today). Takes the list title.
@@ -205,7 +205,7 @@ function Invoke-Backup([string]$Base, [scriptblock]$Tick) {
   $got = @{}; $res = ''
   foreach ($l in $r.Lines) { if ($l -match '^LIST (\d+) (.+)$') { $got[[int]$Matches[1]] = $Matches[2] } elseif ($l -match '^RESULT (\S+)') { $res = $Matches[1] } }
   $note = Get-SignInNote 'Back up' $r.Lines   # R44 E4, engine-v43 S2, S3: the sign-in lines in the run log, with the host
-  $signLine = ''; if ($note -match '^SIGNIN seconds=(\d+) watch=(on|off)') { $signLine = 'The sign-in took ' + $Matches[1] + ' seconds (sign-in window size: ' + $Matches[2] + ').' }
+  $signLine = ''; if ($note -match '^SIGNIN seconds=(\d+)') { $signLine = 'The sign-in took ' + $Matches[1] + ' seconds.' }
   if ($res -ne 'done') { $why = $(switch ($res) { 'no-pnp' { 'the SharePoint tool is not installed' } 'not-connected' { 'the sign-in did not finish' }
         'wrong-site' { 'the sign-in connected to another site than the saved site address' }
         'site-unknown' { 'RADE could not read which site the sign-in connected to' }

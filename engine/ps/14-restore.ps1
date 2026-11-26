@@ -299,4 +299,4 @@ if ($script:mapStop) { 'RESULT map-write-failed'; exit 8 }
 if ($script:stopMake) { 'RESULT reread-failed'; exit 7 }
 'RESULT done'; exit 0
 '@
-$restoreScript = Add-SignInSize $restoreScript   # E3: the sign-in window size block (16-site-scripts.ps1)
+$restoreScript = Add-SignInSize $restoreScript   # E3: the sign-in block (16-site-scripts.ps1)
