@@ -49,7 +49,7 @@ $ui.Hist = Read-RoundHistory (Get-BasePath)
 $script:secret = Get-Secret (Get-ProfileLeaf) (Get-ProfileLeaf)   # saved checks are masked before they are written
 try { $ui.Calm = -not [System.Windows.Forms.SystemInformation]::UIEffectsEnabled } catch { $null = $_ }
 $ui.Form = New-Object System.Windows.Forms.Form
-$ui.Form.Text = 'Redacted Application Deployment Engine' + $dot + 'build ' + $buildId   # the Administrator, 2026-11-19: the full name and the build, no round; the bundle hash stays in the log and the report (docs/specs/bundle-hash.md); the window itself has no title
+$ui.Form.Text = 'RADE - engine-v' + $engineRelease + $(if (Test-RunnerStart) { '' } else { ' - ' + $round })   # from the shortcut: no round; 90-161.Z R44 E2 (the PFM, 2026-11-25): docs/window-design.md "Title bar"
 # The title-bar icon is RADE's logo (Fulcrum everywhere, the PFM, 2026-11-20), drawn at 32 px from the bundle's PNG.
 try {
   $ib = New-Object System.Drawing.Bitmap((New-Object System.IO.MemoryStream(, [System.Convert]::FromBase64String($logoPng))))

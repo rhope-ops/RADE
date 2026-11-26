@@ -1,13 +1,85 @@
 # RADE engine part 16, the site scripts of the checks (moved out of engine/ps/07-checks.ps1 to keep each file at 450
 # lines or fewer; fleet v2 DEC 6): the sign-in window size block ($signInSize, Add-SignInSize), the rights check script
-# ($rightsScript), and the install record on the site (Get-MarkerArg, Get-SiteMark, Test-InstalledHere,
-# Test-FirstInstall, $markerScript). Part 07 runs them (Invoke-Check, Write-SiteMarker); parts 13 and 14 use
-# Add-SignInSize when they load, so this part comes right after part 07.
+# ($rightsScript), Invoke-ChildScript (moved from part 07 in engine-v42), and the install record on the site
+# (Get-MarkerArg, Get-SiteMark, Test-InstalledHere, Test-FirstInstall, $markerScript). Part 07 runs them (Invoke-Check,
+# Write-SiteMarker); parts 13 and 14 use Add-SignInSize when they load, so this part comes right after part 07.
 # Network: none when it loads; the child scripts it holds sign in to the saved site on the DAF SharePoint host (PnP).
-# Writes: none when it loads; $markerScript writes the install record (one row of the app's own list on the site).
+# Writes: none when it loads; Invoke-ChildScript writes each child script to the temp folder and deletes it at the end;
+# $markerScript writes the install record (one row of the app's own list on the site).
 # Credentials: the interactive CAC sign-in of PnP (-UseWebLogin), in the child scripts.
 # Joined into every bundle by engine/rade_build.py, right after part 07; Windows PowerShell 5.1.
 
+<#
+.SYNOPSIS
+Runs an embedded child script as a child powershell.exe, the way steps run, and gives back its exit code and output lines.
+.DESCRIPTION
+No -ExecutionPolicy setting (fleet v2, DEC 3: Group Policy governs). The script is written to the Windows temp folder and
+deleted at the end. With StageSeconds (R44 E4), RADE reads the output while the child runs: a line "STAGE <name>" starts a
+stage, and a stage that runs longer than StageSeconds stops the child; Stage then names it. Without it, the output is
+read at the end (the rights, install record and Restore children).
+.PARAMETER Text
+The script text.
+.PARAMETER ArgText
+The arguments after the script path.
+.PARAMETER Seconds
+The time limit of the whole child.
+.PARAMETER Tick
+A script block called about every 30 ms while the child runs (the window stays live), or $null.
+.PARAMETER StageSeconds
+The time limit of one stage, or 0 for no stage limit.
+.OUTPUTS
+@{ Exit; Lines; Why; Stage }: Stage is the stage that was stopped, or ''.
+#>
+function Invoke-ChildScript([string]$Text, [string]$ArgText, [int]$Seconds, [scriptblock]$Tick, [int]$StageSeconds = 0) {
+  $exe = 'powershell.exe'
+  if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) { $exe = 'pwsh' }
+  $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('@@PREFIX@@-check-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.ps1')
+  $res = @{ Exit = -1; Lines = @(); Why = ''; Stage = '' }
+  try {
+    [System.IO.File]::WriteAllText($tmp, $Text, (New-Object System.Text.UTF8Encoding $true))
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $exe
+    $psi.Arguments = '-NoProfile -File "' + $tmp + '"' + $(if ($ArgText) { ' ' + $ArgText } else { '' })
+    $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
+    # A PowerShell started with -ExecutionPolicy hands that setting to its child processes in this variable (an old RADE
+    # shortcut sets "Bypass"): take only that value out, as Get-StepStartInfo does, else a check would say "ran" where a
+    # step cannot. Any other value a person set stays.
+    if ($psi.EnvironmentVariables['PSExecutionPolicyPreference'] -ceq 'Bypass') { $psi.EnvironmentVariables.Remove('PSExecutionPolicyPreference') }
+    $p = [System.Diagnostics.Process]::Start($psi)
+    $script:child = $p   # Exit stops a check too (review R17)
+    $errTask = $p.StandardError.ReadToEndAsync(); $got = New-Object System.Collections.Generic.List[string]
+    $outTask = $null; $rd = $null
+    if ($StageSeconds -gt 0) { $rd = $p.StandardOutput.ReadLineAsync() } else { $outTask = $p.StandardOutput.ReadToEndAsync() }
+    $deadline = (Get-Date).AddSeconds($Seconds); $stage = ''; $stageEnd = [datetime]::MaxValue
+    while ($true) {
+      while ($rd -and $rd.IsCompleted) {   # the lines that are there now; a STAGE line starts a stage and its time limit
+        $l = $rd.Result; if ($null -eq $l) { $rd = $null; break }
+        $got.Add($l); if ($l -match '^STAGE (.+)$') { $stage = $Matches[1].Trim(); $stageEnd = (Get-Date).AddSeconds($StageSeconds) }
+        $rd = $p.StandardOutput.ReadLineAsync() }
+      if ($p.WaitForExit(30)) { break }
+      if ($Tick) { & $Tick }
+      if ((Get-Date) -gt $deadline) { try { $p.Kill() } catch { $null = $_ }; $res.Why = 'it ran longer than ' + $Seconds + ' seconds'; break }
+      if ($stage -and (Get-Date) -gt $stageEnd) { try { $p.Kill() } catch { $null = $_ }   # it ended already
+        $res.Stage = $stage; $res.Why = 'its stage "' + $stage + '" ran longer than ' + $StageSeconds + ' seconds'; break }
+    }
+    $p.WaitForExit()
+    while ($rd) { $l = $rd.Result; if ($null -eq $l) { break }; $got.Add($l); $rd = $p.StandardOutput.ReadLineAsync() }   # the last lines after the end
+    $res.Exit = $p.ExitCode
+    $all = $(if ($outTask) { @(([string]$outTask.Result) -split "`r?`n") } else { @($got) })
+    $res.Lines = @($all | Where-Object { $_ })
+    if (-not $res.Why -and ([string]$errTask.Result).Trim()) { $res.Why = 'it wrote error output' }
+  } catch { $res.Why = $_.Exception.GetType().Name }
+  finally { $script:child = $null; try { if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force } } catch { $null = $_ } }
+  return $res
+}
+# Gives the words for a stage of the Back up child ("signin", "site", "list <n>"). Takes the stage and the list titles.
+function Get-StageText([string]$Stage, [object[]]$Lists) {
+  if ($Stage -eq 'signin') { return 'the sign-in' }
+  if ($Stage -eq 'site') { return 'the site check' }
+  if ($Stage -match '^list (\d+)$' -and [int]$Matches[1] -ge 1 -and [int]$Matches[1] -le @($Lists).Count) { return ('the read of the list "' + [string]$Lists[[int]$Matches[1] - 1] + '"') }
+  return ('the stage "' + $Stage + '"')
+}
 # E3 (R42 plan; the Owner, 2026-11-21): the one copy of the sign-in window size block. Each child script that signs in
 # holds the line "# <RADE sign-in window size>" in its place; Add-SignInSize puts the block there. An app copies the block
 # (from its start line to its end line) into its own task scripts, so both use the same code.

@@ -54,3 +54,14 @@ if (-not (Test-NiprDevice)) {
 }
 $gui = $true
 try { Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing } catch { $gui = $false; $script:noWindowWhy = 'Windows Forms not available: ' + $_.Exception.Message }
+# R44 E3 (the PFM, 2026-11-25): from Windows PowerShell ISE, the window runs in a child powershell.exe -STA, the host of
+# the shortcut, so both use one dpi path (Get-IseHandoff, Invoke-IseWindow in part 05). If the child cannot run, the
+# window runs in ISE as before, and the ISE console says why.
+if ($gui) {
+  $pol = ''; try { $pol = [string](Get-ExecutionPolicy) } catch { $pol = 'unknown' }
+  $ise = Get-IseHandoff ([string]$Host.Name) $pol
+  if ($ise.Go) { $iseWhy = Invoke-IseWindow
+    if (-not $iseWhy) { Write-Host 'RADE is open in its own window. You can close this ISE tab.'; return }
+    $ise.Why = $iseWhy }
+  if ($ise.Why) { Write-Host ('RADE runs its window in ISE: ' + $ise.Why + '.') }
+}

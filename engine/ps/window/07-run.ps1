@@ -88,7 +88,7 @@ $ui.StartApp = {
 # window callbacks and shows Done, Needs review or Stopped. Takes nothing.
 $ui.Run = {
   $ui.LinkDir = ''; $ui.FieldAsked = $false
-  if ($ui.View -eq 'ready' -and $ui.FieldRow.Visible -and $ui.FieldL.Text -eq 'RADE shortcut in') {   # R29 N8: the folder for the RADE shortcut
+  if ($ui.View -eq 'ready' -and $ui.FieldRow.Visible -and $ui.FieldL.Text -eq 'Shortcut in') {   # R29 N8: the folder for the app's shortcut (the label is the key: 06-open.ps1)
     $d = $ui.Field.Text.Trim().Trim('"')
     if ($d -and -not (Test-Path -LiteralPath $d -PathType Container)) { & $ui.Say1 'That folder was not found. Select "Browse" to choose a folder, or empty the box for no shortcut.'; $script:resume = $null; return }
     $ui.LinkDir = $d; $ui.FieldAsked = $true; if ($d) { Save-ShortcutDir $d } }
@@ -154,7 +154,9 @@ $ui.VDone = {
   $took = Format-Duration ((Get-Date) - $script:roundStart).TotalSeconds
   $ui.Bars['all'].Fill = $(if ($bad) { $ui.C.Blue } else { $ui.C.Green }); & $ui.SetBar 'all' $(if ($bad) { $ui.Bars['all'].Target } else { 1 }) $true
   $mail = $(if ($script:draftMade) { 'An Outlook draft is open with the summary and all result files. Review it, then select Send.' } else { 'The results folder is open and the summary is on the clipboard. Paste it into an e-mail and attach the files.' })
-  $iconNote = ''; if ($dep -and -not $bad) { $null = Save-RunnerCopy; $iconNote = $(if ($ui.FieldAsked -and -not $ui.LinkDir -and (Get-DesktopDir)) { 'The shortcut folder box was empty, so RADE made no shortcut. Open RADE from the RADE page instead.' } else { [string](Add-DesktopIcon ([string]$ui.LinkDir)) }) }   # R28: the runner copy and the desktop shortcut (a deploy that passed)
+  $iconNote = ''; if ($dep -and -not $bad) { $saved = Save-RunnerCopy   # a copy that stays (a higher engine) keeps its shortcut (review of PR 199)
+    $noBox = 'The shortcut folder box was empty, so RADE made no shortcut. Open RADE from the RADE page instead.'   # R28: the runner copy and the shortcut (a deploy that passed)
+    $iconNote = $(if (-not $saved) { '' } elseif ($ui.FieldAsked -and -not $ui.LinkDir -and (Get-DesktopDir)) { $noBox } else { [string](Add-DesktopIcon ([string]$ui.LinkDir)) }) }
   if (-not $bad) {
     $inst = ($dep -and (Get-InstalledText $script:app) -match 'is installed$')
     # Start (R28 fix: after a first install the Done card had no Start button): the checks passed before the install.

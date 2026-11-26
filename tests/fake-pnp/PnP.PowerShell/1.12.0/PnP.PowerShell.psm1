@@ -11,12 +11,16 @@ function Get-FakeState { return (Get-Content -LiteralPath $env:RADE_FAKE_PNP -Ra
 function Save-FakeState($S) { $S | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $env:RADE_FAKE_PNP }
 # The "meta" of a list of the Restore tests, or $null. Takes the state and the list title.
 function Get-FakeMeta($S, [string]$List) { if ($S.meta) { $m = $S.meta.PSObject.Properties[$List]; if ($m) { return $m.Value } }; return $null }
-function Connect-PnPOnline { param([string]$Url, [switch]$UseWebLogin) if ($Url -notlike 'https://usaf.dps.mil/sites/*') { throw 'wrong host' } }
+# R44 E4: "signinSleep" (seconds) makes the sign-in slow (a stage time limit test); "webUrl" is the site the sign-in
+# connected to (default: the address given), for the site check.
+function Connect-PnPOnline { param([string]$Url, [switch]$UseWebLogin) if ($Url -notlike 'https://usaf.dps.mil/sites/*') { throw 'wrong host' }
+  $s = Get-FakeState; if ($s.signinSleep) { Start-Sleep -Seconds ([int]$s.signinSleep) }; $script:fakeUrl = $Url }
 function Get-PnPWeb {
   param([string[]]$Includes)
-  $s = Get-FakeState
+  $s = Get-FakeState; if ($s.webError) { throw 'web read failed' }   # R44 E4: a site check that cannot read the site
   $perm = New-Object psobject | Add-Member -PassThru -MemberType ScriptMethod -Name Has -Value ([scriptblock]::Create('param($k) return ' + $(if ($s.rights) { '$true' } else { '$false' })))
-  return [pscustomobject]@{ EffectiveBasePermissions = $perm; CurrentUser = [pscustomobject]@{ IsSiteAdmin = [bool]$s.admin } }
+  $u = $(if ($s.webUrl) { [string]$s.webUrl } else { [string]$script:fakeUrl })   # R44 E4: the site check reads Url
+  return [pscustomobject]@{ Url = $u; EffectiveBasePermissions = $perm; CurrentUser = [pscustomobject]@{ IsSiteAdmin = [bool]$s.admin } }
 }
 function Get-PnPList { param([string]$Identity, [string[]]$Includes)
   $s = Get-FakeState

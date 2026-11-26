@@ -825,6 +825,11 @@
           "pattern": "^https://",
           "description": "The app's bookmark page, named in the repository check."
         },
+        "displayName": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9]([A-Za-z0-9 ._-]{0,58}[A-Za-z0-9])?$",
+          "description": "Optional (engine-v42; 90-161.Z R44 E2, the PFM, 2026-11-25). The name a person sees for the installed app, for example \"90-161.Z - Kanon\". The shortcut is named \"<displayName> - <version>\". Without it, the app name is used. The app name (apps \"name\") stays the install key, the folder name and the Uninstall confirm text. Letters, digits, spaces, \".\", \"_\" and \"-\" only, so it is a valid file name."
+        },
         "logo": {
           "type": "string",
           "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9_./-]+\\.png$",

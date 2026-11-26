@@ -109,7 +109,7 @@ $ui.Pick = { param([int]$J)
   Select-App $J; $ui.Picked = $true
   # The base checks are not run twice, except the ones whose answer can change at any time ($checkNoSave: Word open, disk, write).
   foreach ($id in $script:appChecks) { if ($ui.BaseRes.ContainsKey($id) -and $checkNoSave -notcontains $id -and $ui.BaseRes[$id].State -in 'PASSED', 'WARNING') { $script:checkResults[$id] = $ui.BaseRes[$id] } }
-  $ui.AppL.Text = $script:app.Name + $(if ($script:app.Version) { ' ' + $script:app.Version } else { '' }); & $ui.ShowAppRow $true
+  $ui.AppL.Text = (Get-AppDisplayVersion); & $ui.ShowAppRow $true   # R44 E2: "90-161.Z - Kanon - 0.1.0" (application.displayName)
   & $ui.InitSel
   $e = $null; if (Test-Deploy) { $e = (Read-Installed (Get-InstalledKey $script:app)) }
   if ($e -and $e.installed) { & $ui.VMaint $e.installed } else { & $ui.Checks $false } }
@@ -129,7 +129,7 @@ $ui.VMaint = { param($Inst)
   # Uninstall (engine-v40): dark red and on for an app with Uninstall steps, else not available (answer 4A).
   $ui.UninstallB = $(if (@($script:app.Uninstall).Count) { @{ Text = 'Uninstall'; Kind = 'danger'; Act = { & $ui.VUninstall } } } else { @{ Text = 'Uninstall'; Kind = 'dangeroff' } })
   $ui.MaintVerb = $verb   # read when the button is clicked (a scriptblock does not keep this card's local variables)
-  & $ui.SetCard @{ View = 'maint'; Kicker = ($script:app.Name + ' ' + $Inst.version + $on); Sentence = 'Maintenance'
+  & $ui.SetCard @{ View = 'maint'; Kicker = ((Get-AppDisplay) + ' - ' + $Inst.version + $on); Sentence = 'Maintenance'
     P = @(('Maintenance holds ' + $verb + ', Diagnose, Back up and Restore.'), $(if ($startB) { 'Start runs the checks, then opens ' + $script:app.Name + '.' } else { '' }))
     Note = $(if (@($script:app.Uninstall).Count) { '' } else { $script:app.Name + ' has no Uninstall steps.' })   # answer 4A of the PFM (2026-11-25)
     Buttons = @($ui.UninstallB, $startB, @{ Text = 'Maintenance'; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.VTools $ui.MaintVerb } })   # Uninstall first: away from the primary   # B5: 1 primary + 3 others at most
@@ -277,12 +277,12 @@ $ui.VReady = {
     Buttons = @($resB, $startB, $runB,   # B7: Details is the link "Details (F2)"; B4: one primary (Resume when it shows)
       $(if ($siteName) { @{ Text = 'Change the site address'; Act = { & $ui.VSite } } } else { $null }))
     Foot = $(if ($siteName) { 'Site: ' + $siteName } else { '' })
-    Field = $(if ($dep -and -not (Test-ShortcutMade)) { @{ Label = 'RADE shortcut in'; Text = (Get-ShortcutDir); Name = 'Folder for the RADE shortcut'; Button = 'Browse'; Act = { & $ui.BrowseDir } } } else { $null })
+    Field = $(if ($dep -and -not (Test-ShortcutMade)) { @{ Label = 'Shortcut in'; Text = (Get-ShortcutDir); Name = 'Folder for the shortcut'; Button = 'Browse'; Act = { & $ui.BrowseDir } } } else { $null })
     Back = { & $ui.VChoose } }
   if ($ui.StartAfter) { $ui.StartAfter = $false; if ($startB) { & $ui.StartApp } else { & $ui.Say1 ('The checks passed, but ' + $script:app.Name + ' cannot be started: it is not recorded as installed, or its start file was not found. Select "Install" to install it again.') } } }   # Start on Maintenance: the checks passed, so the application starts
-# R29 N8 (the PFM, 17 Nov 26): the install asks where the RADE shortcut goes; the box starts with the Desktop folder.
+# R29 N8 (the PFM, 17 Nov 26): the install asks where the app's shortcut goes (engine-v42: one for each app); the box starts with the Desktop folder.
 $ui.BrowseDir = {
   $pick = New-Object System.Windows.Forms.FolderBrowserDialog
-  try { $pick.Description = 'Choose the folder for the RADE shortcut.'; $pick.ShowNewFolderButton = $true; $v = $ui.Field.Text.Trim(); if ($v -and (Test-Path -LiteralPath $v -PathType Container)) { $pick.SelectedPath = $v }
+  try { $pick.Description = 'Choose the folder for the shortcut.'; $pick.ShowNewFolderButton = $true; $v = $ui.Field.Text.Trim(); if ($v -and (Test-Path -LiteralPath $v -PathType Container)) { $pick.SelectedPath = $v }
     if ([string]$pick.ShowDialog($ui.Form) -eq 'OK') { $ui.Field.Text = [string]$pick.SelectedPath } } catch { & $ui.Say1 'The folder window could not open. Type the folder in the box.' } finally { $pick.Dispose() } }
 

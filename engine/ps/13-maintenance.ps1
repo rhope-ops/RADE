@@ -12,6 +12,8 @@
 # Time limit of a child script that signs in and reads every named list, in seconds (Back up and the Restore dry run;
 # the Administrator's lists are small, so it is generous).
 $toolReadSeconds = 1800
+# R44 E4 (R43: Back up stopped after a sign-in window): the time limit of one stage (sign-in, site check, one list), in seconds.
+$toolStageSeconds = 300
 
 # Gives the time stamp of a report or a backup folder (sortable, no colons). Takes nothing.
 function Get-ToolStamp { return (Get-Date).ToString('yyyyMMdd-HHmmss', [System.Globalization.CultureInfo]::InvariantCulture) }
@@ -43,9 +45,9 @@ function Get-DiagnoseInstall {
   $st = [string]$script:app.Start
   if ($st) { if (Get-StartPath) { $out += ConvertTo-ToolLine 'PASS' ('The start script ' + $st + ' is in the app folder') '' }
     else { $out += ConvertTo-ToolLine 'FINDING' ('The start script ' + $st + ' is missing from the app folder') ($repair + ': it puts the file back') } }
-  $rp = Join-Path (Get-RadePath) 'rade-runner.ps1'
-  if (Test-Path -LiteralPath $rp -PathType Leaf) { $out += ConvertTo-ToolLine 'PASS' 'The RADE runner copy is saved' '' }
-  else { $out += ConvertTo-ToolLine 'NOTE' 'The RADE runner copy is not saved, so the desktop shortcut cannot start RADE' $repair }
+  $rp = Get-RunnerPath   # engine-v42: the app's own runner copy, RADE\runners\<key>.ps1
+  if (Test-Path -LiteralPath $rp -PathType Leaf) { $out += ConvertTo-ToolLine 'PASS' 'The RADE runner copy of this app is saved' '' }
+  else { $out += ConvertTo-ToolLine 'NOTE' 'The RADE runner copy of this app is not saved, so its shortcut cannot start RADE' $repair }
   return $out
 }
 
@@ -125,11 +127,21 @@ try {
   if (-not $mod.Count) { 'RESULT no-pnp'; exit 3 }
   $pin = @($mod | Where-Object { [string]$_.Version -eq '1.12.0' }); if ($pin.Count) { $mod = $pin }
   $null = & { Import-Module PnP.PowerShell -RequiredVersion $mod[0].Version -DisableNameChecking } *>&1
+  # R44 E4: STAGE lines let RADE stop a stage that takes too long and name it (Invoke-ChildScript -StageSeconds).
+  'STAGE signin'
+  $signT0 = Get-Date   # the time of the sign-in, with the watch on or off (RADE_SIGNIN_WATCH=0), as in the rights check
   Start-SignInSize   # E3: the CAC sign-in window opens at about 480 x 360, centered (the block above)
-  $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1
+  try { $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1 } finally { Stop-SignInSize }   # R44 E4: no watch after the sign-in
+  'SIGNIN seconds=' + [int]((Get-Date) - $signT0).TotalSeconds + ' watch=' + $(if ($script:signInWatchOn) { 'on' } else { 'off' })
+  # R44 E4: the site check. The connection must be to the given site, else nothing is read (prints no address).
+  'STAGE site'
+  $script:web = $null
+  try { $null = & { $script:web = Get-PnPWeb -ErrorAction Stop } *>&1; $u = [string]$script:web.Url } catch { 'RESULT site-unknown ' + $_.Exception.GetType().Name; exit 5 }
+  if ($u.TrimEnd('/').ToLowerInvariant() -ne $Site.Trim().TrimEnd('/').ToLowerInvariant()) { 'RESULT wrong-site'; exit 4 }
   $i = 0
   foreach ($name in ($Lists -split '\|')) {
     $i++
+    'STAGE list ' + $i
     try {
       $script:items = @()
       $null = & { $script:items = @(Get-PnPListItem -List $name -PageSize 500 -ErrorAction Stop) } *>&1
@@ -193,13 +205,19 @@ function Invoke-Backup([string]$Base, [scriptblock]$Tick) {
     return @{ State = 'no-site'; Path = ''; Lines = @('No site address is saved, so Back up did not sign in.', 'Select "Repair": its checks ask for the site address.') } }
   $dir = Get-NewBackupDir $Base (Get-ToolStamp)   # always a new folder: a failed run removes only this one
   if (-not $dir) { return @{ State = 'failed'; Path = ''; Lines = @('Back up could not make its folder on this computer.') } }
-  $r = Invoke-ChildScript $backupScript ('-Site "' + $site + '" -Folder "' + $dir + '" -Lists "' + ($lists -join '|') + '"') $toolReadSeconds $Tick
+  $r = Invoke-ChildScript $backupScript ('-Site "' + $site + '" -Folder "' + $dir + '" -Lists "' + ($lists -join '|') + '"') $toolReadSeconds $Tick $toolStageSeconds
   $got = @{}; $res = ''
   foreach ($l in $r.Lines) { if ($l -match '^LIST (\d+) (.+)$') { $got[[int]$Matches[1]] = $Matches[2] } elseif ($l -match '^RESULT (\S+)') { $res = $Matches[1] } }
-  if ($res -ne 'done') { $why = $(switch ($res) { 'no-pnp' { 'the SharePoint tool is not installed' } 'not-connected' { 'the sign-in did not finish' } default { 'it stopped: ' + $r.Why } })
+  $sign = @($r.Lines | Where-Object { $_ -like 'SIGNIN *' } | Select-Object -First 1)   # R44 E4: the sign-in time, with the watch on or off
+  $signLine = ''; if ($sign.Count -and $sign[0] -match '^SIGNIN seconds=(\d+) watch=(on|off)$') {
+    Add-RunLog ('Back up ' + $sign[0]); $signLine = 'The sign-in took ' + $Matches[1] + ' seconds (sign-in window size: ' + $Matches[2] + ').' }
+  if ($res -ne 'done') { $why = $(switch ($res) { 'no-pnp' { 'the SharePoint tool is not installed' } 'not-connected' { 'the sign-in did not finish' }
+        'wrong-site' { 'the sign-in connected to another site than the saved site address' }
+        'site-unknown' { 'RADE could not read which site the sign-in connected to' }
+        default { $(if ($r.Stage) { (Get-StageText $r.Stage $lists) + ' did not finish in ' + [int]($toolStageSeconds / 60) + ' minutes, so RADE stopped it' } else { 'it stopped: ' + $r.Why }) } })
     $gone = Clear-BackupDir $dir
     $left = $(if ($gone) { 'Nothing on the site changed.' } else { 'Nothing on the site changed. Its unfinished folder stays: ' + (ConvertTo-Masked $dir) })
-    return @{ State = 'failed'; Path = ''; Lines = @(('Back up saved nothing: ' + $why + '.'), $left, 'Select "Back up" again.') } }
+    return @{ State = 'failed'; Path = ''; Lines = @(@(('Back up saved nothing: ' + $why + '.'), $left, 'Select "Back up" again.') + @($signLine | Where-Object { $_ })) } }
   $lines = @(); $bad = 0
   for ($i = 1; $i -le $lists.Count; $i++) {
     $n = [string]$lists[$i - 1]; $v = [string]$got[$i]; $ok = $false
@@ -209,7 +227,7 @@ function Invoke-Backup([string]$Base, [scriptblock]$Tick) {
     $lines += ('FINDING: "' + $n + '" was not saved' + $ty + '. What to do: check that the list exists and that you can read it, then select "Back up" again')
   }
   $head = $(if ($bad) { [string]$bad + ' of ' + $lists.Count + ' lists were not saved.' } else { 'All ' + $lists.Count + ' lists were saved.' })
-  return @{ State = $(if ($bad) { 'failed' } else { 'done' }); Path = $dir; Lines = @(@($head, 'Nothing on the site changed.') + $lines) }
+  return @{ State = $(if ($bad) { 'failed' } else { 'done' }); Path = $dir; Lines = @(@($head, 'Nothing on the site changed.') + $lines + @($signLine | Where-Object { $_ })) }
 }
 
 # ---- Uninstall (engine-v40; 90-161.Z R43 E3, the PFM, 2026-11-25; docs/engine.md "Maintenance run types"). RADE gives
@@ -354,6 +372,7 @@ function Invoke-Uninstall([string]$Base, [scriptblock]$Tick, [scriptblock]$OnSte
 # ---- Remove RADE from this computer (engine-v40; 90-161.Z R43 E3 b, the PFM, 2026-11-25: option A, "block"). Off while
 # any app is installed: the card names those apps. Then RADE's own local files go to the Recycle Bin: RADE\Config,
 # RADE\rade-runner.ps1, the RADE shortcut that starts that runner, and in each app folder everything but Backups.
+# engine-v42: also each app's shortcut that RADE recorded (RADE\runners\<key>.lnk.txt) and the runners folder.
 
 # Gives the names of the apps that this computer's records show as installed (any paste, any engine). A record that
 # cannot be read counts too: RADE cannot tell, so it blocks. Takes nothing; gives back the names (sorted, unique).
@@ -398,8 +417,8 @@ function Get-RadeAppDir {
 .SYNOPSIS
 Remove RADE from this computer: moves RADE's own local files to the Recycle Bin, when no app is installed.
 .DESCRIPTION
-Order: the RADE shortcut (only one that starts RADE's own runner; its folder is read from Config first), each app
-folder's items except Backups, the runner, then RADE\Config. Writes nothing on a site. A file that cannot move is named;
+Order: the RADE shortcut (only one that starts RADE's own runner; its folder is read from Config first), each app's
+shortcut (engine-v42), each app folder's items except Backups, the runner, RADE\runners, then RADE\Config. Writes nothing on a site. A file that cannot move is named;
 the rest still goes.
 .OUTPUTS
 @{ State; Lines; Path }: State is blocked, done or review; Path is ''.
@@ -412,9 +431,15 @@ function Invoke-RemoveRade {
   if ($lnk -and (Test-Path -LiteralPath $lnk -PathType Leaf)) {   # only RADE's own shortcut: it starts the runner
     try { $arg = [string](New-Object -ComObject WScript.Shell).CreateShortcut($lnk).Arguments
       if ($arg.Contains('"' + $runner + '"')) { $items += @{ P = $lnk; F = $false; N = 'the RADE shortcut' } } } catch { $null = $_ } }   # a shortcut it cannot read is not RADE's: it stays
+  $rd = Join-Path $root 'runners'   # engine-v42: each app's shortcut, only one that starts a runner in this folder
+  foreach ($r in @(Get-ChildItem -LiteralPath $rd -File -Filter '*.lnk.txt' -ErrorAction SilentlyContinue)) {
+    try { $l = ([string](Get-Content -LiteralPath $r.FullName -TotalCount 1)).Trim()
+      if ($l -and (Test-Path -LiteralPath $l -PathType Leaf) -and ([string](New-Object -ComObject WScript.Shell).CreateShortcut($l).Arguments).Contains('"' + $rd + '\')) {
+        $items += @{ P = $l; F = $false; N = ('the shortcut ' + (Split-Path -Leaf $l)) } } } catch { $null = $_ } }   # a shortcut it cannot read is not RADE's: it stays
   foreach ($d in @(Get-RadeAppDir)) { foreach ($c in @(Get-ChildItem -LiteralPath $d -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'Backups' })) {
       $items += @{ P = $c.FullName; F = [bool]$c.PSIsContainer; N = ((Split-Path -Leaf $d) + '\' + $c.Name) } } }
   if (Test-Path -LiteralPath $runner -PathType Leaf) { $items += @{ P = $runner; F = $false; N = 'the RADE runner' } }
+  if (Test-Path -LiteralPath $rd -PathType Container) { $items += @{ P = $rd; F = $true; N = 'RADE\runners' } }
   $cfg = Join-Path $root 'Config'; if (Test-Path -LiteralPath $cfg -PathType Container) { $items += @{ P = $cfg; F = $true; N = 'RADE\Config' } }
   foreach ($i in $items) { try { Move-ToRecycleBin $i.P -Folder:$i.F } catch { $bad += ('Not moved: ' + $i.N + ' [' + $_.Exception.GetType().Name + ']') } }
   $head = $(if ($bad.Count) { [string]$bad.Count + ' of ' + $items.Count + ' items did not move to the Recycle Bin.' } else { [string]$items.Count + ' items are in the Recycle Bin.' })
