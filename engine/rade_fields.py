@@ -19,6 +19,34 @@ def q(s):
     return "'" + s.replace("'", "''") + "'"
 
 
+def qx(s):
+    """Return `s` as a PowerShell string expression with ASCII text only (a bundle is ASCII; engine-v43 L1, the
+    subtitle "Kanon <bullet> ...").
+
+    Args:
+        s: the text; it may hold characters above 127.
+
+    Returns:
+        q(s) for plain ASCII; else a parenthesized sum of quoted ASCII runs and [string][char]0xNNNN parts.
+    """
+    if all(ord(c) < 128 for c in s):
+        return q(s)
+    parts, run = [], ''
+    for c in s:
+        if ord(c) < 128:
+            run += c
+            continue
+        if run:
+            parts.append(q(run))
+            run = ''
+        o = ord(c)
+        units = [o] if o < 0x10000 else [0xD800 + ((o - 0x10000) >> 10), 0xDC00 + ((o - 0x10000) & 0x3FF)]   # UTF-16, as .NET strings hold it
+        parts.extend('[string][char]0x%04X' % u for u in units)
+    if run:
+        parts.append(q(run))
+    return '(' + ' + '.join(parts) + ')'
+
+
 def hand_part(s):
     """The fields "hide" and "answersOnly" of a guide step (docs/engine.md "Step contract") as a part of its $steps line.
 

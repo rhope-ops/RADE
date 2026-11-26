@@ -41,8 +41,8 @@ $ui = @{ View = ''; Running = $false; Busy = $false; RecOn = $false; Edit = $fal
   Log = (New-Object System.Collections.Generic.List[string]); Summary = @(); Sel = @{}; Clean = $true; StepState = @{}; Plan = $null; Picked = $false
   BaseIds = @(); BaseRes = @{}; Blocked = @{}; Newer = @{}; Bars = @{}; G = $null; GUrl = ''; CurId = ''; StepI = 0; StepN = 0; StepNow = ''; BusyShown = $false; Always = @($false, $false, $false, $false, $false, $false); NB = 6; StartAfter = $false; Cancel = $false; Dpi = 96.0; ScreenDpi = 96.0; FontK = 1.0; FontDpi = 96.0; Scaled = $false; Full = @{}; Clock = [System.Diagnostics.Stopwatch]::StartNew(); CardAt = -1000000.0; GuardMs = 400; Calm = $false; ContentW = 780 }
 $ui.OpenedAt = (Get-Date).AddSeconds(-1)   # E4: the SCALE lines of the RADE windows shown from this time on go into the round's results
-# The tagline (the Administrator, 2026-11-19): shown where the application's name shows, until an application is chosen.
-$ui.Tagline = 'Test, deploy, enjoy.'
+# The tagline (the Administrator, 2026-11-19; L1, the PFM, 2026-11-26: no period, and always under the word RADE).
+$ui.Tagline = 'Test, deploy, enjoy'
 # Layout values from engine/window.json, put in by the build (text column share and cap, minimum window size, minimum height of the card frame; pixels at 100 %; the minimum time of a step on the Run card, ms).
 $ui.Layout = @{ Share = [double]'@@TEXT_SHARE@@'; MaxW = [int]'@@TEXT_MAX@@'; MinW = [int]'@@MIN_W@@'; MinH = [int]'@@MIN_H@@'; FrameMin = [int]'@@FRAME_MIN@@'; StepMs = [int]'@@MIN_STEP_MS@@' }
 $ui.Hist = Read-RoundHistory (Get-BasePath)

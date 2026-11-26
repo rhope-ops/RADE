@@ -27,29 +27,36 @@ $ui.FitEdges = { try {
 # margins share those 8 px (left = 8 - the ink of its first letter). Takes nothing; uses $ui.EdgeX.
 $ui.FitStepEdge = { $sd = & $ui.Sc 8; & $ui.SetLeft $ui.StepRow ([int]$ui.EdgeX - $sd); $il = [int][math]::Max(0, [math]::Min($sd, $sd - (& $ui.Ink $ui.StepName))); $m = $ui.StepName.Margin
   if ($m.Left -ne $il -or $m.Right -ne $sd - $il) { $ui.StepName.Margin = New-Object System.Windows.Forms.Padding($il, $m.Top, ($sd - $il), $m.Bottom) } }
-# R29b V1: the word RADE and the application name under it start their ink on one edge. Each sits at the same x in its row
-# (after a 64 px logo and its 12 px gap, or at 0) and draws its text ink-tight ($ui.InkText); what is left of a difference
-# (measured) moves each to the larger of the two. Takes nothing; changes the left margins of $ui.WordL, $ui.AppL and
-# $ui.HeadRule, and the width of $ui.HeadRule.
+# R29b V1, L1 (the PFM, 2026-11-26): in each column of the logo block the word and its subtitle start their ink on one
+# edge, and when both rows start at the same x (both logos, or neither) the two columns share that edge. Each part sits at
+# the same x in its row and draws its text ink-tight ($ui.InkText); what is left of a difference (measured) moves each
+# to the largest. L2: the line under a word is as wide as the word's ink and starts where it starts. Takes nothing;
+# changes the left margins of the words, the lines and the subtitles, and the widths of the lines.
 $ui.FitHead = { try {
-    if (-not (& $ui.HeadPair)) { & $ui.SetLeft $ui.WordL 0; & $ui.SetLeft $ui.AppL 0; return }
-    $iw = & $ui.Ink $ui.WordL; $ia = & $ui.Ink $ui.AppL; $e = [math]::Max($iw, $ia)
-    & $ui.SetLeft $ui.WordL ($e - $iw); & $ui.SetLeft $ui.AppL ($e - $ia)
-    # L2: the line under the word is as wide as the word's ink and starts where it starts.
-    # R34: the width comes from the ink Windows drew in the panel ($ui.InkBox, the measure of the self-check), not from the
-    # panel's width: at 150 % in ISE the panel was 114 wide and the drawn word 93 (each card had the defect).
-    if ($ui.AppUnder) { & $ui.SetLeft $ui.HeadRule $e; $rw = & $ui.RuleW; if ($ui.HeadRule.Width -ne $rw) { $ui.HeadRule.Width = $rw } } } catch { $null = $_ } }   # no measure (no window handle yet): the next fit sets the edges
-# The width of the line under the word RADE: the width of the word's drawn ink, measured once for each text, font and
-# panel size. Takes nothing; gives back the width in pixels (at least 1).
-$ui.RuleW = { $w = $ui.WordL; $f = $w.Font; $k = 'rule|' + [string]$w.Text + '|' + $f.Name + '|' + $f.SizeInPoints + '|' + $w.Width + 'x' + $w.Height
+    $cols = @(& $ui.HeadCols); $same = & $ui.HeadPair; $all = @()
+    foreach ($c in $cols) { $c.IW = & $ui.Ink $c.W; $c.IS = $(if ($c.Sub) { & $ui.Ink $c.S } else { 0 }); $c.E = [math]::Max($c.IW, $c.IS); $all += $c.E }
+    $top = [int]($all | Measure-Object -Maximum).Maximum
+    foreach ($c in $cols) { $e = $(if ($same) { $top } else { $c.E })
+      & $ui.SetLeft $c.W ($e - $c.IW); if ($c.Sub) { & $ui.SetLeft $c.S ($e - $c.IS) }
+      # R34: the width comes from the ink Windows drew in the panel ($ui.InkBox, the measure of the self-check), not from the
+      # panel's width: at 150 % in ISE the panel was 114 wide and the drawn word 93 (each card had the defect).
+      & $ui.SetLeft $c.R $e; $rw = & $ui.RuleW $c.W; if ($c.R.Width -ne $rw) { $c.R.Width = $rw } } } catch { $null = $_ } }   # no measure (no window handle yet): the next fit sets the edges
+# The columns of the logo block that show: the RADE column, and the application column when its row shows. Each is
+# @{ W (word); R (line); S (subtitle); Sub (the subtitle shows) }. Takes nothing.
+$ui.HeadCols = { $o = @(@{ W = $ui.WordL; R = $ui.HeadRule; S = $ui.TagL; Sub = $true })
+  if ($ui.AppRow.Visible) { $o += @{ W = $ui.AppWordL; R = $ui.AppRule; S = $ui.AppL; Sub = [bool]($ui.AppL.Visible -and [string]$ui.AppL.Text) } }
+  $o }
+# The width of the line under a word: the width of the word's drawn ink, measured once for each text, font and panel
+# size. Takes the word's panel; gives back the width in pixels (at least 1).
+$ui.RuleW = { param($W) $f = $W.Font; $k = 'rule|' + [string]$W.Text + '|' + $f.Name + '|' + $f.SizeInPoints + '|' + $W.Width + 'x' + $W.Height
   if ($ui.Inks.ContainsKey($k)) { return [int]$ui.Inks[$k] }
-  $b = & $ui.InkBox $w; $v = [math]::Max(1, [int]$b.Right - [int]$b.Left)
-  $all = ([int]$b.Left -eq 0 -and [int]$b.Top -eq 0 -and [int]$b.Right -eq [int]$w.Width -and [int]$b.Bottom -eq [int]$w.Height)
+  $b = & $ui.InkBox $W; $v = [math]::Max(1, [int]$b.Right - [int]$b.Left)
+  $all = ([int]$b.Left -eq 0 -and [int]$b.Top -eq 0 -and [int]$b.Right -eq [int]$W.Width -and [int]$b.Bottom -eq [int]$W.Height)
   if (-not $all) { $ui.Inks[$k] = $v }   # only a measure is kept (review of PR 123: also when the ink is as wide as the panel); the whole box is the fallback
   return $v }   # no measure (no window handle yet): the next fit sets the edges
-# Whether the header shows the application name on the edge of the word RADE: the name has text and shows, and both rows
-# start at the same x (both logos, or no application logo). Takes nothing; gives back $true or $false.
-$ui.HeadPair = { [bool]([string]$ui.AppL.Text -and $(if ($ui.AppUnder) { $ui.AppL.Visible } else { $ui.AppRow.Visible }) -and ($ui.AppUnder -or $ui.Logo)) }
+# Whether the application row shows and starts its text at the same x as the RADE row (both logos, or neither), so both
+# columns share one edge. Takes nothing; gives back $true or $false.
+$ui.HeadPair = { [bool]($ui.AppRow.Visible -and ([bool]$ui.Logo -eq [bool]$ui.AppLogo)) }
 # The x of a control inside one of its parents (the sum of the lefts on the way up). Takes the control and the parent;
 # gives back the pixels.
 $ui.LeftIn = { param($C, $P) $x = 0; $c = $C; while ($c -and -not [object]::ReferenceEquals($c, $P)) { $x += [int]$c.Left; $c = $c.Parent }; $x }
@@ -87,11 +94,11 @@ $ui.AlignRow = { param($Parts, [int]$Base)
     for ($i = 0; $i -lt $Parts.Count; $i++) { $m = $Parts[$i].Margin; $t = $Base + [int][math]::Floor(($hh - $hs[$i]) / 2); $b = $Base + $hh - $hs[$i] - ($t - $Base)
       if ($m.Top -ne $t -or $m.Bottom -ne $b) { $Parts[$i].Margin = New-Object System.Windows.Forms.Padding($m.Left, $t, $m.Right, $b) } } } catch { $null = $_ } }
 # Returns the controls of one aligned row (Top, FieldRow, ...). Takes the row name.
-$ui.RowParts = { param([string]$Row) switch ($Row) { 'Top' { @(@($ui.Logo, $ui.TitleCol) | Where-Object { $_ }) } 'AppRow' { @(@($ui.AppLogo, $ui.AppL) | Where-Object { $_ }) } 'FieldRow' { @($ui.FieldL, $ui.FieldBox) + @($(if ($ui.FieldBOn) { $ui.FieldB })) } 'TestRow' { @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox) } } }
+$ui.RowParts = { param([string]$Row) switch ($Row) { 'Top' { @(@($ui.Logo, $ui.TitleCol) | Where-Object { $_ }) } 'AppRow' { @(@($ui.AppLogo, $ui.AppCol) | Where-Object { $_ }) } 'FieldRow' { @($ui.FieldL, $ui.FieldBox) + @($(if ($ui.FieldBOn) { $ui.FieldB })) } 'TestRow' { @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox) } } }
 # Lines up every fixed row: box heights, the text box in its frame, then each row on one center line.
 $ui.AlignRows = { try { $bh = [int]$ui.FieldB.Height; if ($bh -gt 0) { foreach ($p in $ui.Boxes) { if ($p.Height -ne $bh) { $p.Height = $bh } } } } catch { $null = $_ }   # a box is as tall as the compact button, measured
   foreach ($p in $ui.Boxes) { & $ui.BoxFit $p }   # the text box fills its frame (R24 job: a frame whose size never changed kept a 100 px text box at its top)
-  & $ui.AlignRow (& $ui.RowParts 'Top') 0; if (-not $ui.AppUnder) { & $ui.AlignRow (& $ui.RowParts 'AppRow') 0 };   # no application logo: the name is in the title column with its own 4 px gap (review of PR 106: a row of one part set it to 0)
+  & $ui.AlignRow (& $ui.RowParts 'Top') 0; if ($ui.AppLogo) { & $ui.AlignRow (& $ui.RowParts 'AppRow') 0 };   # a row of one part (no application logo) keeps its margins (review of PR 106: a row of one part set it to 0)
   $mm = & $ui.Sc $ui.Z.M; & $ui.AlignRow (& $ui.RowParts 'TestRow') $mm; & $ui.AlignTick
   # L3 (the Administrator, 2026-11-19): a label above its box (a text answer). The box is on the next line, on the card's edge, 4 px under the label.
   if ($ui.FieldAbove) { $ui.FieldL.Margin = New-Object System.Windows.Forms.Padding($ui.FieldL.Margin.Left, $mm, 0, 0); $ui.FieldBox.Margin = New-Object System.Windows.Forms.Padding([int]$ui.EdgeX, (& $ui.Sc $ui.Z.G1), $mm, $mm) }
@@ -256,11 +263,16 @@ $ui.Measure = { param([string]$Card)
   # the bar's midpoint (1 px at any scale) when they are on the bar's line.
   # Returns where a control's ink starts (its left edge plus the measured ink offset: text, edge or drawing). Takes the control.
   $tx = { param($C) (& $sr $C).Left + (& $ui.Ink $C) }
-  if ($ui.WordL.Visible -and (& $ui.HeadPair)) { $out += & $ui.HeadBad $Card @{ N = 'WordL'; X = (& $tx $ui.WordL) } @{ N = 'AppL'; X = (& $tx $ui.AppL) } }
-  if ($ui.AppUnder -and $ui.WordL.Visible -and (& $ui.HeadPair)) {   # L2: the word, 4 px, the line, 4 px, the name, measured on the ink Windows drew
-    $rw = & $sr $ui.WordL; $rr = & $sr $ui.HeadRule; $ra = & $sr $ui.AppL; $wi = & $ui.InkBox $ui.WordL; $ai = & $ui.InkBox $ui.AppL
-    $out += & $ui.HeadRuleBad $Card @{ WordBottom = $rw.Top + $wi.Bottom; WordLeft = $rw.Left + $wi.Left; WordW = $wi.Right - $wi.Left; RuleTop = $rr.Top; RuleBottom = $rr.Bottom; RuleLeft = $rr.Left; RuleW = $rr.Width
-      AppTop = $(if ([string]$ui.AppL.Text -cmatch '[A-Z0-9bdfhklt]') { $ra.Top + $ai.Top } else { $null }) } (& $ui.Sc $ui.Z.G1) }
+  # L1, L2: in each column of the logo block the word and its subtitle start on one edge, with the word, 4 px, the line,
+  # 4 px, the subtitle, measured on the ink Windows drew; the two columns share the edge when both rows start at one x.
+  $cols = @(& $ui.HeadCols)
+  if ($ui.WordL.Visible) { foreach ($c in $cols) { $nw = & $ui.NameOf $c.W
+      if (-not $c.Sub) { continue }   # a name with no subtitle has no line and nothing under it to measure
+      $out += & $ui.HeadBad $Card @{ N = $nw; X = (& $tx $c.W) } @{ N = (& $ui.NameOf $c.S); X = (& $tx $c.S) }
+      $rw = & $sr $c.W; $rr = & $sr $c.R; $ra = & $sr $c.S; $wi = & $ui.InkBox $c.W; $ai = & $ui.InkBox $c.S
+      $out += & $ui.HeadRuleBad $Card @{ WordBottom = $rw.Top + $wi.Bottom; WordLeft = $rw.Left + $wi.Left; WordW = $wi.Right - $wi.Left; RuleTop = $rr.Top; RuleBottom = $rr.Bottom; RuleLeft = $rr.Left; RuleW = $rr.Width
+        AppTop = $(if ([string]$c.S.Text -cmatch '[A-Z0-9bdfhklt]') { $ra.Top + $ai.Top } else { $null }) } (& $ui.Sc $ui.Z.G1) }
+    if ((& $ui.HeadPair) -and $cols.Count -gt 1) { $out += & $ui.HeadBad $Card @{ N = 'WordL'; X = (& $tx $ui.WordL) } @{ N = (& $ui.NameOf $ui.AppWordL); X = (& $tx $ui.AppWordL) } } }
   if ($ui.FieldRow.Visible -and $ui.FieldAbove -and -not $ui.RecOn) { $rl = & $sr $ui.FieldL; $rb = & $sr $ui.FieldBox   # L3: the label above its box
     $out += & $ui.AboveBad $Card @{ LabelBottom = $rl.Bottom; BoxTop = $rb.Top; BoxLeft = $rb.Left; BoxW = $rb.Width; Edge = (& $tx $ui.FieldL); TextW = ($ui.ContentW - (& $ui.Sc 10)) } }
   if ($ui.Frame -and -not $ui.RecOn) { $rh = & $sr $ui.Head; $rt = & $sr $ui.Tail; $rc = & $sr $ui.Card   # L1: the header row at the fixed top, the frame at its minimum height at least

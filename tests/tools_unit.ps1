@@ -375,7 +375,14 @@ $script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Marker = $null }
 $env:RADE_SIGNIN_TEST = '1'; $sr1 = Get-SiteRightsCheck $base 'https://usaf.dps.mil/sites/fake' $null   # the child compiles and starts the watch here
 $env:RADE_SIGNIN_WATCH = '0'; $sr2 = Get-SiteRightsCheck $base 'https://usaf.dps.mil/sites/fake' $null; $env:RADE_SIGNIN_WATCH = $null; $env:RADE_SIGNIN_TEST = $null
 Assert-Case 'sign-in time: the rights check detail ends with "SIGNIN seconds=N watch=on", and "watch=off" with RADE_SIGNIN_WATCH=0' (
-  [string]$sr1.Detail -match 'SIGNIN seconds=\d+ watch=on$' -and [string]$sr2.Detail -match 'SIGNIN seconds=\d+ watch=off$')
+  [string]$sr1.Detail -match 'SIGNIN seconds=\d+ watch=on host=\S+$' -and [string]$sr2.Detail -match 'SIGNIN seconds=\d+ watch=off host=\S+$')
+# engine-v43 S1, S2 (the PFM, 2026-11-26): "STAGE none" ends the timed stage; a stage past its limit stops the child and is
+# named; the window report helper compiles (its lines need Windows: here it prints none).
+$st1 = Invoke-ChildScript "'STAGE signin'`r`n'STAGE none'`r`nStart-Sleep -Seconds 3`r`n'RESULT ok'`r`n" '' 60 $null 1
+$st2 = Invoke-ChildScript "'STAGE signin'`r`nStart-Sleep -Seconds 20`r`n'RESULT ok'`r`n" '' 60 $null 2
+$env:RADE_SIGNIN_TEST = '1'; $rpErr = $null; try { Start-SignInReport; Stop-SignInReport } catch { $rpErr = $_ }; $env:RADE_SIGNIN_TEST = $null
+Assert-Case 'sign-in stage (engine-v43): STAGE none ends the limit; a frozen sign-in stops and is named; the report compiles' (
+  -not $st1.Stage -and @($st1.Lines) -contains 'RESULT ok' -and $st2.Stage -eq 'signin' -and @($st2.Lines) -notcontains 'RESULT ok' -and -not $rpErr -and [bool]('RadeSignIn.Report1' -as [type]))
 # Uninstall and Remove RADE (engine-v40): their cases are in tools_unit_uninstall.ps1, run here in this scope (they use the fake site and the app above).
 . (Join-Path $PSScriptRoot 'tools_unit_uninstall.ps1')
 Write-Host ('TOOLS-UNIT pass=' + $script:pass + ' fail=' + $script:fail)

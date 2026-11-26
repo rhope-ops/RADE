@@ -143,7 +143,8 @@ function Invoke-RestorePlan([string]$Base, [string]$Dir, [scriptblock]$Tick) {
   if (-not $siteCheck.Ok) { return @{ State = 'refused'; Lines = $siteCheck.Lines; Plan = @{}; Expect = ''; Missing = 0 } }
   $lists = @($script:app.Backup | Where-Object { $_ })
   $argText = '-Site "' + $siteCheck.Site + '" -Folder "' + $Dir + '" -Lists "' + ($lists -join '|') + '" -Mode plan' + (Get-RestoreMapArg $Base $siteCheck.Site)
-  $child = Invoke-ChildScript $restoreScript $argText $toolReadSeconds $Tick
+  $child = Invoke-ChildScript $restoreScript $argText $toolReadSeconds $Tick $signInStageSeconds   # engine-v43 S1: a frozen sign-in stops after 3 minutes
+  $null = Get-SignInNote 'Restore dry run' $child.Lines
   $res = ''; foreach ($line in $child.Lines) { if ($line -match '^RESULT (\S+)') { $res = $Matches[1] } elseif ($line -eq 'MAP failed') { $res = 'map' } }
   $stop = $(if ($res -eq 'map') { "the record of an earlier Restore on this site (Backups\~restore-map-*.json) could not be read" } else { Get-ChildStopText $res $child.Why })
   if ($res -ne 'plan') { return @{ State = 'failed'; Plan = @{}; Expect = ''; Missing = 0; Lines = @(('The dry run did not finish: ' + $stop + '.'), 'Nothing was changed.') } }
@@ -191,7 +192,8 @@ function Invoke-Restore([string]$Base, [string]$Dir, $Plan, [scriptblock]$Tick) 
   $lists = @($script:app.Backup | Where-Object { $_ }); $pause = $script:app.Restore.Pause
   $pauseArg = $(if ($pause) { ' -Pause "' + $pause.List + '|' + $pause.Title + '|' + $pause.Field + '|' + $pause.On + '"' } else { '' })
   $child = Invoke-ChildScript $restoreScript ('-Site "' + $siteCheck.Site + '" -Folder "' + $Dir + '" -Lists "' + ($lists -join '|') + '" -Mode write -Expect "' + $Plan.Expect + '"' + $pauseArg +
-    (Get-RestoreMapArg $Base $siteCheck.Site)) $restoreWriteSeconds $Tick
+    (Get-RestoreMapArg $Base $siteCheck.Site)) $restoreWriteSeconds $Tick $signInStageSeconds   # engine-v43 S1
+  $null = Get-SignInNote 'Restore' $child.Lines
   $res = ''; $done = @{}; $resume = ''; $binErr = @{}
   foreach ($line in $child.Lines) { if ($line -match '^RESULT (\S+)') { $res = $Matches[1] } elseif ($line -match '^DONE (\d+) (.+)$') { $done[[int]$Matches[1]] = $Matches[2] }
     elseif ($line -match '^RESUME (\S+)') { $resume = $Matches[1] } elseif ($line -match '^BINERR (\d+) ([A-Za-z0-9_.]+)$') { $binErr[[int]$Matches[1]] = $Matches[2] } }
@@ -199,6 +201,7 @@ function Invoke-Restore([string]$Base, [string]$Dir, $Plan, [scriptblock]$Tick) 
   $stop = $(switch ($res) { 'changed' { 'the site changed after the dry run. Run Restore again for a new dry run' }
       'paused-already' { 'the pause switch is on already (another Restore, or it was left on). Check it, then run Restore again' }
       'no-pause-row' { "the app's pause-switch row is not on the site" } 'pause-failed' { 'the pause switch could not be set' } default { '' } })
+  if (-not $stop -and $child.Stage) { $stop = 'the sign-in did not finish in ' + [int]($signInStageSeconds / 60) + ' minutes, so RADE stopped it' }   # engine-v43 S1
   if ($stop) { return @{ State = $(if ($res -eq 'changed') { 'changed' } else { 'failed' }); Path = $fresh.Path; Lines = @(('Restore wrote no rows: ' + $stop + '.'), $freshLine) } }
   $lines = @(); $bad = 0; $back = 0
   for ($i = 1; $i -le $lists.Count; $i++) {

@@ -38,7 +38,7 @@ $ui.VBootErr = { param([string]$Why)
 # first application and sets the card.
 $ui.VChoose = {
   if (@($apps).Count -eq 0) { & $ui.VNoApps; return }
-  Select-App 0; $ui.Picked = $false; $ui.Plan = $null; $ui.StartAfter = $false; $ui.AppL.Text = $ui.Tagline; & $ui.ShowAppRow $true; $list = @(); $dep = $false; $ui.Blocked = @{}; $ui.BlockedFix = @{}
+  Select-App 0; $ui.Picked = $false; $ui.Plan = $null; $ui.StartAfter = $false; & $ui.ShowAppRow $false; $list = @(); $dep = $false; $ui.Blocked = @{}; $ui.BlockedFix = @{}
   for ($j = 0; $j -lt $apps.Count; $j++) { foreach ($id in @($apps[$j].Checks)) { $r = $ui.BaseRes[$id]; if ($r -and $r.State -eq 'FAILED') { $ui.Blocked[$j] = ((Get-CheckDef $id).Name + ': ' + $r.Detail); $ui.BlockedFix[$j] = $(if ($r.Fix) { 'What to do: ' + $r.Fix } else { '' }); break } } }
   for ($j = 0; $j -lt $apps.Count; $j++) {
     $a = $apps[$j]; if ([string]$a.Mode -eq 'deploy') { $dep = $true }
@@ -91,16 +91,18 @@ $ui.OpenTour = {
 $ui.TourB.Add_Click({ & $ui.OpenTour })
 # Resets what the user chose: each step to its default, clean-up on, no step states. Takes nothing.
 $ui.InitSel = { $ui.Sel = @{}; foreach ($k in $script:appSteps) { $ui.Sel[[int]$k] = [bool](Get-StepDefault $k) }; $ui.Clean = $true; $ui.StepState = @{} }
-# Shows or hides the application row of the logo block (its logo, its name) and the link line above it (only when both
-# logos are there). Takes whether to show it.
+# Shows or hides the application row of the logo block (its logo, its name and subtitle) and the link line above it (only
+# when both logos are there). L1 (the PFM, 2026-11-26): boot and Choose show the RADE row only. The texts are as tall
+# as their ink before the row shows, and the window lays out once more so the logo block (docked, sized by the window)
+# takes the row's height: the first card after the choice is measured before the next fit (Windows job, 18 Nov 26: the
+# row at 76 needed 23 px in a 98 px block). Takes whether to show it.
 $ui.ShowAppRow = { param([bool]$On)
-  # The name is as tall as its text before the row shows, and the window lays out once more so the logo block (docked,
-  # sized by the window) takes the row's height: the first card after the choice is measured before the next fit
-  # (Windows job, 18 Nov 26: the row at 76 needed 23 px in a 98 px block).
-  if ($On) { & $ui.InkFit $ui.AppL }   # before the window has its scale: the next fit sizes it
-  if ($ui.AppUnder) { $ui.AppL.Visible = $On; $ui.HeadRule.Visible = $On } else { $ui.AppL.Visible = $On; $ui.AppRow.Visible = $On }   # no application logo: the name is the subtitle under RADE (R29b V1)
-  $ui.LinkLine.Visible = ($On -and $ui.Logo -and $ui.AppLogo)
-  & $ui.FitHead; & $ui.AlignRow (& $ui.RowParts 'Top') 0   # the title column is taller with its subtitle: the RADE row is centered again
+  if (-not $ui.AppLogo) { $ui.TagL.Text = $(if ($On) { [string]$ui.AppWordL.Text } else { $ui.Tagline }); $On = $false }   # no application logo: the name stands under RADE (one row, the window keeps its height)
+  $sub = [bool]($On -and [string]$ui.AppL.Text)   # no subtitle: the name only, with no line under it
+  $ui.AppRule.Visible = $sub; $ui.AppL.Visible = $sub
+  if ($On) { & $ui.InkFit $ui.AppWordL; & $ui.InkFit $ui.AppL }   # before the window has its scale: the next fit sizes them
+  $ui.AppRow.Visible = $On; $ui.LinkLine.Visible = ($On -and $ui.Logo -and $ui.AppLogo)
+  & $ui.FitHead; if ($ui.AppLogo) { & $ui.AlignRow (& $ui.RowParts 'AppRow') 0 }   # the application column is centered on its logo
   try { $ui.Form.PerformLayout() } catch { $null = $_ }   # no form yet (text mode): nothing to lay out
   if ($ui.AppLogo) { $ui.AppLogo.AccessibleName = $(if ($On -and $ui.Picked) { $script:app.Name + ' logo' } else { 'Application logo' }) } }
 # Takes the application the user chose: selects it, reuses base check results that can be reused, and shows Maintenance
@@ -109,7 +111,7 @@ $ui.Pick = { param([int]$J)
   Select-App $J; $ui.Picked = $true
   # The base checks are not run twice, except the ones whose answer can change at any time ($checkNoSave: Word open, disk, write).
   foreach ($id in $script:appChecks) { if ($ui.BaseRes.ContainsKey($id) -and $checkNoSave -notcontains $id -and $ui.BaseRes[$id].State -in 'PASSED', 'WARNING') { $script:checkResults[$id] = $ui.BaseRes[$id] } }
-  $ui.AppL.Text = (Get-AppDisplayVersion); & $ui.ShowAppRow $true   # R44 E2: "90-161.Z - Kanon - 0.1.0" (application.displayName)
+  $ui.AppWordL.Text = [string]$script:app.Name; $ui.AppL.Text = (Get-AppSubtitle); & $ui.ShowAppRow $true   # L1 (the PFM, 2026-11-26): "90-161.Z", under it the subtitle
   & $ui.InitSel
   $e = $null; if (Test-Deploy) { $e = (Read-Installed (Get-InstalledKey $script:app)) }
   if ($e -and $e.installed) { & $ui.VMaint $e.installed } else { & $ui.Checks $false } }

@@ -57,6 +57,9 @@ try { Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System
 # R44 E3 (the PFM, 2026-11-25): from Windows PowerShell ISE, the window runs in a child powershell.exe -STA, the host of
 # the shortcut, so both use one dpi path (Get-IseHandoff, Invoke-IseWindow in part 05). If the child cannot run, the
 # window runs in ISE as before, and the ISE console says why.
+# engine-v43 S3 (the PFM, 2026-11-26): the host of this RADE run, for the sign-in lines of the run log; the child scripts
+# and steps get it too (RADE_HOST): ise (inside ISE), child (the ISE handoff, R44 E3), shortcut (a runner copy), console.
+$env:RADE_HOST = $(if ([string]$Host.Name -eq 'Windows PowerShell ISE Host') { 'ise' } elseif ($env:RADE_FROM_ISE) { 'child' } elseif (Test-RunnerStart) { 'shortcut' } else { 'console' })
 if ($gui) {
   $pol = ''; try { $pol = [string](Get-ExecutionPolicy) } catch { $pol = 'unknown' }
   $ise = Get-IseHandoff ([string]$Host.Name) $pol

@@ -26,30 +26,38 @@ $ui.LogoPic = { param([string]$Png, [string]$Name)
   } catch { $null } }   # no logo: the row shows its text only
 $ui.TopRow = & $ui.LogoRow
 $ui.Logo = & $ui.LogoPic $logoPng 'RADE logo'; if ($ui.Logo) { [void]$ui.TopRow.Controls.Add($ui.Logo) }
-# The title column beside the RADE logo: the word RADE, and under it, when the application has no logo of its own, a thin
-# line and the application name (L2, the Administrator, 2026-11-19: 4 px, a 1 px line as wide as the word, 4 px, ink to
-# ink; $ui.FitHead). The word and the name draw their own text ink-tight ($ui.InkText in engine/rade_ui_text.ps1).
-$ui.TitleCol = New-Object System.Windows.Forms.FlowLayoutPanel
-$ui.TitleCol.AutoSize = $true; $ui.TitleCol.AutoSizeMode = 'GrowAndShrink'; $ui.TitleCol.FlowDirection = 'TopDown'; $ui.TitleCol.WrapContents = $false
-$ui.TitleCol.Margin = (& $ui.Pad 0 0 0 0); $ui.TitleCol.Padding = (& $ui.Pad 0 0 0 0); $ui.TitleCol.BackColor = $ui.C.White
-$ui.WordL = & $ui.InkText $ui.F.Word $ui.C.Navy 'RADE' $false; $ui.WordL.Text = 'RADE'; $ui.WordL.Visible = $true
-$ui.HeadRule = New-Object System.Windows.Forms.Panel
-$ui.HeadRule.Size = New-Object System.Drawing.Size(40, 1); $ui.HeadRule.BackColor = $ui.C.Edge; $ui.HeadRule.Margin = (& $ui.Pad 0 $ui.Z.G1 0 0); $ui.HeadRule.Visible = $false
-[void]$ui.TitleCol.Controls.Add($ui.WordL); [void]$ui.TitleCol.Controls.Add($ui.HeadRule); [void]$ui.TopRow.Controls.Add($ui.TitleCol)
+# One text column of the logo block (L1, the PFM, 2026-11-26): a word (15 pt bold navy), under it a thin line as wide as
+# the word's ink and the subtitle (small, gray), 4 px, 1 px, 4 px ink to ink (L2, 2026-11-19; $ui.FitHead). The word and
+# the subtitle draw their own text ink-tight ($ui.InkText in engine/rade_ui_text.ps1). Takes the word's and the
+# subtitle's screen-reader names; gives back @{ Col; Word; Rule; Sub }.
+$ui.HeadCol = { param([string]$WordName, [string]$SubName)
+  $c = New-Object System.Windows.Forms.FlowLayoutPanel
+  $c.AutoSize = $true; $c.AutoSizeMode = 'GrowAndShrink'; $c.FlowDirection = 'TopDown'; $c.WrapContents = $false
+  $c.Margin = (& $ui.Pad 0 0 0 0); $c.Padding = (& $ui.Pad 0 0 0 0); $c.BackColor = $ui.C.White
+  $w = & $ui.InkText $ui.F.Word $ui.C.Navy $WordName $false; $w.Visible = $true
+  $r = New-Object System.Windows.Forms.Panel
+  $r.Size = New-Object System.Drawing.Size(40, 1); $r.BackColor = $ui.C.Edge; $r.Margin = (& $ui.Pad 0 $ui.Z.G1 0 0); $r.Visible = $true
+  $s = & $ui.InkText $ui.F.Small $ui.C.Gray $SubName $true; $s.Margin = (& $ui.Pad 0 $ui.Z.G1 0 0); $s.Visible = $true   # a long subtitle: cut with "..."; its widest size follows the window ($ui.Fit)
+  foreach ($x in @($w, $r, $s)) { [void]$c.Controls.Add($x) }
+  @{ Col = $c; Word = $w; Rule = $r; Sub = $s } }
+# The RADE column: the word RADE and, under it at all times, the tagline (L1, the PFM, 2026-11-26: "RADE (new line) Test,
+# deploy, enjoy"; it replaces 2026-11-19, where a chosen application's name took the tagline's place).
+$hc = & $ui.HeadCol 'RADE' 'Test, deploy, enjoy'
+$ui.TitleCol = $hc.Col; $ui.WordL = $hc.Word; $ui.HeadRule = $hc.Rule; $ui.TagL = $hc.Sub
+$ui.WordL.Text = 'RADE'; $ui.TagL.Text = $ui.Tagline; [void]$ui.TopRow.Controls.Add($ui.TitleCol)
 # The link line: 1 px gray, 12 px long, on the middle of the logos ("something minimal"); shown with the application row
 # when both logos are there.
 $ui.LinkLine = New-Object System.Windows.Forms.Panel
 $ui.LinkLine.Size = New-Object System.Drawing.Size(1, 12); $ui.LinkLine.BackColor = $ui.C.Gray; $ui.LinkLine.Margin = (& $ui.Pad 32 4 0 4); $ui.LinkLine.Visible = $false
+# The application row, once an application is chosen (L1): its logo (when it has one) and a column like the RADE column:
+# the application name in the word style, and under it the manifest's application.subtitle (for example "Kanon, a bullet,
+# Publications and Forms Management"); without a subtitle, the name only. Hidden on boot and on Choose ($ui.ShowAppRow).
+# An application with no logo has no row of its own: its name stands under RADE in the tagline's place (the window keeps
+# the height of engine-v42; the Windows job's smallest window had no room for a second row).
 $ui.AppRow = & $ui.LogoRow; $ui.AppRow.Visible = $false
 $ui.AppLogo = & $ui.LogoPic $appLogoPng 'Application logo'; if ($ui.AppLogo) { [void]$ui.AppRow.Controls.Add($ui.AppLogo) }
-# The application name and version, gray, no mark before it. With an application logo it is beside that logo, in the
-# application row; without one it is the subtitle under the word RADE, in the title column ($ui.AppUnder; shown by $ui.ShowAppRow).
-$ui.AppUnder = -not $ui.AppLogo
-$ui.AppL = & $ui.InkText $ui.F.Small $ui.C.Gray 'Application' $true; $ui.AppL.Margin = (& $ui.Pad 0 $(if ($ui.AppUnder) { $ui.Z.G1 } else { 0 }) 0 0)   # a long name and version: cut with "..."; its widest size follows the window ($ui.Fit)
-if ($ui.AppUnder) { [void]$ui.TitleCol.Controls.Add($ui.AppL) } else { [void]$ui.AppRow.Controls.Add($ui.AppL) }
-# Boot looks like a chosen application (the Administrator, 2026-11-19): from the first frame the tagline stands where the
-# name will stand, in the same style, and the logo block has its full height; a chosen application's name replaces it.
-$ui.AppL.Text = $ui.Tagline; & $ui.InkFit $ui.AppL; $ui.AppL.Visible = $true; if ($ui.AppUnder) { $ui.HeadRule.Visible = $true } else { $ui.AppRow.Visible = $true; $ui.LinkLine.Visible = [bool]$ui.Logo }
+$ac = & $ui.HeadCol 'Application' 'Application subtitle'
+$ui.AppCol = $ac.Col; $ui.AppWordL = $ac.Word; $ui.AppRule = $ac.Rule; $ui.AppL = $ac.Sub; [void]$ui.AppRow.Controls.Add($ui.AppCol)
 foreach ($c in @($ui.TopRow, $ui.LinkLine, $ui.AppRow)) { [void]$ui.Top.Controls.Add($c) }
 $ui.Bottom = New-Object System.Windows.Forms.TableLayoutPanel
 $ui.Bottom.Dock = 'Bottom'; $ui.Bottom.Height = 46; $ui.Bottom.AutoSize = $true; $ui.Bottom.AutoSizeMode = 'GrowAndShrink'; $ui.Bottom.MinimumSize = New-Object System.Drawing.Size(0, 46); $ui.Bottom.ColumnCount = 5; $ui.Bottom.RowCount = 1; $ui.Bottom.Padding = (& $ui.Pad ($ui.Z.Inset - $ui.Z.M) 3 $ui.Z.Inset 3); $ui.Bottom.BackColor = $ui.C.White

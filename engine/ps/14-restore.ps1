@@ -270,8 +270,7 @@ try {
   if (-not $mod.Count) { 'RESULT no-pnp'; exit 3 }
   $pin = @($mod | Where-Object { [string]$_.Version -eq '1.12.0' }); if ($pin.Count) { $mod = $pin }
   $null = & { Import-Module PnP.PowerShell -RequiredVersion $mod[0].Version -DisableNameChecking } *>&1
-  Start-SignInSize   # E3: the CAC sign-in window opens at about 480 x 360, centered (the block above)
-  $null = & { Connect-PnPOnline -Url $Site -UseWebLogin -ErrorAction Stop } *>&1
+  Connect-RadeSite $Site   # engine-v43 S1: STAGE, SIGNIN and SIGNIN-WIN lines (the block above)
 } catch { 'RESULT not-connected ' + $_.Exception.GetType().Name; exit 2 }
 $record = Read-RestoreRecord
 $info = @{ Lists = @{}; ById = @{} }; $names = @($Lists -split '\|')

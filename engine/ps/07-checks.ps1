@@ -162,10 +162,11 @@ function Write-SiteMarker([string]$Base, [bool]$Whole) {
   $again = ' Until it is written, another account is not stopped from a second install on this site: run this deploy again'
   if (-not (Test-SiteUrl $site)) { return ('NOTE: the install record on the site (' + $where + ') was not written: no site address.' + $again) }
   $val = [string]$script:app.Version + ' ' + (Get-Date).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture) + $(if ($Whole) { '' } else { ' partial' })
-  $r = Invoke-ChildScript $markerScript ('-Site "' + $site + '"' + (Get-MarkerArg) + ' -Value "' + $val + '"') 300 $null
+  $r = Invoke-ChildScript $markerScript ('-Site "' + $site + '"' + (Get-MarkerArg) + ' -Value "' + $val + '"') 300 $null $signInStageSeconds
+  $null = Get-SignInNote 'Install record' $r.Lines   # engine-v43 S2, S3: the sign-in lines in the run log
   $w = ''; foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $w = $Matches[1] } }
   if ($w -in 'added', 'updated') { return ('Install record on the site: ' + $where + ' now holds version ' + $script:app.Version + ' and the date' + $(if ($Whole) { '' } else { ', marked partial' }) + ' (' + $w + ').') }
-  $why = $(switch ($w) { 'no-list' { 'the list was not found' } 'no-pnp' { 'the SharePoint tool is not installed' } default { 'the sign-in or the write did not finish' } })
+  $why = $(switch ($w) { 'no-list' { 'the list was not found' } 'no-pnp' { 'the SharePoint tool is not installed' } default { $(if ($r.Stage -eq 'signin') { 'the sign-in did not finish in ' + [int]($signInStageSeconds / 60) + ' minutes, so RADE stopped it' } else { 'the sign-in or the write did not finish' }) } })   # engine-v43 S1
   return ('NOTE: the install record on the site (' + $where + ') was not written: ' + $why + '.' + $again)
 }
 function Split-Sentence([string]$Text) {
@@ -304,14 +305,14 @@ function Get-NetworkCheck([string]$Id, [string]$Base, [string]$Site) {
 function Get-SiteRightsCheck([string]$Base, [string]$Site, [scriptblock]$Tick) {
   if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'No site address' ('Complete the "Site address" box first (it starts with ' + $sitePrefix + ')') }
   else {
-    $r = Invoke-ChildScript $rightsScript ('-Site "' + $Site + '"' + (Get-MarkerArg)) 300 $Tick
+    $r = Invoke-ChildScript $rightsScript ('-Site "' + $Site + '"' + (Get-MarkerArg)) 300 $Tick $signInStageSeconds   # engine-v43 S1: a frozen sign-in stops after 3 minutes
     $have = @{}; $adm = 'unknown'; $mk = ''; $signLine = ''
     foreach ($l in $r.Lines) {
       if ($l -match '^RIGHT (\w+) (True|False)$') { $have[$Matches[1]] = ($Matches[2] -eq 'True') }
       if ($l -match '^ADMIN (True|False|unknown)$') { $adm = $Matches[1] }
       if ($l -match '^MARKER (none|unknown|found [0-9.]+)$') { $mk = $Matches[1] }
-      if ($l -match '^(SIGNIN seconds=\d+ watch=(on|off))$') { $signLine = $Matches[1] }   # R43 E4: the sign-in time
     }
+    $signLine = Get-SignInNote 'Rights check' $r.Lines   # R43 E4, engine-v43 S2, S3: the sign-in time, the host, the window state
     $admText = 'Site collection administrator: ' + $(switch ($adm) { 'True' { 'yes' } 'False' { 'no' } default { 'not read' } }) + ' (shown only, not required)'
     if (-not $have.Count) {
       $why = 'Sign-in did not finish'; foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $why = $Matches[1] } }
@@ -326,7 +327,7 @@ function Get-SiteRightsCheck([string]$Base, [string]$Site, [scriptblock]$Tick) {
       elseif ((Test-FirstInstall) -and $mk -ne 'none') { $one = Format-CheckResult 'FAILED' 'The install record on the site could not be read' 'Select "Sign in and check site rights" again' }
       else { $one = Format-CheckResult 'PASSED' ('Rights: ' + ($got -join ', ') + '. ' + $admText) '' }
     }
-    if ($signLine) { $one.Detail = [string]$one.Detail + '. ' + $signLine }   # R43 E4: shown in Details and the report
+    if ($signLine) { $one.Detail = [string]$one.Detail + '. ' + $signLine }   # R43 E4, engine-v43: shown in Details and the report (also when the sign-in did not finish)
   }
   return $one
 }
