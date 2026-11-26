@@ -27,12 +27,22 @@ $ui.FitEdges = { try {
 # margins share those 8 px (left = 8 - the ink of its first letter). Takes nothing; uses $ui.EdgeX.
 $ui.FitStepEdge = { $sd = & $ui.Sc 8; & $ui.SetLeft $ui.StepRow ([int]$ui.EdgeX - $sd); $il = [int][math]::Max(0, [math]::Min($sd, $sd - (& $ui.Ink $ui.StepName))); $m = $ui.StepName.Margin
   if ($m.Left -ne $il -or $m.Right -ne $sd - $il) { $ui.StepName.Margin = New-Object System.Windows.Forms.Padding($il, $m.Top, ($sd - $il), $m.Bottom) } }
-# R29b V1, L1 (the PFM, 2026-11-26): in each column of the logo block the word and its subtitle start their ink on one
-# edge, and when both rows start at the same x (both logos, or neither) the two columns share that edge. Each part sits at
-# the same x in its row and draws its text ink-tight ($ui.InkText); what is left of a difference (measured) moves each
-# to the largest. L2: the line under a word is as wide as the word's ink and starts where it starts. Takes nothing;
-# changes the left margins of the words, the lines and the subtitles, and the widths of the lines.
-$ui.FitHead = { try {
+# The edges of the logo block's columns (R29b V1, L1, L2): the help is in the block.
+$ui.FitHead = {
+  <#
+  .SYNOPSIS
+  Puts the ink of each column of the logo block on one edge, sizes the lines and puts a version text on its base line.
+  .DESCRIPTION
+  R29b V1, L1 (the PFM, 2026-11-26): in each column the word and its subtitle start their ink on one edge, and when both
+  rows start at the same x (both logos, or neither) the two columns share that edge. Each part sits at the same x in its
+  row and draws its text ink-tight ($ui.InkText); what is left of a difference (measured) moves each to the largest. L2:
+  the line under a word is as wide as the word's ink and starts where it starts. Name spot L2 (engine-v45): a version
+  text beside the word gets the top margin that puts its base line on the word's ($ui.VerTop).
+  .OUTPUTS
+  Nothing. Changes the left margins of the words, the lines and the subtitles, the widths of the lines and the top margin
+  of a version text. Before the window has a handle nothing can be measured: the next fit sets them.
+  #>
+  try {
     $cols = @(& $ui.HeadCols); $same = & $ui.HeadPair; $all = @()
     foreach ($c in $cols) { $c.IW = & $ui.Ink $c.W; $c.IS = $(if ($c.Sub) { & $ui.Ink $c.S } else { 0 }); $c.E = [math]::Max($c.IW, $c.IS); $all += $c.E }
     $top = [int]($all | Measure-Object -Maximum).Maximum

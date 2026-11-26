@@ -26,14 +26,27 @@ $ui.LogoPic = { param([string]$Png, [string]$Name)
   } catch { $null } }   # no logo: the row shows its text only
 $ui.TopRow = & $ui.LogoRow
 $ui.Logo = & $ui.LogoPic $logoPng 'RADE logo'; if ($ui.Logo) { [void]$ui.TopRow.Controls.Add($ui.Logo) }
-# One text column of the logo block (L1, the PFM, 2026-11-26): a word (15 pt bold navy), under it a thin line as wide as
-# the word's ink and the subtitle (small, gray), 4 px, 1 px, 4 px ink to ink (L2, 2026-11-19; $ui.FitHead). The word and
-# the subtitle draw their own text ink-tight ($ui.InkText in engine/rade_ui_text.ps1). Takes the word's and the
-# subtitle's screen-reader names, and the screen-reader name of a version text beside the word ('' for none). Name spot
-# L2 (engine-v45; the PFM, 2026-11-26): a column with a version text has a word row (the word, which keeps room for
-# descenders, and the version text, Small gray, on the word's base line; $ui.FitHead), and its line comes under the
-# lowest ink of that row. Gives back @{ Col; Word; Rule; Sub; Ver } (Ver is $null without a version text).
-$ui.HeadCol = { param([string]$WordName, [string]$SubName, [string]$VerName = '')
+# One text column of the logo block (L1; name spot L2): the help is in the block.
+$ui.HeadCol = {
+  <#
+  .SYNOPSIS
+  Makes one text column of the logo block: a word, a thin line under it and a subtitle, and optionally a version text.
+  .DESCRIPTION
+  L1 (the PFM, 2026-11-26): a word (15 pt bold navy), under it a thin line as wide as the word's ink and the subtitle
+  (small, gray), 4 px, 1 px, 4 px ink to ink (L2, 2026-11-19; $ui.FitHead). The word and the subtitle draw their own
+  text ink-tight ($ui.InkText in engine/rade_ui_text.ps1). Name spot L2 (engine-v45; the PFM, 2026-11-26): a column with
+  a version text has a word row: the word, which keeps room for descenders, and the version text (Small gray) on the
+  word's base line ($ui.FitHead); the line then comes under the lowest ink of that row.
+  .PARAMETER WordName
+  The word's screen-reader name.
+  .PARAMETER SubName
+  The subtitle's screen-reader name.
+  .PARAMETER VerName
+  The version text's screen-reader name; '' (the default) for a column with no version text.
+  .OUTPUTS
+  @{ Col; Word; Rule; Sub; Ver }: Ver is $null without a version text.
+  #>
+  param([string]$WordName, [string]$SubName, [string]$VerName = '')
   $c = New-Object System.Windows.Forms.FlowLayoutPanel
   $c.AutoSize = $true; $c.AutoSizeMode = 'GrowAndShrink'; $c.FlowDirection = 'TopDown'; $c.WrapContents = $false
   $c.Margin = (& $ui.Pad 0 0 0 0); $c.Padding = (& $ui.Pad 0 0 0 0); $c.BackColor = $ui.C.White
