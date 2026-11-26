@@ -255,7 +255,8 @@ The execution policy in effect (Get-ExecutionPolicy).
 function Get-IseHandoff([string]$HostName, [string]$Policy) {
   if ($HostName -ne 'Windows PowerShell ISE Host') { return @{ Go = $false; Why = '' } }
   if ($env:RADE_ISE_CHILD -eq '0') { return @{ Go = $false; Why = 'RADE_ISE_CHILD=0' } }
-  if (-not $script:selfText) { return @{ Go = $false; Why = 'RADE could not read its own text' } }
+  $own = ([string]$script:selfText).Contains("`$buildId = '" + $buildId + "'")   # only this bundle's text (review of PR 199)
+  if (-not $own) { return @{ Go = $false; Why = 'RADE could not read its own text' } }
   if ($Policy -notin 'Unrestricted', 'RemoteSigned', 'Bypass') { return @{ Go = $false; Why = ('the execution policy is ' + $Policy) } }
   return @{ Go = $true; Why = '' }
 }
@@ -414,7 +415,8 @@ function Add-DesktopIcon([string]$Dir) {
     $sc.WorkingDirectory = (Get-RadePath); $sc.Description = ('Open RADE for ' + (Get-AppDisplay)); $sc.WindowStyle = 7
     if ($hasIco) { $sc.IconLocation = $ico + ',0' }
     $sc.Save(); Write-FileWhole (Get-ShortcutRecord) ($lnk + "`r`n")
-    if ($was -and $new) { try { Move-ToRecycleBin $was } catch { $null = $_ } }   # the older version's shortcut of this app
+    if ($was -and $new) {   # the older version's shortcut of this app, only while it still starts this runner (review of PR 199)
+      try { if (([string]$sh.CreateShortcut($was).Arguments).Contains('"' + $runner + '"')) { Move-ToRecycleBin $was } } catch { $null = $_ } }   # a shortcut it cannot read stays
     if (-not $new) { return '' }
     $where = $(if ($isDesk) { 'on your desktop' } else { 'in the folder "' + (Split-Path -Leaf $desk) + '"' })
     return ('A shortcut named "' + $name + '" is now ' + $where + '. It opens RADE for ' + (Get-AppDisplay) + '.')

@@ -120,11 +120,13 @@ $null = Invoke-RemoveRade
 Assert-Case 'remove RADE (engine-v42): the runners folder goes' (-not (Test-Path -LiteralPath (Join-Path (Join-Path $Dir 'RADE') 'runners')))
 $appDisplay = ''; $script:app.Version = $keepVer
 # ---- ISE start (engine-v42; 90-161.Z R44 E3): from ISE the window goes to a child powershell.exe -STA, with plain fallbacks.
-$script:selfText = '# text'; $h1 = Get-IseHandoff 'Windows PowerShell ISE Host' 'RemoteSigned'; $h2 = Get-IseHandoff 'ConsoleHost' 'RemoteSigned'
+$script:selfText = "`$buildId = '" + $buildId + "'"; $h1 = Get-IseHandoff 'Windows PowerShell ISE Host' 'RemoteSigned'; $h2 = Get-IseHandoff 'ConsoleHost' 'RemoteSigned'
 $h3 = Get-IseHandoff 'Windows PowerShell ISE Host' 'AllSigned'; $env:RADE_ISE_CHILD = '0'; $h4 = Get-IseHandoff 'Windows PowerShell ISE Host' 'Bypass'; $env:RADE_ISE_CHILD = $null
+$script:selfText = '# another script'; $h6 = Get-IseHandoff 'Windows PowerShell ISE Host' 'Unrestricted'
 $script:selfText = ''; $h5 = Get-IseHandoff 'Windows PowerShell ISE Host' 'Unrestricted'
 Assert-Case 'ISE start (R44 E3): ISE goes to the child; ConsoleHost stays; AllSigned, RADE_ISE_CHILD=0 and no own text stay in ISE with the reason' ($h1.Go -and -not $h2.Go -and -not $h2.Why -and
-  -not $h3.Go -and $h3.Why -eq 'the execution policy is AllSigned' -and -not $h4.Go -and $h4.Why -eq 'RADE_ISE_CHILD=0' -and -not $h5.Go -and $h5.Why -eq 'RADE could not read its own text')
+  -not $h3.Go -and $h3.Why -eq 'the execution policy is AllSigned' -and -not $h4.Go -and $h4.Why -eq 'RADE_ISE_CHILD=0' -and
+  -not $h5.Go -and $h5.Why -eq 'RADE could not read its own text' -and -not $h6.Go)
 # R44 E4: a site check that cannot read the site gives its own words (not "the sign-in did not finish").
 Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake'   # Remove RADE above took RADE\Config again
 $fk | Add-Member -NotePropertyName webError -NotePropertyValue $true -Force; Set-Fake $fk
