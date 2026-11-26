@@ -135,8 +135,9 @@ try {
   'SIGNIN seconds=' + [int]((Get-Date) - $signT0).TotalSeconds + ' watch=' + $(if ($script:signInWatchOn) { 'on' } else { 'off' })
   # R44 E4: the site check. The connection must be to the given site, else nothing is read (prints no address).
   'STAGE site'
-  $script:web = $null; $null = & { $script:web = Get-PnPWeb -ErrorAction Stop } *>&1
-  if (([string]$script:web.Url).TrimEnd('/').ToLowerInvariant() -ne $Site.Trim().TrimEnd('/').ToLowerInvariant()) { 'RESULT wrong-site'; exit 4 }
+  $script:web = $null
+  try { $null = & { $script:web = Get-PnPWeb -ErrorAction Stop } *>&1; $u = [string]$script:web.Url } catch { 'RESULT site-unknown ' + $_.Exception.GetType().Name; exit 5 }
+  if ($u.TrimEnd('/').ToLowerInvariant() -ne $Site.Trim().TrimEnd('/').ToLowerInvariant()) { 'RESULT wrong-site'; exit 4 }
   $i = 0
   foreach ($name in ($Lists -split '\|')) {
     $i++
@@ -212,6 +213,7 @@ function Invoke-Backup([string]$Base, [scriptblock]$Tick) {
     Add-RunLog ('Back up ' + $sign[0]); $signLine = 'The sign-in took ' + $Matches[1] + ' seconds (sign-in window size: ' + $Matches[2] + ').' }
   if ($res -ne 'done') { $why = $(switch ($res) { 'no-pnp' { 'the SharePoint tool is not installed' } 'not-connected' { 'the sign-in did not finish' }
         'wrong-site' { 'the sign-in connected to another site than the saved site address' }
+        'site-unknown' { 'RADE could not read which site the sign-in connected to' }
         default { $(if ($r.Stage) { (Get-StageText $r.Stage $lists) + ' did not finish in ' + [int]($toolStageSeconds / 60) + ' minutes, so RADE stopped it' } else { 'it stopped: ' + $r.Why }) } })
     $gone = Clear-BackupDir $dir
     $left = $(if ($gone) { 'Nothing on the site changed.' } else { 'Nothing on the site changed. Its unfinished folder stays: ' + (ConvertTo-Masked $dir) })

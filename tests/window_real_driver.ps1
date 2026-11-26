@@ -48,10 +48,19 @@ function global:Save-RadeUninstall([string]$bp, [string]$nm) {
   $script:app.Uninstall = $keepU
   # Remove RADE (engine-v40, E3 b): the block card (this app is installed here) and the confirm card (drawn as is: no run).
   & $ui.VRemoveRade; Save-RadeCard 'rmblock'
-  $what = 'RADE moves these to the Recycle Bin: RADE\Config, the RADE runner, the RADE shortcut, and the files in each app folder. The Backups folders stay.'
+  $what = 'RADE moves these to the Recycle Bin: RADE\Config, the RADE runners, the shortcuts RADE made, and the files in each app folder. The Backups folders stay.'   # as engine/ps/window/11-tools.ps1 (engine-v42)
   & $ui.SetCard @{ View = 'rmrade'; Light = 'you'; Sentence = 'Remove RADE from this computer?'; P = @('No app is installed.', $what, 'To use RADE again later, paste a RADE script again.')
     Field = @{ Label = 'Type RADE to confirm'; Text = ''; Name = 'The word RADE, to confirm Remove RADE' }; Focus = 'field'; Buttons = @(@{ Text = 'Remove RADE'; Kind = 'danger'; Act = {} }); Back = { & $ui.VChoose } }
   Save-RadeCard 'rmrade'
+  # Back up (engine-v42; 90-161.Z R44 E4), for the PFM's preview: the card while it runs (the Alt+Tab line), a result
+  # with the sign-in time and a result of a stage past its time limit (fake data; nothing runs).
+  & $ui.SetCard @{ View = 'toolrun'; Kicker = 'MAINTENANCE'; Sentence = 'Back up is running.'; P = @('Reads the lists and saves them on this computer. Nothing on the site changes. ' + $ui.SignInHint) }
+  Save-RadeCard 'toolrun-backup-hint'
+  & $ui.ToolResult 'Back up' @{ State = 'done'; Path = (Join-Path $bp 'Backups\20261126-100000'); Lines = @('All 2 lists were saved.', 'Nothing on the site changed.',
+      'PASS: "Sample Tasks": 2 rows saved', 'PASS: "Sample Recs (Form 1)": 0 rows saved', 'The sign-in took 14 seconds (sign-in window size: on).') }
+  Save-RadeCard 'toolres-backup-signin'
+  & $ui.ToolResult 'Back up' @{ State = 'failed'; Path = ''; Lines = @('Back up saved nothing: the sign-in did not finish in 5 minutes, so RADE stopped it.', 'Nothing on the site changed.', 'Select "Back up" again.') }
+  Save-RadeCard 'toolres-backup-stage'
 }
 
 function global:Save-RadeRestore {

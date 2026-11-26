@@ -17,7 +17,7 @@ function Connect-PnPOnline { param([string]$Url, [switch]$UseWebLogin) if ($Url 
   $s = Get-FakeState; if ($s.signinSleep) { Start-Sleep -Seconds ([int]$s.signinSleep) }; $script:fakeUrl = $Url }
 function Get-PnPWeb {
   param([string[]]$Includes)
-  $s = Get-FakeState
+  $s = Get-FakeState; if ($s.webError) { throw 'web read failed' }   # R44 E4: a site check that cannot read the site
   $perm = New-Object psobject | Add-Member -PassThru -MemberType ScriptMethod -Name Has -Value ([scriptblock]::Create('param($k) return ' + $(if ($s.rights) { '$true' } else { '$false' })))
   $u = $(if ($s.webUrl) { [string]$s.webUrl } else { [string]$script:fakeUrl })   # R44 E4: the site check reads Url
   return [pscustomobject]@{ Url = $u; EffectiveBasePermissions = $perm; CurrentUser = [pscustomobject]@{ IsSiteAdmin = [bool]$s.admin } }

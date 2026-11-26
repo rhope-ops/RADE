@@ -125,3 +125,10 @@ $h3 = Get-IseHandoff 'Windows PowerShell ISE Host' 'AllSigned'; $env:RADE_ISE_CH
 $script:selfText = ''; $h5 = Get-IseHandoff 'Windows PowerShell ISE Host' 'Unrestricted'
 Assert-Case 'ISE start (R44 E3): ISE goes to the child; ConsoleHost stays; AllSigned, RADE_ISE_CHILD=0 and no own text stay in ISE with the reason' ($h1.Go -and -not $h2.Go -and -not $h2.Why -and
   -not $h3.Go -and $h3.Why -eq 'the execution policy is AllSigned' -and -not $h4.Go -and $h4.Why -eq 'RADE_ISE_CHILD=0' -and -not $h5.Go -and $h5.Why -eq 'RADE could not read its own text')
+# R44 E4: a site check that cannot read the site gives its own words (not "the sign-in did not finish").
+Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake'   # Remove RADE above took RADE\Config again
+$fk | Add-Member -NotePropertyName webError -NotePropertyValue $true -Force; Set-Fake $fk
+Start-Sleep -Seconds 1; $script:app.Backup = @('Sample Tasks'); $b5 = Invoke-Backup $base $null
+Assert-Case 'back up (R44 E4): a site check that fails is named as the site check' ($b5.State -eq 'failed' -and
+  $b5.Lines[0] -eq 'Back up saved nothing: RADE could not read which site the sign-in connected to.')
+$fk.PSObject.Properties.Remove('webError'); Set-Fake $fk
