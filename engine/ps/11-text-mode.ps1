@@ -2,7 +2,33 @@
 # the round and the summary) when no window is open. Uses the parts before it.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
+<#
+.SYNOPSIS
+Shows this process's console window again (engine-v44, review of the hidden ISE child).
+.DESCRIPTION
+The ISE child (Invoke-IseWindow, part 05) starts with -WindowStyle Hidden, so no blank console shows while the RADE
+window is open. When the window cannot open there, text mode runs in that console: it must show, or its questions wait
+where nobody can see them. Only the console of this process is shown; nothing else is read or changed. Windows only;
+a failure (no console, Constrained Language Mode) changes nothing.
+.OUTPUTS
+None.
+#>
+function Show-RadeConsole {
+  if ($env:OS -ne 'Windows_NT') { return }
+  try {
+    if (-not ('RadeConsole.Show1' -as [type])) {
+      Add-Type -Namespace RadeConsole -Name Show1 -ErrorAction Stop -MemberDefinition @"
+[System.Runtime.InteropServices.DllImport("kernel32.dll")] public static extern System.IntPtr GetConsoleWindow();
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr h, int cmd);
+"@
+    }
+    $cw = [RadeConsole.Show1]::GetConsoleWindow()
+    if ($cw -ne [IntPtr]::Zero) { $null = [RadeConsole.Show1]::ShowWindow($cw, 9) }   # 9 = SW_RESTORE: shown and not minimized
+  } catch { $null = $_ }   # no console to show: text mode writes as before
+}
+
 try {
+  if ($env:RADE_HOST -eq 'child') { Show-RadeConsole }   # the hidden ISE child: its console shows for text mode
   $script:textMode = $true
   # Writes a line to the run log and the console. Takes the line; gives back nothing.
   $say = { param($t) Add-RunLog $t; Write-Host $t }
