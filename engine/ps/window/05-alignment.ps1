@@ -53,14 +53,23 @@ $ui.FitHead = {
       & $ui.SetLeft $c.R $e; $rw = & $ui.RuleW $c.W; if ($c.R.Width -ne $rw) { $c.R.Width = $rw }
       if ($c.V) { $mt = & $ui.VerTop $c.W $c.V; $m = $c.V.Margin   # name spot L2: the version text on the word's base line
         if ($m.Top -ne $mt) { $c.V.Margin = New-Object System.Windows.Forms.Padding($m.Left, $mt, $m.Right, $m.Bottom) } } } } catch { $null = $_ } }   # no measure (no window handle yet): the next fit sets the edges
-# VerBad (name spot L2, the PFM, 2026-11-26): the version text stands on the word's base line (1 px, scaled), and no ink
-# of the word row reaches the line under it (R44: the "g" of "sign-in" was cut by the line). Takes the card and the
-# measured numbers @{ WordBase; VerBase; InkBottom; RuleTop } in screen pixels; gives back the defect lines.
-$ui.VerBad = { param([string]$Card, $M)
-  $out = @(); $tol = [math]::Max(1, (& $ui.Sc 1))
-  if ([math]::Abs([int]$M.VerBase - [int]$M.WordBase) -gt $tol) { $out += ('LAYOUT ' + $Card + ' header version: its base line is at ' + $M.VerBase + ', the word''s is at ' + $M.WordBase) }
-  if ([int]$M.InkBottom -gt [int]$M.RuleTop) { $out += ('LAYOUT ' + $Card + ' header line: at ' + $M.RuleTop + ', the ink of the word row goes down to ' + $M.InkBottom) }
+# VerBad (name spot L2, the PFM, 2026-11-26): each text of the word row ends its ink inside its own panel (no cut), each
+# text after the word stands on the word's base line (1 px, scaled), and no ink of the row reaches the line under it
+# (R44: the "g" of "sign-in" was cut by the line). Takes the card, the texts of the row, word first, each
+# @{ N; Ink = @{ Bottom; Base; Panel } } in screen pixels ($ui.TextInk), and the line's top ($null: no line); gives back
+# the defect lines.
+$ui.VerBad = { param([string]$Card, [object[]]$Row, $RuleTop)
+  $out = @(); $tol = [math]::Max(1, (& $ui.Sc 1)); $w = $Row[0]
+  foreach ($t in $Row) { if ([int]$t.Ink.Bottom -gt [int]$t.Ink.Panel) { $out += ('LAYOUT ' + $Card + ' header ' + $t.N + ': its ink goes down to ' + $t.Ink.Bottom + ', its panel ends at ' + $t.Ink.Panel) }
+    if (-not [object]::ReferenceEquals($t, $w) -and [math]::Abs([int]$t.Ink.Base - [int]$w.Ink.Base) -gt $tol) { $out += ('LAYOUT ' + $Card + ' header ' + $t.N + ': its base line is at ' + $t.Ink.Base + ', the word''s is at ' + $w.Ink.Base) } }
+  $low = [int](@($Row | ForEach-Object { $_.Ink.Bottom }) | Measure-Object -Maximum).Maximum
+  if ($null -ne $RuleTop -and $low -gt [int]$RuleTop) { $out += ('LAYOUT ' + $Card + ' header line: at ' + $RuleTop + ', the ink of the word row goes down to ' + $low) }
   return $out }
+# Name spot L2: where the whole ink of an ink-tight text ends, as Windows draws the text with no panel around it ($ui.InkOf),
+# and its base line, both on the screen; Panel is where its panel ends. Takes the panel and its screen rectangle; gives
+# back @{ Bottom; Base; Panel } (Bottom is the panel's end when the text cannot be measured).
+$ui.TextInk = { param($P, $R) $fi = & $ui.FontInk $P.Font; $y0 = [int]$R.Top - [int]$fi.Top; $b = $null; if ([string]$P.Text) { $b = & $ui.InkOf ([string]$P.Text) $P.Font }
+  @{ Bottom = $(if ($b) { $y0 + [int]$b.Bottom } else { [int]$R.Bottom }); Base = $y0 + [int]$fi.Base; Panel = [int]$R.Bottom } }
 # Name spot L2: the top margin that puts a version text's base line on the word's base line (both panels start at the top
 # of the capitals: $ui.InkFit). Takes the word's and the version text's panels; gives back pixels (0 at least).
 $ui.VerTop = { param($W, $V) $fw = & $ui.FontInk $W.Font; $fv = & $ui.FontInk $V.Font; [int][math]::Max(0, ([int]$fw.Base - [int]$fw.Top) - ([int]$fv.Base - [int]$fv.Top)) }
@@ -289,13 +298,16 @@ $ui.Measure = { param([string]$Card)
   # L1, L2: in each column of the logo block the word and its subtitle start on one edge, with the word, 4 px, the line,
   # 4 px, the subtitle, measured on the ink Windows drew; the two columns share the edge when both rows start at one x.
   $cols = @(& $ui.HeadCols)
-  if ($ui.WordL.Visible) { foreach ($c in $cols) { $nw = & $ui.NameOf $c.W
+  if ($ui.WordL.Visible) { foreach ($c in $cols) { $nw = & $ui.NameOf $c.W; $rw = & $sr $c.W
+      # Name spot L2: a word that keeps room for descenders (the application column) and its version text. The ink is the
+      # text's whole ink as Windows draws it with no panel around it ($ui.TextInk), so a panel or a line that cuts it shows.
+      $row = $null; if ($c.W.Tag.Desc) { $row = @(@{ N = $nw; Ink = (& $ui.TextInk $c.W $rw) })
+        if ($c.V) { $rv = & $sr $c.V; $row += @{ N = (& $ui.NameOf $c.V); Ink = (& $ui.TextInk $c.V $rv) } }
+        $out += & $ui.VerBad $Card $row $(if ($c.Sub) { (& $sr $c.R).Top } else { $null }) }
       if (-not $c.Sub) { continue }   # a name with no subtitle has no line and nothing under it to measure
       $out += & $ui.HeadBad $Card @{ N = $nw; X = (& $tx $c.W) } @{ N = (& $ui.NameOf $c.S); X = (& $tx $c.S) }
-      $rw = & $sr $c.W; $rr = & $sr $c.R; $ra = & $sr $c.S; $wi = & $ui.InkBox $c.W; $ai = & $ui.InkBox $c.S; $wb = $rw.Top + $wi.Bottom
-      if ($c.V) { $rv = & $sr $c.V; $vi = & $ui.InkBox $c.V; $wb = [math]::Max($rw.Bottom, $rv.Bottom)   # L2: the line comes under the word row's descender room
-        $out += & $ui.VerBad $Card @{ WordBase = $rw.Top + (& $ui.FontInk $c.W.Font).Base - (& $ui.FontInk $c.W.Font).Top; VerBase = $rv.Top + (& $ui.FontInk $c.V.Font).Base - (& $ui.FontInk $c.V.Font).Top
-          InkBottom = [math]::Max($rw.Top + $wi.Bottom, $rv.Top + $vi.Bottom); RuleTop = $rr.Top } }
+      $rr = & $sr $c.R; $ra = & $sr $c.S; $wi = & $ui.InkBox $c.W; $ai = & $ui.InkBox $c.S; $wb = $rw.Top + $wi.Bottom
+      if ($row) { $wb = [int](@($row | ForEach-Object { $_.Ink.Panel }) | Measure-Object -Maximum).Maximum }   # L2: the line comes under the word row's descender room
       $out += & $ui.HeadRuleBad $Card @{ WordBottom = $wb; WordLeft = $rw.Left + $wi.Left; WordW = $wi.Right - $wi.Left; RuleTop = $rr.Top; RuleBottom = $rr.Bottom; RuleLeft = $rr.Left; RuleW = $rr.Width
         AppTop = $(if ([string]$c.S.Text -cmatch '[A-Z0-9bdfhklt]') { $ra.Top + $ai.Top } else { $null }) } (& $ui.Sc $ui.Z.G1) }
     if ((& $ui.HeadPair) -and $cols.Count -gt 1) { $out += & $ui.HeadBad $Card @{ N = 'WordL'; X = (& $tx $ui.WordL) } @{ N = (& $ui.NameOf $ui.AppWordL); X = (& $tx $ui.AppWordL) } } }
