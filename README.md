@@ -1,4 +1,4 @@
-![RADE: Test, deploy, enjoy](docs/assets/RADE-social-preview.png)
+![RADE: Redacted Application Deployment Engine](docs/assets/RADE-social-preview.png)
 
 # RADE
 <p><b>Redacted Application Deployment Engine</b></p>
