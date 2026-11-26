@@ -27,12 +27,22 @@ $ui.FitEdges = { try {
 # margins share those 8 px (left = 8 - the ink of its first letter). Takes nothing; uses $ui.EdgeX.
 $ui.FitStepEdge = { $sd = & $ui.Sc 8; & $ui.SetLeft $ui.StepRow ([int]$ui.EdgeX - $sd); $il = [int][math]::Max(0, [math]::Min($sd, $sd - (& $ui.Ink $ui.StepName))); $m = $ui.StepName.Margin
   if ($m.Left -ne $il -or $m.Right -ne $sd - $il) { $ui.StepName.Margin = New-Object System.Windows.Forms.Padding($il, $m.Top, ($sd - $il), $m.Bottom) } }
-# R29b V1, L1 (the PFM, 2026-11-26): in each column of the logo block the word and its subtitle start their ink on one
-# edge, and when both rows start at the same x (both logos, or neither) the two columns share that edge. Each part sits at
-# the same x in its row and draws its text ink-tight ($ui.InkText); what is left of a difference (measured) moves each
-# to the largest. L2: the line under a word is as wide as the word's ink and starts where it starts. Takes nothing;
-# changes the left margins of the words, the lines and the subtitles, and the widths of the lines.
-$ui.FitHead = { try {
+# The edges of the logo block's columns (R29b V1, L1, L2): the help is in the block.
+$ui.FitHead = {
+  <#
+  .SYNOPSIS
+  Puts the ink of each column of the logo block on one edge, sizes the lines and puts a version text on its base line.
+  .DESCRIPTION
+  R29b V1, L1 (the PFM, 2026-11-26): in each column the word and its subtitle start their ink on one edge, and when both
+  rows start at the same x (both logos, or neither) the two columns share that edge. Each part sits at the same x in its
+  row and draws its text ink-tight ($ui.InkText); what is left of a difference (measured) moves each to the largest. L2:
+  the line under a word is as wide as the word's ink and starts where it starts. Name spot L2 (engine-v45): a version
+  text beside the word gets the top margin that puts its base line on the word's ($ui.VerTop).
+  .OUTPUTS
+  Nothing. Changes the left margins of the words, the lines and the subtitles, the widths of the lines and the top margin
+  of a version text. Before the window has a handle nothing can be measured: the next fit sets them.
+  #>
+  try {
     $cols = @(& $ui.HeadCols); $same = & $ui.HeadPair; $all = @()
     foreach ($c in $cols) { $c.IW = & $ui.Ink $c.W; $c.IS = $(if ($c.Sub) { & $ui.Ink $c.S } else { 0 }); $c.E = [math]::Max($c.IW, $c.IS); $all += $c.E }
     $top = [int]($all | Measure-Object -Maximum).Maximum
@@ -40,11 +50,16 @@ $ui.FitHead = { try {
       & $ui.SetLeft $c.W ($e - $c.IW); if ($c.Sub) { & $ui.SetLeft $c.S ($e - $c.IS) }
       # R34: the width comes from the ink Windows drew in the panel ($ui.InkBox, the measure of the self-check), not from the
       # panel's width: at 150 % in ISE the panel was 114 wide and the drawn word 93 (each card had the defect).
-      & $ui.SetLeft $c.R $e; $rw = & $ui.RuleW $c.W; if ($c.R.Width -ne $rw) { $c.R.Width = $rw } } } catch { $null = $_ } }   # no measure (no window handle yet): the next fit sets the edges
+      & $ui.SetLeft $c.R $e; $rw = & $ui.RuleW $c.W; if ($c.R.Width -ne $rw) { $c.R.Width = $rw }
+      if ($c.V) { $mt = & $ui.VerTop $c.W $c.V; $m = $c.V.Margin   # name spot L2: the version text on the word's base line
+        if ($m.Top -ne $mt) { $c.V.Margin = New-Object System.Windows.Forms.Padding($m.Left, $mt, $m.Right, $m.Bottom) } } } } catch { $null = $_ } }   # no measure (no window handle yet): the next fit sets the edges
+# Name spot L2: the top margin that puts a version text's base line on the word's base line (both panels start at the top
+# of the capitals: $ui.InkFit). Takes the word's and the version text's panels; gives back pixels (0 at least).
+$ui.VerTop = { param($W, $V) $fw = & $ui.FontInk $W.Font; $fv = & $ui.FontInk $V.Font; [int][math]::Max(0, ([int]$fw.Base - [int]$fw.Top) - ([int]$fv.Base - [int]$fv.Top)) }
 # The columns of the logo block that show: the RADE column, and the application column when its row shows. Each is
-# @{ W (word); R (line); S (subtitle); Sub (the subtitle shows) }. Takes nothing.
-$ui.HeadCols = { $o = @(@{ W = $ui.WordL; R = $ui.HeadRule; S = $ui.TagL; Sub = $true })
-  if ($ui.AppRow.Visible) { $o += @{ W = $ui.AppWordL; R = $ui.AppRule; S = $ui.AppL; Sub = [bool]($ui.AppL.Visible -and [string]$ui.AppL.Text) } }
+# @{ W (word); R (line); S (subtitle); Sub (the subtitle shows); V (the version text beside the word, or $null) }. Takes nothing.
+$ui.HeadCols = { $o = @(@{ W = $ui.WordL; R = $ui.HeadRule; S = $ui.TagL; Sub = $true; V = $null })
+  if ($ui.AppRow.Visible) { $o += @{ W = $ui.AppWordL; R = $ui.AppRule; S = $ui.AppL; Sub = [bool]($ui.AppL.Visible -and [string]$ui.AppL.Text); V = $(if ($ui.AppVerL -and $ui.AppVerL.Visible -and [string]$ui.AppVerL.Text) { $ui.AppVerL } else { $null }) } }
   $o }
 # The width of the line under a word: the width of the word's drawn ink, measured once for each text, font and panel
 # size. Takes the word's panel; gives back the width in pixels (at least 1).
@@ -266,11 +281,17 @@ $ui.Measure = { param([string]$Card)
   # L1, L2: in each column of the logo block the word and its subtitle start on one edge, with the word, 4 px, the line,
   # 4 px, the subtitle, measured on the ink Windows drew; the two columns share the edge when both rows start at one x.
   $cols = @(& $ui.HeadCols)
-  if ($ui.WordL.Visible) { foreach ($c in $cols) { $nw = & $ui.NameOf $c.W
+  if ($ui.WordL.Visible) { foreach ($c in $cols) { $nw = & $ui.NameOf $c.W; $rw = & $sr $c.W
+      # Name spot L2: a word that keeps room for descenders (the application column) and its version text. The ink is the
+      # text's whole ink as Windows draws it with no panel around it ($ui.TextInk), so a panel or a line that cuts it shows.
+      $row = $null; if ($c.W.Tag.Desc) { $row = @(@{ N = $nw; Ink = (& $ui.TextInk $c.W $rw) })
+        if ($c.V) { $rv = & $sr $c.V; $row += @{ N = (& $ui.NameOf $c.V); Ink = (& $ui.TextInk $c.V $rv) } }
+        $out += & $ui.VerBad $Card $row $(if ($c.Sub) { (& $sr $c.R).Top } else { $null }) }
       if (-not $c.Sub) { continue }   # a name with no subtitle has no line and nothing under it to measure
       $out += & $ui.HeadBad $Card @{ N = $nw; X = (& $tx $c.W) } @{ N = (& $ui.NameOf $c.S); X = (& $tx $c.S) }
-      $rw = & $sr $c.W; $rr = & $sr $c.R; $ra = & $sr $c.S; $wi = & $ui.InkBox $c.W; $ai = & $ui.InkBox $c.S
-      $out += & $ui.HeadRuleBad $Card @{ WordBottom = $rw.Top + $wi.Bottom; WordLeft = $rw.Left + $wi.Left; WordW = $wi.Right - $wi.Left; RuleTop = $rr.Top; RuleBottom = $rr.Bottom; RuleLeft = $rr.Left; RuleW = $rr.Width
+      $rr = & $sr $c.R; $ra = & $sr $c.S; $wi = & $ui.InkBox $c.W; $ai = & $ui.InkBox $c.S; $wb = $rw.Top + $wi.Bottom
+      if ($row) { $wb = [int](@($row | ForEach-Object { $_.Ink.Panel }) | Measure-Object -Maximum).Maximum }   # L2: the line comes under the word row's descender room
+      $out += & $ui.HeadRuleBad $Card @{ WordBottom = $wb; WordLeft = $rw.Left + $wi.Left; WordW = $wi.Right - $wi.Left; RuleTop = $rr.Top; RuleBottom = $rr.Bottom; RuleLeft = $rr.Left; RuleW = $rr.Width
         AppTop = $(if ([string]$c.S.Text -cmatch '[A-Z0-9bdfhklt]') { $ra.Top + $ai.Top } else { $null }) } (& $ui.Sc $ui.Z.G1) }
     if ((& $ui.HeadPair) -and $cols.Count -gt 1) { $out += & $ui.HeadBad $Card @{ N = 'WordL'; X = (& $tx $ui.WordL) } @{ N = (& $ui.NameOf $ui.AppWordL); X = (& $tx $ui.AppWordL) } } }
   if ($ui.FieldRow.Visible -and $ui.FieldAbove -and -not $ui.RecOn) { $rl = & $sr $ui.FieldL; $rb = & $sr $ui.FieldBox   # L3: the label above its box

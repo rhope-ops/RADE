@@ -322,9 +322,17 @@ $script:scriptCheck = Get-ScriptCheck
 
 # Gives the name a person sees for the chosen app: the manifest's application.displayName, else the app name. Takes nothing.
 function Get-AppDisplay { if ([string]$appDisplay) { return [string]$appDisplay }; return [string]$script:app.Name }
-# Gives the line under the application name in the logo block: the manifest's application.subtitle, or '' (L1, the PFM,
-# 2026-11-26). Takes nothing.
-function Get-AppSubtitle { return [string]$appSubtitle }
+# Name spot L2 (engine-v45; the PFM, 2026-11-26): the word of the application row is application.productName ("Kanon"),
+# else the app name. Takes nothing.
+function Get-AppWord { if ([string]$appProduct) { return [string]$appProduct }; return [string]$script:app.Name }
+# The line under the word: "<name> <bullet> <subtitle>" with a productName ("90-161.Z <bullet> Publications and Forms
+# Management"), else the subtitle alone (L1); '' when there is nothing to show. Takes nothing.
+function Get-AppSubtitle { $s = [string]$appSubtitle; if (-not [string]$appProduct) { return $s }
+  if ($s) { return ([string]$script:app.Name + ' ' + [string][char]0x2022 + ' ' + $s) }; return [string]$script:app.Name }
+# The Small gray text beside the word: "<version> <dot> <round> <label>"; from the shortcut (no round) the version only.
+# Takes nothing.
+function Get-AppVersionText { $v = [string]$script:app.Version; if (Test-RunnerStart) { return $v }
+  $r = ([string]$round + $(if ([string]$roundLabel) { ' ' + [string]$roundLabel } else { '' })); if (-not $v) { return $r }; return ($v + ' ' + [string][char]0x00B7 + ' ' + $r) }
 # Says whether RADE runs from an app's runner copy in RADE\runners (opened by its shortcut: no round, R44 E2). Takes nothing.
 function Test-RunnerStart {
   try { return [bool]($script:startFile -and (Split-Path -Parent $script:startFile) -eq (Join-Path (Get-RadePath) 'runners')) } catch { return $false }   # no RADE folder: not a runner

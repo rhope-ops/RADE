@@ -53,6 +53,13 @@
           "pattern": "^R[0-9]{2,}$",
           "description": "Round id; also the results folder Rounds\\<round> and the e-mail subject."
         },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24,
+          "pattern": "^[^\\u0000-\\u001f'\"`$]+$",
+          "description": "Optional (engine-v45, name spot L2; the PFM, 2026-11-26). A few words for the round, for example \"sign-in test\". The window shows \"<version> \u00b7 <round> <label>\" beside the application's word in the logo block; without it, \"<version> \u00b7 <round>\". At most 24 characters; no quotes, no $ and no control characters."
+        },
         "title": {
           "type": "string",
           "minLength": 1,
@@ -830,12 +837,17 @@
           "pattern": "^[A-Za-z0-9]([A-Za-z0-9 ._-]{0,58}[A-Za-z0-9])?$",
           "description": "Optional (engine-v42; 90-161.Z R44 E2, the PFM, 2026-11-25). The name a person sees for the installed app, for example \"90-161.Z - Kanon\". The shortcut is named \"<displayName> - <version>\". Without it, the app name is used. The app name (apps \"name\") stays the install key, the folder name and the Uninstall confirm text. Letters, digits, spaces, \".\", \"_\" and \"-\" only, so it is a valid file name."
         },
+        "productName": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9]([A-Za-z0-9 ._-]{0,38}[A-Za-z0-9])?$",
+          "description": "Optional (engine-v45, name spot L2; the PFM, 2026-11-26). The product's own name, for example \"Kanon\". It is the word of the application row in the window's logo block, and under the line comes \"<name> \u2022 <subtitle>\". Without it, the word is the app name and the subtitle stands alone under the line. Letters, digits, spaces, \".\", \"_\" and \"-\", at most 40 characters."
+        },
         "subtitle": {
           "type": "string",
           "minLength": 1,
           "maxLength": 80,
           "pattern": "^[^\\u0000-\\u001f'\"`$]+$",
-          "description": "Optional (engine-v43, L1; the PFM, 2026-11-26). The line under the application name in the window's logo block, for example \"Kanon \u2022 Publications and Forms Management\". Without it, the application row shows the name only. At most 80 characters; no quotes, no $ and no control characters (the build writes it into the bundle as ASCII text)."
+          "description": "Optional (engine-v43, L1; the PFM, 2026-11-26). The line under the application name in the window's logo block, for example \"Publications and Forms Management\" (with productName \"Kanon\", the line shows \"90-161.Z \u2022 Publications and Forms Management\"). Without it, the application row shows its word only (with productName: the app name under the line). At most 80 characters; no quotes, no $ and no control characters (the build writes it into the bundle as ASCII text)."
         },
         "logo": {
           "type": "string",
