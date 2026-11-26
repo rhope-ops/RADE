@@ -100,7 +100,7 @@ $ui.ShowAppRow = { param([bool]$On)
   if (-not $ui.AppLogo) { $ui.TagL.Text = $(if ($On) { [string]$script:app.Name } else { $ui.Tagline }); $On = $false }   # no application logo: the name stands under RADE (one row, the window keeps its height)
   $sub = [bool]($On -and [string]$ui.AppL.Text)   # no subtitle: the name only, with no line under it
   $ui.AppRule.Visible = $sub; $ui.AppL.Visible = $sub; $ui.AppVerL.Visible = [bool]($On -and [string]$ui.AppVerL.Text)   # L2: the version text beside the word
-  if ($On) { & $ui.InkFit $ui.AppWordL; & $ui.InkFit $ui.AppVerL; & $ui.InkFit $ui.AppL }   # before the window has its scale: the next fit sizes them
+  if ($On) { & $ui.InkFit $ui.AppVerL; & $ui.WordRoom; & $ui.InkFit $ui.AppL }   # before the window has its scale: the next fit sizes them
   $ui.AppRow.Visible = $On; $ui.LinkLine.Visible = ($On -and $ui.Logo -and $ui.AppLogo)
   & $ui.FitHead; if ($ui.AppLogo) { & $ui.AlignRow (& $ui.RowParts 'AppRow') 0 }   # the application column is centered on its logo
   try { $ui.Form.PerformLayout() } catch { $null = $_ }   # no form yet (text mode): nothing to lay out

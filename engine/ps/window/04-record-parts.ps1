@@ -124,8 +124,7 @@ $ui.Fit = {
   # The header's ink-tight texts get their size now that the window has its scale; a long name ends with "..." at the window's edge.
   foreach ($l in @($ui.TagL, $ui.AppWordL, $ui.AppVerL, $ui.AppL)) { try { $l.Tag.MaxW = [math]::Max((& $ui.Sc 60), ($ui.Top.ClientSize.Width - (& $ui.LeftIn $l $ui.Top) - (& $ui.Sc $ui.Z.Inset))) } catch { $null = $_ } }   # L1: each text of the logo block ends at the window's inset
   foreach ($l in @($ui.WordL, $ui.TagL, $ui.AppVerL, $ui.AppL)) { & $ui.InkFit $l }
-  if ($ui.AppVerL.Visible) { $ui.AppWordL.Tag.MaxW = [math]::Max((& $ui.Sc 60), [int]$ui.AppWordL.Tag.MaxW - $ui.AppVerL.Width - $ui.AppVerL.Margin.Left) }   # L2: room for the version text
-  & $ui.InkFit $ui.AppWordL
+  $ui.AppWordL.Tag.Max0 = [int]$ui.AppWordL.Tag.MaxW; & $ui.WordRoom   # L2: room for the version text
   try { $lh = [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $ui.Kick.Font).Height + (& $ui.Sc 2); if ($ui.Head.MinimumSize.Height -ne $lh) { $ui.Head.MinimumSize = New-Object System.Drawing.Size(0, $lh) } } catch { $null = $_ }   # L1: the header row keeps its height on a card with no line
   foreach ($l in @($ui.RightL, $ui.StepTime, $ui.StepFrac)) { & $ui.FixW $l }   # labels of changing values: one size from their widest value
   & $ui.FitRow; & $ui.Apart; & $ui.FitSent; & $ui.FitSteps; & $ui.FitEdges; & $ui.FitBar; & $ui.AlignRows

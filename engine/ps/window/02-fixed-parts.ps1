@@ -76,6 +76,11 @@ $ui.VerBad = { param([string]$Card, [object[]]$Row, $RuleTop)
 # back @{ Bottom; Base; Panel } (Bottom is the panel's end when the text cannot be measured).
 $ui.TextInk = { param($P, $R) $fi = & $ui.FontInk $P.Font; $y0 = [int]$R.Top - [int]$fi.Top; $b = $null; if ([string]$P.Text) { $b = & $ui.InkOf ([string]$P.Text) $P.Font }
   @{ Bottom = $(if ($b) { $y0 + [int]$b.Bottom } else { [int]$R.Bottom }); Base = $y0 + [int]$fi.Base; Panel = [int]$R.Bottom } }
+# Name spot L2: the application word ends with "..." where the version text beside it still fits before the window's
+# inset (Tag.Max0: the word's widest size alone, set by $ui.Fit), then gets its size. Takes nothing.
+$ui.WordRoom = { $w = $ui.AppWordL; $m0 = [int]$w.Tag.Max0
+  if ($m0 -gt 0) { $w.Tag.MaxW = $(if ($ui.AppVerL.Visible) { [math]::Max((& $ui.Sc 60), $m0 - $ui.AppVerL.Width - $ui.AppVerL.Margin.Left) } else { $m0 }) }
+  & $ui.InkFit $w }
 # The RADE column: the word RADE and, under it at all times, the tagline (L1, the PFM, 2026-11-26: "RADE (new line) Test,
 # deploy, enjoy"; it replaces 2026-11-19, where a chosen application's name took the tagline's place).
 $hc = & $ui.HeadCol 'RADE' 'Test, deploy, enjoy'
