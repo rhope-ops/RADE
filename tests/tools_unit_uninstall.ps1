@@ -132,3 +132,12 @@ Start-Sleep -Seconds 1; $script:app.Backup = @('Sample Tasks'); $b5 = Invoke-Bac
 Assert-Case 'back up (R44 E4): a site check that fails is named as the site check' ($b5.State -eq 'failed' -and
   $b5.Lines[0] -eq 'Back up saved nothing: RADE could not read which site the sign-in connected to.')
 $fk.PSObject.Properties.Remove('webError'); Set-Fake $fk
+# R44 E2 (the PFM's Q1 answer, 2026-11-26): opened from a runner copy (the shortcut), the title has no round; the word
+# spot and the Maintenance card show "<display> - <version>".
+$appDisplay = 'Sample - Kanon'; $keepVer = $script:app.Version; $script:app.Version = '0.1.0'; $keepStart = $script:startFile
+$script:startFile = Join-Path (Join-Path (Join-Path $Dir 'RADE') 'runners') 'aaaaaaaaaaaa.ps1'; $r1 = Test-RunnerStart
+$script:startFile = ''; $r2 = Test-RunnerStart; $script:startFile = Join-Path $Dir 'other.ps1'; $r3 = Test-RunnerStart
+$dv = Get-AppDisplayVersion; $script:app.Version = ''; $dn = Get-AppDisplayVersion
+Assert-Case 'title and names (R44 E2): a runner copy start is known; a paste or another file is not; "<display> - <version>"' ($r1 -and -not $r2 -and -not $r3 -and
+  $dv -eq 'Sample - Kanon - 0.1.0' -and $dn -eq 'Sample - Kanon')
+$appDisplay = ''; $script:app.Version = $keepVer; $script:startFile = $keepStart

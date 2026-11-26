@@ -228,7 +228,7 @@ function Get-PowerShellExe {
 # The installed runner (R28, the Administrator, 2026-11-17): RADE had none, so the desktop shortcut had nothing to open. The smallest
 # one: after a deploy has passed, a copy of the pasted text is saved (the file is a whole bundle, so it carries its own engine
 # and its own applications). The app's shortcut runs it. From engine-v42 each app has its own copy (Save-RunnerCopy below).
-$script:selfText = ''
+$script:selfText = ''; $script:startFile = [string]$PSCommandPath   # the file RADE runs from ('' for a paste in ISE)
 try { if ($PSCommandPath -and (Test-Path -LiteralPath $PSCommandPath -PathType Leaf)) { $script:selfText = [System.IO.File]::ReadAllText($PSCommandPath) } } catch { $null = $_ }
 if (-not $script:selfText) { try { if ($psISE -and $psISE.CurrentFile) { $script:selfText = [string]$psISE.CurrentFile.Editor.Text } } catch { $null = $_ } }
 # In the paste guard (engine/rade_hash.py) this code runs inside the guard's script block, so $MyInvocation is that block's:
@@ -321,6 +321,13 @@ $script:scriptCheck = Get-ScriptCheck
 
 # Gives the name a person sees for the chosen app: the manifest's application.displayName, else the app name. Takes nothing.
 function Get-AppDisplay { if ([string]$appDisplay) { return [string]$appDisplay }; return [string]$script:app.Name }
+# Gives the display name and the version as one text, "<display> - <version>" (the display name alone with no version).
+# The word spot, the Maintenance card and the shortcut use it (R44 E2). Takes nothing.
+function Get-AppDisplayVersion { return ((Get-AppDisplay) + $(if ([string]$script:app.Version) { ' - ' + [string]$script:app.Version } else { '' })) }
+# Says whether RADE runs from an app's runner copy in RADE\runners (opened by its shortcut: no round, R44 E2). Takes nothing.
+function Test-RunnerStart {
+  try { return [bool]($script:startFile -and (Split-Path -Parent $script:startFile) -eq (Join-Path (Get-RadePath) 'runners')) } catch { return $false }   # no RADE folder: not a runner
+}
 # Gives the name of the chosen app's shortcut, without ".lnk": "<display> - <version>". Takes nothing.
 function Get-ShortcutName { return ((Get-AppDisplay) + ' - ' + [string]$script:app.Version) }
 # Gives the path of the chosen app's runner copy, RADE\runners\<key>.ps1 (the folder may not be there yet). Takes nothing.
