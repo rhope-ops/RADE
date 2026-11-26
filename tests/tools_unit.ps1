@@ -358,7 +358,9 @@ Assert-Case 'sign-in block (engine-v44): the marker lines stay; no size watch, n
   $signInSize -match '(?m)^# ---- RADE sign-in window size \(start' -and $signInSize -match '(?m)^# ---- RADE sign-in window size \(end\)' -and
   $signInSize -notmatch 'SetWindowPos|function Start-SignInSize|function Stop-SignInSize|RADE_SIGNIN_WATCH|Size2' -and $signInSize -notmatch 'EnumWindows\(')
 $sbErr = $null; $cLines = @()
-try { . ([scriptblock]::Create($signInSize)); function Connect-PnPOnline { [CmdletBinding()] param($Url, [switch]$UseWebLogin) }
+try { . ([scriptblock]::Create($signInSize))
+  # A stand-in for the PnP sign-in that returns at once (this case tests the lines only). Takes the address; gives nothing.
+  function Connect-PnPOnline { [CmdletBinding()] param($Url, [switch]$UseWebLogin) }
   $cLines = @(Connect-RadeSite 'https://usaf.dps.mil/sites/fake'); Remove-Item Function:\Connect-PnPOnline } catch { $sbErr = $_ }
 Assert-Case 'sign-in block (engine-v44): Connect-RadeSite prints STAGE signin, SIGNIN seconds=N and STAGE none' ($null -eq $sbErr -and
   @($cLines).Count -eq 3 -and $cLines[0] -eq 'STAGE signin' -and $cLines[1] -match '^SIGNIN seconds=\d+$' -and $cLines[2] -eq 'STAGE none')
