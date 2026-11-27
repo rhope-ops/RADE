@@ -36,8 +36,10 @@ function global:Save-RadeUninstall([string]$bp, [string]$nm) {
   & $ui.VUninstall; Save-RadeCard 'unconfirm'
   Write-Host ('WIN uninstall-confirm view=' + $ui.View + ' danger=' + [bool]@($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Uninstall' -and $ui.Kinds[$_] -eq 'danger' }).Count)
   $ui.Field.Text = 'wrong name'; & $ui.UninstallGo; Save-RadeCard 'unconfirm-wrongname'
-  & $ui.ToolResult 'Uninstall' @{ State = 'done'; Path = (Join-Path $bp 'Uninstall\uninstall-20261125-140000.txt'); Lines = @('Sample app (deploy) is uninstalled from the test site. 2 of 2 steps done.',
-      'Your local files and the backups stay on this computer.', ('Test site: ' + $nm), 'Backup: 20261125-135900 (2 lists)', 'U01: PASSED (2 passed, 0 failed, exit code 0) in 12s', 'U02: PASSED (confirmed by you) in 1m 5s') }
+  # engine-v48: the Done lines of the clean-up (Invoke-Uninstall, Get-CleanLine), Backups kept; the path is the Backups folder.
+  & $ui.ToolResult 'Uninstall' @{ State = 'done'; Path = (Join-Path $bp 'Backups'); Lines = @('Sample app (deploy) is uninstalled from the test site. 2 of 2 steps done.',
+      'Moved to the Recycle Bin: 6 items of the app folder, 3 runner copy files, 1 shortcut, 1 install record.', ('The Backups folder stays on this computer: ' + (ConvertTo-Masked (Join-Path $bp 'Backups'))),
+      ('Test site: ' + $nm), 'Backup: 20261125-135900 (2 lists)', 'U01: PASSED (2 passed, 0 failed, exit code 0) in 12s', 'U02: PASSED (confirmed by you) in 1m 5s') }
   Save-RadeCard 'toolres-uninstall'
   & $ui.ToolResult 'Uninstall' @{ State = 'review'; Path = (Join-Path $bp 'Uninstall\uninstall-20261125-141000.txt'); Lines = @('Uninstall stopped at "Remove the lists". 0 of 2 steps done.',
       'Read the report, fix the cause, then select "Uninstall" again. The backups stay on this computer.', ('Test site: ' + $nm), 'U01: NEEDS REVIEW (1 passed, 1 failed, exit code 0) in 9s', 'Not run: 1 step(s) after "Remove the lists".') }
