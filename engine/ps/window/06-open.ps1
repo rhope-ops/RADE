@@ -147,8 +147,9 @@ $ui.VMaint = { param($Inst)
   $ui.MaintVerb = $verb   # read when a row is clicked (a scriptblock does not keep this card's local variables)
   $fix = @{ Index = 10; Name = $verb; Ver = ''; Sub = $(if ($verb -eq 'Repair') { 'Adds what is missing. Keeps your data.' } else { 'Installs ' + $script:app.Version + ' and keeps your data.' }); R1 = 'Runs the checks' }
   # Uninstall (engine-v40): dark red and on for an app with Uninstall steps, else not available (answer 4A of the PFM, 2026-11-25).
-  $un = $(if (@($script:app.Uninstall).Count) { @{ Index = 20; Name = 'Uninstall'; Ver = ''; Danger = $true; Sub = ('Saves a backup, then removes ' + (Get-AppWord) + ' from the test site.'); R1 = 'Changes the site' } }
-    else { @{ Off = $true; Soon = $true; Index = 20; Name = 'Uninstall'; Ver = ''; Sub = ($script:app.Name + ' has no Uninstall steps.'); R1 = 'Not set up' } })
+  # The texts do not name the app (a long name made the row 3 lines and the card scroll: Windows job of PR 209, 624 x 682).
+  $un = $(if (@($script:app.Uninstall).Count) { @{ Index = 20; Name = 'Uninstall'; Ver = ''; Danger = $true; Sub = 'Makes a backup, then removes the app.'; R1 = 'Changes the site' } }
+    else { @{ Off = $true; Soon = $true; Index = 20; Name = 'Uninstall'; Ver = ''; Sub = 'This app has no Uninstall steps.'; R1 = 'Not set up' } })
   & $ui.SetCard @{ View = 'maint'; Kicker = ((Get-AppWord) + ' ' + [string][char]0x2022 + ' ' + $Inst.version); Sentence = ((Get-AppWord) + ' ' + $Inst.version + ' is installed.')
     Options = (& $ui.InlineRows (@($fix) + @(& $ui.ToolRows) + @($un))); OnOption = { param($j) & $ui.MaintPick $j }
     Buttons = @($startB); Focus = 'button'; Back = { & $ui.VChoose } } }   # Focus: Start when it is the primary, else the first row
