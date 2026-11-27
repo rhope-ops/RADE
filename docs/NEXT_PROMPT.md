@@ -7,4 +7,4 @@ Updated: 2026-11-26 14:08 Central by Claude (engine-v44 and engine-v45 released)
 - Engine: v35 R42 E1-E5 (DECISIONS 2026-11-21); v34 .txt copy; v33 mark remove; v32 local test site; v31 Restore; older: [releases](https://github.com/rhope-ops/RADE/releases). Not on a device: resume cards, CAC words, tools. Open: detail 17-25.
 - Plan: [intro, Fulcrum](reviews/2026-11-21-plan-intro-fulcrum.md), v35+, R42.
 - R44: engine-v42 ([plan](reviews/2026-11-26-plan-r44-engine-v42.md)): PR, previews, review, release.yml, tag to 90-161.Z. Next logo item: SVG in application.logo. Open from R43: "RADE page" texts. After v46: Remove RADE and Uninstall (DECISIONS 2026-11-26).
-- engine-v47: [plan](reviews/2026-11-26-plan-engine-v47.md) (approved 2026-11-26). Next: review, merge, release, tag to 90-161.Z.
+- engine-v47 released 2026-11-26 (#209, fc26200; [plan](reviews/2026-11-26-plan-engine-v47.md)); 90-161.Z R47 locks it. Next: engine-v48 (Remove RADE, Uninstall clean-up).
