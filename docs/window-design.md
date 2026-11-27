@@ -70,7 +70,7 @@ The most characters of each text an application gives the window. Source of the 
 |---|---|---|
 | application name | 48 | ends it with "..." on Choose and in the logo block; wraps it in a sentence |
 | version | 14 | ends it with "..." |
-| summary | 150 | wraps it to 4 lines on Choose, then "..."; the two facts go under it when it needs more than 2 lines beside them (engine-v47; 2 lines before) |
+| summary | 150 | wraps it to 4 lines on Choose, then "..."; the two facts go under it when it needs more than 2 lines beside them or they leave it less than 60 % of the row; the notice wraps to 3 lines (engine-v47; 2 lines before) |
 | step name | 56 | wraps it as the sentence of a hand step and in the Details screen; in the step line the bar goes to the next line |
 | step title | 56 | The manifest field `title`: shown where the step name is shown to a person (the hand step's headline, the step line, the Details screen's step boxes); wraps as the name does. The log, the report, the summary and the results keep the name |
 | step note | 200 | wraps it in the Details screen (the step list scrolls) |

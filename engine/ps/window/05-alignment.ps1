@@ -198,7 +198,7 @@ $ui.Rows = { param([string]$Text, $Font, [int]$W, [int]$LineH, [int]$Most) if (-
 $ui.OptPlan = { param($o, [int]$w)
   # Where the parts of one choice go, and how tall it is. The name gets its width first. The two facts stay on the
   # right when the name and they fit on one line and the summary needs 2 lines or fewer beside them; else they go on one
-  # line under the summary. The summary wraps to 4 lines (engine-v47, the PFM, 2026-11-26: the summary was cut at full
+  # line under the summary, also when they leave the summary less than 60 % of the row. The summary wraps to 4 lines, the notice to 3 (engine-v47, the PFM, 2026-11-26: the summary was cut at full
   # and at half width; 2 lines before), a blocked application's reason and its "What to do" to 2 lines each; then "...".
   $pad = & $ui.Sc 16; $x = $pad + (& $ui.Sc 38); $inner = $w - $x - $pad; $gap = & $ui.Sc 12
   $h1 = [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $ui.F.Body).Height; $h2 = [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $ui.F.Small).Height
@@ -216,8 +216,8 @@ $ui.OptPlan = { param($o, [int]$w)
     if ($sw -ge (& $ui.Sc 120)) { $sl = & $ui.Rows ([string]$o.Sub) $ui.F.Small $sw $h2 2; $ni = [math]::Max($h1, $sl * $h2); $hi = [math]::Max((& $ui.Sc 40), ($ni + (& $ui.Sc 16)))
       return @{ Inline = $true; H = [int]$hi; Pad = $pad; X = $x; Tw = [int]($inner - $rw - $gap); Rw = $rw; Under = $false; S1 = $sl; S2 = 0; NL = 0; H1 = $h1; H2 = $h2; Vw = 0; Nw = $nw; Nc = [int]$nc; Sw = [int]$sw; Y = 0 } } }
   $sf = $(if ($o.Off) { $ui.F.SmallB } else { $ui.F.Small }); $s1 = & $ui.Rows ([string]$o.Sub) $sf $tw $h2 4
-  if ($rw -and -not $under -and -not $o.Off -and $s1 -gt 2) { $under = $true; $tw = $inner; $s1 = & $ui.Rows ([string]$o.Sub) $sf $tw $h2 4 }   # a long summary takes the whole width
-  $s2 = & $ui.Rows ([string]$o.Sub2) $ui.F.Small $tw $h2 2; $nl = & $ui.Rows ([string]$o.Note) $ui.F.SmallB $tw $h2 2
+  if ($rw -and -not $under -and -not $o.Off -and -not $o.Inline -and ($s1 -gt 2 -or $tw -lt [int]($inner * 0.6))) { $under = $true; $tw = $inner; $s1 = & $ui.Rows ([string]$o.Sub) $sf $tw $h2 4 }   # the summary takes the whole width when the facts leave it a narrow column (Windows job of PR 209: 2 short lines and a cut notice)
+  $s2 = & $ui.Rows ([string]$o.Sub2) $ui.F.Small $tw $h2 2; $nl = & $ui.Rows ([string]$o.Note) $ui.F.SmallB $tw $h2 3
   $need = $h1 + ($s1 + $s2 + $nl + [int]$under) * $h2
   $hh = [math]::Max((& $ui.Sc 66), ($need + (& $ui.Sc 20)))
   return @{ H = [int]$hh; Pad = $pad; X = $x; Tw = [int]$tw; Rw = $rw; Under = $under; S1 = $s1; S2 = $s2; NL = $nl; H1 = $h1; H2 = $h2; Vw = $vw; Nw = $nw; Y = [int](($hh - $need) / 2) } }
