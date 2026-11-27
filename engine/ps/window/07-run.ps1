@@ -113,12 +113,12 @@ $ui.RunIcon = { param($G, [string]$Word, $Color, [int]$X, [int]$Y) $d = & $ui.Sc
   $pn.Dispose() }
 # The Cancel question (Cards v2; critique change 10): Cancel or Esc on the Run card asks first. "Stop the install" lets the
 # step that runs now finish and then stops the run ($script:stopAfter, engine/ps/06-round.ps1); "Keep installing" shows the
-# Run card again. The run goes on while the question shows. Takes nothing.
+# Run card again. The run goes on while the question shows; during the setup, before the first step, it says so. Takes nothing.
 $ui.VCancelQ = {
   if (-not $ui.Running -or $ui.View -ne 'run') { return }
   $t = & $ui.TitleOf $ui.StepNow; $dep = Test-Deploy; $verb = $(if ($dep) { 'install' } else { 'round' })
   & $ui.SetCard @{ View = 'cancelq'; Light = 'you'; Kicker = $ui.Kick.Text; Sentence = ('Stop the ' + $verb + '?')
-    P = @(('RADE stops after "' + $t + '". The steps that passed stay done.'), $(if ($dep) { 'To finish the install later, select "Install ' + $script:app.Version + '" again.' } else { '' }))
+    P = @($(if ($ui.StepI -and $t) { 'RADE stops after "' + $t + '". The steps that passed stay done.' } else { 'RADE stops before the first step.' }), $(if ($dep) { 'To finish the install later, select "Install ' + $script:app.Version + '" again.' } else { '' }))
     Buttons = @(@{ Text = ('Stop the ' + $verb); Kind = 'dangerline'; Always = $true; Act = { $script:stopAfter = $true; & $ui.ShowRun; & $ui.Say1 'RADE stops after the step that runs now.' } },
       @{ Text = $(if ($dep) { 'Keep installing' } else { 'Keep running' }); Kind = 'primary'; Always = $true; Act = { & $ui.ShowRun } }) } }
 # Shows the run card: step k of n, the step name, the bars, Cancel and the next step that needs you.

@@ -29,6 +29,10 @@ $ui.Stage = New-Object System.Windows.Forms.Panel
 $ui.Stage.BackColor = $ui.C.Band; $ui.Stage.AccessibleRole = 'StaticText'; $ui.Stage.AccessibleName = 'Stage now'
 $ui.StageNow = @{ N = 1; Word = 'Choose'; Done = $false }
 foreach ($c in @($ui.Logo, $ui.BandWord, $ui.BandSub, $ui.BandLine, $ui.BandVer, $ui.Stage)) { [void]$ui.Band.Controls.Add($c) }
+# A contrast theme that changes while the window is open ($ui.Recolor) finds a part's token by its color; BandInk and White
+# have one color in the light set, so the band's parts are given their tokens here (the chip's: 03-card.ps1).
+foreach ($c in @($ui.Logo, $ui.Stage)) { $ui.Roles[$c] = @{ BackColor = 'Band' } }; $ui.Roles[$ui.BandWord] = @{ ForeColor = 'BandInk'; BackColor = 'Band' }
+foreach ($c in @($ui.BandSub, $ui.BandLine, $ui.BandVer)) { $ui.Roles[$c] = @{ ForeColor = 'BandMuted'; BackColor = 'Band' } }; $ui.Roles[$ui.Band] = @{ BackColor = 'Band' }
 # The stage of each card: 1 Choose (what to install or do), 2 Check (the checks and Ready), 3 Install (the run and its end).
 $ui.StageViews = @{ site = 2; checking = 2; fail = 2; need = 2; ready = 2; nodrive = 2; run = 3; hand = 3; handfail = 3; answer = 3; answerfail = 3; feedback = 3
   done = 3; review = 3; stopped = 3; stepfail = 3; cancelq = 3 }

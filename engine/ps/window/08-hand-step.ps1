@@ -19,7 +19,7 @@ $ui.VHand = {
   & $ui.SetCard @{ View = 'hand'; Light = 'you'; Kicker = $(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN } else { '' }); Sentence = (Get-StepTitle $st)
     P = @([string]$st.Note); Lines = @($st.Guide); Close = $close
     Field = $(if ($addr) { @{ Label = 'Address'; Text = $ui.GUrl; Name = 'Address to open'; Button = 'Open in browser'; Act = { & $ui.OpenUrl } } } else { $null }); Path = $file; Links = [bool]$file; Note = $clip
-    Buttons = $bs; Focus = $(if ($addr) { 'fieldbutton' } else { 'text' }) } }   # Cards v2 (critique change 3): Enter = Done ("Done (Enter)")
+    Buttons = $bs; Focus = $(if ($addr) { 'button' } else { 'text' }) } }   # Cards v2 (critique change 3): Enter = Done ("Done (Enter)"): the focus is on Done (a focused button takes Enter itself)
 # Shows the card where the user pastes the error of a hand step that failed; its button sets the answer to Abort. Takes
 # nothing.
 $ui.VHandFail = {

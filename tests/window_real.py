@@ -295,6 +295,8 @@ def ui_why(lines, d, name):
         why.append("no inventory (RADE_INVENTORY)")
     if name.startswith("contrast-") and not any(l.startswith("WIN high=True") for l in lines):
         why.append("the contrast run did not take the system colors (no WIN high=True line)")
+    if (name.startswith("dark-") or "-dark" in name) and not any(l.startswith("WIN high=") and " dark=True " in l for l in lines):
+        why.append("the dark run did not take the dark colors (no dark=True on the WIN high= line)")
     return why
 
 

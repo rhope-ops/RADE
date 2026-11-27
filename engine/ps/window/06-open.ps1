@@ -79,7 +79,7 @@ $ui.Boot = {
 # Choose (RADE\Config\rade-tour.txt), and again from "Help (F1)". S = the headline of a card, P = its paragraphs.
 $ui.TourCards = @(
   @{ S = 'RADE installs and tests applications on this computer.'; P = @('You choose an application. RADE checks this computer, then does the work as a list of steps.', 'A test of an application is called a round.') },
-  @{ S = 'RADE does most steps. Some steps are yours.'; P = @('When RADE does a step, the bottom right shows its progress. Keep the window open.', 'A yellow line at the top: RADE waits for you. The card says what to do.') },
+  @{ S = 'RADE does most steps. Some steps are yours.'; P = @('When RADE does a step, the card shows its progress. Keep the window open.', 'A yellow line at the top: RADE waits for you. The card says what to do.') },
   @{ S = 'A step that you do has up to three answers.'; P = @('"Done": you did the step and it worked.', '"It failed": the step did not work. RADE then asks what the error said.', '"Skip": you did not do the step. A card shows only the answers that fit its step.') },
   @{ S = 'The results stay on this computer.'; P = @('RADE writes a report into its results folder. RADE sends nothing.', 'After a test round RADE makes an e-mail draft with the results. You read it, and you send it.') },
   @{ S = 'Details shows everything.'; P = @('Select "Details" or press F2 to see all checks, steps, files and the log.', 'Select "Help" or press F1 to see this tour again.') })

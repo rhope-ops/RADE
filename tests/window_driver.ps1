@@ -408,7 +408,7 @@ function global:Test-RadeRecordOpen {
     }
     $hb = @($ui.B | Where-Object { $_.Shown }); $hm = (Get-RadeMain); if (-not @($hb | Where-Object { $_.Text -eq 'It failed' }).Count) { $hm.PerformClick() }   # B3: Done last; a look-and-answer check: Yes
     elseif ($global:RadeT.Hand -eq 'fail') { Push-RadeButton 'It failed' } elseif ($global:RadeT.Hand -eq 'skip') { @($hb | Where-Object { $_.Text -ne 'It failed' -and -not [object]::ReferenceEquals($_, $hm) })[0].PerformClick() }
-    else { $ui.Form.Key('Return'); Write-Host ('WIN enter-hand answer=' + $ui.Answer) }   # Cards v2: Enter = Done (the main button)
+    else { $f = [string]$ui.Form.ActiveControl.Text; $ui.Form.Key('Return'); Write-Host ('WIN enter-hand focus=' + $f + ' answer=' + $ui.Answer) }   # Cards v2: Enter = Done (the main button)
   }
   elseif ($v -eq 'answer') {
     Write-Host ('WIN sent-pt=' + $ui.Sent.Font.SizeInPoints + ' for "' + $ui.Sent.Text + '"')

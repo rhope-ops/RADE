@@ -182,7 +182,7 @@ function global:Step-Rade {
   if (((Get-Date) - $global:RadeT.T0).TotalSeconds -gt 240) { Write-Host ('WIN TIMEOUT view=' + $ui.View + ' sent=' + $ui.Sent.Text); [Environment]::Exit(3) }
   if (-not $ui -or -not $ui.Form -or $ui.Form.IsDisposed -or -not $ui.Form.Visible -or -not $ui.View) { return }
   if (-not $global:RadeT.Env) {
-    $global:RadeT.Env = $true; $sc = [System.Windows.Forms.Screen]::PrimaryScreen; Write-Host ('WIN high=' + [bool]$ui.High + ' fonts=' + $ui.FontNote + ' standard=' + $ui.Standard)
+    $global:RadeT.Env = $true; $sc = [System.Windows.Forms.Screen]::PrimaryScreen; Write-Host ('WIN high=' + [bool]$ui.High + ' dark=' + [bool]$ui.Dark + ' fonts=' + $ui.FontNote + ' standard=' + $ui.Standard)
     Write-Host ('WINENV ps=' + $PSVersionTable.PSVersion + ' dpi=' + $ui.Dpi + ' screen=' + $sc.Bounds.Width + 'x' + $sc.Bounds.Height + ' working=' + $sc.WorkingArea.Width + 'x' + $sc.WorkingArea.Height + ' form=' + $ui.Form.Width + 'x' + $ui.Form.Height + ' interactive=' + [Environment]::UserInteractive)
     foreach ($k in @($ui.F.Keys | Sort-Object)) { $f = $ui.F[$k]; Write-Host ('MEASURE ' + $k + ' ' + $f.Name + ' ' + $f.SizeInPoints + ' ' + $f.Style + ' = ' + [System.Windows.Forms.TextRenderer]::MeasureText('The quick brown fox jumps over the lazy dog 0123456789', $f, (New-Object System.Drawing.Size(9999, 99)), [System.Windows.Forms.TextFormatFlags]'NoPadding, NoPrefix, SingleLine').Width + ' h=' + [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $f).Height) }
   }
@@ -205,7 +205,7 @@ function global:Step-Rade {
     Write-Host 'WIN BAD no choice for the application'; [Environment]::Exit(4)
   }
   elseif ($v -eq 'maint') { Write-RadeRow; if (-not $global:RadeT.ToolsDone) { $global:RadeT.ToolsDone = $true; Save-RadeTools } else { & $ui.OnOpt 10 } }   # the Maintenance card (the Restore cards once), then the Repair or Update row (Start would start the application)
-  elseif ($v -eq 'notinst' -or ($v -eq 'run' -and $ui.Running -and -not $global:RadeT.CancelQ)) { Step-RadeV48 $v }   # plan engine-v48: the not-installed card, the Cancel question
+  elseif ($v -eq 'notinst' -or ($v -eq 'run' -and $ui.Running -and $ui.StepI -and -not $global:RadeT.CancelQ)) { Step-RadeV48 $v }   # plan engine-v48: the not-installed card, the Cancel question
   elseif ($v -eq 'site') { $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }
   elseif ($v -in 'fail', 'need') {
     $id = [string]@($script:appChecks)[([int]($ui.Kick.Text -replace '^CHECK (\d+) OF .*$', '$1')) - 1]

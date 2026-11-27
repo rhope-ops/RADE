@@ -33,7 +33,7 @@ $ui.Kick = & $ui.Text $ui.F.SmallB $ui.C.Gray 0 'Card line'; $ui.Kick.Visible = 
 # person (the yellow light), a yellow chip "YOUR TURN" stands before the line in capitals; the separate "Your turn" line of
 # R35 is gone. Yellow means only this (and the light line).
 $ui.Chip = & $ui.Label $ui.F.SmallB $ui.C.OnYellow 0; $ui.Chip.BackColor = $ui.C.Yellow; $ui.Chip.Text = 'YOUR TURN'; $ui.Chip.AccessibleName = 'Your turn'
-$ui.Chip.Padding = (& $ui.Pad $ui.Z.G2 $ui.Z.G1 $ui.Z.G2 $ui.Z.G1); $ui.Chip.Margin = (& $ui.Pad 0 0 $ui.Z.G3 0)
+$ui.Chip.Padding = (& $ui.Pad $ui.Z.G2 $ui.Z.G1 $ui.Z.G2 $ui.Z.G1); $ui.Chip.Margin = (& $ui.Pad 0 0 $ui.Z.G3 0); $ui.Roles[$ui.Chip] = @{ ForeColor = 'OnYellow'; BackColor = 'Yellow' }   # its tokens for $ui.Recolor
 # The header row: the chip (on your turn), then the line in capitals, on one line. It never scrolls and never moves.
 $ui.Head = & $ui.Flow 0; $ui.Head.Visible = $true; $ui.Head.AccessibleName = 'Card header'
 [void]$ui.Head.Controls.Add($ui.Chip); [void]$ui.Head.Controls.Add($ui.Kick)
