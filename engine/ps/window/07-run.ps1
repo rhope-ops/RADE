@@ -50,17 +50,20 @@ $ui.RunMark = { param([string]$S) switch ($S) { 'PASSED' { @('PASSED', 'GreenInk
     'FAILED' { @('FAILED', 'Red') } 'NEEDS REVIEW' { @('NEEDS REVIEW', 'Red') } 'INTERRUPTED' { @('STOPPED', 'Red') } default { @('WAITING', 'Gray') } } }
 # Makes the rows of this run from the steps that are on. Takes the selection (one flag for each step); sets $ui.RunList.
 $ui.MakeRunList = { param($Sel)
-  $ui.RunList = @(); if ($cleanup.Count -and $ui.Clean) { $ui.RunList += @{ Key = 'Clean-up'; Title = 'Clean-up'; Sub = 'Moves old files to the Recycle Bin'; State = '' } }
+  $ui.RunList = @(); if ($cleanup.Count -and $ui.Clean -and -not $script:resume) {   # a resume runs no clean-up (Invoke-Round)
+  $ui.RunList += @{ Key = 'Clean-up'; Title = 'Clean-up'; Sub = ''; State = '' } }
   for ($k = 0; $k -lt $steps.Count; $k++) { if ($Sel[$k]) { $ui.RunList += @{ Key = [string]$steps[$k].Name; Title = (Get-StepTitle $steps[$k]); Sub = [string]$steps[$k].Doing; State = '' } } } }
 # The number of drawn rows the Run card has room for beside the running one: 4 in a tall card, 2 in a middle one, none in a
 # small one (811 x 469: the card does not scroll). Takes nothing; gives back the number.
 $ui.RunSlots = { $h = [int]$ui.Card.ClientSize.Height; if ($h -ge (& $ui.Sc 560)) { return 4 }; if ($h -ge (& $ui.Sc 440)) { return 2 }; return 0 }
-# The height of one drawn row: its name and its second line (2 lines at most), 44 px at least. Takes the row and the width.
+# The width of a drawn row's texts (the row less the status column and the side room). Takes the row width.
+$ui.RunTextW = { param([int]$W) [int][math]::Max(1, $W - (& $ui.Sc 120) - 2 * (& $ui.Sc $ui.Z.G2)) }
+# The height of one drawn row: its name and its second line, each wrapped to 2 lines at most, 44 px at least. Takes the row and the width.
 $ui.RunRowH = { param($R, [int]$W)
-  $h1 = & $ui.LineH $ui.F.SmallB; $h2 = & $ui.LineH $ui.F.Small; $tw = $W - (& $ui.Sc 120)
-  $n = & $ui.Rows ([string]$R.Sub) $ui.F.Small ([math]::Max(1, $tw)) $h2 2; return [int][math]::Max((& $ui.Sc 44), $h1 + $n * $h2 + (& $ui.Sc $ui.Z.G3)) }
+  $h1 = & $ui.LineH $ui.F.SmallB; $h2 = & $ui.LineH $ui.F.Small; $tw = & $ui.RunTextW $W
+  $n1 = & $ui.Rows ([string]$R.Title) $ui.F.SmallB $tw $h1 2; $n = & $ui.Rows ([string]$R.Sub) $ui.F.Small $tw $h2 2; return [int][math]::Max((& $ui.Sc 44), $n1 * $h1 + $n * $h2 + (& $ui.Sc $ui.Z.G3)) }
 # Sizes one drawn list to its rows. Takes the panel.
-$ui.SizeRuns = { param($P) $h = 0; foreach ($r in @($P.Tag)) { $h += & $ui.RunRowH $r ([int]$P.Width) }; $P.Height = [math]::Max(1, $h); $P.Visible = [bool]@($P.Tag).Count
+$ui.SizeRuns = { param($P) $h = 0; foreach ($r in @($P.Tag)) { $h += & $ui.RunRowH $r ([int]$P.Width) }; $P.Height = [math]::Max(1, $h)
   $P.AccessibleDescription = (@($P.Tag) | ForEach-Object { [string]$_.Title + ': ' + (& $ui.RunMark ([string]$_.State))[0] }) -join '; ' }
 # Puts the rows around the running step into the lists: the one before it, then as many after it as there is room for.
 # Takes nothing; sets the lists, the running row's summary, and lays the card out.
@@ -68,7 +71,7 @@ $ui.PlaceRuns = {
   $all = @($ui.RunList); $r = -1; for ($i = 0; $i -lt $all.Count; $i++) { if ($all[$i].State -eq 'RUNNING') { $r = $i } }
   $n = & $ui.RunSlots; $a = @(); if ($r -gt 0 -and $n -gt 0) { $a = @($all[$r - 1]) }
   $b = @(); for ($i = $r + 1; $i -lt $all.Count -and $b.Count -lt ($n - $a.Count); $i++) { $b += $all[$i] }
-  $ui.RunA.Tag = $a; $ui.RunB.Tag = $b; & $ui.SizeRuns $ui.RunA; & $ui.SizeRuns $ui.RunB
+  $ui.RunA.Tag = $a; $ui.RunB.Tag = $b; foreach ($p in @($ui.RunA, $ui.RunB)) { & $ui.SizeRuns $p; $p.Visible = [bool]@($p.Tag).Count }   # only the Run card shows them ($ui.Dress hides them)
   $ui.StepSum.Text = $(if ($r -ge 0) { [string]$all[$r].Sub } else { '' }); $ui.StepSum.Visible = [bool]$ui.StepSum.Text
   $ui.RunA.Invalidate(); $ui.RunB.Invalidate(); & $ui.Squeeze }
 # Marks the step that starts as running, and a row that was running and has no result as done. Takes the step name.
@@ -81,7 +84,7 @@ $ui.RunEnd = { param([string]$Name, [string]$State, [string]$Rest)
 $ui.PaintRuns = {
   <#
   .SYNOPSIS
-  Draws the rows of one step list: a thin line under each row, the name, the second line (2 lines at most), and at the
+  Draws the rows of one step list: a thin line under each row, the name and the second line (2 lines each at most), and at the
   right the status as an icon and a word (PASSED with a tick, WAITING with a ring, FAILED with a cross).
   .PARAMETER P
   The list panel (its Tag holds the rows).
@@ -94,8 +97,9 @@ $ui.PaintRuns = {
   try { $G.Clear($ui.C.White); $G.SmoothingMode = 'AntiAlias'; $w = $P.ClientSize.Width; $y = 0; $pad = & $ui.Sc $ui.Z.G2; $mw = & $ui.Sc 120; $h1 = & $ui.LineH $ui.F.SmallB; $h2 = & $ui.LineH $ui.F.Small
     $wrap = 'Left, Top, NoPrefix, WordBreak, EndEllipsis, TextBoxControl'; $ln = New-Object System.Drawing.Pen($ui.C.Hair)
     foreach ($r in @($P.Tag)) { $h = & $ui.RunRowH $r $w; $m = & $ui.RunMark ([string]$r.State); $col = $ui.C[[string]$m[1]]
-      & $ui.Word $G ([string]$r.Title) $ui.F.SmallB $ui.C.Navy $pad ($y + (& $ui.Sc 6)) ($w - $mw - 2 * $pad) $h1 'Left, Top, NoPrefix, SingleLine, EndEllipsis'
-      & $ui.Word $G ([string]$r.Sub) $ui.F.Small $ui.C.Gray $pad ($y + (& $ui.Sc 6) + $h1) ($w - $mw - 2 * $pad) (2 * $h2) $wrap
+      $tw = & $ui.RunTextW $w; $n1 = & $ui.Rows ([string]$r.Title) $ui.F.SmallB $tw $h1 2   # the name and the second line wrap to 2 lines each (Cards v2)
+      & $ui.Word $G ([string]$r.Title) $ui.F.SmallB $ui.C.Navy $pad ($y + (& $ui.Sc 6)) $tw ($n1 * $h1) $wrap
+      & $ui.Word $G ([string]$r.Sub) $ui.F.Small $ui.C.Gray $pad ($y + (& $ui.Sc 6) + $n1 * $h1) $tw (2 * $h2) $wrap
       & $ui.Word $G ([string]$m[0]) $ui.F.SmallB $col ($w - $mw) $y ($mw - $pad) $h 'Right, VerticalCenter, NoPrefix, SingleLine'
       $ww = [int](& $ui.Meas ([string]$m[0]) $ui.F.SmallB 100000).Width; & $ui.RunIcon $G ([string]$m[0]) $col ($w - $pad - $ww - (& $ui.Sc 16)) ($y + [int]($h / 2))
       $y += $h; $G.DrawLine($ln, 0, ($y - 1), $w, ($y - 1)) }
@@ -258,7 +262,9 @@ $ui.VPassed = {
   .OUTPUTS
   Nothing.
   #>
-  $dep = Test-Deploy; $made = ''; if ($dep) { $made = [string](& $ui.MadeText) }; $n = @($ui.RunList).Count; $m = @($script:appChecks).Count
+  $dep = Test-Deploy; $made = ''; if ($dep) { $made = [string](& $ui.MadeText) }
+  $all = @($ui.RunList).Count; $n = @($ui.RunList | Where-Object { [string]$_.State -in 'PASSED', 'DONE' }).Count   # counted from the states: a skipped step did not pass
+  $m = @($script:appChecks | Where-Object { $script:checkResults[$_] -and [string]$script:checkResults[$_].State -like 'PASSED*' }).Count   # a warning did not pass
   $iconNote = ''; if ($dep) { $saved = Save-RunnerCopy   # a copy that stays (a higher engine) keeps its shortcut (review of PR 199)
     $noBox = 'The shortcut folder box was empty, so RADE made no shortcut. Open RADE from the RADE page instead.'   # R28: the runner copy and the shortcut (a deploy that passed)
     $iconNote = $(if (-not $saved) { '' } elseif ($ui.FieldAsked -and -not $ui.LinkDir -and (Get-DesktopDir)) { $noBox } else { [string](Add-DesktopIcon ([string]$ui.LinkDir)) }) }
@@ -266,7 +272,7 @@ $ui.VPassed = {
   # Start (R28 fix: after a first install the Done card had no Start button): the checks passed before the install.
   $startB = $(if ($inst -and [string]$script:app.Start -and (Get-StartPath)) { @{ Text = 'Start ' + $w; Kind = 'primary'; Act = { & $ui.StartApp } } } else { $null })
   & $ui.SetCard @{ View = 'done'; Light = 'pass'; Tick = $true; KickColor = 'GreenInk'; Strong = $true
-    Kicker = $(if ($dep -and -not $inst) { 'Passed' } else { 'All ' + $n + ' steps passed' })
+    Kicker = $(if (($dep -and -not $inst) -or $n -ne $all) { 'Passed' } else { 'All ' + $n + ' steps passed' })
     Sentence = $(if (-not $dep) { 'Round ' + $round + ' is done.' } elseif ($inst) { $w + ' ' + $script:app.Version + ' is installed.' } else { 'The run passed, but version ' + $script:app.Version + ' is not recorded as installed.' })
     P = @(([string]$n + ' steps and ' + $m + ' checks passed in ' + $ui.Took + '.'), $(if ($dep -and -not $inst) { 'Some steps were off or skipped. Run again with every step on.' } else { '' }), $(if ($dep) { 'Nothing was sent. The report stays on this computer.' } else { $ui.Mail }), $made, $iconNote)
     Buttons = @(@{ Text = 'Open results folder'; Act = { & $ui.Open } }, @{ Text = 'Copy summary'; Act = { & $ui.Copy } }, @{ Text = 'Close'; Kind = $(if ($startB) { '' } else { 'primary' }); Act = { $ui.Form.Close() } }, $startB)

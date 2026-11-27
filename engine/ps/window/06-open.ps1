@@ -138,7 +138,7 @@ $ui.VMaint = { param($Inst)
   if ([string]$script:app.Start -and (Get-StartPath)) { $startB = @{ Text = 'Start ' + (Get-AppWord); Kind = $(if ([string]$Inst.version -eq [string]$script:app.Version) { 'primary' } else { '' }); Act = { $ui.StartAfter = $true; & $ui.Checks $false } } }
   $ui.MaintVerb = $verb   # read when a row is clicked (a scriptblock does not keep this card's local variables)
   # D1 (the PFM, 2026-11-27): row 1 "Install <version>" stays, gray and off; row 2 Repair or Update, then the tools.
-  $off = @{ Off = $true; Soon = $true; Index = 0; Name = ('Install ' + $script:app.Version); Ver = ''; Sub = ((Get-AppWord) + ' ' + $Inst.version + ' is installed.'); R1 = '' }
+  $off = @{ Off = $true; Soon = $true; Index = 0; Name = ('Install ' + $script:app.Version); Ver = ''; Sub = ''; R1 = '' }
   $fix = @{ Index = 10; Name = $verb; Ver = ''; Sub = $(if ($verb -eq 'Repair') { 'Adds what is missing. Keeps your data.' } else { 'Installs ' + $script:app.Version + ' and keeps your data.' }); R1 = 'Runs the checks' }
   # Uninstall (engine-v40): dark red and on for an app with Uninstall steps, else not available (answer 4A of the PFM, 2026-11-25).
   # The texts do not name the app (a long name made the row 3 lines and the card scroll: Windows job of PR 209, 624 x 682).
@@ -184,7 +184,7 @@ $ui.Checks = { param([bool]$Force)
   $ids = @($script:appChecks); $cache = Read-CheckCache; $script:savedWhy = @{}
   $ui.Cancel = $false
   & $ui.SetCard @{ View = 'checking'; Sentence = 'Checking this computer and your access.'; P = @('Read-only. Nothing is changed.'); Range = @{ P0 = @($ids | ForEach-Object { [string](Get-CheckDef $_).Name }) }; Buttons = @(@{ Text = 'Cancel'; Always = $true; Act = { & $ui.CancelChecks } }) }
-  & $ui.SetBar 'all' 0 $true; $ui.Bars['all'].Fill = $ui.C.Blue; $ui.Busy = $true
+  & $ui.SetBar 'all' 0 $true; $ui.Bars['all'].Fill = $ui.C.Info; $ui.Busy = $true
   try {
     for ($i = 0; $i -lt $ids.Count; $i++) {
       if ($ui.Form.IsDisposed -or $script:closing) { return }

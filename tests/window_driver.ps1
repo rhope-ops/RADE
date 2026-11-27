@@ -295,6 +295,29 @@ function global:Push-RadeButton([string]$Text) {
   foreach ($b in $ui.B) { if ($b.Shown -and $b.Text -in $Text, ($Text + ' (Enter)')) { $b.PerformClick(); return } }   # Cards v2: the main button shows its key
   throw ('the test user found no button "' + $Text + '" in view ' + $ui.View)
 }
+# D4 (plan engine-v48): prints "WIN stack", once: in a narrow window 240 px buttons, the main one 16 px over the others; then the row.
+function global:Test-RadeStack {
+  if (-not $global:RadeT.Stack) { $global:RadeT.Stack = $true; $ui.Narrow = $true; & $ui.Apart   # D4: a narrow window stacks the buttons, 240 wide, the main one 16 px over the others
+    $sw = (@(@($ui.B) + @($ui.BackB) | Where-Object { $_.Shown } | ForEach-Object { $_.Width }) -join ','); $low = (Get-RadeMain).Margin.Bottom; $ui.Narrow = $false; & $ui.Apart
+    Write-Host ('WIN stack widths=' + $sw + ' main-low=' + $low + ' row=' + (@(@($ui.B) + @($ui.BackB) | Where-Object { $_.Shown } | ForEach-Object { $_.Width }) -join ',')) }
+}
+<#
+.SYNOPSIS
+The Record (Details) from the Ready card, once: its controls, its measures, Copy all and its keys (WIN record lines).
+.OUTPUTS
+Nothing; WIN lines.
+#>
+function global:Test-RadeRecordOpen {
+  $global:RadeT.Opened = $true; $script:checkResults['ps'] = @{ State = 'PASSED'; Detail = 'Last check: 14 Nov 26'; Fix = 'Version [5.1]'; Saved = $true }   # a reused check, as Get-SavedCheck gives it
+  Push-RadeButton 'Details'; $ui.Form.Repaint()
+  $all = New-Object 'System.Collections.Generic.List[System.Windows.Forms.Control]'; $ui.Rec.Walk($all)   # the Record's controls: each one that takes the focus has a ring
+  foreach ($c in $all) { $t = $c.GetType().Name; if ($t -in 'Button', 'TextBox', 'CheckBox' -and -not ($c.Parent -and $c.Parent.Events.ContainsKey('Paint'))) { Write-Host ('WIN NOFOCUS ' + $t + ' "' + $c.Text + '" in the Record') } }
+  $boxes = @($ui.RecSteps.Controls | Where-Object { $_ -is [System.Windows.Forms.CheckBox] }); $lab = @($ui.RecSteps.Controls | Where-Object { $_ -is [System.Windows.Forms.Label] })[0]
+  Write-Host ('WIN measure record box=' + $boxes[0].Margin.Left + ',' + $boxes[0].Margin.Top + ' label=' + $lab.Margin.Left + ',' + $lab.Margin.Bottom + ' rows=' + (& $ui.RecPlan 400).Tall + ' one-line=' + (-not $boxes[0].AutoSize -and -not $boxes[0].Values.ContainsKey('AutoEllipsis')))
+  Write-Host ('WIN record on=' + $ui.RecOn + ' rows=' + @($ui.RecData).Count + ' boxes=' + $boxes.Count + ' enabled=' + $boxes[0].Enabled + ' text=' + [bool]($ui.RecText.Text -match 'Files this round saves') + ' name=' + [bool]($ui.RecChecks.Values['AccessibleName'] -match 'PASSED') + ' reused=' + (@($ui.RecData | Where-Object { $_.Name -match '^PowerShell is version' })[0].More -join ' / ') + ' tall=' + ($ui.RecChecks.Height -gt 100) + ' box-text=' + (($boxes | ForEach-Object { $ui.Full[$_] }) -join '|') + ' box-name=' + ($boxes[1].Values['AccessibleName'] -replace '\. .*$', ''))
+  Test-RadeRecordCopy; $ui.Form.Key('Next'); Write-Host ('WIN paged=' + $ui.RecScroll.Values['AutoScrollPosition'].Y); $ui.Form.Key('Prior')   # the names Windows gives Page Down and Page Up
+  foreach ($b in $boxes) { if ([int]$b.Tag -lt 0) { $b.Checked = $false } }; $ui.Form.Key('Escape'); Write-Host ('WIN record on=' + $ui.RecOn + ' clean=' + $ui.Clean)
+}
 [RadeStub.Driver]::Pump = {
   if (-not $ui -or -not $ui.Form -or $ui.Form.Closed -or -not $ui.View) { return }
   if (-not $global:RadeT.Quick) { $global:RadeT.Quick = $true; $ui.GuardMs = 0; Start-RadeR31 }   # the test user acts at once, as if it had waited (the guard is tested on the first question)
@@ -322,6 +345,9 @@ function global:Push-RadeButton([string]$Text) {
   elseif ($v -eq 'booterr') { $ui.RunBase = $global:RadeT.RunBase; Push-RadeButton 'Try again' }
   elseif ($v -eq 'noapps') { $script:apps = $global:RadeT.Apps; & $ui.VChoose }   # R28: a paste with no application has a card
   elseif ($v -eq 'checking' -and $env:RADE_T_CANCEL -eq '1' -and -not $global:RadeT.Cancelled) { $global:RadeT.Cancelled = $true; Write-Host ('WIN cancel busy=' + $ui.Busy + ' always=' + $ui.Always[0]); Push-RadeButton 'Cancel' }   # R28: Cancel on the checking card goes back to Choose
+  elseif ($v -eq 'run' -and $env:RADE_T_STOP -and $ui.Running -and $ui.StepI -and -not $global:RadeT.StopDone) {   # Cards v2: Esc on Run opens the Cancel question
+    $global:RadeT.StopDone = $true; $ui.Form.Key('Escape'); $q = $ui.View + ' kick=' + $ui.Kick.Text + ' btn=' + ((@($ui.B | Where-Object { $_.Shown }) | ForEach-Object { '[' + $_.Text + ']' }) -join ' ') + ' p=' + $ui.P[0].Text
+    $ui.Form.Key('Escape'); $q2 = $ui.View; Push-RadeButton 'Stop the install'; Write-Host ('WIN cancelq esc=' + $q + ' esc-again=' + $q2 + ' after=' + $ui.View + ' flag=' + $script:stopAfter) }
   elseif ($v -eq 'notinst') { Write-Host ('WIN notinst enter=' + $ui.Form.Values['AcceptButton'].Text + ' back=' + $ui.BackB.Text); Push-RadeButton ('Install ' + $script:app.Version) }   # D8: one Install button
   elseif ($v -eq 'maint') {
     if (-not $global:RadeT.Esc) { $global:RadeT.Esc = $true; Write-Host 'WIN esc'; $ui.Form.Key('Escape'); return }   # Esc = Back: Choose again; the user chooses the same application
@@ -330,6 +356,7 @@ function global:Push-RadeButton([string]$Text) {
   } elseif ($v -eq 'toolres') { Step-RadeTools $v }
   elseif ($v -eq 'site') { $ui.Field.Text = 'not an address'; $ui.B[0].PerformClick(); Write-Host ('WIN site-note=' + $ui.Note.Text); $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }   # .invalid never resolves: the site check fails on every computer
   elseif ($v -in 'fail', 'need') {
+    if (-not $global:RadeT.EscFail -and $v -eq 'fail') { $global:RadeT.EscFail = $true; $ui.Form.Key('Escape'); Write-Host ('WIN esc-fail view=' + $ui.View + ' back=' + $ui.BackB.Text) }
     # The check on the card: the look-and-answer check is answered through its own card; any other is set to PASSED.
     $id = [string]@($script:appChecks)[([int]($ui.Kick.Text -replace '^CHECK (\d+) OF .*$', '$1')) - 1]
     if ($v -eq 'need' -and (Get-CheckDef $id).Kind -eq 'guide') { $ui.B[0].PerformClick(); return }
@@ -343,6 +370,7 @@ function global:Push-RadeButton([string]$Text) {
     & $ui.Next
   }
   elseif ($v -eq 'ready') {
+    Test-RadeStack
     if ($env:RADE_T_START -eq 'maint') { return }   # Start on Maintenance: the window starts the application when the checks have passed
     if ($env:RADE_T_LINK -and $ui.FieldRow.Shown -and -not $global:RadeT.Linked) {   # R29 N8: a folder that does not exist is refused; then the folder of the test
       $global:RadeT.Linked = $true; $ui.Field.Text = (Join-Path $env:RADE_T_LINK 'no-such-folder'); Push-RadeButton 'Install'; Write-Host ('WIN link-bad view=' + $ui.View + ' note=' + $ui.Note.Text) }
@@ -350,21 +378,7 @@ function global:Push-RadeButton([string]$Text) {
       $global:RadeT.Min = $true; $ui.Form.WindowState = 'Minimized'; & $ui.ToFront
       Write-Host ('WIN restored=' + $ui.Form.WindowState + ' taskbar=' + $ui.Form.Values['ShowInTaskbar'] + ' minbox=' + $ui.Form.Values['MinimizeBox'] + ' shown-by=' + [RadeStub.Driver]::ShownBy)
     }
-    if ($global:RadeT.Record -and -not $global:RadeT.Opened) {
-      $global:RadeT.Opened = $true
-      $script:checkResults['ps'] = @{ State = 'PASSED'; Detail = 'Last check: 14 Nov 26'; Fix = 'Version [5.1]'; Saved = $true }   # a reused check, as Get-SavedCheck gives it
-      Push-RadeButton 'Details'
-      $ui.Form.Repaint()
-      $all = New-Object 'System.Collections.Generic.List[System.Windows.Forms.Control]'; $ui.Rec.Walk($all)   # the Record's controls: each one that takes the focus has a ring
-      foreach ($c in $all) { $t = $c.GetType().Name; if ($t -in 'Button', 'TextBox', 'CheckBox' -and -not ($c.Parent -and $c.Parent.Events.ContainsKey('Paint'))) { Write-Host ('WIN NOFOCUS ' + $t + ' "' + $c.Text + '" in the Record') } }
-      $boxes = @($ui.RecSteps.Controls | Where-Object { $_ -is [System.Windows.Forms.CheckBox] })
-      $lab = @($ui.RecSteps.Controls | Where-Object { $_ -is [System.Windows.Forms.Label] })[0]
-      Write-Host ('WIN measure record box=' + $boxes[0].Margin.Left + ',' + $boxes[0].Margin.Top + ' label=' + $lab.Margin.Left + ',' + $lab.Margin.Bottom + ' rows=' + (& $ui.RecPlan 400).Tall + ' one-line=' + (-not $boxes[0].AutoSize -and -not $boxes[0].Values.ContainsKey('AutoEllipsis')))
-      Write-Host ('WIN record on=' + $ui.RecOn + ' rows=' + @($ui.RecData).Count + ' boxes=' + $boxes.Count + ' enabled=' + $boxes[0].Enabled + ' text=' + [bool]($ui.RecText.Text -match 'Files this round saves') + ' name=' + [bool]($ui.RecChecks.Values['AccessibleName'] -match 'PASSED') + ' reused=' + (@($ui.RecData | Where-Object { $_.Name -match '^PowerShell is version' })[0].More -join ' / ') + ' tall=' + ($ui.RecChecks.Height -gt 100) + ' box-text=' + (($boxes | ForEach-Object { $ui.Full[$_] }) -join '|') + ' box-name=' + ($boxes[1].Values['AccessibleName'] -replace '\. .*$', ''))
-      Test-RadeRecordCopy; $ui.Form.Key('Next'); Write-Host ('WIN paged=' + $ui.RecScroll.Values['AutoScrollPosition'].Y); $ui.Form.Key('Prior')   # the names Windows gives Page Down and Page Up
-      foreach ($b in $boxes) { if ([int]$b.Tag -lt 0) { $b.Checked = $false } }
-      $ui.Form.Key('Escape'); Write-Host ('WIN record on=' + $ui.RecOn + ' clean=' + $ui.Clean)
-    }
+    if ($global:RadeT.Record -and -not $global:RadeT.Opened) { Test-RadeRecordOpen }
     # R28: an installed application with a start script has a Start button; it is the main one when the installed version is this paste's.
     $sb = @($ui.B | Where-Object { $_.Shown -and $_.Text -like 'Start *' })[0]
     if ($sb) {
@@ -393,7 +407,8 @@ function global:Push-RadeButton([string]$Text) {
       $ui.GUrl = $g0; $ui.G.Step = $s0; & $ui.VHand
     }
     $hb = @($ui.B | Where-Object { $_.Shown }); $hm = (Get-RadeMain); if (-not @($hb | Where-Object { $_.Text -eq 'It failed' }).Count) { $hm.PerformClick() }   # B3: Done last; a look-and-answer check: Yes
-    elseif ($global:RadeT.Hand -eq 'fail') { Push-RadeButton 'It failed' } elseif ($global:RadeT.Hand -eq 'skip') { @($hb | Where-Object { $_.Text -ne 'It failed' -and -not [object]::ReferenceEquals($_, $hm) })[0].PerformClick() } else { $hm.PerformClick() }
+    elseif ($global:RadeT.Hand -eq 'fail') { Push-RadeButton 'It failed' } elseif ($global:RadeT.Hand -eq 'skip') { @($hb | Where-Object { $_.Text -ne 'It failed' -and -not [object]::ReferenceEquals($_, $hm) })[0].PerformClick() }
+    else { $ui.Form.Key('Return'); Write-Host ('WIN enter-hand answer=' + $ui.Answer) }   # Cards v2: Enter = Done (the main button)
   }
   elseif ($v -eq 'answer') {
     Write-Host ('WIN sent-pt=' + $ui.Sent.Font.SizeInPoints + ' for "' + $ui.Sent.Text + '"')

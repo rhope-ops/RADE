@@ -84,6 +84,11 @@ sed -i 's#"logo": "assets/sample-logo.png"#"logo": "../sample-logo.png"#' "$t/ap
 for bad in "/etc/sample-logo.png" "assets/../../sample-logo.png"; do sed -i "s#\"logo\": \"[^\"]*\"#\"logo\": \"$bad\"#" "$t/app/scripts/paste_bundles.json"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: the path must stay inside the application repo" "$t/lg.txt" && ok || bad "build stops on application logo $bad"; done
 sed -i 's#"logo": "[^"]*"#"logo": "assets/sample-logo.png"#' "$t/app/scripts/paste_bundles.json"
 mv "$t/sl.png" "$t/app/assets/sample-logo.png"; build || bad "rebuild after the application logo checks"
+# application.logoDark (plan engine-v48 D6): the logo of the dark mode, with the rules of logo; without it the bundle's value is empty.
+grep -q "^\$appLogoDarkPng = ''$" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" && sed -i 's#"logo": "assets/sample-logo.png"#"logo": "assets/sample-logo.png", "logoDark": "assets/sample-logo.png"#' "$t/app/scripts/paste_bundles.json" &&
+  python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1 && grep -q "^\$appLogoDarkPng = 'iVBORw0KGgo" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" &&
+  sed -i 's#"logoDark": "assets/sample-logo.png"#"logoDark": "assets/no-such-logo.png"#' "$t/app/scripts/paste_bundles.json" && ! python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1 &&
+  grep -q "application.logoDark: no file at assets/no-such-logo.png" "$t/lg.txt" && sed -i 's#, "logoDark": "assets/no-such-logo.png"##' "$t/app/scripts/paste_bundles.json" && build && ok || bad "application.logoDark: in the bundle, and the build stops on a missing file"
 b="$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1"
 grep -q "Name = 'Sample app (deploy)'.*Mode = 'deploy'; Version = '1.0.0'" "$b" && ! grep "Name = 'Sample app (deploy)'" "$b" | grep -q "'outlook'" && ok || bad "catalog: deploy app has Mode, Version and no outlook check"
 grep "Name = 'Sample app'" "$b" | grep -q "'outlook'.*Mode = 'test'; Version = ''" && ok || bad "catalog: test app keeps the outlook check and Mode test"

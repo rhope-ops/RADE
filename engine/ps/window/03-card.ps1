@@ -115,7 +115,8 @@ $ui.BoxFit = { param($P) if (-not $ui.Scaled) { return }
 # gives back the frame panel and remembers it in $ui.Boxes.
 $ui.MkBox = { param($Tb, [int]$W)
   $p = New-Object System.Windows.Forms.Panel; $p.Size = New-Object System.Drawing.Size($W, $ui.Z.CompactH); $p.BackColor = $ui.C.White; $p.AccessibleName = 'Text box'
-  $Tb.BorderStyle = 'None'; $Tb.AutoSize = $false; $Tb.Font = $ui.F.Small; $Tb.ForeColor = $ui.C.Ink; [void]$p.Controls.Add($Tb); $Tb.Add_GotFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } }); $Tb.Add_LostFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } })
+  $Tb.BorderStyle = 'None'; $Tb.AutoSize = $false; $Tb.Font = $ui.F.Small; $Tb.ForeColor = $ui.C.Ink
+  $Tb.BackColor = $ui.C.White; [void]$p.Controls.Add($Tb); $Tb.Add_GotFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } }); $Tb.Add_LostFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } })
   $p.Add_Paint({ try { $pn = New-Object System.Drawing.Pen($ui.C.Edge); $_.Graphics.DrawRectangle($pn, 0, 0, ($this.ClientSize.Width - 1), ($this.ClientSize.Height - 1)); $pn.Dispose() } catch { $null = $_ } })
   $p.Add_SizeChanged({ & $ui.BoxFit $this }); $p.Add_Click({ try { [void]$this.Controls[0].Focus() } catch { $null = $_ } }); $ui.Boxes += $p; $p }
 $ui.Field = New-Object System.Windows.Forms.TextBox
@@ -126,7 +127,7 @@ foreach ($c in @($ui.FieldL, $ui.FieldBox, $ui.FieldB)) { [void]$ui.FieldRow.Con
 $ui.ErrRow = & $ui.Flow $ui.Z.G2; & $ui.Ring $ui.ErrRow
 $ui.ErrBox = New-Object System.Windows.Forms.TextBox
 $ui.ErrBox.Multiline = $true; $ui.ErrBox.ScrollBars = 'Vertical'; $ui.ErrBox.Size = New-Object System.Drawing.Size($ui.Z.FieldL, 96)
-$ui.ErrBox.Margin = (& $ui.Pad 4 4 4 4); $ui.ErrBox.BorderStyle = 'FixedSingle'; $ui.ErrBox.Font = $ui.F.Small; $ui.ErrBox.ForeColor = $ui.C.Ink; $ui.ErrBox.AccessibleName = 'Error message'; & $ui.Cue $ui.ErrBox
+$ui.ErrBox.Margin = (& $ui.Pad 4 4 4 4); $ui.ErrBox.BorderStyle = 'FixedSingle'; $ui.ErrBox.Font = $ui.F.Small; $ui.ErrBox.ForeColor = $ui.C.Ink; $ui.ErrBox.BackColor = $ui.C.White; $ui.ErrBox.AccessibleName = 'Error message'; & $ui.Cue $ui.ErrBox
 [void]$ui.ErrRow.Controls.Add($ui.ErrBox)
 $ui.LinkRow = & $ui.Flow 0; $ui.LinkRow.WrapContents = $true; $ui.LinkRow.Margin = (& $ui.Pad (-$ui.Z.M) 0 0 0); & $ui.Ring $ui.LinkRow
 $ui.CopyPathB = & $ui.LinkBtn 'Copy file path'; $ui.ShowFileB = & $ui.LinkBtn 'Show file in folder'; $ui.PageB = & $ui.LinkBtn 'Open the RADE page'
@@ -181,6 +182,9 @@ $ui.Dress = {
   if (-not $C.StepRow) { $ui.RunA.Visible = $false; $ui.RunB.Visible = $false }
   $ui.Todo.Visible = [bool]$C.Todo; $ui.TodoT.Text = [string]$C.Todo
   $ui.P[0].Font = $(if ($C.Strong) { $ui.F.Turn } else { $ui.F.Body }) }   # the Done card's summary line is strong
+# Says whether a button text fits the widest button (B1: 240 x 40) with the button's padding, as $ui.BtnSize measures it. A
+# main button whose text with " (Enter)" does not fit keeps its text alone (Enter still selects it). Takes the text.
+$ui.KeyFits = { param([string]$T) try { return ([int][System.Windows.Forms.TextRenderer]::MeasureText($T, $ui.F.SmallB).Width + (& $ui.Sc (2 * $ui.Z.G2)) -le (& $ui.Sc $ui.Z.WideW)) } catch { return $true } }   # no measure: the key shows
 $ui.SetButtons = {
   <#
   .SYNOPSIS
@@ -199,7 +203,7 @@ $ui.SetButtons = {
   for ($k = 0; $k -lt $ui.NB; $k++) {
     $b = $ui.B[$k]
     if ($k -ge $bs.Count) { $b.Visible = $false; $ui.Acts += $null; continue }
-    $main = ([string]$bs[$k].Kind -eq 'primary'); $key = $(if ($main -and -not $C.NoAccept) { ' (Enter)' } else { '' })
+    $main = ([string]$bs[$k].Kind -eq 'primary'); $key = $(if ($main -and -not $C.NoAccept -and (& $ui.KeyFits ([string]$bs[$k].Text + ' (Enter)'))) { ' (Enter)' } else { '' })
     $b.Text = [string]$bs[$k].Text + $key; & $ui.Style $b ([string]$bs[$k].Kind); $b.Visible = $true; $ui.Acts += $bs[$k].Act; $ui.BOn[$k] = $true; $ui.BMain[$k] = $main; $ui.Always[$k] = [bool]$bs[$k].Always
     if ($b.Enabled -and -not $ui.First) { $ui.First = $b }; if ($b.Enabled -and -not $ui.Accept -and $main) { $ui.Accept = $b } }
   & $ui.Apart

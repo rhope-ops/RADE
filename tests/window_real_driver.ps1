@@ -173,6 +173,11 @@ function global:Get-RadeMain { $m = @($ui.B | Where-Object { $_.Visible -and [st
 # Prints the action row of the card on screen: its wrap width, the text column, and each button's place and left margin.
 function global:Write-RadeRow { Write-Host ('WIN row max=' + $ui.BtnRow.MaximumSize.Width + ' cw=' + $ui.ContentW + ' w=' + $ui.BtnRow.Width + ' ' + ((@(@($ui.BackB) + @($ui.B)) | Where-Object { $_.Visible } |
     ForEach-Object { $_.Text + ':' + $_.Left + '/' + $_.Top + '/' + $_.Width + '/m' + $_.Margin.Left }) -join ' ')) }
+# Plan engine-v48: the not-installed card (its one Install button), and on the first Run card the Cancel question, drawn
+# once, then "Keep installing" (the Run card again). Takes the view.
+function global:Step-RadeV48([string]$V) {
+  if ($V -eq 'notinst') { (Get-RadeMain).PerformClick(); return }
+  $global:RadeT.CancelQ = $true; & $ui.VCancelQ; Save-RadeCard 'cancelq'; & $ui.ShowRun }
 function global:Step-Rade {
   if (((Get-Date) - $global:RadeT.T0).TotalSeconds -gt 240) { Write-Host ('WIN TIMEOUT view=' + $ui.View + ' sent=' + $ui.Sent.Text); [Environment]::Exit(3) }
   if (-not $ui -or -not $ui.Form -or $ui.Form.IsDisposed -or -not $ui.Form.Visible -or -not $ui.View) { return }
@@ -200,6 +205,7 @@ function global:Step-Rade {
     Write-Host 'WIN BAD no choice for the application'; [Environment]::Exit(4)
   }
   elseif ($v -eq 'maint') { Write-RadeRow; if (-not $global:RadeT.ToolsDone) { $global:RadeT.ToolsDone = $true; Save-RadeTools } else { & $ui.OnOpt 10 } }   # the Maintenance card (the Restore cards once), then the Repair or Update row (Start would start the application)
+  elseif ($v -eq 'notinst' -or ($v -eq 'run' -and $ui.Running -and -not $global:RadeT.CancelQ)) { Step-RadeV48 $v }   # plan engine-v48: the not-installed card, the Cancel question
   elseif ($v -eq 'site') { $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }
   elseif ($v -in 'fail', 'need') {
     $id = [string]@($script:appChecks)[([int]($ui.Kick.Text -replace '^CHECK (\d+) OF .*$', '$1')) - 1]
@@ -222,11 +228,10 @@ function global:Step-Rade {
     $hf = @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'It failed' })[0]   # B3: Done (primary) is the last button
     if (-not $hf) { (Get-RadeMain).PerformClick() } elseif ($global:RadeT.Hand -eq 'fail') { $hf.PerformClick() } else { (Get-RadeMain).PerformClick() }
   }
-  elseif ($v -eq 'answer') {
-    if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }; Step-RadeR31 $v }
+  elseif ($v -eq 'answer') { if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }; Step-RadeR31 $v }
   elseif ($v -in 'tour', 'answerfail', 'feedback') { Step-RadeR31 $v }
   elseif ($v -eq 'handfail') { $ui.ErrBox.Text = 'Import failed: flow https://usaf.dps.mil/sites/fake/x not found'; $ui.B[0].PerformClick() }
-  elseif ($v -in 'done', 'review', 'stopped') {
+  elseif ($v -in 'done', 'review', 'stopped', 'stepfail') {
     foreach ($l in @($ui.Log)) { if ([string]$l -match 'failed|FAILED|STOPPED|could not') { Write-Host ('WIN log ' + ([string]$l).Trim()) } }
     & $ui.VRecord; Save-RadeCard ($v + '-record'); & $ui.CloseRecord
     $ll = @((& $ui.LayLine) -split "`r`n"); Write-Host ('WIN line ' + $ll[0]); foreach ($l in $ll) { if ($l -like 'SCALE *') { Write-Host ('WIN ' + $l) } }   # the scaling facts (numbers only)

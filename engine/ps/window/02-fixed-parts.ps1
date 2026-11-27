@@ -10,9 +10,10 @@
 # the stage ($ui.BandFit). It replaces the logo block of engine-v43 to v47 (logo 64 px, word, line, subtitle).
 $ui.Band = New-Object System.Windows.Forms.Panel
 $ui.Band.Dock = 'Top'; $ui.Band.Height = $ui.Z.BandH; $ui.Band.BackColor = $ui.C.Band; $ui.Band.AccessibleName = 'Band'
-# Makes one text of the band: a label in the band colors that ends with "..." when its room is short. Takes the font, the
-# color and the screen-reader name; gives back the label.
-$ui.BandText = { param($Font, $Color, [string]$Name) $l = New-Object System.Windows.Forms.Label; $l.AutoSize = $false; $l.AutoEllipsis = $true
+$ui.BandRaw = @{}   # the whole text of each band label (its shown text can be shortened)
+# Makes one text of the band: a label in the band colors; $ui.BandFit shortens its text ($ui.Shorten: no tooltip) when its
+# room is short. Takes the font, the color and the screen-reader name; gives back the label.
+$ui.BandText = { param($Font, $Color, [string]$Name) $l = New-Object System.Windows.Forms.Label; $l.AutoSize = $false
   $l.UseMnemonic = $false; $l.Font = $Font; $l.ForeColor = $Color; $l.BackColor = $ui.C.Band; $l.TextAlign = 'MiddleLeft'; $l.AccessibleName = $Name; $l }
 # Reads one logo from base64 PNG text. Takes the text; gives back the image, or $null (no text, or not readable).
 $ui.LogoImg = { param([string]$Png) if (-not $Png) { return $null }
@@ -74,14 +75,16 @@ $ui.BandFit = {
     $ui.Logo.Visible = [bool]$ui.Logo.Image; $x0 = $pad; if ($ui.Logo.Visible) { $ui.Logo.Bounds = New-Object System.Drawing.Rectangle($pad, [int](($H - $lg) / 2), $lg, $lg); $x0 = $pad + $lg + $gap }
     $sw = (& $ui.Sc ($ui.Z.Disc + $ui.Z.G2)) + [int](& $ui.Meas ([string]$ui.StageNow.Word) $ui.F.SmallB 100000).Width + (& $ui.Sc $ui.Z.G1)
     $ui.Stage.Bounds = New-Object System.Drawing.Rectangle(($W - $pad - $sw), 0, $sw, $H); $rx = $W - $pad - $sw - $gap
+    foreach ($l in @($ui.BandWord, $ui.BandSub, $ui.BandLine, $ui.BandVer)) { if ([string]$l.Text -cne [string]$ui.BandRaw[$l]) { $l.Text = [string]$ui.BandRaw[$l] } }   # the whole texts first
     $ui.BandVer.Visible = [bool](-not $ui.Narrow -and [string]$ui.BandVer.Text)
     if ($ui.BandVer.Visible) { $vw = [int](& $ui.Meas ([string]$ui.BandVer.Text) $ui.F.Small 100000).Width + (& $ui.Sc 4); $vh = & $ui.LineH $ui.F.Small; $ui.BandVer.Bounds = New-Object System.Drawing.Rectangle(($rx - $vw), [int](($H - $vh) / 2), $vw, $vh); $rx -= $vw + $gap }
     $wh = & $ui.LineH $ui.F.Word; $sh = $(if ([string]$ui.BandSub.Text) { & $ui.LineH $ui.F.Small } else { 0 }); $ui.BandSub.Visible = [bool]$sh; $top = [int](($H - $wh - $sh) / 2)
     $cw = [math]::Max((& $ui.Meas ([string]$ui.BandWord.Text) $ui.F.Word 100000).Width, (& $ui.Meas ([string]$ui.BandSub.Text) $ui.F.Small 100000).Width) + (& $ui.Sc 4); $cw = [int][math]::Max((& $ui.Sc 40), [math]::Min($cw, $rx - $x0))
     $ui.BandWord.Bounds = New-Object System.Drawing.Rectangle($x0, $top, $cw, $wh); if ($sh) { $ui.BandSub.Bounds = New-Object System.Drawing.Rectangle($x0, ($top + $wh), $cw, $sh) }
+    foreach ($l in @($ui.BandWord, $ui.BandSub)) { & $ui.Shorten $l ([string]$ui.BandRaw[$l]) $cw }   # a word wider than its room ends with "..." (no tooltip)
     $lx = $x0 + $cw + (& $ui.Sc $ui.Z.G4); $lh = & $ui.LineH $ui.F.Small
     $ui.BandLine.Visible = [bool](-not $ui.Narrow -and [string]$ui.BandLine.Text -and ($rx - $lx) -ge (& $ui.Sc 60))
-    if ($ui.BandLine.Visible) { $ui.BandLine.Bounds = New-Object System.Drawing.Rectangle($lx, [int](($H - $lh) / 2), ($rx - $lx), $lh) } } catch { $null = $_ } }   # no measure yet: the next fit places them
+    if ($ui.BandLine.Visible) { $ui.BandLine.Bounds = New-Object System.Drawing.Rectangle($lx, [int](($H - $lh) / 2), ($rx - $lx), $lh); & $ui.Shorten $ui.BandLine ([string]$ui.BandRaw[$ui.BandLine]) ($rx - $lx) } } catch { $null = $_ } }   # no measure yet: the next fit places them
 $ui.Band.Add_SizeChanged({ & $ui.BandFit })
 # Sets the texts and the logo of the band. Takes $true once an application is chosen (its logo, word and subtitle), else
 # RADE's own (the word RADE, RADE's full name as the subtitle). An app with productName and a logo shows its own from the
@@ -89,9 +92,10 @@ $ui.Band.Add_SizeChanged({ & $ui.BandFit })
 $ui.SetBand = { param([bool]$App)
   $own = [bool]($App -or ([string]$appProduct -and $ui.AppImg)); $img = $(if ($own -and $ui.AppImg) { $ui.AppImg } else { $ui.RadeImg })
   if (-not [object]::ReferenceEquals($ui.Logo.Image, $img)) { $ui.Logo.Image = $img }; $ui.Logo.AccessibleName = $(if ($own -and $ui.AppImg) { (Get-AppWord) + ' logo' } else { 'RADE logo' })
-  $ui.BandWord.Text = $(if ($own) { (Get-AppWord).ToUpperInvariant() } else { 'RADE' }); $ui.BandSub.Text = $(if ($own) { 'in RADE' } else { '' })
-  $ui.BandLine.Text = $(if ($own) { [string](Get-AppSubtitle) } else { $ui.Tagline }); $r = $(if (Test-RunnerStart) { '' } else { [string]$round })
-  $ui.BandVer.Text = (@($(if ($App -and [string]$script:app.Version) { [string]$script:app.Version }), $r) | Where-Object { $_ }) -join $dot; & $ui.BandFit }
+  $ui.BandRaw[$ui.BandWord] = $(if ($own) { (Get-AppWord).ToUpperInvariant() } else { 'RADE' }); $ui.BandRaw[$ui.BandSub] = $(if ($own) { 'in RADE' } else { '' })
+  $ui.BandRaw[$ui.BandLine] = $(if ($own) { [string](Get-AppSubtitle) } else { $ui.Tagline }); $r = $(if (Test-RunnerStart) { '' } else { [string]$round })
+  $ui.BandRaw[$ui.BandVer] = (@($(if ($App -and [string]$script:app.Version) { [string]$script:app.Version }), $r) | Where-Object { $_ }) -join $dot
+  foreach ($l in @($ui.BandWord, $ui.BandSub, $ui.BandLine, $ui.BandVer)) { $l.Text = [string]$ui.BandRaw[$l] }; & $ui.BandFit }
 # The light line under the band (plan engine-v48 step 2): 4 px in the line color when nothing is asked, 4 px green when a
 # run passed, 8 px yellow on your turn (yellow means only that), 8 px in the error color on a failure. The card's words
 # always say it too.
@@ -127,7 +131,7 @@ $ui.DrawBar = { param($P, $G) try { $b = $ui.Bars[[string]$P.Tag]; $G.Clear($(if
 $ui.MkBar = { param([string]$Name, [string]$Label)
   $p = New-Object System.Windows.Forms.Panel; $p.Height = 4; $p.Tag = $Name; $p.AccessibleRole = 'ProgressBar'; $p.AccessibleName = $Label; $p.AccessibleDescription = '0 %'
   try { [System.Windows.Forms.Control].GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]'NonPublic, Instance').SetValue($p, $true, $null) } catch { $null = $_ }
-  $ui.Bars[$Name] = @{ Panel = $p; Target = 0.0; Shown = 0.0; On = $false; Fill = $ui.C.Blue }
+  $ui.Bars[$Name] = @{ Panel = $p; Target = 0.0; Shown = 0.0; On = $false; Fill = $ui.C.Info }   # progress: the Info color (dark: blue, not the ember of the main button)
   $p.Add_Paint({ & $ui.DrawBar $this $_.Graphics }); $p }
 # Sets what a bar shows. Takes the bar name, the fraction (0 to 1) and whether it is on; the fill eases to it, and a
 # smaller value jumps back at once. Gives back nothing.
