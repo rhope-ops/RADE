@@ -209,7 +209,7 @@ $ui.VUninstall = {
   $ui.UninstallSite = [string]$siteCheck.Name; $all = @($script:app.Uninstall); $n = @($script:app.Backup).Count
   $rows = @(for ($i = 0; $i -lt $all.Count; $i++) { $st = $steps[[int]$all[$i]]
       ([string]($i + 1) + '. ' + (Get-StepTitle $st) + $(if ($st.Kind -eq 'guide') { ' (you do this step)' } else { '' })) })
-  $what = 'RADE first backs up ' + $n + ' list(s). Then it runs these ' + $all.Count + ' steps of ' + $script:app.Name + '.'
+  $what = 'RADE first backs up ' + $n + ' list(s). Then it runs ' + $(if ($all.Count -eq 1) { 'this step' } else { 'these ' + $all.Count + ' steps' }) + ' of ' + $script:app.Name + '.'
   $what += ' They remove what the install made on the site. Your local files and the backups stay on this computer.'
   & $ui.SetCard @{ View = 'unconfirm'; Light = 'you'; Kicker = [string]$ui.Kick.Text; Sentence = ('Uninstall ' + $script:app.Name + ' from the test site?')
     P = @(('Test site: ' + $ui.UninstallSite), $what); Lines = $rows

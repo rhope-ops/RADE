@@ -83,7 +83,7 @@ $ui.BandFit = {
     $ui.BandVer.Visible = [bool](-not $ui.Narrow -and [string]$ui.BandVer.Text)
     if ($ui.BandVer.Visible) { $vw = [int](& $ui.Meas ([string]$ui.BandVer.Text) $ui.F.Small 100000).Width + (& $ui.Sc 4); $vh = & $ui.BandLH $ui.BandVer; $ui.BandVer.Bounds = New-Object System.Drawing.Rectangle(($rx - $vw), [int](($H - $vh) / 2), $vw, $vh); $rx -= $vw + $gap }
     $wh = & $ui.BandLH $ui.BandWord; $sh = $(if ([string]$ui.BandSub.Text) { & $ui.BandLH $ui.BandSub } else { 0 }); $ui.BandSub.Visible = [bool]$sh
-    if ($wh + $sh -gt $H) { $H = $wh + $sh; $ui.Band.Height = $H }   # 56 px at 100 %; it grows only when the word and "in RADE" need more
+    $bh = [int][math]::Max((& $ui.Sc $ui.Z.BandH), $wh + $sh); if ($bh -ne $H) { $H = $bh; $ui.Band.Height = $bh }   # 56 px at 100 %, or what the word and "in RADE" need when that is more (each fit)
     $top = [int](($H - $wh - $sh) / 2)
     $cw = [math]::Max((& $ui.Meas ([string]$ui.BandWord.Text) $ui.F.Word 100000).Width, (& $ui.Meas ([string]$ui.BandSub.Text) $ui.F.Small 100000).Width) + (& $ui.Sc 4); $cw = [int][math]::Max((& $ui.Sc 40), [math]::Min($cw, $rx - $x0))
     $ui.BandWord.Bounds = New-Object System.Drawing.Rectangle($x0, $top, $cw, $wh); if ($sh) { $ui.BandSub.Bounds = New-Object System.Drawing.Rectangle($x0, ($top + $wh), $cw, $sh) }

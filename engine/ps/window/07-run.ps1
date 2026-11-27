@@ -61,23 +61,32 @@ $ui.RunRoom = { $ph = { param($C) $h = 0; try { $h = [int]$C.GetPreferredSize((N
 $ui.RunMost = 4   # at most 4 drawn rows beside the running one (the Cards v2 mock: 5 rows in all)
 # The width of a drawn row's texts (the row less the status column and the side room). Takes the row width.
 $ui.RunTextW = { param([int]$W) [int][math]::Max(1, $W - (& $ui.Sc 120) - 2 * (& $ui.Sc $ui.Z.G2)) }
-# The height of one drawn row: its name and its second line, each wrapped to 2 lines at most, 44 px at least. Takes the row and the width.
-$ui.RunRowH = { param($R, [int]$W)
-  $h1 = & $ui.LineH $ui.F.SmallB; $h2 = & $ui.LineH $ui.F.Small; $tw = & $ui.RunTextW $W
-  $n1 = & $ui.Rows ([string]$R.Title) $ui.F.SmallB $tw $h1 2; $n = & $ui.Rows ([string]$R.Sub) $ui.F.Small $tw $h2 2; return [int][math]::Max((& $ui.Sc 44), $n1 * $h1 + $n * $h2 + (& $ui.Sc $ui.Z.G3)) }
-# Sizes one drawn list to its rows. Takes the panel.
-$ui.SizeRuns = { param($P) $h = 0; foreach ($r in @($P.Tag)) { $h += & $ui.RunRowH $r ([int]$P.Width) }; $P.Height = [math]::Max(1, $h)
+# The height of one drawn row slot (R35, the Administrator, 2026-11-19: values do not move anything): the tallest row this
+# run can have, from the longest name of all its steps (2 lines at most) and a second line of 2 lines, 44 px at least.
+# Takes the width; gives back pixels.
+$ui.RunSlotOf = { param([int]$W)
+  $h1 = & $ui.LineH $ui.F.SmallB; $h2 = & $ui.LineH $ui.F.Small; $tw = & $ui.RunTextW $W; $n1 = 1
+  foreach ($x in @($ui.RunList)) { $n1 = [math]::Max($n1, (& $ui.Rows ([string]$x.Title) $ui.F.SmallB $tw $h1 2)) }
+  return [int][math]::Max((& $ui.Sc 44), $n1 * $h1 + 2 * $h2 + (& $ui.Sc $ui.Z.G3)) }
+$ui.RunCap = @{}; $ui.RunSlotH = 0; $ui.RunN = 0; $ui.RunKey = ''   # the slots of each list, the slot height, the slots in all, the size they are for
+# Sizes one drawn list to its slots (not to its rows: a list keeps its height from step to step). Takes the panel.
+$ui.SizeRuns = { param($P) $P.Height = [math]::Max(1, [int]$ui.RunCap[$P] * [int]$ui.RunSlotH)
   $P.AccessibleDescription = (@($P.Tag) | ForEach-Object { [string]$_.Title + ': ' + (& $ui.RunMark ([string]$_.State))[0] }) -join '; ' }
-# Puts the rows around the running step into the lists: the one before it, then as many after it as there is room for.
-# Takes nothing; sets the lists, the running row's summary, and lays the card out.
+# The number of row slots the Run card has room for at this window size (R35: once for a size, again only after a
+# resize, so the parts never move from step to step). Takes nothing; sets $ui.RunN, $ui.RunSlotH and $ui.RunKey.
+$ui.RunFit = { $key = [string]$ui.Card.ClientSize.Width + 'x' + $ui.Card.ClientSize.Height; if ($ui.RunKey -eq $key) { return }
+  foreach ($p in @($ui.RunA, $ui.RunB)) { $ui.RunCap[$p] = 0; $p.Visible = $false }   # first the card with no list: its room ($ui.RunRoom)
+  try { $ui.Card.PerformLayout() } catch { $null = $_ }; $ui.RunSlotH = & $ui.RunSlotOf ([int]$ui.RunA.Width)
+  $ui.RunN = [int][math]::Min($ui.RunMost, [math]::Floor((& $ui.RunRoom) / [math]::Max(1, $ui.RunSlotH))); $ui.RunKey = $key }
+# Puts the rows around the running step into the lists: one slot for the step before it (empty on the first step), the
+# other slots for the steps after it. The slots keep their heights from step to step. Takes nothing.
 $ui.PlaceRuns = {
   $all = @($ui.RunList); $r = -1; for ($i = 0; $i -lt $all.Count; $i++) { if ($all[$i].State -eq 'RUNNING') { $r = $i } }
-  foreach ($p in @($ui.RunA, $ui.RunB)) { $p.Tag = @(); $p.Visible = $false }   # first the card with no list: its room ($ui.RunRoom)
-  $ui.StepSum.Text = $(if ($r -ge 0) { [string]$all[$r].Sub } else { '' }); $ui.StepSum.Visible = [bool]$ui.StepSum.Text
-  try { $ui.Card.PerformLayout() } catch { $null = $_ }; $room = & $ui.RunRoom; $w = [int]$ui.RunA.Width; $a = @(); $b = @()
-  if ($r -gt 0) { $h = & $ui.RunRowH $all[$r - 1] $w; if ($h -le $room) { $a = @($all[$r - 1]); $room -= $h } }   # the step before, then the steps after, while they fit
-  for ($i = $r + 1; $i -lt $all.Count -and ($a.Count + $b.Count) -lt $ui.RunMost; $i++) { $h = & $ui.RunRowH $all[$i] $w; if ($h -gt $room) { break }; $b += $all[$i]; $room -= $h }
-  $ui.RunA.Tag = $a; $ui.RunB.Tag = $b; foreach ($p in @($ui.RunA, $ui.RunB)) { & $ui.SizeRuns $p; $p.Visible = [bool]@($p.Tag).Count }   # only the Run card shows them ($ui.Dress hides them)
+  $ui.StepSum.Text = $(if ($r -ge 0) { [string]$all[$r].Sub } else { '' }); $ui.StepSum.Visible = $true   # its room is the longest summary ($ui.Range)
+  & $ui.RunFit; $na = [int][bool]$ui.RunN; $a = @(); if ($na -and $r -gt 0) { $a = @($all[$r - 1]) }
+  $b = @(); for ($i = $r + 1; $i -lt $all.Count -and $b.Count -lt ($ui.RunN - $na); $i++) { $b += $all[$i] }
+  $ui.RunA.Tag = $a; $ui.RunB.Tag = $b; $ui.RunCap[$ui.RunA] = $na; $ui.RunCap[$ui.RunB] = $ui.RunN - $na
+  foreach ($p in @($ui.RunA, $ui.RunB)) { & $ui.SizeRuns $p; $p.Visible = [bool]$ui.RunCap[$p] }   # only the Run card shows them ($ui.Dress hides them)
   $ui.RunA.Invalidate(); $ui.RunB.Invalidate(); & $ui.Squeeze }
 # Marks the step that starts as running, and a row that was running and has no result as done. Takes the step name.
 $ui.RunStart = { param([string]$Name) foreach ($x in @($ui.RunList)) { if ($x.State -eq 'RUNNING') { $x.State = 'DONE' } }
@@ -101,7 +110,7 @@ $ui.PaintRuns = {
   param($P, $G)
   try { $G.Clear($ui.C.White); $G.SmoothingMode = 'AntiAlias'; $w = $P.ClientSize.Width; $y = 0; $pad = & $ui.Sc $ui.Z.G2; $mw = & $ui.Sc 120; $h1 = & $ui.LineH $ui.F.SmallB; $h2 = & $ui.LineH $ui.F.Small
     $wrap = 'Left, Top, NoPrefix, WordBreak, EndEllipsis, TextBoxControl'; $ln = New-Object System.Drawing.Pen($ui.C.Hair)
-    foreach ($r in @($P.Tag)) { $h = & $ui.RunRowH $r $w; $m = & $ui.RunMark ([string]$r.State); $col = $ui.C[[string]$m[1]]
+    foreach ($r in @($P.Tag)) { $h = [int]$ui.RunSlotH; $m = & $ui.RunMark ([string]$r.State); $col = $ui.C[[string]$m[1]]
       $tw = & $ui.RunTextW $w; $n1 = & $ui.Rows ([string]$r.Title) $ui.F.SmallB $tw $h1 2   # the name and the second line wrap to 2 lines each (Cards v2)
       & $ui.Word $G ([string]$r.Title) $ui.F.SmallB $ui.C.Navy $pad ($y + (& $ui.Sc 6)) $tw ($n1 * $h1) $wrap
       & $ui.Word $G ([string]$r.Sub) $ui.F.Small $ui.C.Gray $pad ($y + (& $ui.Sc 6) + $n1 * $h1) $tw (2 * $h2) $wrap
@@ -136,6 +145,7 @@ $ui.ShowRun = {
     StepRow = $true; Buttons = @(@{ Text = 'Cancel (Esc)'; Always = $true; Act = { & $ui.VCancelQ } })   # Cards v2: the Cancel question first (the window's X still asks with a message)
     Range = @{ Kick = @('STARTING', 'STEP 00 OF 00'); StepName = @(@($steps | ForEach-Object { Get-StepTitle $_ }) + @('Clean-up')) }   # every step title: the step row keeps its place
     Foot = $(if (@($ui.Guides).Count) { 'RADE needs you next at "' + (& $ui.TitleOf $ui.Guides[0]) + '". Until then, keep this window open.' } elseif (-not (Test-Deploy) -and -not $ui.Asked) { 'RADE asks you one last question at the end. Until then, keep this window open.' } else { 'Nothing is needed from you. Keep this window open.' }) }
+  $ui.Range[$ui.StepSum] = @($ui.RunList | ForEach-Object { [string]$_.Sub } | Where-Object { $_ }); & $ui.Reflow $ui.StepSum   # one height for every summary (R35)
   $ui.StepName.Text = (& $ui.TitleOf $ui.StepNow); $ui.PctL.Text = [string][int]($ui.Bars['all'].Target * 100) + ' %'; $null = & $ui.PlaceRuns; $null = & $ui.FitEdges; $null = & $ui.FitBar; $null = & $ui.ShowTime }   # the edge follows the ink of the new text's first letter (titles start with any letter)
 # Shows a new step on the Run card that is shown: its number in the line in capitals and its title. Both keep their size
 # ($ui.Range of the card), and the edges are fitted for the title's first letter. Takes the step number, the count and the name.
@@ -199,7 +209,7 @@ $ui.Run = {
     $answers += $a
   }
   $ui.Bars['all'].Fill = $ui.C.Info; $ui.Bars['run'].Fill = $ui.C.Info; $ui.Bars['step'].Fill = $ui.C.Info; & $ui.SetBar 'all' 0 $true; & $ui.SetBar 'run' 0 $true; & $ui.SetBar 'step' 0 $true
-  $script:stopAfter = $false; & $ui.MakeRunList $sel; & $ui.ShowRun; $ui.TimeT.Start()
+  $script:stopAfter = $false; & $ui.MakeRunList $sel; $ui.RunKey = ''; & $ui.ShowRun; $ui.TimeT.Start()
   $checkLines = Get-CheckSummary $script:checkResults
   $script:roundStart = Get-Date
   try {
