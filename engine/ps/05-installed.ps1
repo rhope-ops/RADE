@@ -329,9 +329,12 @@ function Get-AppDisplay { if ([string]$appDisplay) { return [string]$appDisplay 
 # else the app name. Takes nothing.
 function Get-AppWord { if ([string]$appProduct) { return [string]$appProduct }; return [string]$script:app.Name }
 # The line under the word: "<name> <bullet> <subtitle>" with a productName ("90-161.Z <bullet> Publications and Forms
-# Management"), else the subtitle alone (L1); '' when there is nothing to show. Takes nothing.
+# Management"), else the subtitle alone (L1); '' when there is nothing to show. The name is the application's own
+# (manifest application.name, $appName; engine-v47: the row shows from the first screen, so a chosen round's name such as
+# "90-161.Z R46" must not stand there), else the chosen app's name. Takes nothing.
 function Get-AppSubtitle { $s = [string]$appSubtitle; if (-not [string]$appProduct) { return $s }
-  if ($s) { return ([string]$script:app.Name + ' ' + [string][char]0x2022 + ' ' + $s) }; return [string]$script:app.Name }
+  $n = $(if ([string]$appName) { [string]$appName } else { [string]$script:app.Name })
+  if ($s) { return ($n + ' ' + [string][char]0x2022 + ' ' + $s) }; return $n }
 # Says whether RADE runs from an app's runner copy in RADE\runners (opened by its shortcut: no round, R44 E2). Takes nothing.
 function Test-RunnerStart {
   try { return [bool]($script:startFile -and (Split-Path -Parent $script:startFile) -eq (Join-Path (Get-RadePath) 'runners')) } catch { return $false }   # no RADE folder: not a runner

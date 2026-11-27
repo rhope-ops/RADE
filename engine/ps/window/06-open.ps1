@@ -34,21 +34,33 @@ $ui.VBootErr = { param([string]$Why)
     P = @($Why, 'Nothing was changed.', 'What to do: select "Try again". If it stops again, ask in the Teams channel.'); Help = (Get-HelpLine)
     Buttons = @(@{ Text = 'Try again'; Kind = 'primary'; Act = { & $ui.Boot } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } }) }
   & $ui.ToFront }
+# engine-v47 (the PFM, 2026-11-26): for an app with application.productName every choice is a version of one product, so a
+# choice reads "<word> <version>" ("Kanon 0.1.0") or, for a round, "<word> <round>" ("Kanon R46"), and the headline asks for
+# the version. Without a productName: the choice's name and its version, as before. Takes the choice; gives @{ Name; Ver }.
+$ui.ChoiceName = { param($A)
+  if (-not [string]$appProduct) { return @{ Name = [string]$A.Name; Ver = $(if ($A.Version) { ' ' + $A.Version } else { '' }) } }
+  $n = [string]$A.Name; $tail = $(if ([string]$A.Version) { [string]$A.Version } elseif ([string]$appName -and $n.StartsWith([string]$appName + ' ')) { $n.Substring(([string]$appName).Length + 1) } else { [string]$round })
+  return @{ Name = ([string]$appProduct + ' ' + $tail); Ver = '' } }   # "90-161.Z R46" gives "Kanon R46"; another name gives the round
+# The Choose headline. Takes whether a choice installs (deploy); gives the sentence.
+$ui.ChooseSentence = { param([bool]$Dep)
+  $verb = $(if ($Dep) { 'install' } else { 'run' })
+  if ([string]$appProduct) { return ('What version of ' + [string]$appProduct + ' do you want to ' + $verb + '?') }
+  return ('Which application do you want to ' + $verb + '?') }
 # Shows the Choose card: one option for each application, off when one of its checks failed. Takes nothing; selects the
 # first application and sets the card.
 $ui.VChoose = {
   if (@($apps).Count -eq 0) { & $ui.VNoApps; return }
-  Select-App 0; $ui.Picked = $false; $ui.Plan = $null; $ui.StartAfter = $false; & $ui.ShowAppRow $false; $list = @(); $dep = $false; $ui.Blocked = @{}; $ui.BlockedFix = @{}
+  Select-App 0; $ui.Picked = $false; $ui.Plan = $null; $ui.StartAfter = $false; & $ui.ShowAppRow $false; $ui.Form.Text = & $ui.TitleText $null; $list = @(); $dep = $false; $ui.Blocked = @{}; $ui.BlockedFix = @{}
   for ($j = 0; $j -lt $apps.Count; $j++) { foreach ($id in @($apps[$j].Checks)) { $r = $ui.BaseRes[$id]; if ($r -and $r.State -eq 'FAILED') { $ui.Blocked[$j] = ((Get-CheckDef $id).Name + ': ' + $r.Detail); $ui.BlockedFix[$j] = $(if ($r.Fix) { 'What to do: ' + $r.Fix } else { '' }); break } } }
   for ($j = 0; $j -lt $apps.Count; $j++) {
     $a = $apps[$j]; if ([string]$a.Mode -eq 'deploy') { $dep = $true }
-    if ($ui.Blocked.ContainsKey($j)) { $list += @{ Off = $true; Index = $j; Name = [string]$a.Name; Ver = $(if ($a.Version) { ' ' + $a.Version } else { '' }); Sub = [string]$ui.Blocked[$j]; Sub2 = [string]$ui.BlockedFix[$j]; R1 = 'FAILED' }; continue }
-    $f = Get-AppFact $a $ui.Hist
-    $list += @{ Index = $j; Name = [string]$a.Name; Ver = $(if ($a.Version) { ' ' + $a.Version } else { '' }); Sub = [string]$a.Summary; R1 = $f.Steps; R2 = $f.Installed
+    if ($ui.Blocked.ContainsKey($j)) { $nv = & $ui.ChoiceName $a; $list += @{ Off = $true; Index = $j; Name = $nv.Name; Ver = $nv.Ver; Sub = [string]$ui.Blocked[$j]; Sub2 = [string]$ui.BlockedFix[$j]; R1 = 'FAILED' }; continue }
+    $f = Get-AppFact $a $ui.Hist; $nv = & $ui.ChoiceName $a
+    $list += @{ Index = $j; Name = $nv.Name; Ver = $nv.Ver; Sub = [string]$a.Summary; R1 = $f.Steps; R2 = $f.Installed
       Note = $(if ($ui.Newer[$j]) { 'Version ' + $ui.Newer[$j] + ' is on the RADE page. This paste installs ' + $a.Version + '.' } else { '' }) }
   }
   $nr = [string]$ui.NewRound
-  & $ui.SetCard @{ View = 'choose'; Sentence = $(if ($dep) { 'Which application do you want to install?' } else { 'Which application do you want to run?' })
+  & $ui.SetCard @{ View = 'choose'; Sentence = (& $ui.ChooseSentence $dep)
     P = @($(if ($nr) { 'A newer round, ' + $nr + ', is in the repository. Close this window and run ' + $nr + ' instead.' } else { '' })); Options = $list; OnOption = { param($j) & $ui.Pick $j }
     PageLink = [bool](@($ui.Newer.Values | Where-Object { $_ }).Count)
     Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Kind = 'primary'; Act = { & $ui.Boot } } } else { $null }),
@@ -71,7 +83,7 @@ $ui.TourCards = @(
   @{ S = 'The results stay on this computer.'; P = @('RADE writes a report into its results folder. RADE sends nothing.', 'After a test round RADE makes an e-mail draft with the results. You read it, and you send it.') },
   @{ S = 'Details shows everything.'; P = @('Select "Details" or press F2 to see all checks, steps, files and the log.', 'Select "Help" or press F1 to see this tour again.') })
 # The cards that "Help (F1)" can leave and show again: no step or check runs on them, and none waits inside the engine.
-$ui.HelpViews = @('choose', 'maint', 'tools', 'toolres', 'restmark', 'restpick', 'restconfirm', 'site', 'fail', 'need', 'ready', 'nodrive', 'done', 'review', 'stopped', 'noapps', 'booterr')
+$ui.HelpViews = @('choose', 'maint', 'toolres', 'restmark', 'restpick', 'restconfirm', 'site', 'fail', 'need', 'ready', 'nodrive', 'done', 'review', 'stopped', 'noapps', 'booterr')
 # Shows card $I of the tour (0 = the first). "Next" and "Back" move; "Skip the tour" and the last card's button end it.
 # Takes the card number.
 $ui.VTour = { param([int]$I)
@@ -92,12 +104,13 @@ $ui.TourB.Add_Click({ & $ui.OpenTour })
 # Resets what the user chose: each step to its default, clean-up on, no step states. Takes nothing.
 $ui.InitSel = { $ui.Sel = @{}; foreach ($k in $script:appSteps) { $ui.Sel[[int]$k] = [bool](Get-StepDefault $k) }; $ui.Clean = $true; $ui.StepState = @{} }
 # Shows or hides the application row of the logo block (its logo, its name and subtitle). L1 (the PFM, 2026-11-26): boot
-# and Choose show the RADE row only. Name spot L3 (engine-v46, the PFM, 2026-11-26): once an application with a logo is
+# and Choose show the RADE row only; engine-v47: not for an app with productName and a logo ($ui.AppFirst): its row always shows. Name spot L3 (engine-v46, the PFM, 2026-11-26): once an application with a logo is
 # chosen, its row takes the RADE row's place (the title bar keeps the RADE icon, name and engine). The texts are as tall
 # as their ink before the row shows, and the window lays out once more so the logo block (docked, sized by the window)
 # takes the row's height: the first card after the choice is measured before the next fit (Windows job, 18 Nov 26: the
 # row at 76 needed 23 px in a 98 px block). Takes whether to show it.
 $ui.ShowAppRow = { param([bool]$On)
+  if ($ui.AppFirst) { $On = $true; $ui.AppWordL.Text = ([string]$appProduct).ToUpperInvariant(); $ui.AppL.Text = (Get-AppSubtitle) }   # engine-v47: the app's row on every screen
   if (-not $ui.AppLogo) { $ui.TagL.Text = $(if ($On) { [string]$script:app.Name } else { $ui.Tagline }); $On = $false }   # no application logo: the name stands under RADE (one row, the window keeps its height)
   $sub = [bool]($On -and [string]$ui.AppL.Text)   # no subtitle: the name only, with no line under it
   $ui.AppRule.Visible = $sub; $ui.AppL.Visible = $sub
@@ -105,7 +118,7 @@ $ui.ShowAppRow = { param([bool]$On)
   $ui.RadeRowOn = -not $On; $ui.TopRow.Visible = $ui.RadeRowOn; $ui.AppRow.Visible = $On   # L3: one row: RADE's or the application's
   & $ui.FitHead; if ($ui.AppLogo) { & $ui.AlignRow (& $ui.RowParts 'AppRow') 0 }   # the application column is centered on its logo
   try { $ui.Form.PerformLayout() } catch { $null = $_ }   # no form yet (text mode): nothing to lay out
-  if ($ui.AppLogo) { $ui.AppLogo.AccessibleName = $(if ($On -and $ui.Picked) { $script:app.Name + ' logo' } else { 'Application logo' }) } }
+  if ($ui.AppLogo) { $ui.AppLogo.AccessibleName = $(if ($ui.AppFirst) { [string]$appProduct + ' logo' } elseif ($On -and $ui.Picked) { $script:app.Name + ' logo' } else { 'Application logo' }) } }
 # Takes the application the user chose: selects it, reuses base check results that can be reused, and shows Maintenance
 # (already installed) or the checks. Takes the application number.
 $ui.Pick = { param([int]$J)
@@ -113,40 +126,38 @@ $ui.Pick = { param([int]$J)
   # The base checks are not run twice, except the ones whose answer can change at any time ($checkNoSave: Word open, disk, write).
   foreach ($id in $script:appChecks) { if ($ui.BaseRes.ContainsKey($id) -and $checkNoSave -notcontains $id -and $ui.BaseRes[$id].State -in 'PASSED', 'WARNING') { $script:checkResults[$id] = $ui.BaseRes[$id] } }
   $ui.AppWordL.Text = (Get-AppWord).ToUpperInvariant(); $ui.AppL.Text = (Get-AppSubtitle); & $ui.ShowAppRow $true   # L3 (the PFM, 2026-11-26): the word in capitals ("KANON"), under the line the name and the subtitle
+  $ui.Form.Text = & $ui.TitleText $script:app   # engine-v47: "Kanon - 0.1.0" or "Kanon - R46"
   & $ui.InitSel
   $e = $null; if (Test-Deploy) { $e = (Read-Installed (Get-InstalledKey $script:app)) }
   if ($e -and $e.installed) { & $ui.VMaint $e.installed } else { & $ui.Checks $false } }
 # Shows the Maintenance card of an installed application. Takes its install record (version and date).
 $ui.VMaint = { param($Inst)
-  $ui.MaintInst = $Inst   # Back on the Maintenance screen shows this card again
-  # Maintenance (the Administrator, 2026-11-14; docs/engine.md "Maintenance run types"): shown for an application that is
-  # installed. UI standard v1 (the Administrator, 2026-11-20): the card has Start, "Maintenance" (its own screen,
-  # $ui.VTools: Update or Repair, Diagnose, Back up, Restore) and Uninstall set apart (engine-v40: $ui.VUninstall, part 11).
+  $ui.MaintInst = $Inst   # Back from a tool's cards shows this card again
+  # Maintenance (the Administrator, 2026-11-14; docs/engine.md "Maintenance run types"). engine-v47, option A of the mock
+  # (the PFM, 2026-11-26: "put all options that are maintenance actions directly on that screen, in the list, with uninstall
+  # last, including repair in it"): one card, one list: Update or Repair, Diagnose, Back up, Restore, then Uninstall in dark
+  # red; "Start <word>" is the action button. The second screen "Maintenance" (view tools, engine-v30 to v46) is gone.
   $verb = 'Install ' + $script:app.Version
   try { $c = ([version][string]$script:app.Version).CompareTo([version][string]$Inst.version); if ($c -gt 0) { $verb = 'Update to ' + $script:app.Version } elseif ($c -eq 0) { $verb = 'Repair' } } catch { $null = $_ }
-  # Start (R28 fix: the PFM found no Start button): the installed application with a start script can be started from here too.
+  # Start (R28 fix: the PFM found no Start button): the installed application with a start script can be started from here.
   # It runs the checks first (Start comes only after they pass: AGENTS.md "RADE and the app"), then starts the application.
-  $ui.StartAfter = $false; $startB = $null; $startMain = $false
-  if ([string]$script:app.Start -and (Get-StartPath)) { $startMain = ([string]$Inst.version -eq [string]$script:app.Version); $startB = @{ Text = 'Start ' + $script:app.Name; Kind = $(if ($startMain) { 'primary' } else { '' }); Act = { $ui.StartAfter = $true; & $ui.Checks $false } } }
-  # Uninstall (engine-v40): dark red and on for an app with Uninstall steps, else not available (answer 4A).
-  $ui.UninstallB = $(if (@($script:app.Uninstall).Count) { @{ Text = 'Uninstall'; Kind = 'danger'; Act = { & $ui.VUninstall } } } else { @{ Text = 'Uninstall'; Kind = 'dangeroff' } })
-  $ui.MaintVerb = $verb   # read when the button is clicked (a scriptblock does not keep this card's local variables)
-  & $ui.SetCard @{ View = 'maint'; Kicker = ((Get-AppWord) + ' ' + [string][char]0x2022 + ' ' + $Inst.version); Sentence = 'Maintenance'
-    P = @(('Maintenance holds ' + $verb + ', Diagnose, Back up and Restore.'), $(if ($startB) { 'Start runs the checks, then opens ' + $script:app.Name + '.' } else { '' }))
-    Note = $(if (@($script:app.Uninstall).Count) { '' } else { $script:app.Name + ' has no Uninstall steps.' })   # answer 4A of the PFM (2026-11-25)
-    Buttons = @($ui.UninstallB, $startB, @{ Text = 'Maintenance'; Kind = $(if ($startMain) { '' } else { 'primary' }); Act = { & $ui.VTools $ui.MaintVerb } })   # Uninstall first: away from the primary   # B5: 1 primary + 3 others at most
-    Back = { & $ui.VChoose } } }
-# The Maintenance screen (the Administrator, 2026-11-20): Update or Repair (works: the checks, then the install run),
-# and the list of Diagnose and Back up (engine-v30) and Restore (engine-v31; docs/engine.md "Maintenance run types").
-# Takes the install verb ("Update to <version>" or "Repair").
-$ui.VTools = { param([string]$Verb)
-  & $ui.SetCard @{ View = 'tools'; Kicker = [string]$ui.Kick.Text; Sentence = 'Maintenance'
-    # The tools are a list (the Administrator, 2026-11-20: Repair must not stand alone on a row): one row each, as on Choose,
-    # with what it does; shown not available until it is built. The action row is Back (Esc) and the install verb.
-    P = @(($Verb + ' adds what is missing and keeps your data.'))
-    Options = (& $ui.ToolRows); OnOption = { param($j) & $ui.RunTool $j }   # Diagnose and Back up run on a click; Restore opens its cards (window/11-tools.ps1)
-    Buttons = @(@{ Text = $Verb; Kind = 'primary'; Act = { & $ui.Checks $false } })
-    Back = { & $ui.VMaint $ui.MaintInst } } }
+  # Primary when the installed version is this paste's version; else the Update row is the main action.
+  $ui.StartAfter = $false; $startB = $null
+  if ([string]$script:app.Start -and (Get-StartPath)) { $startB = @{ Text = 'Start ' + (Get-AppWord); Kind = $(if ([string]$Inst.version -eq [string]$script:app.Version) { 'primary' } else { '' }); Act = { $ui.StartAfter = $true; & $ui.Checks $false } } }
+  $ui.MaintVerb = $verb   # read when a row is clicked (a scriptblock does not keep this card's local variables)
+  $fix = @{ Index = 10; Name = $verb; Ver = ''; Sub = $(if ($verb -eq 'Repair') { 'Adds what is missing. Keeps your data.' } else { 'Installs ' + $script:app.Version + ' and keeps your data.' }); R1 = 'Runs the checks first' }
+  # Uninstall (engine-v40): dark red and on for an app with Uninstall steps, else not available (answer 4A of the PFM, 2026-11-25).
+  $un = $(if (@($script:app.Uninstall).Count) { @{ Index = 20; Name = 'Uninstall'; Ver = ''; Danger = $true; Sub = ('Removes ' + (Get-AppWord) + ' from the test site, after a backup. You type the name to confirm.'); R1 = 'Changes the site' } }
+    else { @{ Off = $true; Soon = $true; Index = 20; Name = 'Uninstall'; Ver = ''; Sub = ($script:app.Name + ' has no Uninstall steps.'); R1 = 'Not set up by this app' } })
+  & $ui.SetCard @{ View = 'maint'; Kicker = ((Get-AppWord) + ' ' + [string][char]0x2022 + ' ' + $Inst.version); Sentence = ((Get-AppWord) + ' ' + $Inst.version + ' is installed.')
+    Options = @(@($fix) + @(& $ui.ToolRows) + @($un)); OnOption = { param($j) & $ui.MaintPick $j }
+    Buttons = @($startB); Back = { & $ui.VChoose } } }
+# A click on a row of the Maintenance card: 10 = Update or Repair (the checks, then the install run), 20 = Uninstall (its
+# confirm card, part 11), else a tool row (Diagnose, Back up, Restore: $ui.RunTool, part 11). Takes the row's index.
+$ui.MaintPick = { param([int]$J)
+  if ($J -eq 10) { & $ui.Checks $false } elseif ($J -eq 20) { & $ui.VUninstall } else { & $ui.RunTool $J } }
+# The Back target of the tool cards: the Maintenance card. Takes nothing.
+$ui.ToolsBack = { & $ui.VMaint $ui.MaintInst }
 # Says whether the chosen application has a check that needs the site address. Takes nothing; gives back $true or
 # $false.
 $ui.NeedSite = { [bool](@($script:appChecks | Where-Object { $_ -in 'net-site', 'site-rights' }).Count) }

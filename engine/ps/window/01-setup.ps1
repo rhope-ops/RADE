@@ -38,31 +38,45 @@ if ($script:native) {
 }
 # engine-v46 (the PFM, 2026-11-26: the taskbar showed a PowerShell icon): the RADE process gets its own taskbar identity
 # (an AppUserModelID) before any window exists, so Windows gives the RADE window its own taskbar button with the window's
-# icon (the RADE logo), not a button in the PowerShell group. Not in ISE (the window then runs inside ISE, and the
+# icon (the app logo from engine-v47, else the RADE logo), not a button in the PowerShell group. Not in ISE (the window then runs inside ISE, and the
 # identity would move ISE's own windows too). A separate type (Rade.Aumid): a paste again in one session must not fail.
 # $script:taskbarId is "own" when Windows took it, else "n/a".
 $script:taskbarId = 'n/a'
 if ($script:native -and [string]$Host.Name -ne 'Windows PowerShell ISE Host') {
   try { Add-Type -Namespace Rade -Name Aumid -MemberDefinition '[DllImport("shell32.dll", CharSet = CharSet.Unicode)] public static extern int SetCurrentProcessExplicitAppUserModelID(string id);' -ErrorAction Stop
-    if ([Rade.Aumid]::SetCurrentProcessExplicitAppUserModelID('RhopeOps.RADE.Window') -eq 0) { $script:taskbarId = 'own' } } catch { $script:taskbarId = 'n/a' }   # no compiler or an old Windows: the PowerShell group, as before
+    # engine-v47 (the PFM, 2026-11-26: "Kanon icon and name"): an app with application.productName gets its own identity
+    # ("RhopeOps.RADE.Kanon"), so its taskbar button groups apart from RADE's and shows the app logo (the form icon below).
+    $aid = 'RhopeOps.RADE.' + $(if ([string]$appProduct -and ([string]$appProduct -replace '[^A-Za-z0-9]', '')) { [string]$appProduct -replace '[^A-Za-z0-9]', '' } else { 'Window' })
+    if ([Rade.Aumid]::SetCurrentProcessExplicitAppUserModelID($aid) -eq 0) { $script:taskbarId = 'own' } } catch { $script:taskbarId = 'n/a' }   # no compiler or an old Windows: the PowerShell group, as before
 }
 [System.Windows.Forms.Application]::EnableVisualStyles()
 $ui = @{ View = ''; Running = $false; Busy = $false; RecOn = $false; Edit = $false; Answer = ''; Acts = @(); Back = $null; OnOpt = $null; FieldDo = $null
   Log = (New-Object System.Collections.Generic.List[string]); Summary = @(); Sel = @{}; Clean = $true; StepState = @{}; Plan = $null; Picked = $false
   BaseIds = @(); BaseRes = @{}; Blocked = @{}; Newer = @{}; Bars = @{}; G = $null; GUrl = ''; CurId = ''; StepI = 0; StepN = 0; StepNow = ''; BusyShown = $false; Always = @($false, $false, $false, $false, $false, $false); NB = 6; StartAfter = $false; Cancel = $false; Dpi = 96.0; ScreenDpi = 96.0; FontK = 1.0; FontDpi = 96.0; Scaled = $false; Full = @{}; Clock = [System.Diagnostics.Stopwatch]::StartNew(); CardAt = -1000000.0; GuardMs = 400; Calm = $false; ContentW = 780 }
 $ui.OpenedAt = (Get-Date).AddSeconds(-1)   # E4: the SCALE lines of the RADE windows shown from this time on go into the round's results
-# The tagline (the Administrator, 2026-11-19; L1, the PFM, 2026-11-26: no period, and always under the word RADE).
-$ui.Tagline = 'Test, deploy, enjoy'
+# engine-v47 (the PFM, 2026-11-26): the line under the word RADE is RADE's full name, "Redacted Application Deployment
+# Engine" (replaces the short tagline of L1). The RADE row shows only for an app with no productName and logo.
+$ui.Tagline = 'Redacted Application Deployment Engine'
 # Layout values from engine/window.json, put in by the build (text column share and cap, minimum window size, minimum height of the card frame; pixels at 100 %; the minimum time of a step on the Run card, ms).
 $ui.Layout = @{ Share = [double]'@@TEXT_SHARE@@'; MaxW = [int]'@@TEXT_MAX@@'; MinW = [int]'@@MIN_W@@'; MinH = [int]'@@MIN_H@@'; FrameMin = [int]'@@FRAME_MIN@@'; StepMs = [int]'@@MIN_STEP_MS@@' }
 $ui.Hist = Read-RoundHistory (Get-BasePath)
 $script:secret = Get-Secret (Get-ProfileLeaf) (Get-ProfileLeaf)   # saved checks are masked before they are written
 try { $ui.Calm = -not [System.Windows.Forms.SystemInformation]::UIEffectsEnabled } catch { $null = $_ }
 $ui.Form = New-Object System.Windows.Forms.Form
-$ui.Form.Text = 'RADE - engine-v' + $engineRelease + $(if (Test-RunnerStart) { '' } else { ' - ' + $round })   # from the shortcut: no round; 90-161.Z R44 E2 (the PFM, 2026-11-25): docs/window-design.md "Title bar"
-# The title-bar icon is RADE's logo (Fulcrum everywhere, the PFM, 2026-11-20), drawn at 32 px from the bundle's PNG.
+# The title text (docs/window-design.md "Title bar"). engine-v47 (the PFM, 2026-11-26: "Kanon icon and name"): for an app with
+# application.productName, "<word> - <version>" for a chosen install ("Kanon - 0.1.0"), else "<word> - <round>" ("Kanon - R46";
+# from the shortcut, the version of the paste's install); the engine number is in Details (F2). Without a productName,
+# "RADE - engine-vNN - <round>" as before (90-161.Z R44 E2; from the shortcut: no round). Takes the chosen app or $null.
+$ui.TitleText = { param($App)
+  if (-not [string]$appProduct) { return ('RADE - engine-v' + $engineRelease + $(if (Test-RunnerStart) { '' } else { ' - ' + $round })) }
+  if (-not $App -and (Test-RunnerStart)) { $App = @($apps | Where-Object { [string]$_.Version })[0] }   # the shortcut opens the paste of an install
+  $v = $(if ($App -and [string]$App.Version) { [string]$App.Version } elseif (-not (Test-RunnerStart)) { [string]$round } else { '' })
+  return ([string]$appProduct + $(if ($v) { ' - ' + $v } else { '' })) }
+$ui.Form.Text = & $ui.TitleText $null
+# The title-bar and taskbar icon: the app logo for an app with productName and a logo (engine-v47), else RADE's logo
+# (Fulcrum, the PFM, 2026-11-20); drawn at 32 px from the bundle's PNG.
 try {
-  $ib = New-Object System.Drawing.Bitmap((New-Object System.IO.MemoryStream(, [System.Convert]::FromBase64String($logoPng))))
+  $ib = New-Object System.Drawing.Bitmap((New-Object System.IO.MemoryStream(, [System.Convert]::FromBase64String($(if ([string]$appProduct -and [string]$appLogoPng) { $appLogoPng } else { $logoPng })))))
   $ui.Form.Icon = [System.Drawing.Icon]::FromHandle((New-Object System.Drawing.Bitmap($ib, 32, 32)).GetHicon())
 } catch { $null = $_ }   # a logo System.Drawing cannot read keeps the default icon
 $ui.Form.SuspendLayout()

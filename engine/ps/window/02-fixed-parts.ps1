@@ -73,15 +73,16 @@ $ui.VerBad = { param([string]$Card, [object[]]$Row, $RuleTop)
 # back @{ Bottom; Base; Panel } (Bottom is the panel's end when the text cannot be measured).
 $ui.TextInk = { param($P, $R) $fi = & $ui.FontInk $P.Font; $y0 = [int]$R.Top - [int]$fi.Top; $b = $null; if ([string]$P.Text) { $b = & $ui.InkOf ([string]$P.Text) $P.Font }
   @{ Bottom = $(if ($b) { $y0 + [int]$b.Bottom } else { [int]$R.Bottom }); Base = $y0 + [int]$fi.Base; Panel = [int]$R.Bottom } }
-# The RADE column: the word RADE and, under it at all times, the tagline (L1, the PFM, 2026-11-26: "RADE (new line) Test,
-# deploy, enjoy"; it replaces 2026-11-19, where a chosen application's name took the tagline's place).
-$hc = & $ui.HeadCol 'RADE' 'Test, deploy, enjoy'
+# The RADE column: the word RADE and, under it, the tagline ($ui.Tagline: RADE's full name from engine-v47; L1 of
+# 2026-11-26 had a short tagline). An app with no logo puts its name there once it is chosen.
+$hc = & $ui.HeadCol 'RADE' $ui.Tagline
 $ui.TitleCol = $hc.Col; $ui.WordL = $hc.Word; $ui.HeadRule = $hc.Rule; $ui.TagL = $hc.Sub
 $ui.WordL.Text = 'RADE'; $ui.TagL.Text = $ui.Tagline; [void]$ui.TopRow.Controls.Add($ui.TitleCol)
 # The application row, once an application is chosen (L1; name spot L3, engine-v46, the PFM, 2026-11-26): its logo (when
 # it has one) and a column like the RADE column: the application's word in capitals ("KANON"), and under the line
 # "<name> <bullet> <subtitle>" ("90-161.Z <bullet> Publications and Forms Management"); without a subtitle, the name only.
-# Hidden on boot and on Choose; with an application logo it takes the RADE row's place ($ui.ShowAppRow).
+# With an application logo it takes the RADE row's place ($ui.ShowAppRow): from the first screen for an app with
+# application.productName (engine-v47, the PFM, 2026-11-26: "it should be the KANON logo"), else once an app is chosen.
 # An application with no logo has no row of its own: its name stands under RADE in the tagline's place (the window keeps
 # the height of engine-v42; the Windows job's smallest window had no room for a second row).
 $ui.AppRow = & $ui.LogoRow; $ui.AppRow.Visible = $false
@@ -90,6 +91,10 @@ $ac = & $ui.HeadCol 'Application' 'Application subtitle' $true
 $ui.AppCol = $ac.Col; $ui.AppWordL = $ac.Word; $ui.AppRule = $ac.Rule; $ui.AppL = $ac.Sub; [void]$ui.AppRow.Controls.Add($ui.AppCol)
 foreach ($c in @($ui.TopRow, $ui.AppRow)) { [void]$ui.Top.Controls.Add($c) }
 $ui.RadeRowOn = $true   # L3: the RADE row shows until an application with a logo is chosen ($ui.ShowAppRow)
+# engine-v47 (the PFM, 2026-11-26): an app with productName and a logo shows its own row from the first screen (boot too).
+$ui.AppFirst = [bool]([string]$appProduct -and $ui.AppLogo)
+if ($ui.AppFirst) { $ui.AppWordL.Text = ([string]$appProduct).ToUpperInvariant(); $ui.AppL.Text = (Get-AppSubtitle); $ui.AppLogo.AccessibleName = [string]$appProduct + ' logo'
+  $ui.RadeRowOn = $false; $ui.TopRow.Visible = $false; $ui.AppRow.Visible = $true; $sub0 = [bool][string]$ui.AppL.Text; $ui.AppRule.Visible = $sub0; $ui.AppL.Visible = $sub0 }
 $ui.Bottom = New-Object System.Windows.Forms.TableLayoutPanel
 $ui.Bottom.Dock = 'Bottom'; $ui.Bottom.Height = 46; $ui.Bottom.AutoSize = $true; $ui.Bottom.AutoSizeMode = 'GrowAndShrink'; $ui.Bottom.MinimumSize = New-Object System.Drawing.Size(0, 46); $ui.Bottom.ColumnCount = 5; $ui.Bottom.RowCount = 1; $ui.Bottom.Padding = (& $ui.Pad ($ui.Z.Inset - $ui.Z.M) 3 $ui.Z.Inset 3); $ui.Bottom.BackColor = $ui.C.White
 foreach ($cs in @('AutoSize', 'AutoSize', 'AutoSize', 'Percent', 'AutoSize')) { [void]$ui.Bottom.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle($cs, 100))) }
