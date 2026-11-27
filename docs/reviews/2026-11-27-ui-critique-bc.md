@@ -28,3 +28,7 @@ Nielsen heuristics: 23 of 36 (64 %, acceptable); heuristic 9 (errors) not scored
 Fulcrum's five colors and their derived set do not cover the window. Measured: ember as a bar on a dark track is 2.87 : 1 (needs 3 : 1); the ember link and the soft red error are 1.10 : 1 apart (the same color to the eye). Added on the board, each checked: Band #0E1015, Info #8DB8F0 (links, progress, RUNNING), Run tint #1B2433, Raised #1E2129, Off fill #262A33, Off ink #9599A3, Off red #C98F89, Track #3A3F4A; control line changes from #6E7382 to #7A7F8C. Rule: ember = the main action and the stage now; info blue = links, progress and RUNNING; soft red = errors only.
 
 Light mode (Kanon in USAF): add a Band token #081B33; the yellow changes from #FFD520 to the logo yellow #FFCD00; Off ink changes to #5F6874 on #F4F6F8.
+
+## Cards, version 2 (2026-11-27)
+
+Board "Cards v2" on the same page: 7 half-size cards in both modes (not installed, Run, Your turn, after "It failed", Cancel question, step failed, Done), with changes 1 to 8 and the single Install card (D8). Dark focus ring changes from #FF8C66 to cream #F3EEE4: the orange ring could not be seen around the ember main button.
