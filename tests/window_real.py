@@ -259,6 +259,10 @@ def restore_why(lines):
         return ["\"Remove test-site mark\" did not remove the mark and show the result card"]
     if drawn and not any(" view=restconfirm " in l and " p=Test site: " in l for l in cards):
         return ["the Restore confirm card did not show \"Test site: <name>\" as its first line"]
+    if drawn and not (any(l.startswith("WIN uninstall-backups view=unbackups main=Keep the Backups folder") and l.endswith(" back=True")
+                          for l in lines) and "WIN uninstall-remove view=unconfirm keep=False choice=True" in lines):
+        return ["the Uninstall Backups card (engine-v48) did not show with \"Keep the Backups folder\" as its main button, "
+                "or \"Remove the Backups folder too\" did not reach the confirm card with that choice"]
     if drawn and "WIN uninstall-confirm view=unconfirm danger=True" not in lines:
         return ["the Uninstall confirm card (engine-v40) did not show, or its button \"Uninstall\" was not dark red"]
     got = [int(m.group(1)) for m in (re.match(r"WIN restore-lines (\d+) visible=True", l) for l in lines) if m]

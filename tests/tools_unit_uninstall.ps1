@@ -134,6 +134,10 @@ Assert-Case 'uninstall (engine-v48): the last app clears RADE shared files; Back
   -not (Test-Path -LiteralPath (Join-Path $rade 'Config')) -and -not (Test-Path -LiteralPath (Join-Path $rade 'runners')) -and -not (Test-Path -LiteralPath (Join-Path $rade 'rade-runner.ps1')) -and
   (Test-Path -LiteralPath (Join-Path $base 'Backups')) -and (Test-Path -LiteralPath (Join-Path $rade 'Other')) -and (Test-Path -LiteralPath (Join-Path $Dir 'keep.txt')) -and
   $u.Lines[1] -like '*, 3 shared RADE folders and files.')
+# The window closes after the last Uninstall: its place and the tour mark are not written, so RADE\Config does not come back.
+$gone = [bool]$script:radeConfigGone; Save-WindowState 10 10 800 600 'Normal' 96 780 560 'Normal'; Save-TourSeen
+Assert-Case 'uninstall (engine-v48): after the last app, the window place and the tour mark do not make RADE\Config again' ($gone -and -not (Test-Path -LiteralPath (Join-Path $rade 'Config')))
+$script:radeConfigGone = $false
 Assert-Case 'Remove RADE (engine-v40) is gone (engine-v48): no function of it is left' (-not (Get-Command Invoke-RemoveRade, Get-InstalledAppName, Get-RadeAppDir -ErrorAction SilentlyContinue))
 Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake'   # the clean-up above took the app's Config folder: the next cases need the site address
 # ---- Back up stall (engine-v42; 90-161.Z R44 E4): the sign-in time line, the site check and the stage time limit.
