@@ -46,7 +46,10 @@ def ui_tokens():
         assert re.fullmatch(r'[A-Za-z]+', name), 'engine/ui-tokens.json: color name %r: letters only' % name
         assert re.fullmatch(r'#[0-9A-Fa-f]{6}', c['hex']), 'engine/ui-tokens.json: color %s: hex must be #RRGGBB' % name
         assert c['system'] in SYSTEM_ROLES, 'engine/ui-tokens.json: color %s: system role %r is not one of %s' % (name, c['system'], sorted(SYSTEM_ROLES))
-    for p in t['pairs']:
+    dark = t['dark']['colors']   # the dark set (plan engine-v48 D6): the same names as the light set, each a #RRGGBB
+    assert list(dark) == list(t['colors']), 'engine/ui-tokens.json: dark.colors must name the colors of "colors", in the same order'
+    assert all(re.fullmatch(r'#[0-9A-Fa-f]{6}', h) for h in dark.values()), 'engine/ui-tokens.json: a dark color must be #RRGGBB'
+    for p in t['pairs'] + t['dark']['pairs']:
         assert p['fg'] in t['colors'] and p['bg'] in t['colors'] and p['kind'] in ('text', 'non-text'), 'engine/ui-tokens.json: pair %r' % p
     for group in ('sizes', 'gaps', 'fields'):
         for k, v in t[group].items():
@@ -81,6 +84,9 @@ def ui_token_block(t):
         r, g, b = (int(c['hex'][i:i + 2], 16) for i in (1, 3, 5))
         cols.append('$ui.Tok.%s = @(%d, %d, %d, %s)' % (name, r, g, b, q(c['system'])))
     out += ['; '.join(cols[i:i + 3]) for i in range(0, len(cols), 3)]
+    out += ['# The dark set (plan engine-v48 D6): name = @(red, green, blue); the system role is the light one.', '$ui.TokDark = [ordered]@{}']
+    dk = ['$ui.TokDark.%s = @(%d, %d, %d)' % ((name,) + tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))) for name, h in t['dark']['colors'].items()]
+    out += ['; '.join(dk[i:i + 4]) for i in range(0, len(dk), 4)]
     out += ['# Sizes, gaps and field widths, in pixels at 100 % (every size set after the form has scaled goes through $ui.Sc).',
             '$ui.Z = @{ %s' % ints('sizes'), '  %s' % ints('gaps'), '  %s }' % ints('fields'),
             "# Faces: name = @(family, the font file's name in the bundle ('' = none), the family used when the font cannot be loaded)."]

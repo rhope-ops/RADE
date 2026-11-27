@@ -209,3 +209,18 @@ $ui.Word = { param($G, [string]$Text, $Font, $Color, [int]$X, [int]$Y, [int]$W, 
 # The size of a text that wraps at a width (the real font; docs/window-design.md "Text lengths").
 $ui.Meas = { param([string]$Text, $Font, [int]$W) [System.Windows.Forms.TextRenderer]::MeasureText($Text, $Font, (New-Object System.Drawing.Size([math]::Max(1, $W), 0)),
   [System.Windows.Forms.TextFormatFlags]'WordBreak, NoPrefix, TextBoxControl') }
+# ---- Copy and paste of card text (moved from engine/rade_ui.ps1 for engine-v48, to keep it at 450 lines or fewer)
+# Copy gives the text as written (R28 N4): a word that RADE broke to fit a line is whole again (the break is a lone line feed), and the
+# lines of a hand step (a rich text box) lose the tabs of their number column: "1. Open the page." on its own line.
+$ui.CopyText = { param($C)
+  try { if (-not ($C -is [System.Windows.Forms.TextBoxBase]) -or $C.SelectionLength -le 0) { return $false }
+    $s = [string]$C.SelectedText
+    if ($C -is [System.Windows.Forms.RichTextBox]) { $s = ($s -replace '\r?\n', "`n" -replace ([string][char]0x2007), '' -replace '\t', ' ') -replace "`n", "`r`n" }
+    elseif (& $ui.IsCardText $C) { $s = $s -replace '(?<!\r)\n', '' }
+    if ($s) { [System.Windows.Forms.Clipboard]::SetText($s); return $true } } catch { $null = $_ }
+  return $false }
+# R34 (the PFM: the answer box did not take a pasted block): a one-line box keeps only the first line of a paste, so a
+# paste into it comes here. $ui.OneLine joins the lines of a text with one space and cuts it to the room that is left.
+# Takes the text and the room (characters); gives back the text to put in.
+$ui.OneLine = { param([string]$T, [int]$Room)
+  $s = ($T -replace '\s*(\r\n|\r|\n)\s*', ' ' -replace '\t', ' ').Trim(); if ($Room -lt 0) { $Room = 0 }; if ($s.Length -gt $Room) { $s = $s.Substring(0, $Room) }; return $s }

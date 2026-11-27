@@ -73,15 +73,17 @@ $ui.TitleText = { param($App)
   $v = $(if ($App -and [string]$App.Version) { [string]$App.Version } elseif (-not (Test-RunnerStart)) { [string]$round } else { '' })
   return ([string]$appProduct + $(if ($v) { ' - ' + $v } else { '' })) }
 $ui.Form.Text = & $ui.TitleText $null
-# The title-bar and taskbar icon: the app logo for an app with productName and a logo (engine-v47), else RADE's logo
-# (Fulcrum, the PFM, 2026-11-20); drawn at 32 px from the bundle's PNG.
-try {
-  $ib = New-Object System.Drawing.Bitmap((New-Object System.IO.MemoryStream(, [System.Convert]::FromBase64String($(if ([string]$appProduct -and [string]$appLogoPng) { $appLogoPng } else { $logoPng })))))
-  $ui.Form.Icon = [System.Drawing.Icon]::FromHandle((New-Object System.Drawing.Bitmap($ib, 32, 32)).GetHicon())
-} catch { $null = $_ }   # a logo System.Drawing cannot read keeps the default icon
 $ui.Form.SuspendLayout()
 $ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(96, 96); $ui.Form.AutoScaleMode = 'Dpi'   # sizes below are at 100 % scaling
 # @@UI@@
+# The title-bar and taskbar icon: the app logo for an app with productName and a logo (engine-v47), else RADE's logo
+# (Fulcrum, the PFM, 2026-11-20); drawn at 32 px from the bundle's PNG. In the dark mode the app's logoDark when it has
+# one (plan engine-v48 D6): $ui.AppPng is the app logo of the theme, for the icon and the band (02-fixed-parts.ps1).
+$ui.AppPng = $(if ($ui.Dark -and -not $ui.High -and [string]$appLogoDarkPng) { [string]$appLogoDarkPng } else { [string]$appLogoPng })
+try {
+  $ib = New-Object System.Drawing.Bitmap((New-Object System.IO.MemoryStream(, [System.Convert]::FromBase64String($(if ([string]$appProduct -and $ui.AppPng) { $ui.AppPng } else { $logoPng })))))
+  $ui.Form.Icon = [System.Drawing.Icon]::FromHandle((New-Object System.Drawing.Bitmap($ib, 32, 32)).GetHicon())
+} catch { $null = $_ }   # a logo System.Drawing cannot read keeps the default icon
 $ui.Form.ClientSize = New-Object System.Drawing.Size(1020, 760)   # at 100 %; the minimum size is set when the window has its scale (Shown)
 $ui.Form.StartPosition = 'CenterScreen'; $ui.Form.KeyPreview = $true; $ui.Form.BackColor = $ui.C.White
 $ui.Form.ShowInTaskbar = $true; $ui.Form.MinimizeBox = $true   # its own taskbar button: a minimized window can be restored (R24)

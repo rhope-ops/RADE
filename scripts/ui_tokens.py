@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """UI standard v1 checks (the Administrator, 2026-11-20; docs/ui-standard.md B10, B11): contrast and the page's colors.
 
-1. Contrast: every pair of engine/ui-tokens.json "pairs" meets WCAG 2.2: text at least 4.5:1 (1.4.3), non-text at
-   least 3:1 (1.4.11), computed from the hex values with the WCAG relative luminance.
+1. Contrast: every pair of engine/ui-tokens.json "pairs" (the light set) and "dark"."pairs" (the dark set, plan engine-v48
+   D6) meets WCAG 2.2: text at least 4.5:1 (1.4.3), non-text at least 3:1 (1.4.11), computed from the hex values with
+   the WCAG relative luminance.
 2. The RADE page (index.html): its light colors and its contrast blocks are written from the same tokens, between the
    marks of PAGE_BLOCKS (the dark scheme stays the page's own). --write writes them; the check fails when they are old.
 3. The self-test: a known pair (black on white = 21:1, #777 on white = 4.48:1) proves the formula first.
 
-Usage: python3 scripts/ui_tokens.py [--write]   Pass = last line "UI-TOKENS pass pairs=N".
+Usage: python3 scripts/ui_tokens.py [--write]   Pass = last line "UI-TOKENS pass pairs=N" (N: both sets).
 Run target: Python 3.
 Network: none.
 Writes: index.html (--write only).
@@ -87,11 +88,14 @@ def main(write):
     if round(ratio('#000000', '#FFFFFF'), 2) != 21.0 or round(ratio('#777777', '#FFFFFF'), 2) != 4.48:
         bad.append('the contrast formula fails its self-test')
     t = json.loads(TOKENS.read_text(encoding='utf-8'))
-    for p in t['pairs']:
-        r = ratio(t['colors'][p['fg']]['hex'], t['colors'][p['bg']]['hex'])
-        print('CONTRAST %s on %s (%s): %.2f:1, need %.1f:1' % (p['fg'], p['bg'], p['kind'], r, NEED[p['kind']]))
-        if r < NEED[p['kind']]:
-            bad.append('%s on %s is %.2f:1, the %s minimum is %.1f:1' % (p['fg'], p['bg'], r, p['kind'], NEED[p['kind']]))
+    light = {k: c['hex'] for k, c in t['colors'].items()}
+    sets = [('light', light, t['pairs']), ('dark', t['dark']['colors'], t['dark']['pairs'])]
+    for name, hexes, pairs in sets:
+        for p in pairs:
+            r = ratio(hexes[p['fg']], hexes[p['bg']])
+            print('CONTRAST %s %s on %s (%s): %.2f:1, need %.1f:1' % (name, p['fg'], p['bg'], p['kind'], r, NEED[p['kind']]))
+            if r < NEED[p['kind']]:
+                bad.append('%s: %s on %s is %.2f:1, the %s minimum is %.1f:1' % (name, p['fg'], p['bg'], r, p['kind'], NEED[p['kind']]))
     page = PAGE.read_text(encoding='utf-8')
     new = spliced(page, page_blocks(t))
     if new is None:
@@ -103,7 +107,7 @@ def main(write):
         bad.append('index.html: the colors are old: run python3 scripts/ui_tokens.py --write')
     for b in bad:
         print('FAIL ' + b)
-    print('UI-TOKENS %s pairs=%d' % ('fail' if bad else 'pass', len(t['pairs'])))
+    print('UI-TOKENS %s pairs=%d' % ('fail' if bad else 'pass', sum(len(x[2]) for x in sets)))
     sys.exit(1 if bad else 0)
 
 

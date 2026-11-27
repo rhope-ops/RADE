@@ -21,11 +21,22 @@ $ui.Tok.White = @(255, 255, 255, 'Window'); $ui.Tok.Ink = @(27, 36, 48, 'WindowT
 $ui.Tok.Gray = @(90, 101, 115, 'GrayText'); $ui.Tok.Blue = @(0, 83, 159, 'Highlight'); $ui.Tok.OnBlue = @(255, 255, 255, 'HighlightText')
 $ui.Tok.Link = @(0, 83, 159, 'HotTrack'); $ui.Tok.Focus = @(11, 37, 69, 'HotTrack'); $ui.Tok.Face = @(255, 255, 255, 'ButtonFace')
 $ui.Tok.FaceInk = @(11, 37, 69, 'ControlText'); $ui.Tok.Edge = @(122, 135, 148, 'ControlText'); $ui.Tok.Hair = @(227, 232, 238, 'GrayText')
-$ui.Tok.Track = @(127, 147, 168, 'GrayText'); $ui.Tok.Off = @(233, 236, 240, 'ButtonFace'); $ui.Tok.OffInk = @(85, 85, 85, 'GrayText')
-$ui.Tok.Yellow = @(255, 213, 32, 'Highlight'); $ui.Tok.Red = @(139, 26, 26, 'WindowText'); $ui.Tok.Green = @(46, 133, 64, 'Highlight')
-$ui.Tok.GreenInk = @(31, 107, 49, 'WindowText')
+$ui.Tok.Track = @(127, 147, 168, 'GrayText'); $ui.Tok.Off = @(244, 246, 248, 'ButtonFace'); $ui.Tok.OffInk = @(95, 104, 116, 'GrayText')
+$ui.Tok.Yellow = @(255, 205, 0, 'Highlight'); $ui.Tok.Red = @(139, 26, 26, 'WindowText'); $ui.Tok.Green = @(46, 133, 64, 'Highlight')
+$ui.Tok.GreenInk = @(31, 107, 49, 'WindowText'); $ui.Tok.Band = @(8, 27, 51, 'Window'); $ui.Tok.BandInk = @(255, 255, 255, 'WindowText')
+$ui.Tok.BandMuted = @(185, 199, 216, 'GrayText'); $ui.Tok.Info = @(0, 83, 159, 'Highlight'); $ui.Tok.Tint = @(242, 246, 251, 'Window')
+$ui.Tok.OnYellow = @(11, 37, 69, 'HighlightText'); $ui.Tok.OffRed = @(139, 26, 26, 'GrayText')
+# The dark set (plan engine-v48 D6): name = @(red, green, blue); the system role is the light one.
+$ui.TokDark = [ordered]@{}
+$ui.TokDark.White = @(21, 23, 29); $ui.TokDark.Ink = @(243, 238, 228); $ui.TokDark.Navy = @(243, 238, 228); $ui.TokDark.Gray = @(169, 172, 181)
+$ui.TokDark.Blue = @(228, 87, 46); $ui.TokDark.OnBlue = @(21, 23, 29); $ui.TokDark.Link = @(141, 184, 240); $ui.TokDark.Focus = @(243, 238, 228)
+$ui.TokDark.Face = @(30, 33, 41); $ui.TokDark.FaceInk = @(243, 238, 228); $ui.TokDark.Edge = @(122, 127, 140); $ui.TokDark.Hair = @(48, 52, 61)
+$ui.TokDark.Track = @(58, 63, 74); $ui.TokDark.Off = @(38, 42, 51); $ui.TokDark.OffInk = @(149, 153, 163); $ui.TokDark.Yellow = @(212, 175, 55)
+$ui.TokDark.Red = @(244, 155, 145); $ui.TokDark.Green = @(95, 208, 142); $ui.TokDark.GreenInk = @(95, 208, 142); $ui.TokDark.Band = @(14, 16, 21)
+$ui.TokDark.BandInk = @(243, 238, 228); $ui.TokDark.BandMuted = @(169, 172, 181); $ui.TokDark.Info = @(141, 184, 240); $ui.TokDark.Tint = @(27, 36, 51)
+$ui.TokDark.OnYellow = @(21, 23, 29); $ui.TokDark.OffRed = @(201, 143, 137)
 # Sizes, gaps and field widths, in pixels at 100 % (every size set after the form has scaled goes through $ui.Sc).
-$ui.Z = @{ ActionW = 160; WideW = 240; ActionH = 40; CompactW = 96; CompactH = 30; LinkH = 28; BarTop = 11; M = 4; Inset = 24
+$ui.Z = @{ ActionW = 160; WideW = 240; ActionH = 40; CompactW = 96; CompactH = 30; LinkH = 28; BarTop = 11; M = 4; Inset = 24; BandH = 56; BandLogo = 36; Disc = 20; LineIdle = 4; LineLoud = 8; Narrow = 700
   G1 = 4; G2 = 8; G3 = 12; G4 = 16; G6 = 24
   FieldS = 240; FieldM = 420; FieldL = 600 }
 # Faces: name = @(family, the font file's name in the bundle ('' = none), the family used when the font cannot be loaded).
@@ -48,11 +59,16 @@ $ui.Color = { param([string]$Role)
   $t = $ui.Tok[$Role]
   if ($ui.High) { $r = $(if ($t) { [string]$t[3] } else { 'WindowText' }); try { $sc = [System.Drawing.SystemColors]::$r; if ($null -eq $sc) { $sc = [System.Drawing.SystemColors]::WindowText }; return $sc } catch { return [System.Drawing.Color]::Black } }   # a role with no color: WindowText; no system colors: black
   if (-not $t) { return [System.Drawing.Color]::Black }
+  if ($ui.Dark -and $ui.TokDark[$Role]) { $t = $ui.TokDark[$Role] }   # the dark set (plan engine-v48 D6)
   return [System.Drawing.Color]::FromArgb([int]$t[0], [int]$t[1], [int]$t[2]) }
+# Themes (the PFM, 2026-11-27, plan engine-v48 D6): the window reads the Windows app mode once when it opens. The value
+# AppsUseLightTheme 0 = dark (Kanon in Fulcrum colors); 1 or no value = light (Kanon in USAF colors). A contrast theme
+# wins over both ($ui.High). Takes nothing; gives back $true for dark. No registry (not Windows): light.
+$ui.DarkOn = { try { $v = Get-ItemPropertyValue -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'AppsUseLightTheme' -ErrorAction Stop; return ([int]$v -eq 0) } catch { return $false } }
 # Puts the colors for a theme into $ui.C in place (every builder and paint handler reads them there). Takes $true for the
 # system colors of a contrast theme, $false for the own colors.
 $ui.UseColors = { param([bool]$High) $ui.High = $High; foreach ($k in @($ui.Tok.Keys)) { $ui.C[$k] = & $ui.Color $k } }
-$ui.C = @{}; & $ui.UseColors (& $ui.HighOn)
+$ui.Dark = [bool](& $ui.DarkOn); $ui.C = @{}; & $ui.UseColors (& $ui.HighOn)
 # ---- Fonts, sizes and buttons
 # Cosmetics never stop the window (R06: Font('Segoe UI', 10, 'Bold') failed with "Multiple ambiguous overloads"): a typed
 # style and size, and the window font when a font cannot be made.
@@ -151,19 +167,6 @@ $ui.TextSize = { param([string]$Txt, $Font, [int]$W)
   if ($W -gt 0 -and $one.Width -gt $W) { $sz = & $ui.Meas $Txt $Font $W; $bw = $W + $sl } else { $bw = $one.Width + 2 * $sl }
   return (New-Object System.Drawing.Size($bw, ($sz.Height + (& $ui.Sc 2)))) }
 $ui.Menu = New-Object System.Windows.Forms.ContextMenuStrip; $ui.Menu.AccessibleName = 'Text menu'; $ui.MenuCopy = $ui.Menu.Items.Add('Copy'); $ui.MenuAll = $ui.Menu.Items.Add('Select All')
-# Copy gives the text as written (R28 N4): a word that RADE broke to fit a line is whole again (the break is a lone line feed), and the
-# lines of a hand step (a rich text box) lose the tabs of their number column: "1. Open the page." on its own line.
-$ui.CopyText = { param($C)
-  try { if (-not ($C -is [System.Windows.Forms.TextBoxBase]) -or $C.SelectionLength -le 0) { return $false }
-    $s = [string]$C.SelectedText
-    if ($C -is [System.Windows.Forms.RichTextBox]) { $s = ($s -replace '\r?\n', "`n" -replace ([string][char]0x2007), '' -replace '\t', ' ') -replace "`n", "`r`n" }
-    elseif (& $ui.IsCardText $C) { $s = $s -replace '(?<!\r)\n', '' }
-    if ($s) { [System.Windows.Forms.Clipboard]::SetText($s); return $true } } catch { $null = $_ }
-  return $false }
-# R34 (the PFM: the answer box did not take a pasted block): a one-line box keeps only the first line of a paste, so a
-# paste into it comes here. $ui.OneLine joins the lines of a text with one space and cuts it to the room that is left.
-# Takes the text and the room (characters); gives back the text to put in.
-$ui.OneLine = { param([string]$T, [int]$Room) $s = ($T -replace '\s*(\r\n|\r|\n)\s*', ' ' -replace '\t', ' ').Trim(); if ($Room -lt 0) { $Room = 0 }; if ($s.Length -gt $Room) { $s = $s.Substring(0, $Room) }; return $s }
 # Pastes the clipboard text into a one-line text box as one line, in place of its selection. When the text is longer
 # than the room, it is cut and the gray line under the box says how many characters did not fit (R7, the Administrator,
 # 2026-11-19; docs/window-design.md "Cards"). Takes the box; gives back $true when it pasted (the key is then handled),
@@ -194,15 +197,16 @@ $ui.Cue = { param($C) $C.Add_GotFocus({ try { $this.Parent.Invalidate() } catch 
 $ui.Ring = { param($P) $P.Add_Paint({ try { foreach ($c in $this.Controls) { if (($c.Focused -or ($ui.Boxes -contains $c -and $c.ContainsFocus)) -and $c.Visible) {
           $pn = New-Object System.Drawing.Pen($ui.C.Focus, [single](& $ui.Sc 2)); $b = $c.Bounds; $o = & $ui.Sc 2; $_.Graphics.DrawRectangle($pn, ($b.Left - $o), ($b.Top - $o), ($b.Width + 2 * $o - 1), ($b.Height + 2 * $o - 1)); $pn.Dispose() } } } catch { $null = $_ } }) }
 $ui.Style = { param($B, [string]$Kind)
-  # primary = Air Force blue; danger = dark red; off = not available (gray, text 6.3:1); dangeroff = the destructive
+  # primary = Air Force blue (dark: ember); danger = dark red (dark: an outline); dangerline = an outline in the error color; off = not available (gray, text 6.3:1); dangeroff = the destructive
   # action while it is not available (gray, dark red text and edge, 8:1); else white with a gray edge. The colors under
   # the pointer and while pressed are set here too (Windows picks its own otherwise): a white button goes to the hair
   # and the off gray, a blue or dark red button keeps its color.
   $ui.Kinds[$B] = $Kind; $B.Enabled = ($Kind -notin 'off', 'dangeroff'); $B.FlatStyle = 'Flat'; $B.FlatAppearance.BorderSize = 1; $B.Font = $ui.F.SmallB; $over = $null; $down = $null
   if ($Kind -eq 'off') { $B.BackColor = $ui.C.Off; $B.ForeColor = $ui.C.OffInk; $B.FlatAppearance.BorderColor = $ui.C.Track }
-  elseif ($Kind -eq 'dangeroff') { $B.BackColor = $ui.C.Off; $B.ForeColor = $ui.C.Red; $B.FlatAppearance.BorderColor = $ui.C.Red }
+  elseif ($Kind -eq 'dangeroff') { $B.BackColor = $ui.C.Off; $B.ForeColor = $ui.C.OffRed; $B.FlatAppearance.BorderColor = $ui.C.OffRed }
   elseif ($Kind -eq 'primary') { $B.BackColor = $ui.C.Blue; $B.ForeColor = $ui.C.OnBlue; $B.FlatAppearance.BorderColor = $ui.C.Blue }
-  elseif ($Kind -eq 'danger') { $B.BackColor = $ui.C.Red; $B.ForeColor = $ui.C.White; $B.FlatAppearance.BorderColor = $ui.C.Red }
+  elseif ($Kind -eq 'danger' -and -not $ui.Dark) { $B.BackColor = $ui.C.Red; $B.ForeColor = $ui.C.White; $B.FlatAppearance.BorderColor = $ui.C.Red }
+  elseif ($Kind -in 'danger', 'dangerline') { $B.BackColor = $ui.C.Face; $B.ForeColor = $ui.C.Red; $B.FlatAppearance.BorderColor = $ui.C.Red }   # the error color as text and edge (Cards v2: "Stop the install"; dark: every danger button)
   else { $B.BackColor = $ui.C.Face; $B.ForeColor = $ui.C.FaceInk; $B.FlatAppearance.BorderColor = $ui.C.Edge; $over = $ui.C.Hair; $down = $ui.C.Off }
   if (-not $over) { $over = $B.BackColor; $down = $B.BackColor }
   try { $B.FlatAppearance.MouseOverBackColor = $over; $B.FlatAppearance.MouseDownBackColor = $down } catch { $null = $_ } }
