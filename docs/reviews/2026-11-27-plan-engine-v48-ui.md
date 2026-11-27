@@ -10,6 +10,7 @@ Started: 2026-11-27 06:15 Central. Status: questions open (button layout). Sourc
 | D2 | How RADE decides "installed" | The install record on this computer (no sign-in before the card). Each Uninstall and each round clean-up that removes the app's lists also clears the record. |
 | D3 | Release | One release: engine-v48 holds this UI pass and the planned Remove RADE and Uninstall clean-up (DECISIONS 2026-11-26). |
 | D4 | Buttons at half size | Open: the PFM asked for a preview of all 3 options. Preview: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "UI pass after R47 (27 Nov)". |
+| D5 | Window layout | Open (the PFM, 2026-11-27, after the button preview: "I forgot how much I liked option A"): preview two hybrids of UI pass 3: the top band of C with the body of A, and with the body of B, at full and half size (same page). A hybrid replaces the "One thing" design (2026-11-14): a design change that needs the PFM's approval before a build. |
 
 ## Items (from the PFM's notes)
 
