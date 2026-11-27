@@ -39,8 +39,8 @@ $script:binAsk = New-Object System.Collections.Generic.List[string]; $script:bin
 # Stands in for the engine's Move-ToRecycleBin (engine/ps/03-files.ps1). Takes the path, whether it is a folder and whether
 # Windows asks first (-AskFirst: logged in $script:binAsk; a path in $script:binCancel acts as a cancel of that question).
 function Move-ToRecycleBin([string]$Path, [switch]$Folder, [switch]$AskFirst) { $null = $Folder
-  if ($AskFirst) { $script:binAsk.Add($Path); if ($Path -eq $script:binCancel) { throw (New-Object System.OperationCanceledException) } }
-  if ($Path -eq $script:binFail) { throw (New-Object System.IO.IOException 'the file is in use') }
+  if ($AskFirst) { $script:binAsk.Add($Path); if ($Path -eq $script:binCancel) { throw (New-Object System.Management.Automation.MethodInvocationException 'Exception calling "DeleteDirectory"', (New-Object System.OperationCanceledException)) } }
+  if ($Path -eq $script:binFail) { throw (New-Object System.Management.Automation.MethodInvocationException 'Exception calling "DeleteFile"', (New-Object System.IO.IOException 'the file is in use')) }
   $to = Join-Path $bin ([string]($script:binLog.Count + 1) + '-' + (Split-Path -Leaf $Path))
   Move-Item -LiteralPath $Path -Destination $to; $script:binLog.Add($Path) }
 $rade = Join-Path $Dir 'RADE'; $rp = Get-RunnerPath

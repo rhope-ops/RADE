@@ -261,8 +261,9 @@ function Invoke-CleanItem($Items, $Tally) {
   foreach ($i in @($Items | Where-Object { $_ })) {
     $ok = $(if ($i.Kind -eq 'shortcut') { [string]$i.P -match '\.lnk$' } else { Test-InRadeFolder $i.P })
     if (-not $ok) { $Tally.Bad.Add('Not moved: ' + $i.N + '. It is not in the RADE folder.'); continue }
+    # A cancel of the question of Windows (-AskFirst) leaves the item; GetBaseException finds the cancel in the wrapper.
     try { Move-ToRecycleBin $i.P -Folder:([bool]$i.F) -AskFirst:([bool]$i.Ask); $Tally.Moved[$i.Kind] = 1 + [int]$Tally.Moved[$i.Kind] }
-    catch { $ty = $_.Exception.GetType().Name   # the person canceled the question of Windows (-AskFirst): the item stays
+    catch { $ty = $_.Exception.GetBaseException().GetType().Name   # a .NET error comes wrapped (MethodInvocationException)
       $Tally.Bad.Add($(if ($ty -eq 'OperationCanceledException') { 'Not moved: ' + $i.N + '. You canceled the move.' } else { 'Not moved: ' + $i.N + ' [' + $ty + ']' })) } }
 }
 
