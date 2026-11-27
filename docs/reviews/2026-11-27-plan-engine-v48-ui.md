@@ -10,13 +10,13 @@ Started: 2026-11-27 06:15 Central. Status: questions open (button layout). Sourc
 | D2 | How RADE decides "installed" | The install record on this computer (no sign-in before the card). Each Uninstall and each round clean-up that removes the app's lists also clears the record. |
 | D3 | Release | One release: engine-v48 holds this UI pass and the planned Remove RADE and Uninstall clean-up (DECISIONS 2026-11-26). |
 | D4 | Buttons at half size | Open: the PFM asked for a preview of all 3 options. Preview: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "UI pass after R47 (27 Nov)". |
-| D5 | Window layout | Open (the PFM, 2026-11-27, after the button preview: "I forgot how much I liked option A"): preview two hybrids of UI pass 3: the top band of C with the body of A, and with the body of B, at full and half size (same page). A hybrid replaces the "One thing" design (2026-11-14): a design change that needs the PFM's approval before a build. |
+| D5 | Window layout | The PFM chose "B + C" (2026-11-27): the navy top band of UI pass 3 C with the quiet rows of B. Polished preview: same page, board "B + C polished" (not yet approved for the build). History: Open (the PFM, 2026-11-27, after the button preview: "I forgot how much I liked option A"): preview two hybrids of UI pass 3: the top band of C with the body of A, and with the body of B, at full and half size (same page). A hybrid replaces the "One thing" design (2026-11-14): a design change that needs the PFM's approval before a build. |
 
 ## Items (from the PFM's notes)
 
 1. Maintenance card when the app is not installed: headline "Select an option."; row 1 "Install <version>" in blue (an edge and text in blue, as Uninstall is in red); the other rows off unless an earlier install left data or backups (D1).
 2. Maintenance card when installed: "<word> <version> is installed." and the D1 rows.
-3. Buttons at half size: one layout from D4.
+3. Buttons: full size, one row (Back at the left end, the main button at the right end); half size, a stack at the right edge, 240 px wide, main button on top, Back last (the PFM, 2026-11-27: "narrow mode stacks ... less wide").
 4. Run card: the bar is indented a few pixels from the card's left edge at half size ("One left edge" rule).
 5. Run card: the line above the bar is a summary of the step; the line below is the detail, with counts ("Making list 3 of 12: <list name>"). The count lines come from the app's step script (NOW lines): a 90-161.Z change, made by a 90-161.Z session ("App repos" rule).
 6. Header: the line in capitals ("STEP 23 OF 24") is too close to the logo block; add space.
