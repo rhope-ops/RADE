@@ -216,6 +216,7 @@ function Invoke-Round([bool]$Clean, [bool[]]$Selected, [string]$To, [scriptblock
     Invoke-RoundSetup $run $Clean $To $OnStatus
     for ($k = 0; $k -lt $steps.Count; $k++) {
       if ($script:closing) { throw 'the window was closed (Exit) while the round ran; the steps after it did not run' }
+      if ($script:stopAfter) { $script:stopAfter = $false; throw 'you stopped the run after a step; the steps after it did not run' }   # the window's Cancel question (plan engine-v48 step 3)
       if (-not $Selected[$k]) { if ($script:appSteps -contains $k) { $run.Summary += ($steps[$k].Name + $(if ($run.Prior[[string]$steps[$k].Name] -eq 'PASSED') { ': already done for version ' + $script:app.Version + ', not run again' } else { ': not selected' })) }; continue }
       if ($run.Kept.ContainsKey([string]$steps[$k].Name)) { Restore-RoundStep $run $k $OnStep; continue }   # resume: a passed step stays done
       $ans = ''; if ($Answers -and $Answers.Count -gt $k) { $ans = [string]$Answers[$k] }

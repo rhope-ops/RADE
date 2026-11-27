@@ -852,6 +852,11 @@
           "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9_./-]+\\.png$",
           "description": "Optional. Path in the application repo of the application's logo (a PNG; 128 px square is enough). The window shows it at 64 px under the RADE logo, with the application name beside it, once the user chooses the application (the Administrator, 2026-11-18)."
         },
+        "logoDark": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9_./-]+\\.png$",
+          "description": "Optional (engine-v48, plan D6; the PFM, 2026-11-27). Path in the application repo of the application's logo for the dark mode (a PNG, the same rules as logo). When Windows apps use the dark mode, the window shows it in the place of logo; without it, the window shows logo."
+        },
         "own": {
           "type": "array",
           "minItems": 1,

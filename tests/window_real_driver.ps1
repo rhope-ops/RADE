@@ -154,9 +154,9 @@ function global:Save-RadeCard([string]$Tag) {
   if ($ui.Scrolls -and -not $ui.RecOn) { try { $y0 = $ui.Scroll.AutoScrollPosition.Y; $ev = New-Object System.Windows.Forms.HandledMouseEventArgs('None', 0, 0, 0, -120)
       [System.Windows.Forms.Control].GetMethod('OnMouseWheel', [System.Reflection.BindingFlags]'NonPublic, Instance').Invoke($ui.Sent, [object[]]@($ev.PSObject.BaseObject))   # as Windows raises it on the headline: only the hook of $ui.WheelOn hands it on
       Write-Host ('WIN wheel ' + $card + ' moved=' + ($ui.Scroll.AutoScrollPosition.Y -ne $y0)); $ui.Scroll.AutoScrollPosition = New-Object System.Drawing.Point(0, 0) } catch { Write-Host ('WIN wheel ' + $card + ' error=' + $_.Exception.Message) } }
-  # R32 measures (screen pixels, top/height): the bottom line's two texts, the header's widths, and on the Run card the step row.
+  # R32 measures (screen pixels, top/height): the bottom line's two texts, the band and its line, and on the Run card the step row.
   try { $sr = { param($C) $q = $C.RectangleToScreen($C.ClientRectangle); [string]$q.Top + '/' + $q.Height }
-    $m = 'WIN r32 ' + $card + ' rec=' + (& $sr $ui.RecB) + ' right=' + (& $sr $ui.RightL) + ' word=' + $ui.WordL.Width + ' rule=' + $ui.HeadRule.Width + ' app=' + $ui.AppL.Width
+    $m = 'WIN r32 ' + $card + ' rec=' + (& $sr $ui.RecB) + ' right=' + (& $sr $ui.RightL) + ' band=' + (& $sr $ui.Band) + ' word=' + $ui.BandWord.Width + ' stage=' + $ui.Stage.Width + ' line=' + (& $sr $ui.Light)
     if ($ui.View -eq 'run') { $m += ' name=' + (& $sr $ui.StepName) + ' bar=' + (& $sr $ui.StepBar) + '/m' + $ui.StepBar.Margin.Top + ' time=' + (& $sr $ui.StepTime) + '/m' + $ui.StepTime.Margin.Top + '/pref' + $ui.StepTime.PreferredSize.Height + ' [' + $ui.StepTime.Text + '] now=' + (& $sr $ui.Now) + '/m' + $ui.Now.Margin.Top + '/' + $ui.Now.Visible + ' row=' + $ui.StepRow.Height + ' frac=' + (& $sr $ui.StepFrac) }
     Write-Host $m } catch { Write-Host ('WIN r32 ' + $card + ' error=' + $_.Exception.Message) }
 }
@@ -173,11 +173,16 @@ function global:Get-RadeMain { $m = @($ui.B | Where-Object { $_.Visible -and [st
 # Prints the action row of the card on screen: its wrap width, the text column, and each button's place and left margin.
 function global:Write-RadeRow { Write-Host ('WIN row max=' + $ui.BtnRow.MaximumSize.Width + ' cw=' + $ui.ContentW + ' w=' + $ui.BtnRow.Width + ' ' + ((@(@($ui.BackB) + @($ui.B)) | Where-Object { $_.Visible } |
     ForEach-Object { $_.Text + ':' + $_.Left + '/' + $_.Top + '/' + $_.Width + '/m' + $_.Margin.Left }) -join ' ')) }
+# Plan engine-v48: the not-installed card (its one Install button), and on the first Run card the Cancel question, drawn
+# once, then "Keep installing" (the Run card again). Takes the view.
+function global:Step-RadeV48([string]$V) {
+  if ($V -eq 'notinst') { (Get-RadeMain).PerformClick(); return }
+  $global:RadeT.CancelQ = $true; & $ui.VCancelQ; Save-RadeCard 'cancelq'; & $ui.ShowRun }
 function global:Step-Rade {
   if (((Get-Date) - $global:RadeT.T0).TotalSeconds -gt 240) { Write-Host ('WIN TIMEOUT view=' + $ui.View + ' sent=' + $ui.Sent.Text); [Environment]::Exit(3) }
   if (-not $ui -or -not $ui.Form -or $ui.Form.IsDisposed -or -not $ui.Form.Visible -or -not $ui.View) { return }
   if (-not $global:RadeT.Env) {
-    $global:RadeT.Env = $true; $sc = [System.Windows.Forms.Screen]::PrimaryScreen; Write-Host ('WIN high=' + [bool]$ui.High + ' fonts=' + $ui.FontNote + ' standard=' + $ui.Standard)
+    $global:RadeT.Env = $true; $sc = [System.Windows.Forms.Screen]::PrimaryScreen; Write-Host ('WIN high=' + [bool]$ui.High + ' dark=' + [bool]$ui.Dark + ' fonts=' + $ui.FontNote + ' standard=' + $ui.Standard)
     Write-Host ('WINENV ps=' + $PSVersionTable.PSVersion + ' dpi=' + $ui.Dpi + ' screen=' + $sc.Bounds.Width + 'x' + $sc.Bounds.Height + ' working=' + $sc.WorkingArea.Width + 'x' + $sc.WorkingArea.Height + ' form=' + $ui.Form.Width + 'x' + $ui.Form.Height + ' interactive=' + [Environment]::UserInteractive)
     foreach ($k in @($ui.F.Keys | Sort-Object)) { $f = $ui.F[$k]; Write-Host ('MEASURE ' + $k + ' ' + $f.Name + ' ' + $f.SizeInPoints + ' ' + $f.Style + ' = ' + [System.Windows.Forms.TextRenderer]::MeasureText('The quick brown fox jumps over the lazy dog 0123456789', $f, (New-Object System.Drawing.Size(9999, 99)), [System.Windows.Forms.TextFormatFlags]'NoPadding, NoPrefix, SingleLine').Width + ' h=' + [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $f).Height) }
   }
@@ -200,6 +205,7 @@ function global:Step-Rade {
     Write-Host 'WIN BAD no choice for the application'; [Environment]::Exit(4)
   }
   elseif ($v -eq 'maint') { Write-RadeRow; if (-not $global:RadeT.ToolsDone) { $global:RadeT.ToolsDone = $true; Save-RadeTools } else { & $ui.OnOpt 10 } }   # the Maintenance card (the Restore cards once), then the Repair or Update row (Start would start the application)
+  elseif ($v -eq 'notinst' -or ($v -eq 'run' -and $ui.Running -and $ui.StepI -and -not $global:RadeT.CancelQ)) { Step-RadeV48 $v }   # plan engine-v48: the not-installed card, the Cancel question
   elseif ($v -eq 'site') { $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }
   elseif ($v -in 'fail', 'need') {
     $id = [string]@($script:appChecks)[([int]($ui.Kick.Text -replace '^CHECK (\d+) OF .*$', '$1')) - 1]
@@ -212,7 +218,7 @@ function global:Step-Rade {
   }
   elseif ($v -eq 'ready') {
     if (-not $global:RadeT.Opened) { $global:RadeT.Opened = $true; & $ui.VRecord; Save-RadeCard 'record'; & $ui.CloseRecord }
-    $ib = @($ui.B | Where-Object { $_.Visible -and $_.Text -in 'Install', 'Run' })[0]; $ib.PerformClick()
+    $ib = @($ui.B | Where-Object { $_.Visible -and $_.Text -in 'Install', 'Run', 'Install (Enter)', 'Run (Enter)' })[0]; $ib.PerformClick()
   }
   elseif ($v -eq 'hand') {
     if (-not $global:RadeT.NoAddr -and $ui.FieldRow.Visible) {   # R28 N1: the same step with no address: no address row (its own picture and self-check)
@@ -222,11 +228,10 @@ function global:Step-Rade {
     $hf = @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'It failed' })[0]   # B3: Done (primary) is the last button
     if (-not $hf) { (Get-RadeMain).PerformClick() } elseif ($global:RadeT.Hand -eq 'fail') { $hf.PerformClick() } else { (Get-RadeMain).PerformClick() }
   }
-  elseif ($v -eq 'answer') {
-    if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }; Step-RadeR31 $v }
+  elseif ($v -eq 'answer') { if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }; Step-RadeR31 $v }
   elseif ($v -in 'tour', 'answerfail', 'feedback') { Step-RadeR31 $v }
   elseif ($v -eq 'handfail') { $ui.ErrBox.Text = 'Import failed: flow https://usaf.dps.mil/sites/fake/x not found'; $ui.B[0].PerformClick() }
-  elseif ($v -in 'done', 'review', 'stopped') {
+  elseif ($v -in 'done', 'review', 'stopped', 'stepfail') {
     foreach ($l in @($ui.Log)) { if ([string]$l -match 'failed|FAILED|STOPPED|could not') { Write-Host ('WIN log ' + ([string]$l).Trim()) } }
     & $ui.VRecord; Save-RadeCard ($v + '-record'); & $ui.CloseRecord
     $ll = @((& $ui.LayLine) -split "`r`n"); Write-Host ('WIN line ' + $ll[0]); foreach ($l in $ll) { if ($l -like 'SCALE *') { Write-Host ('WIN ' + $l) } }   # the scaling facts (numbers only)

@@ -30,7 +30,7 @@ $ui.RecScroll.Dock = 'Fill'; $ui.RecScroll.AutoScroll = $true; $ui.RecScroll.Bac
 $ui.RecScroll.Controls.Add($ui.RecChecks)
 $ui.Rec.Controls.Add($ui.RecScroll, 0, 1); $ui.Rec.Controls.Add($ui.RecSteps, 1, 1); $ui.Rec.Controls.Add($ui.RecText, 2, 1)
 # The Fill parts go in first: they dock last, inside the light, the logo line, the bottom line and the edge bar.
-foreach ($c in @($ui.Card, $ui.Rec, $ui.Bottom, $ui.Edge, $ui.Top, $ui.Light)) { $ui.Form.Controls.Add($c) }
+foreach ($c in @($ui.Card, $ui.Rec, $ui.Bottom, $ui.Edge, $ui.Light, $ui.Band)) { $ui.Form.Controls.Add($c) }   # the band on top, the light line under it
 $ui.Form.ResumeLayout($false); $ui.Form.PerformLayout()
 
 # The lines of a hand step (the Administrator, 2026-11-17; R28 N4): a guide line that starts with "<digits>. " is numbered:
@@ -114,18 +114,17 @@ $ui.Fit = {
       $ui.CardCols[0].SizeType = 'Absolute'; $ui.CardCols[0].Width = $side; $ui.CardCols[1].SizeType = 'Absolute'; $ui.CardCols[1].Width = $col
       $ui.CardCols[2].SizeType = 'Percent'; $ui.CardCols[2].Width = 100 } } catch { $null = $_ }   # stand-in types or a form being closed: the card keeps its last columns
   $cw = [math]::Max((& $ui.Sc 240), $col - (& $ui.Sc 4)); $ui.ContentW = $cw
-  foreach ($l in @($ui.Kick, $ui.Turn, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathT, $ui.Now, $ui.Note, $ui.Help, $ui.Foot, $ui.Close)) { & $ui.SetWrap $l $cw }
+  foreach ($l in @($ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathT, $ui.Note, $ui.Help, $ui.Foot, $ui.Close)) { & $ui.SetWrap $l $cw }
+  & $ui.SetWrap $ui.Kick ($cw - $(if ($ui.Chip.Visible) { [int]$ui.Chip.PreferredSize.Width + (& $ui.Sc $ui.Z.G3) } else { 0 }))   # the line in capitals beside the YOUR TURN chip
   & $ui.SetWrap $ui.Sent ($cw - (& $ui.Sc 44))
   # Rows wrap at the card's width (a button or a box is never cut), and no box is wider than the card.
   $mm = & $ui.Sc $ui.Z.M
-  foreach ($r in @($ui.BtnRow, $ui.LinkRow, $ui.TestRow, $ui.FieldRow, $ui.StepRow)) { $r.MaximumSize = New-Object System.Drawing.Size(($cw + 2 * $mm), 0) }
+  foreach ($r in @($ui.BtnRow, $ui.LinkRow, $ui.TestRow, $ui.FieldRow)) { $r.MaximumSize = New-Object System.Drawing.Size(($cw + 2 * $mm), 0) }
   $ui.BtnRow.MinimumSize = New-Object System.Drawing.Size(($cw + 2 * $mm), 0)   # B3: the action row is as wide as the column, so the primary can stand at its right end (an auto-sized row wraps at its own width)
-  & $ui.SetWrap $ui.StepName ($cw - (& $ui.Sc 8)); $ui.ErrBox.Width = [math]::Min((& $ui.Sc $ui.Z.FieldL), ($cw - 2 * $mm))
-  # The header's ink-tight texts get their size now that the window has its scale; a long name ends with "..." at the window's edge.
-  foreach ($l in @($ui.TagL, $ui.AppWordL, $ui.AppL)) { try { $l.Tag.MaxW = [math]::Max((& $ui.Sc 60), ($ui.Top.ClientSize.Width - (& $ui.LeftIn $l $ui.Top) - (& $ui.Sc $ui.Z.Inset))) } catch { $null = $_ } }   # L1: each text of the logo block ends at the window's inset
-  foreach ($l in @($ui.WordL, $ui.TagL, $ui.AppWordL, $ui.AppL)) { & $ui.InkFit $l }
-  try { $lh = [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $ui.Kick.Font).Height + (& $ui.Sc 2); if ($ui.Head.MinimumSize.Height -ne $lh) { $ui.Head.MinimumSize = New-Object System.Drawing.Size(0, $lh) } } catch { $null = $_ }   # L1: the header row keeps its height on a card with no line
-  foreach ($l in @($ui.RightL, $ui.StepTime, $ui.StepFrac)) { & $ui.FixW $l }   # labels of changing values: one size from their widest value
+  $ui.ErrBox.Width = [math]::Min((& $ui.Sc $ui.Z.FieldL), ($cw - 2 * $mm))
+  & $ui.BandFit   # the band: full size or half size for this width (02-fixed-parts.ps1)
+  try { $lh = [math]::Max([int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $ui.Kick.Font).Height + (& $ui.Sc 2), [int]$ui.Chip.PreferredSize.Height); if ($ui.Head.MinimumSize.Height -ne $lh) { $ui.Head.MinimumSize = New-Object System.Drawing.Size(0, $lh) } } catch { $null = $_ }   # L1: the header row keeps its height on a card with no line or no chip
+  foreach ($l in @($ui.RightL, $ui.StepTime, $ui.StepFrac, $ui.PctL)) { & $ui.FixW $l }   # labels of changing values: one size from their widest value
   & $ui.FitRow; & $ui.Apart; & $ui.FitSent; & $ui.FitSteps; & $ui.FitEdges; & $ui.FitBar; & $ui.AlignRows
   foreach ($o in @($ui.Opts.Controls)) { $o.Width = $cw; try { $o.Height = (& $ui.OptPlan $o.Tag $cw).H } catch { $null = $_ } }
   & $ui.Squeeze }
