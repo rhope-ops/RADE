@@ -33,7 +33,13 @@ function global:Save-RadeUninstall([string]$bp, [string]$nm) {
   # name and the result cards (the site is marked above; the steps are two of the app's own, as stand-ins: no run here).
   $keepU = $script:app.Uninstall; $script:app.Uninstall = @(@($script:app.Steps) | Select-Object -First 2)
   & $ui.VMaint $ui.MaintInst; Save-RadeCard 'maint-uninstall'
-  & $ui.VUninstall; Save-RadeCard 'unconfirm'
+  # engine-v48: the Backups card first (keep, the main button; or remove too), then the confirm card says the choice.
+  & $ui.VUninstall; Save-RadeCard 'unbackups'
+  $acc = $(if ($ui.Form.AcceptButton) { [string]$ui.Form.AcceptButton.Text } else { '' })
+  Write-Host ('WIN uninstall-backups view=' + $ui.View + ' main=' + $acc + ' back=' + $ui.BackB.Visible)
+  @($ui.B | Where-Object { $_.Visible -and $_.Text -like 'Remove the Backups folder too*' })[0].PerformClick(); Save-RadeCard 'unconfirm-remove'
+  Write-Host ('WIN uninstall-remove view=' + $ui.View + ' keep=' + [bool]$ui.UninstallKeep + ' choice=' + [bool](@($ui.P | Where-Object { $_.Text -like '*Your choice: remove the Backups folder too.' }).Count))
+  & $ui.VUninstall; @($ui.B | Where-Object { $_.Visible -and $_.Text -like 'Keep the Backups folder*' })[0].PerformClick(); Save-RadeCard 'unconfirm'
   Write-Host ('WIN uninstall-confirm view=' + $ui.View + ' danger=' + [bool]@($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Uninstall' -and $ui.Kinds[$_] -eq 'danger' }).Count)
   $ui.Field.Text = 'wrong name'; & $ui.UninstallGo; Save-RadeCard 'unconfirm-wrongname'
   # engine-v48: the Done lines of the clean-up (Invoke-Uninstall, Get-CleanLine), Backups kept; the path is the Backups folder.

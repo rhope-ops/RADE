@@ -195,35 +195,53 @@ $ui.RestoreGo = {
 $ui.VUninstall = {
   <#
   .SYNOPSIS
-  Uninstall, the confirm card (view unconfirm; engine-v40, 90-161.Z R43 E3, the PFM, 2026-11-25).
+  Uninstall, the first card: the test-site gate, then the Backups card (view unbackups; engine-v48, the orchestrator's
+  choice of 2026-11-27 for DECISIONS 2026-11-26: keep the Backups folder, or remove it too).
   .DESCRIPTION
   Test sites only (the Restore gate: a site that only lacks the local mark goes to the mark card first, then back here).
-  The card names the test site, the backup, the app's Uninstall steps (a hand step says so) and what goes to the Recycle
-  Bin after them (engine-v48); the person types the app name, then "Uninstall" (dark red: the one destructive action)
-  runs it. Takes no parameter.
+  The Backups card asks one question with two buttons: "Keep the Backups folder" (the main button, Enter) and "Remove
+  the Backups folder too"; each one goes to the confirm card ($ui.VUninstallConfirm). Back (Esc) goes to Maintenance.
+  Takes no parameter.
   #>
   if ($ui.Busy) { return }
   $siteCheck = Test-UninstallSite (Get-BasePath)
   # The mark card goes on to this card, and its Back returns to the Maintenance card.
   if ($siteCheck.NeedMark) { $ui.MarkNext = $ui.VUninstall; $ui.MarkBack = $ui.ToolsBack; & $ui.VRestoreMark; return }
   if (-not $siteCheck.Ok) { & $ui.ToolResult 'Uninstall' @{ State = 'refused'; Path = ''; Lines = @($siteCheck.Lines) }; return }
-  $ui.UninstallSite = [string]$siteCheck.Name; $all = @($script:app.Uninstall); $n = @($script:app.Backup).Count
+  $ui.UninstallSite = [string]$siteCheck.Name
+  & $ui.SetCard @{ View = 'unbackups'; Light = 'you'; Kicker = [string]$ui.Kick.Text; Sentence = 'Keep the Backups folder?'
+    P = @(('The Backups folder holds the backups of ' + (Get-AppWord) + '. Restore needs them.'))
+    Buttons = @(@{ Text = 'Remove the Backups folder too'; Kind = ''; Act = { $ui.UninstallKeep = $false; & $ui.VUninstallConfirm } },
+      @{ Text = 'Keep the Backups folder'; Kind = 'primary'; Act = { $ui.UninstallKeep = $true; & $ui.VUninstallConfirm } }); Back = { & $ui.VMaint $ui.MaintInst } } }
+
+$ui.VUninstallConfirm = {
+  <#
+  .SYNOPSIS
+  Uninstall, the confirm card (view unconfirm; engine-v40, 90-161.Z R43 E3, the PFM, 2026-11-25).
+  .DESCRIPTION
+  The card names the test site, the backup, the app's Uninstall steps (a hand step says so), what goes to the Recycle
+  Bin after them and the Backups choice of the card before ($ui.UninstallKeep; engine-v48); the person types the app
+  name, then "Uninstall" (dark red: the one destructive action) runs it. Back goes to the Backups card. Takes no parameter.
+  #>
+  if ($ui.Busy) { return }
+  $all = @($script:app.Uninstall); $n = @($script:app.Backup).Count
   $rows = @(for ($i = 0; $i -lt $all.Count; $i++) { $st = $steps[[int]$all[$i]]
       ([string]($i + 1) + '. ' + (Get-StepTitle $st) + $(if ($st.Kind -eq 'guide') { ' (you do this step)' } else { '' })) })
   $what = 'RADE first backs up ' + $n + ' list(s). Then it runs ' + $(if ($all.Count -eq 1) { 'this step' } else { 'these ' + $all.Count + ' steps' }) + ' of ' + $script:app.Name + '.'
   $what += ' They remove what the install made on the site.'
-  # engine-v48 (DECISIONS 2026-11-26): after the steps, the clean-up (Invoke-Uninstall, part 13); the last app's also takes RADE's shared files.
-  $clean = 'After the steps, RADE moves the app files, the runner copy, the shortcut and the install record to the Recycle Bin. The Backups folder stays.'
+  # engine-v48 (DECISIONS 2026-11-26): after the steps, the clean-up (Invoke-Uninstall, part 17); the last app's also takes RADE's shared files.
+  $clean = $(if ($ui.UninstallKeep) { 'After the steps, RADE moves the app files, the runner copy, the shortcut and the install record to the Recycle Bin. Your choice: keep the Backups folder.' }
+    else { 'After the steps, RADE moves the app folder, the runner copy, the shortcut and the install record to the Recycle Bin. Your choice: remove the Backups folder too.' })
   if (-not @(Get-OtherRecordKey (Get-InstalledKey $script:app)).Count) { $clean += ' No other app has an install record on this computer, so RADE\Config and RADE\runners go to the Recycle Bin too.' }
   & $ui.SetCard @{ View = 'unconfirm'; Light = 'you'; Kicker = [string]$ui.Kick.Text; Sentence = ('Uninstall ' + $script:app.Name + ' from the test site?')
     P = @(('Test site: ' + $ui.UninstallSite), $what, $clean); Lines = $rows
     Field = @{ Label = ('Type ' + $script:app.Name + ' to confirm'); Text = ''; Name = 'The app name, to confirm Uninstall' }; Focus = 'field'
-    Buttons = @(@{ Text = 'Uninstall'; Kind = 'danger'; Act = { & $ui.UninstallGo } }); Back = { & $ui.VMaint $ui.MaintInst } } }
+    Buttons = @(@{ Text = 'Uninstall'; Kind = 'danger'; Act = { & $ui.UninstallGo } }); Back = { & $ui.VUninstall } } }
 
 $ui.UninstallGo = {
   <#
   .SYNOPSIS
-  Uninstall, the run: checks the typed app name, runs Invoke-Uninstall (part 13), then shows the result card.
+  Uninstall, the run: checks the typed app name, runs Invoke-Uninstall (part 17) with the Backups choice, then shows the result card.
   .DESCRIPTION
   The name must match exactly, capitals too. The run card names each step; a hand step shows its own card. Takes no
   parameter.
@@ -237,8 +255,7 @@ $ui.UninstallGo = {
   $ui.Busy = $true; [System.Windows.Forms.Application]::DoEvents(); $res = $null
   # Before each step: the run card names it. Takes the step, its number and the count.
   $onStep = { param($St, $I, $N) & $card ('Uninstall step ' + $I + ' of ' + $N + ': ' + (Get-StepTitle $St)); [System.Windows.Forms.Application]::DoEvents() }
-  # KeepBackups: $true, the default choice "Keep the Backups folder". The card has no radio pair yet (engine-v48 worker 2: SetCard has no radio part).
-  try { $res = Invoke-Uninstall (Get-BasePath) { [System.Windows.Forms.Application]::DoEvents() } $onStep $true }
+  try { $res = Invoke-Uninstall (Get-BasePath) { [System.Windows.Forms.Application]::DoEvents() } $onStep ([bool]$ui.UninstallKeep) }   # the Backups card's choice
   catch { $why = 'Uninstall stopped with an error [' + $_.Exception.GetType().Name + '].'
     $res = @{ State = 'failed'; Path = ''; Lines = @($why, 'Select "Uninstall" again: its steps remove only what is still there.') } }
   finally { $ui.Busy = $false }

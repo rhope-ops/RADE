@@ -11,7 +11,7 @@ param([Parameter(Mandatory = $true)][string]$Dir)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 foreach ($p in '01-base', '02-config', '03-files', '04-steps', '05-installed', '07-checks', '16-site-scripts', '08-saved-checks', '13-maintenance', '14-restore',
-  '15-restore-run', '12-resume') { . (Join-Path $root ('engine/ps/' + $p + '.ps1')) }
+  '15-restore-run', '17-uninstall', '12-resume') { . (Join-Path $root ('engine/ps/' + $p + '.ps1')) }
 # What a bundle sets before the engine: fake data only.
 $round = 'R01'; $buildId = 'abcd1234'; $engineRelease = 30; $appFolder = 'SampleApp'; $sitePrefix = 'https://usaf.dps.mil/sites/'
 $script:appChecks = @(); $script:runLog = New-Object System.Collections.Generic.List[string]

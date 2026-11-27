@@ -22,6 +22,9 @@ function Test-MailTo([string]$To) {
 function Get-ConfigFile([string]$Base, [string]$Name) { return (Join-Path (Join-Path $Base 'Config') $Name) }
 # Returns the path of a file in RADE's own Config folder (a test can set $script:configOver). Takes the file name.
 function Get-RadeConfigFile([string]$Name) { if ($script:configOver) { return (Join-Path $script:configOver $Name) }; return (Join-Path (Join-Path (Get-RadePath) 'Config') $Name) }   # the engine's own settings (R17)
+# engine-v48: $true after the last app's Uninstall moved RADE\Config to the Recycle Bin (Clear-UninstallRecord, part 17).
+# Then the window place and the tour mark are not written again, so the closing window does not make RADE\Config again.
+$script:radeConfigGone = $false
 function Read-WindowState {
   # R28 (the Administrator, 2026-11-17): where the user last closed the window. RADE\Config\rade-window.json (a cache: when it
   # is lost or does not read, the window opens maximized on the screen with the mouse). { x, y, w, h, state, dpi, closed: { w, h, state } }
@@ -37,6 +40,7 @@ function Read-WindowState {
 }
 function Save-WindowState([int]$X, [int]$Y, [int]$W, [int]$H, [string]$State, [int]$Dpi, [int]$ClientW, [int]$ClientH, [string]$CloseState) {
   # Numbers and two words only: no name, path or text. A write that fails is ignored (the window is closing).
+  if ($script:radeConfigGone) { return }   # engine-v48: the last Uninstall took RADE\Config
   try { $o = [ordered]@{ about = 'RADE window place (a cache; delete it to open maximized again)'; x = $X; y = $Y; w = $W; h = $H; state = $State; dpi = $Dpi; closed = [ordered]@{ w = $ClientW; h = $ClientH; state = $CloseState } }
     Write-FileWhole (Get-RadeConfigFile 'rade-window.json') (($o | ConvertTo-Json -Depth 4) + "`r`n") } catch { $null = $_ }
 }
@@ -47,6 +51,7 @@ function Test-TourSeen { try { return [bool](Test-Path -LiteralPath (Get-RadeCon
 # Remembers that the RADE tour was shown: writes the date to RADE\Config\rade-tour.txt; a failure is ignored. Takes
 # nothing; gives back nothing.
 function Save-TourSeen {
+  if ($script:radeConfigGone) { return }   # engine-v48: the last Uninstall took RADE\Config
   try { $p = Get-RadeConfigFile 'rade-tour.txt'; $d = Split-Path -Parent $p
     if (-not (Test-Path -LiteralPath $d -PathType Container)) { [void](New-Item -ItemType Directory -Path $d -Force) }
     Write-FileWhole $p ((Get-Date -Format 'yyyy-MM-dd') + "`r`n") } catch { $null = $_ }   # not saved: the tour shows one more time
