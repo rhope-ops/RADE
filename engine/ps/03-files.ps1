@@ -150,7 +150,7 @@ function Get-StepEnv([string]$Base, $Step) {
   }
   $o = [ordered]@{ RADE_CONTRACT = '1'; RADE_MODE = [string]$script:app.Mode; RADE_APP = [string]$script:app.Name; RADE_APP_VERSION = [string]$script:app.Version
     RADE_INSTALLED_VERSION = $inst; RADE_STEP_LAST = $last; RADE_SITE = $(if (Test-SiteUrl (Get-SiteUrl $Base)) { [string](Get-SiteUrl $Base) } else { '' }) }
-  # Uninstall (engine-v40) sets RADE_MODE=uninstall and RADE_MADE for its own steps only (Invoke-Uninstall, part 13).
+  # Uninstall (engine-v40) sets RADE_MODE=uninstall and RADE_MADE for its own steps only (Invoke-Uninstall, part 17).
   if ($script:stepEnvExtra) { foreach ($k in @($script:stepEnvExtra.Keys)) { $o[[string]$k] = [string]$script:stepEnvExtra[$k] } }
   return $o
 }
