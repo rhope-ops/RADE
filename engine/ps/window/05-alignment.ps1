@@ -207,6 +207,13 @@ $ui.OptPlan = { param($o, [int]$w)
   $rw = 0; foreach ($r in @($o.R1, $o.R2)) { if ($r) { $rw = [math]::Max($rw, [System.Windows.Forms.TextRenderer]::MeasureText([string]$r, $ui.F.SmallB).Width) } }
   $under = [bool]($rw -and -not $o.Off -and ($nw + $vw + $gap + $rw) -gt $inner)
   $tw = $inner; if ($rw -and -not $under) { $tw = $inner - $rw - $gap }
+  # Inline rows (engine-v47, the Maintenance card, mock option A): the name in a column as wide as the widest name of the
+  # list ($o.Names), the text beside it (2 lines at most), the fact on the right, so 5 rows fit without a scroll
+  # (Windows job of PR 209: the card scrolled at 1020 x 616 with rows of the Choose height). Too narrow: the Choose layout.
+  if ($o.Inline -and $rw) { $nc = $gap; foreach ($nm in @($o.Names)) { $nc = [math]::Max($nc, [System.Windows.Forms.TextRenderer]::MeasureText([string]$nm, $ui.F.Body).Width + $gap) }
+    $sw = $inner - $rw - $gap - $nc
+    if ($sw -ge (& $ui.Sc 120)) { $sl = & $ui.Rows ([string]$o.Sub) $ui.F.Small $sw $h2 2; $ni = [math]::Max($h1, $sl * $h2); $hi = [math]::Max((& $ui.Sc 40), ($ni + (& $ui.Sc 16)))
+      return @{ Inline = $true; H = [int]$hi; Pad = $pad; X = $x; Tw = [int]($inner - $rw - $gap); Rw = $rw; Under = $false; S1 = $sl; S2 = 0; NL = 0; H1 = $h1; H2 = $h2; Vw = 0; Nw = $nw; Nc = [int]$nc; Sw = [int]$sw; Y = 0 } } }
   $sf = $(if ($o.Off) { $ui.F.SmallB } else { $ui.F.Small }); $s1 = & $ui.Rows ([string]$o.Sub) $sf $tw $h2 4
   if ($rw -and -not $under -and -not $o.Off -and $s1 -gt 2) { $under = $true; $tw = $inner; $s1 = & $ui.Rows ([string]$o.Sub) $sf $tw $h2 4 }   # a long summary takes the whole width
   $s2 = & $ui.Rows ([string]$o.Sub2) $ui.F.Small $tw $h2 2; $nl = & $ui.Rows ([string]$o.Note) $ui.F.SmallB $tw $h2 2
@@ -232,6 +239,11 @@ $ui.PaintOpt = { param($P, $G)
       $k = & $ui.Sc 24; $ky = [int](($h - $k) / 2); $kp = New-Object System.Drawing.Pen($ui.C.Edge); $G.DrawRectangle($kp, $pad, $ky, $k, $k); $kp.Dispose()
       & $ui.Word $G ([string]$o.Key) $ui.F.SmallB $ui.C.Gray $pad $ky $k $k 'HorizontalCenter, VerticalCenter, NoPrefix, SingleLine'
     }
+    if ($pl.Inline) {   # one line: name, text, fact (the Maintenance card)
+      & $ui.Word $G ([string]$o.Name) $ui.F.Body $(if ($o.Off) { $ui.C.Gray } elseif ($o.Danger) { $ui.C.Red } else { $ui.C.Navy }) $x ([int](($h - $h1) / 2)) ($pl.Nc - (& $ui.Sc 4)) $h1 $one
+      $sh = $pl.S1 * $h2; & $ui.Word $G ([string]$o.Sub) $ui.F.Small $ui.C.Gray ($x + $pl.Nc) ([int](($h - $sh) / 2)) $pl.Sw $sh $wrap
+      & $ui.Word $G ([string]$o.R1) $ui.F.Small $(if ($o.Soon) { $ui.C.Gray } elseif ($o.Off -or $o.Danger) { $ui.C.Red } else { $ui.C.Navy }) ($w - $pad - $rw) ([int](($h - $h2) / 2)) $rw $h2 'Right, Top, NoPrefix, SingleLine'
+      return }
     $nw = [math]::Max((& $ui.Sc 40), [math]::Min($pl.Nw, ($tw - $pl.Vw)))   # the name first; the version keeps its place after it
     & $ui.Word $G ([string]$o.Name) $ui.F.Body $(if ($o.Off) { $ui.C.Gray } elseif ($o.Danger) { $ui.C.Red } else { $ui.C.Navy }) $x $y $nw $h1 $one
     if ($o.Ver) { & $ui.Word $G ([string]$o.Ver) $ui.F.Small $ui.C.Gray ($x + $nw) $y ([math]::Max(1, ($tw - $nw))) $h1 $one }
