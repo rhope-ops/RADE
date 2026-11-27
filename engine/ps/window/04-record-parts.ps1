@@ -127,4 +127,5 @@ $ui.Fit = {
   foreach ($l in @($ui.RightL, $ui.StepTime, $ui.StepFrac, $ui.PctL)) { & $ui.FixW $l }   # labels of changing values: one size from their widest value
   & $ui.FitRow; & $ui.Apart; & $ui.FitSent; & $ui.FitSteps; & $ui.FitEdges; & $ui.FitBar; & $ui.AlignRows
   foreach ($o in @($ui.Opts.Controls)) { $o.Width = $cw; try { $o.Height = (& $ui.OptPlan $o.Tag $cw).H } catch { $null = $_ } }
+  if ($ui.View -eq 'run' -and $ui.Running) { & $ui.PlaceRuns }   # the step lists take the room this size has
   & $ui.Squeeze }

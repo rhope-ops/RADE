@@ -84,6 +84,11 @@ sed -i 's#"logo": "assets/sample-logo.png"#"logo": "../sample-logo.png"#' "$t/ap
 for bad in "/etc/sample-logo.png" "assets/../../sample-logo.png"; do sed -i "s#\"logo\": \"[^\"]*\"#\"logo\": \"$bad\"#" "$t/app/scripts/paste_bundles.json"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: the path must stay inside the application repo" "$t/lg.txt" && ok || bad "build stops on application logo $bad"; done
 sed -i 's#"logo": "[^"]*"#"logo": "assets/sample-logo.png"#' "$t/app/scripts/paste_bundles.json"
 mv "$t/sl.png" "$t/app/assets/sample-logo.png"; build || bad "rebuild after the application logo checks"
+# Dark is opt-in (review of PR 211): engine/rade_ui.ps1 alone takes the light set also when the Windows app mode says dark (an
+# app window copies that file); only the RADE window's setup reads the app mode. The probe with $ui.Dark set shows the test sees dark.
+[ "$(pwsh -NoProfile -Command 'function Get-ItemPropertyValue { 0 }; $t = Get-Content engine/rade_ui.ps1 -Raw; $a = $t.IndexOf("# ---- UI tokens"); $b = $t.IndexOf("# ---- Fonts, sizes and buttons")
+  foreach ($d in @($null, $true)) { $ui = @{ Dark = $d }; . ([scriptblock]::Create($t.Substring($a, $b - $a))); ($ui.C.White.ToArgb() -band 0xFFFFFF).ToString("X6") + "/" + $ui.Dark }' 2>&1 | tr '\n' ' ')" = "FFFFFF/False 15171D/True " ] &&
+  ! grep -q "AppsUseLightTheme" engine/rade_ui.ps1 && grep -q "^\$ui.Dark = \[bool\](& \$ui.DarkOn)$" engine/ps/window/01-setup.ps1 && ok || bad "dark is opt-in: rade_ui.ps1 alone is light; the RADE window reads the app mode"
 # application.logoDark (plan engine-v48 D6): the logo of the dark mode, with the rules of logo; without it the bundle's value is empty.
 grep -q "^\$appLogoDarkPng = ''$" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" && sed -i 's#"logo": "assets/sample-logo.png"#"logo": "assets/sample-logo.png", "logoDark": "assets/sample-logo.png"#' "$t/app/scripts/paste_bundles.json" &&
   python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1 && grep -q "^\$appLogoDarkPng = 'iVBORw0KGgo" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" &&

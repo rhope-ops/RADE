@@ -122,6 +122,11 @@ $ui.VNotInst = { $w = Get-AppWord; $v = [string]$script:app.Version
     P = @(('Install puts ' + $w + ' on this computer' + $(if (& $ui.NeedSite) { ' and on your site' } else { '' }) + '. RADE runs the checks first.'))
     Note = 'Repair, Diagnose, Back up, Restore and Uninstall are available after the install.'
     Buttons = @(@{ Text = ('Install ' + $v); Kind = 'primary'; Act = { & $ui.Checks $false } }); Back = { & $ui.VChoose } } }
+# The name of the row that installs this paste's version (D1): "Install <v>" when nothing is installed, "Update to <v>"
+# when an older version is, "Repair" when this one is. Takes the install record's installed part (or $null); gives the name.
+$ui.RowVerb = { param($Inst) $v = [string]$script:app.Version; if (-not $Inst) { return ('Install ' + $v) }
+  try { $c = ([version]$v).CompareTo([version][string]$Inst.version); if ($c -gt 0) { return ('Update to ' + $v) } elseif ($c -eq 0) { return 'Repair' } } catch { $null = $_ }   # a version that is not a number: Install
+  return ('Install ' + $v) }
 # Shows the Maintenance card of an installed application. Takes its install record (version and date).
 $ui.VMaint = { param($Inst)
   $ui.MaintInst = $Inst   # Back from a tool's cards shows this card again
@@ -129,8 +134,7 @@ $ui.VMaint = { param($Inst)
   # (the PFM, 2026-11-26: "put all options that are maintenance actions directly on that screen, in the list, with uninstall
   # last, including repair in it"): one card, one list: Update or Repair, Diagnose, Back up, Restore, then Uninstall in dark
   # red; "Start <word>" is the action button. The second screen "Maintenance" (view tools, engine-v30 to v46) is gone.
-  $verb = 'Install ' + $script:app.Version
-  try { $c = ([version][string]$script:app.Version).CompareTo([version][string]$Inst.version); if ($c -gt 0) { $verb = 'Update to ' + $script:app.Version } elseif ($c -eq 0) { $verb = 'Repair' } } catch { $null = $_ }
+  $verb = & $ui.RowVerb $Inst
   # Start (R28 fix: the PFM found no Start button): the installed application with a start script can be started from here.
   # It runs the checks first (Start comes only after they pass: AGENTS.md "RADE and the app"), then starts the application.
   # Primary when the installed version is this paste's version; else the Update row is the main action.
