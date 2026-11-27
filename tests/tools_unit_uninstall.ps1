@@ -120,6 +120,15 @@ Assert-Case 'uninstall (engine-v48): the app folder name test takes plain names 
 # names, the Backups folder and the files outside RADE stay.
 Remove-Item -LiteralPath (Join-Path $rade 'Config\installed\bbbbbbbbbbbb.json'); Set-Content -LiteralPath (Join-Path $rade 'rade-runner.ps1') -Value '# runner'
 $null = New-Item -ItemType Directory -Path (Join-Path $rade 'Other') -Force
+# First: the record cannot be saved after the clean-up (a stand-in Save-Uninstalled). The record and RADE\Config stay,
+# and the lines do not say "select Uninstall again" (the clean-up took the saved site).
+$keepSave = ${function:Save-Uninstalled}; ${function:Save-Uninstalled} = { param([bool]$Whole, [string]$Key) $null = $Whole; $null = $Key; 'the file is read-only' }
+$u = Invoke-Uninstall $base $null $null; ${function:Save-Uninstalled} = $keepSave
+Assert-Case 'uninstall (engine-v48): a record that cannot be saved after the clean-up stays, with RADE\Config; the lines say so' ($u.State -eq 'review' -and
+  (Test-Path -LiteralPath (Read-InstalledRaw $kSelf).Path) -and (Test-Path -LiteralPath (Join-Path $rade 'Config')) -and (Test-Path -LiteralPath (Join-Path $rade 'runners')) -and
+  $u.Lines[1] -like 'The install record stays: *' -and @($u.Lines) -contains 'NOTE: the install record could not be saved: the file is read-only' -and
+  -not (Test-Path -LiteralPath (Join-Path $base 'Uninstall')) -and $u.Path -eq (Join-Path $base 'Backups'))
+Reset-SampleInstall
 $u = Invoke-Uninstall $base $null $null
 Assert-Case 'uninstall (engine-v48): the last app clears RADE shared files; Backups, other folders and files outside RADE stay' ($u.State -eq 'done' -and
   -not (Test-Path -LiteralPath (Join-Path $rade 'Config')) -and -not (Test-Path -LiteralPath (Join-Path $rade 'runners')) -and -not (Test-Path -LiteralPath (Join-Path $rade 'rade-runner.ps1')) -and

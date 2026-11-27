@@ -371,11 +371,11 @@ function Invoke-Uninstall([string]$Base, [scriptblock]$Tick, [scriptblock]$OnSte
     elseif ($noRec) { 'Every Uninstall step is done, but RADE could not save the install record.' }
     else { 'Uninstall stopped at "' + $stop + '". ' + $done + ' of ' + $all.Count + ' steps done.' })
   $tail = $(if ($whole) { $cl[0] }
-    elseif ($noRec) { 'Select "Uninstall" again: RADE saves a backup, runs the steps again and tries to save the record.' }
+    elseif ($noRec) { 'The install record stays: the app shows as installed. To run Uninstall again, first restore the app files from the Recycle Bin.' }   # the clean-up took the saved site
     else { 'Read the report, fix the cause, then select "Uninstall" again. The backups stay on this computer.' })
   if ($whole) { $cl = @($cl | Select-Object -Skip 1) }
   $p = ''; $bk = Join-Path $Base 'Backups'
-  if ($whole) { if (Test-Path -LiteralPath $bk -PathType Container) { $p = $bk } }   # the folder that stays; no report file: the app folder is gone
+  if ($whole -or $noRec) { if (Test-Path -LiteralPath $bk -PathType Container) { $p = $bk } }   # the folder that stays; no report file: the clean-up took the app folder
   elseif (Test-Path -LiteralPath $Base -PathType Container) {
     try { $p = Join-Path (Join-Path $Base 'Uninstall') ('uninstall-' + $stamp + '.txt')
       Write-FileWhole $p ((@($head, '') + $cl + $lines + @('', 'Log:') + @($log) -join "`r`n") + "`r`n") } catch { $p = '' } }
@@ -442,8 +442,8 @@ This app's record key.
 function Get-UninstallCleanPlan([string]$Base, [bool]$KeepBackups, [string]$Key) {
   $items = @(); $no = @(); $others = @(Get-OtherRecordKey $Key); $name = [string]$script:app.Name
   $root = [System.IO.Path]::GetFullPath((Get-RadePath)).TrimEnd('\', '/'); $bp = [System.IO.Path]::GetFullPath($Base).TrimEnd('\', '/')
-  $sameDir = @($others | Where-Object { $_ -eq '?' -or ($_ -split '/', 2)[0] -ceq $appFolder }).Count
-  $sameApp = @($others | Where-Object { $_ -eq '?' -or (($_ -split '/', 2)[0] -ceq $appFolder -and (($_ -split '/', 2)[-1] -replace '@[^@]*$', '') -ceq $name) }).Count
+  $sameDir = @($others | Where-Object { $_ -eq '?' -or ($_ -split '/', 2)[0] -eq $appFolder }).Count
+  $sameApp = @($others | Where-Object { $_ -eq '?' -or (($_ -split '/', 2)[0] -eq $appFolder -and (($_ -split '/', 2)[-1] -replace '@[^@]*$', '') -eq $name) }).Count
   if ((Split-Path -Parent $bp) -ne $root -or -not (Test-RadeAppName (Split-Path -Leaf $bp))) {
     $no += ('Not moved: the app folder ' + (ConvertTo-Masked $Base) + '. It is not an app folder in the RADE folder.') }
   elseif ($sameDir) { $no += 'Not moved: the app folder. Another install record on this computer uses it.' }
