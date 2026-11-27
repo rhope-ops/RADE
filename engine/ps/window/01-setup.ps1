@@ -53,6 +53,12 @@ if ($script:native -and [string]$Host.Name -ne 'Windows PowerShell ISE Host') {
 $ui = @{ View = ''; Running = $false; Busy = $false; RecOn = $false; Edit = $false; Answer = ''; Acts = @(); Back = $null; OnOpt = $null; FieldDo = $null
   Log = (New-Object System.Collections.Generic.List[string]); Summary = @(); Sel = @{}; Clean = $true; StepState = @{}; Plan = $null; Picked = $false
   BaseIds = @(); BaseRes = @{}; Blocked = @{}; Newer = @{}; Bars = @{}; G = $null; GUrl = ''; CurId = ''; StepI = 0; StepN = 0; StepNow = ''; BusyShown = $false; Always = @($false, $false, $false, $false, $false, $false); NB = 6; StartAfter = $false; Cancel = $false; Dpi = 96.0; ScreenDpi = 96.0; FontK = 1.0; FontDpi = 96.0; Scaled = $false; Full = @{}; Clock = [System.Diagnostics.Stopwatch]::StartNew(); CardAt = -1000000.0; GuardMs = 400; Calm = $false; ContentW = 780 }
+# Themes (the PFM, 2026-11-27, plan engine-v48 D6): the RADE window reads the Windows app mode once when it opens:
+# AppsUseLightTheme 0 = dark (Kanon in Fulcrum colors); 1 or no value = light (Kanon in USAF colors). A contrast theme
+# wins over both. engine/rade_ui.ps1 takes $ui.Dark as it is set here (an app window that copies that file stays light).
+# Takes nothing; gives back $true for dark. No registry (not Windows): light.
+$ui.DarkOn = { try { $v = Get-ItemPropertyValue -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'AppsUseLightTheme' -ErrorAction Stop; return ([int]$v -eq 0) } catch { return $false } }   # no value: light
+$ui.Dark = [bool](& $ui.DarkOn)
 $ui.OpenedAt = (Get-Date).AddSeconds(-1)   # E4: the SCALE lines of the RADE windows shown from this time on go into the round's results
 # engine-v47 (the PFM, 2026-11-26): the line under the word RADE is RADE's full name, "Redacted Application Deployment
 # Engine" (replaces the short tagline of L1). The RADE row shows only for an app with no productName and logo.
@@ -73,15 +79,17 @@ $ui.TitleText = { param($App)
   $v = $(if ($App -and [string]$App.Version) { [string]$App.Version } elseif (-not (Test-RunnerStart)) { [string]$round } else { '' })
   return ([string]$appProduct + $(if ($v) { ' - ' + $v } else { '' })) }
 $ui.Form.Text = & $ui.TitleText $null
-# The title-bar and taskbar icon: the app logo for an app with productName and a logo (engine-v47), else RADE's logo
-# (Fulcrum, the PFM, 2026-11-20); drawn at 32 px from the bundle's PNG.
-try {
-  $ib = New-Object System.Drawing.Bitmap((New-Object System.IO.MemoryStream(, [System.Convert]::FromBase64String($(if ([string]$appProduct -and [string]$appLogoPng) { $appLogoPng } else { $logoPng })))))
-  $ui.Form.Icon = [System.Drawing.Icon]::FromHandle((New-Object System.Drawing.Bitmap($ib, 32, 32)).GetHicon())
-} catch { $null = $_ }   # a logo System.Drawing cannot read keeps the default icon
 $ui.Form.SuspendLayout()
 $ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(96, 96); $ui.Form.AutoScaleMode = 'Dpi'   # sizes below are at 100 % scaling
 # @@UI@@
+# The title-bar and taskbar icon: the app logo for an app with productName and a logo (engine-v47), else RADE's logo
+# (Fulcrum, the PFM, 2026-11-20); drawn at 32 px from the bundle's PNG. In the dark mode the app's logoDark when it has
+# one (plan engine-v48 D6): $ui.AppPng is the app logo of the theme, for the icon and the band (02-fixed-parts.ps1).
+$ui.AppPng = $(if ($ui.Dark -and -not $ui.High -and [string]$appLogoDarkPng) { [string]$appLogoDarkPng } else { [string]$appLogoPng })
+try {
+  $ib = New-Object System.Drawing.Bitmap((New-Object System.IO.MemoryStream(, [System.Convert]::FromBase64String($(if ([string]$appProduct -and $ui.AppPng) { $ui.AppPng } else { $logoPng })))))
+  $ui.Form.Icon = [System.Drawing.Icon]::FromHandle((New-Object System.Drawing.Bitmap($ib, 32, 32)).GetHicon())
+} catch { $null = $_ }   # a logo System.Drawing cannot read keeps the default icon
 $ui.Form.ClientSize = New-Object System.Drawing.Size(1020, 760)   # at 100 %; the minimum size is set when the window has its scale (Shown)
 $ui.Form.StartPosition = 'CenterScreen'; $ui.Form.KeyPreview = $true; $ui.Form.BackColor = $ui.C.White
 $ui.Form.ShowInTaskbar = $true; $ui.Form.MinimizeBox = $true   # its own taskbar button: a minimized window can be restored (R24)

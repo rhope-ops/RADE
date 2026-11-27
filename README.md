@@ -71,7 +71,7 @@ RADE has no script of its own. You copy the script from the README of an applica
 | Restore on a site that is not a test site | Restore runs only on the application's test sites. |
 | Restore a person who is not on the site | That field stays empty; fill it in by hand. |
 | Uninstall on a site that is not a test site | Uninstall runs only on the application's test sites. |
-| Remove RADE while an application is installed | Uninstall each application first; then select Remove RADE on the Choose screen. |
+| Remove RADE from this computer | Uninstall the last application. Its Uninstall also moves RADE's shared files to the Recycle Bin. |
 
 ---
 

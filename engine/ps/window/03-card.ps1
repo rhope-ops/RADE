@@ -29,13 +29,14 @@ $ui.Scroll = New-Object System.Windows.Forms.Panel
 $ui.Scroll.AutoScroll = $true; $ui.Scroll.Margin = (& $ui.Pad 0 0 0 0); $ui.Scroll.BackColor = $ui.C.White; $ui.Scroll.AccessibleName = 'Card text'
 $ui.Body.Location = New-Object System.Drawing.Point(0, 0); [void]$ui.Scroll.Controls.Add($ui.Body)
 $ui.Kick = & $ui.Text $ui.F.SmallB $ui.C.Gray 0 'Card line'; $ui.Kick.Visible = $true; $ui.MinLines[$ui.Kick] = 1   # one line tall also when the card has no line
-# "Your turn" (the Administrator, 2026-11-19): bold, in the accent color (Air Force blue), on its own line right above the
-# headline, only while RADE waits for the person (a card with the yellow light). Its line keeps its room when it is empty,
-# so nothing moves between a card that waits and one that does not ($ui.Hold: one line, any text).
-$ui.Turn = & $ui.Text $ui.F.Turn $ui.C.Blue 0 'Your turn'; $ui.Turn.Visible = $true; $ui.Hold[$ui.Turn] = 1
-# The header row: the line in capitals, then the "Your turn" line, one under the other. It never scrolls and never moves.
-$ui.Head = & $ui.Flow 0; $ui.Head.FlowDirection = 'TopDown'; $ui.Head.Visible = $true; $ui.Head.AccessibleName = 'Card header'
-[void]$ui.Head.Controls.Add($ui.Kick); [void]$ui.Head.Controls.Add($ui.Turn)
+# The YOUR TURN chip (plan engine-v48 step 3; critique change 1, the PFM, 2026-11-27): on a card where RADE waits for the
+# person (the yellow light), a yellow chip "YOUR TURN" stands before the line in capitals; the separate "Your turn" line of
+# R35 is gone. Yellow means only this (and the light line).
+$ui.Chip = & $ui.Label $ui.F.SmallB $ui.C.OnYellow 0; $ui.Chip.BackColor = $ui.C.Yellow; $ui.Chip.Text = 'YOUR TURN'; $ui.Chip.AccessibleName = 'Your turn'
+$ui.Chip.Padding = (& $ui.Pad $ui.Z.G2 $ui.Z.G1 $ui.Z.G2 $ui.Z.G1); $ui.Chip.Margin = (& $ui.Pad 0 0 $ui.Z.G3 0); $ui.Roles[$ui.Chip] = @{ ForeColor = 'OnYellow'; BackColor = 'Yellow' }   # its tokens for $ui.Recolor
+# The header row: the chip (on your turn), then the line in capitals, on one line. It never scrolls and never moves.
+$ui.Head = & $ui.Flow 0; $ui.Head.Visible = $true; $ui.Head.AccessibleName = 'Card header'
+[void]$ui.Head.Controls.Add($ui.Chip); [void]$ui.Head.Controls.Add($ui.Kick)
 $ui.Gap = New-Object System.Windows.Forms.Panel; $ui.Gap.Size = New-Object System.Drawing.Size(1, 0); $ui.Gap.Margin = (& $ui.Pad 0 0 0 0); $ui.Gap.BackColor = $ui.C.White; $ui.Gap.Visible = $false
 $ui.SentRow = & $ui.Flow $ui.Z.G1; $ui.SentRow.Visible = $true
 $ui.TickP = New-Object System.Windows.Forms.Panel
@@ -58,22 +59,46 @@ $ui.GuideNums = @(); $ui.GuideTexts = @(); $ui.GuideRest = @(); $ui.GuideH = 0; 
 # The file a hand step made, by its full path (R28 N6: a step that pastes the path from the clipboard shows it, to check it).
 $ui.PathL = & $ui.Label $ui.F.SmallB $ui.C.Gray $ui.Z.G3; $ui.PathL.Text = 'File path'
 $ui.PathT = & $ui.Text $ui.F.Small $ui.C.Navy $ui.Z.G1 'File path'
-$ui.StepRow = & $ui.Flow $ui.Z.G3; $ui.StepRow.WrapContents = $true   # a long step name: the bar goes to the next line
-$ui.StepName = & $ui.Text $ui.F.Body $ui.C.Navy 0 'Step name'; $ui.StepName.Visible = $true
-$ui.StepBar = & $ui.MkBar 'step' 'Progress of this step'; $ui.StepBar.Width = 200; $ui.StepBar.Margin = (& $ui.Pad 14 $ui.Z.BarTop 14 0)
+# ---- The Run card (plan engine-v48 step 3, Cards v2): one percent and one bar for the whole run, then the step list: the
+# steps before the running one ($ui.RunA), the running step ($ui.RunRow), the steps after it ($ui.RunB). The rows of the
+# other steps are drawn ($ui.PaintRuns, 07-run.ps1): the name, a second line in 2 lines at most, the status as icon and word.
+$ui.PctRow = & $ui.Flow $ui.Z.G3; $ui.PctRow.AccessibleName = 'Progress of the run'
+$ui.PctL = & $ui.Label $ui.F.Word $ui.C.Navy 0; $ui.PctL.Visible = $true; $ui.PctL.AccessibleName = 'Percent of the run'; $ui.Most[$ui.PctL] = @('100 %'); $ui.PctL.Add_TextChanged({ & $ui.FixW $this })
+$ui.RunBar = & $ui.MkBar 'run' 'Progress of all steps'; $ui.RunBar.Height = 6; $ui.RunBar.Margin = (& $ui.Pad 0 $ui.Z.G1 0 $ui.Z.G3)
+[void]$ui.PctRow.Controls.Add($ui.PctL)
+# Makes one drawn list of step rows (above or below the running step). Takes the name; gives back the panel.
+$ui.MkRuns = { param([string]$Name) $p = New-Object System.Windows.Forms.Panel; $p.Margin = (& $ui.Pad 0 0 0 0); $p.BackColor = $ui.C.White; $p.AccessibleRole = 'StaticText'; $p.AccessibleName = $Name
+  $p.Tag = @(); $p.Visible = $false; $p.Add_Paint({ & $ui.PaintRuns $this $_.Graphics }); $p }
+$ui.RunA = & $ui.MkRuns 'Steps before this one'; $ui.RunB = & $ui.MkRuns 'Steps after this one'
+# The running step: a tinted row with its name and RUNNING at the right, its summary (the step's doing text), its bar with
+# the time in the step and the count, and the now-doing line under the bar (2 lines; it wraps).
+$ui.RunRow = & $ui.Flow 0; $ui.RunRow.FlowDirection = 'TopDown'; $ui.RunRow.BackColor = $ui.C.Tint; $ui.RunRow.Padding = (& $ui.Pad $ui.Z.G2 $ui.Z.G2 $ui.Z.G2 $ui.Z.G2); $ui.RunRow.AccessibleName = 'The running step'
+$ui.RunHead = & $ui.Flow 0; $ui.RunHead.Visible = $true; $ui.RunHead.BackColor = $ui.C.Tint
+$ui.StepName = & $ui.Text $ui.F.SmallB $ui.C.Navy 0 'Step name'; $ui.StepName.Visible = $true; $ui.StepName.BackColor = $ui.C.Tint
+$ui.RunWord = & $ui.Label $ui.F.SmallB $ui.C.Info 0; $ui.RunWord.Text = 'RUNNING'; $ui.RunWord.Visible = $true; $ui.RunWord.BackColor = $ui.C.Tint; $ui.RunWord.AccessibleName = 'Status: running'
+[void]$ui.RunHead.Controls.Add($ui.StepName); [void]$ui.RunHead.Controls.Add($ui.RunWord)
+$ui.StepSum = & $ui.Text $ui.F.Small $ui.C.Navy $ui.Z.G1 'What the step does'; $ui.StepSum.BackColor = $ui.C.Tint
+$ui.StepRow = & $ui.Flow $ui.Z.G1; $ui.StepRow.Visible = $true; $ui.StepRow.BackColor = $ui.C.Tint
+$ui.StepBar = & $ui.MkBar 'step' 'Progress of this step'; $ui.StepBar.Width = 200; $ui.StepBar.Margin = (& $ui.Pad 0 $ui.Z.BarTop $ui.Z.G2 0)
 # R28 N10: the time in this step, at the right end of its bar ("4m 12s"), every second ($ui.TimeT). The log keeps "Started".
-$ui.StepTime = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepTime.Visible = $true; $ui.StepTime.AccessibleName = 'Time in this step'
-$ui.StepFrac = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepFrac.Visible = $true; $ui.StepFrac.Margin = (& $ui.Pad $ui.Z.G3 2 0 0)
+$ui.StepTime = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepTime.Visible = $true; $ui.StepTime.AccessibleName = 'Time in this step'; $ui.StepTime.BackColor = $ui.C.Tint
+$ui.StepFrac = & $ui.Label $ui.F.Small $ui.C.Gray 2; $ui.StepFrac.Visible = $true; $ui.StepFrac.Margin = (& $ui.Pad $ui.Z.G3 2 0 0); $ui.StepFrac.BackColor = $ui.C.Tint
 # The time ("4m 12s", "1h 04m 12s") and the count ("3 of 12") keep one size from their widest value ($ui.FixW), so the bar
 # beside them never changes its width as they count (the Administrator, 2026-11-19).
 $ui.Most[$ui.StepTime] = @('9h 59m 59s'); $ui.Most[$ui.StepFrac] = @('999 of 999')
 foreach ($c in @($ui.StepTime, $ui.StepFrac)) { $c.Add_TextChanged({ & $ui.FixW $this }) }
-foreach ($c in @($ui.StepName, $ui.StepBar, $ui.StepTime, $ui.StepFrac)) { [void]$ui.StepRow.Controls.Add($c) }
-# The now-doing line (L7, the Administrator, 2026-11-19; the last log line before): what the running step does now, as a plain
-# sentence ($ui.ShowNow). It has a fixed room of $ui.NowLines lines, shown also with no text, and a longer text ends with "..."
-# (the Administrator, 2026-11-19: Cancel under it jumped as the text changed; before, it wrapped to its full height, R28 N9).
-$ui.Now = & $ui.Text $ui.F.Small $ui.C.Gray $ui.Z.G2 'Now doing'
+foreach ($c in @($ui.StepBar, $ui.StepTime, $ui.StepFrac)) { [void]$ui.StepRow.Controls.Add($c) }
+# The now-doing line (L7, the Administrator, 2026-11-19): what the running step does now ($ui.ShowNow). It has a fixed room
+# of $ui.NowLines lines, shown also with no text, so Cancel under it never moves; a text wraps to those 2 lines (Cards v2).
+$ui.Now = & $ui.Text $ui.F.Small $ui.C.Gray $ui.Z.G1 'Now doing'; $ui.Now.BackColor = $ui.C.Tint; $ui.Now.Visible = $true
 $ui.NowLines = 2; $ui.Hold[$ui.Now] = $ui.NowLines
+foreach ($c in @($ui.RunHead, $ui.StepSum, $ui.StepRow, $ui.Now)) { [void]$ui.RunRow.Controls.Add($c) }
+# The WHAT TO DO box of the step-failed card (Cards v2): a 1 px edge around the label and the text.
+$ui.Todo = & $ui.Flow $ui.Z.G3; $ui.Todo.FlowDirection = 'TopDown'; $ui.Todo.Padding = (& $ui.Pad $ui.Z.G3 $ui.Z.G2 $ui.Z.G3 $ui.Z.G2); $ui.Todo.AccessibleName = 'What to do'
+$ui.TodoL = & $ui.Label $ui.F.SmallB $ui.C.Gray 0; $ui.TodoL.Text = 'WHAT TO DO'; $ui.TodoL.Visible = $true
+$ui.TodoT = & $ui.Text $ui.F.Body $ui.C.Navy $ui.Z.G1 'What to do'; $ui.TodoT.Visible = $true
+[void]$ui.Todo.Controls.Add($ui.TodoL); [void]$ui.Todo.Controls.Add($ui.TodoT)
+$ui.Todo.Add_Paint({ try { $pn = New-Object System.Drawing.Pen($ui.C.Edge); $_.Graphics.DrawRectangle($pn, 0, 0, ($this.ClientSize.Width - 1), ($this.ClientSize.Height - 1)); $pn.Dispose() } catch { $null = $_ } })   # no edge drawn: the box still shows its text
 $ui.FieldRow = & $ui.Flow $ui.Z.G2; $ui.FieldRow.WrapContents = $true; & $ui.Ring $ui.FieldRow
 $ui.FieldL = & $ui.Label $ui.F.SmallB $ui.C.Gray 9; $ui.FieldL.Visible = $true
 # A one-line box: a frame as tall as a compact button with RADE's own 1 px edge, the text box inside it with no border,
@@ -90,10 +115,14 @@ $ui.BoxFit = { param($P) if (-not $ui.Scaled) { return }
 # gives back the frame panel and remembers it in $ui.Boxes.
 $ui.MkBox = { param($Tb, [int]$W)
   $p = New-Object System.Windows.Forms.Panel; $p.Size = New-Object System.Drawing.Size($W, $ui.Z.CompactH); $p.BackColor = $ui.C.White; $p.AccessibleName = 'Text box'
-  $Tb.BorderStyle = 'None'; $Tb.AutoSize = $false; $Tb.Font = $ui.F.Small; $Tb.ForeColor = $ui.C.Ink; [void]$p.Controls.Add($Tb); $Tb.Add_GotFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } }); $Tb.Add_LostFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } })
+  $Tb.BorderStyle = 'None'; $Tb.AutoSize = $false; $Tb.Font = $ui.F.Small; $Tb.ForeColor = $ui.C.Ink
+  $Tb.BackColor = $ui.C.White; [void]$p.Controls.Add($Tb); $Tb.Add_GotFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } }); $Tb.Add_LostFocus({ try { $this.Parent.Parent.Invalidate() } catch { $null = $_ } })
   $p.Add_Paint({ try { $pn = New-Object System.Drawing.Pen($ui.C.Edge); $_.Graphics.DrawRectangle($pn, 0, 0, ($this.ClientSize.Width - 1), ($this.ClientSize.Height - 1)); $pn.Dispose() } catch { $null = $_ } })
   $p.Add_SizeChanged({ & $ui.BoxFit $this }); $p.Add_Click({ try { [void]$this.Controls[0].Focus() } catch { $null = $_ } }); $ui.Boxes += $p; $p }
 $ui.Field = New-Object System.Windows.Forms.TextBox
+# On a card with BoxNoEnter (the hand card) Enter in the box answers nothing: the main button is not the Enter button
+# while the box has the focus (review of PR 211: Enter in the address box answered Done).
+$ui.Field.Add_GotFocus({ if ($ui.BoxNoEnter) { $ui.Form.AcceptButton = $null } }); $ui.Field.Add_LostFocus({ if ($ui.BoxNoEnter) { $ui.Form.AcceptButton = $ui.AcceptOn } })
 $ui.FieldBox = & $ui.MkBox $ui.Field $ui.Z.FieldM; $ui.FieldBox.Margin = (& $ui.Pad $ui.Z.G2 $ui.Z.M $ui.Z.M $ui.Z.M)   # 8 from the label; 4 + the button's 4 = 8 to the button
 $ui.FieldB = & $ui.Btn 'compact'
 $ui.FieldB.Add_Click({ if ($ui.FieldDo) { & $ui.FieldDo } })
@@ -101,7 +130,7 @@ foreach ($c in @($ui.FieldL, $ui.FieldBox, $ui.FieldB)) { [void]$ui.FieldRow.Con
 $ui.ErrRow = & $ui.Flow $ui.Z.G2; & $ui.Ring $ui.ErrRow
 $ui.ErrBox = New-Object System.Windows.Forms.TextBox
 $ui.ErrBox.Multiline = $true; $ui.ErrBox.ScrollBars = 'Vertical'; $ui.ErrBox.Size = New-Object System.Drawing.Size($ui.Z.FieldL, 96)
-$ui.ErrBox.Margin = (& $ui.Pad 4 4 4 4); $ui.ErrBox.BorderStyle = 'FixedSingle'; $ui.ErrBox.Font = $ui.F.Small; $ui.ErrBox.ForeColor = $ui.C.Ink; $ui.ErrBox.AccessibleName = 'Error message'; & $ui.Cue $ui.ErrBox
+$ui.ErrBox.Margin = (& $ui.Pad 4 4 4 4); $ui.ErrBox.BorderStyle = 'FixedSingle'; $ui.ErrBox.Font = $ui.F.Small; $ui.ErrBox.ForeColor = $ui.C.Ink; $ui.ErrBox.BackColor = $ui.C.White; $ui.ErrBox.AccessibleName = 'Error message'; & $ui.Cue $ui.ErrBox
 [void]$ui.ErrRow.Controls.Add($ui.ErrBox)
 $ui.LinkRow = & $ui.Flow 0; $ui.LinkRow.WrapContents = $true; $ui.LinkRow.Margin = (& $ui.Pad (-$ui.Z.M) 0 0 0); & $ui.Ring $ui.LinkRow
 $ui.CopyPathB = & $ui.LinkBtn 'Copy file path'; $ui.ShowFileB = & $ui.LinkBtn 'Show file in folder'; $ui.PageB = & $ui.LinkBtn 'Open the RADE page'
@@ -127,9 +156,62 @@ foreach ($c in @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox)) { [void]$ui.Test
 # Puts controls into a table as one auto-sized row each, top to bottom. Takes the table and the list of controls; sets
 # the row count; gives back nothing.
 $ui.Fill = { param($T, $Parts) $row = 0; foreach ($c in @($Parts)) { [void]$T.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('AutoSize'))); $T.Controls.Add($c, 0, $row); $row++ }; $T.RowCount = $row }
-& $ui.Fill $ui.Body @($ui.SentRow, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.Opts, $ui.FieldRow, $ui.Guide, $ui.PathL, $ui.PathT, $ui.StepRow, $ui.Now, $ui.ErrRow, $ui.LinkRow, $ui.Note, $ui.Help)
+& $ui.Fill $ui.Body @($ui.SentRow, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.Opts, $ui.FieldRow, $ui.Guide, $ui.PathL, $ui.PathT, $ui.PctRow, $ui.RunBar, $ui.RunA, $ui.RunRow, $ui.RunB,
+  $ui.ErrRow, $ui.Todo, $ui.LinkRow, $ui.Note, $ui.Help)
 $i = 0; foreach ($x in @($ui.BtnRow.Controls)) { $x.TabIndex = $i; $i++ }   # Tab goes along the row from the left: Back (Esc) first, the primary last (B3, B6)
 & $ui.Fill $ui.Tail @($ui.Close, $ui.BtnRow, $ui.Foot, $ui.TestRow)
 & $ui.Fill $ui.Stack @($ui.Head, $ui.Scroll, $ui.Gap, $ui.Tail)
 $ui.Card.Controls.Add($ui.Stack, 1, 1); $ui.Card.SetColumnSpan($ui.Stack, 2)   # two columns: room for the scroll bar beside the text
 
+# ---- What a card shows around its text (plan engine-v48 steps 2 to 4; $ui.SetCard calls these)
+# Esc (Cards v2; critique change 4, the PFM, 2026-11-27): Back only on Choose, Maintenance and the not-installed card, and
+# on the Run card Esc opens the Cancel question. Your turn and Done take no Esc; the Back of another card is a plain "Back".
+$ui.EscViews = @('choose', 'maint', 'notinst')
+$ui.Dress = {
+  <#
+  .SYNOPSIS
+  Sets the parts of a card that are not its text: the light line, the stage now, the YOUR TURN chip, the color of the line
+  in capitals and the parts of the Run and step-failed cards.
+  .PARAMETER C
+  The card (the hashtable of $ui.SetCard): Light ('you', 'bad' or 'pass'), KickColor (a token name), StepRow, Todo.
+  .OUTPUTS
+  Nothing.
+  #>
+  param($C)
+  & $ui.SetLight ([string]$C.Light); & $ui.SetStage ([string]$C.View) ([string]$C.Light -eq 'pass')
+  $ui.Chip.Visible = ([string]$C.Light -eq 'you'); $ui.Kick.ForeColor = $(if ($C.KickColor) { $ui.C[[string]$C.KickColor] } else { $ui.C.Gray })
+  if ($ui.Scaled) { & $ui.SetWrap $ui.Kick ([int]$ui.ContentW - $(if ($ui.Chip.Visible) { [int]$ui.Chip.PreferredSize.Width + (& $ui.Sc $ui.Z.G3) } else { 0 })) }   # the line in capitals beside the chip
+  foreach ($x in @($ui.PctRow, $ui.RunBar, $ui.RunRow)) { $x.Visible = [bool]$C.StepRow }
+  if (-not $C.StepRow) { $ui.RunA.Visible = $false; $ui.RunB.Visible = $false }
+  $ui.Todo.Visible = [bool]$C.Todo; $ui.TodoT.Text = [string]$C.Todo
+  $om = & $ui.Sc $(if (@($C.Options | Where-Object { $_ -and $_.Inline }).Count) { $ui.Z.G4 } else { $ui.Z.G6 }); $m = $ui.Opts.Margin   # one-line rows (Maintenance): 16 above the list
+  if ($m.Top -ne $om) { $ui.Opts.Margin = New-Object System.Windows.Forms.Padding($m.Left, $om, $m.Right, $m.Bottom) }
+  $ui.P[0].Font = $(if ($C.Strong) { $ui.F.Turn } else { $ui.F.Body }) }   # the Done card's summary line is strong
+# Says whether a button text fits the widest button (B1: 240 x 40) with the button's padding, as $ui.BtnSize measures it. A
+# main button whose text with " (Enter)" does not fit keeps its text alone (Enter still selects it). Takes the text.
+$ui.KeyFits = { param([string]$T) try { return ([int][System.Windows.Forms.TextRenderer]::MeasureText($T, $ui.F.SmallB).Width + (& $ui.Sc (2 * $ui.Z.G2)) -le (& $ui.Sc $ui.Z.WideW)) } catch { return $true } }   # no measure: the key shows
+$ui.SetButtons = {
+  <#
+  .SYNOPSIS
+  Fills the action row of a card: the primary button last (B3, B4) with its key in its text ("Done (Enter)"), Back at the
+  left end ("Back (Esc)" where Esc does Back), and Enter on the primary unless the card says NoAccept.
+  .PARAMETER C
+  The card: Buttons (Text, Kind, Act, Always; up to $ui.NB), Back, NoAccept.
+  .OUTPUTS
+  Nothing. Sets $ui.Acts, $ui.BOn, $ui.BMain, $ui.Always, $ui.Back, $ui.BackOn, $ui.First, $ui.Accept and the AcceptButton.
+  #>
+  param($C)
+  $bs = @(@($C.Buttons | Where-Object { $_ -and [string]$_.Kind -ne 'primary' }) + @($C.Buttons | Where-Object { $_ -and [string]$_.Kind -eq 'primary' }))
+  $ui.Acts = @(); $ui.First = $null; $ui.Accept = $null; $ui.BOn = @($false) * $ui.NB; $ui.BMain = @($false) * $ui.NB; $ui.Always = @($false) * $ui.NB
+  $ui.Back = $C.Back; $ui.BackOn = ([bool]$C.Back -and -not $ui.RecOn); $ui.BackB.Visible = $ui.BackOn   # B6: Back at the left end of the action row
+  $ui.BackB.Text = $(if ($ui.EscViews -contains [string]$C.View) { 'Back (Esc)' } else { 'Back' }); $ui.BackB.AccessibleName = $ui.BackB.Text   # "(Esc)" only where Esc works
+  $ui.BoxNoEnter = [bool]$C.BoxNoEnter   # Enter in a box of this card answers nothing (the hand card's address box)
+  for ($k = 0; $k -lt $ui.NB; $k++) {
+    $b = $ui.B[$k]
+    if ($k -ge $bs.Count) { $b.Visible = $false; $ui.Acts += $null; continue }
+    $main = ([string]$bs[$k].Kind -eq 'primary'); $key = $(if ($main -and -not $C.NoAccept -and (& $ui.KeyFits ([string]$bs[$k].Text + ' (Enter)'))) { ' (Enter)' } else { '' })
+    $b.Text = [string]$bs[$k].Text + $key; & $ui.Style $b ([string]$bs[$k].Kind); $b.Visible = $true; $ui.Acts += $bs[$k].Act; $ui.BOn[$k] = $true; $ui.BMain[$k] = $main; $ui.Always[$k] = [bool]$bs[$k].Always
+    if ($b.Enabled -and -not $ui.First) { $ui.First = $b }; if ($b.Enabled -and -not $ui.Accept -and $main) { $ui.Accept = $b } }
+  & $ui.Apart
+  $ui.BtnRow.Visible = [bool]($bs.Count -or $ui.BackOn)
+  $ui.Form.AcceptButton = $(if ($C.NoAccept) { $null } else { $ui.Accept }); $ui.AcceptOn = $ui.Form.AcceptButton }   # Enter = the primary button ("(Enter)" in its text)

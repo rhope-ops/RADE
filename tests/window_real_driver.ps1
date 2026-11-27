@@ -33,11 +33,24 @@ function global:Save-RadeUninstall([string]$bp, [string]$nm) {
   # name and the result cards (the site is marked above; the steps are two of the app's own, as stand-ins: no run here).
   $keepU = $script:app.Uninstall; $script:app.Uninstall = @(@($script:app.Steps) | Select-Object -First 2)
   & $ui.VMaint $ui.MaintInst; Save-RadeCard 'maint-uninstall'
-  & $ui.VUninstall; Save-RadeCard 'unconfirm'
+  # engine-v48: the Backups card first (keep, the main button; or remove too), then the confirm card says the choice.
+  & $ui.VUninstall; Save-RadeCard 'unbackups'
+  $acc = $(if ($ui.Form.AcceptButton) { [string]$ui.Form.AcceptButton.Text } else { '' })
+  Write-Host ('WIN uninstall-backups view=' + $ui.View + ' main=' + $acc + ' back=' + $ui.BackB.Visible)
+  @($ui.B | Where-Object { $_.Visible -and $_.Text -like 'Remove the Backups folder too*' })[0].PerformClick(); Save-RadeCard 'unconfirm-remove'
+  # The choice sentence is in the third paragraph, before the last-app sentence when no other app has a record (run 223520b:
+  # an end-anchored match missed it). The shown text is the raw text with long words broken ($ui.BreakAll keeps $ui.Raw).
+  $said = { param($Want) [bool](@($ui.P | Where-Object { $_.Visible } | ForEach-Object { $e = $ui.Raw[$_]; $(if ($e -and [string]$_.Text -ceq [string]$e.Out) { [string]$e.Raw } else { [string]$_.Text }) } |
+        Where-Object { $_.Contains($Want) }).Count) }
+  Write-Host ('WIN uninstall-remove view=' + $ui.View + ' keep=' + [bool]$ui.UninstallKeep + ' choice=' + (& $said 'Your choice: remove the Backups folder too.'))
+  & $ui.VUninstall; @($ui.B | Where-Object { $_.Visible -and $_.Text -like 'Keep the Backups folder*' })[0].PerformClick(); Save-RadeCard 'unconfirm'
+  Write-Host ('WIN uninstall-keep view=' + $ui.View + ' keep=' + [bool]$ui.UninstallKeep + ' choice=' + (& $said 'Your choice: keep the Backups folder.'))
   Write-Host ('WIN uninstall-confirm view=' + $ui.View + ' danger=' + [bool]@($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Uninstall' -and $ui.Kinds[$_] -eq 'danger' }).Count)
   $ui.Field.Text = 'wrong name'; & $ui.UninstallGo; Save-RadeCard 'unconfirm-wrongname'
-  & $ui.ToolResult 'Uninstall' @{ State = 'done'; Path = (Join-Path $bp 'Uninstall\uninstall-20261125-140000.txt'); Lines = @('Sample app (deploy) is uninstalled from the test site. 2 of 2 steps done.',
-      'Your local files and the backups stay on this computer.', ('Test site: ' + $nm), 'Backup: 20261125-135900 (2 lists)', 'U01: PASSED (2 passed, 0 failed, exit code 0) in 12s', 'U02: PASSED (confirmed by you) in 1m 5s') }
+  # engine-v48: the Done lines of the clean-up (Invoke-Uninstall, Get-CleanLine), Backups kept; the path is the Backups folder.
+  & $ui.ToolResult 'Uninstall' @{ State = 'done'; Path = (Join-Path $bp 'Backups'); Lines = @('Sample app (deploy) is uninstalled from the test site. 2 of 2 steps done.',
+      'Moved to the Recycle Bin: 6 items of the app folder, 3 runner copy files, 1 shortcut, 1 install record.', ('The Backups folder stays on this computer: ' + (ConvertTo-Masked (Join-Path $bp 'Backups'))),
+      ('Test site: ' + $nm), 'Backup: 20261125-135900 (2 lists)', 'U01: PASSED (2 passed, 0 failed, exit code 0) in 12s', 'U02: PASSED (confirmed by you) in 1m 5s') }
   Save-RadeCard 'toolres-uninstall'
   & $ui.ToolResult 'Uninstall' @{ State = 'review'; Path = (Join-Path $bp 'Uninstall\uninstall-20261125-141000.txt'); Lines = @('Uninstall stopped at "Remove the lists". 0 of 2 steps done.',
       'Read the report, fix the cause, then select "Uninstall" again. The backups stay on this computer.', ('Test site: ' + $nm), 'U01: NEEDS REVIEW (1 passed, 1 failed, exit code 0) in 9s', 'Not run: 1 step(s) after "Remove the lists".') }
@@ -46,12 +59,6 @@ function global:Save-RadeUninstall([string]$bp, [string]$nm) {
       '1 of 2 lists were not saved.') }
   Save-RadeCard 'toolres-uninstall-nobackup'
   $script:app.Uninstall = $keepU
-  # Remove RADE (engine-v40, E3 b): the block card (this app is installed here) and the confirm card (drawn as is: no run).
-  & $ui.VRemoveRade; Save-RadeCard 'rmblock'
-  $what = 'RADE moves these to the Recycle Bin: RADE\Config, the RADE runners, the shortcuts RADE made, and the files in each app folder. The Backups folders stay.'   # as engine/ps/window/11-tools.ps1 (engine-v42)
-  & $ui.SetCard @{ View = 'rmrade'; Light = 'you'; Sentence = 'Remove RADE from this computer?'; P = @('No app is installed.', $what, 'To use RADE again later, paste a RADE script again.')
-    Field = @{ Label = 'Type RADE to confirm'; Text = ''; Name = 'The word RADE, to confirm Remove RADE' }; Focus = 'field'; Buttons = @(@{ Text = 'Remove RADE'; Kind = 'danger'; Act = {} }); Back = { & $ui.VChoose } }
-  Save-RadeCard 'rmrade'
   # Back up (engine-v42; 90-161.Z R44 E4), for the PFM's preview: the card while it runs (the Alt+Tab line), a result
   # with the sign-in time and a result of a stage past its time limit (fake data; nothing runs).
   & $ui.SetCard @{ View = 'toolrun'; Kicker = 'MAINTENANCE'; Sentence = 'Back up is running.'; P = @('Reads the lists and saves them on this computer. Nothing on the site changes. ' + $ui.SignInHint) }
@@ -154,9 +161,9 @@ function global:Save-RadeCard([string]$Tag) {
   if ($ui.Scrolls -and -not $ui.RecOn) { try { $y0 = $ui.Scroll.AutoScrollPosition.Y; $ev = New-Object System.Windows.Forms.HandledMouseEventArgs('None', 0, 0, 0, -120)
       [System.Windows.Forms.Control].GetMethod('OnMouseWheel', [System.Reflection.BindingFlags]'NonPublic, Instance').Invoke($ui.Sent, [object[]]@($ev.PSObject.BaseObject))   # as Windows raises it on the headline: only the hook of $ui.WheelOn hands it on
       Write-Host ('WIN wheel ' + $card + ' moved=' + ($ui.Scroll.AutoScrollPosition.Y -ne $y0)); $ui.Scroll.AutoScrollPosition = New-Object System.Drawing.Point(0, 0) } catch { Write-Host ('WIN wheel ' + $card + ' error=' + $_.Exception.Message) } }
-  # R32 measures (screen pixels, top/height): the bottom line's two texts, the header's widths, and on the Run card the step row.
+  # R32 measures (screen pixels, top/height): the bottom line's two texts, the band and its line, and on the Run card the step row.
   try { $sr = { param($C) $q = $C.RectangleToScreen($C.ClientRectangle); [string]$q.Top + '/' + $q.Height }
-    $m = 'WIN r32 ' + $card + ' rec=' + (& $sr $ui.RecB) + ' right=' + (& $sr $ui.RightL) + ' word=' + $ui.WordL.Width + ' rule=' + $ui.HeadRule.Width + ' app=' + $ui.AppL.Width
+    $m = 'WIN r32 ' + $card + ' rec=' + (& $sr $ui.RecB) + ' right=' + (& $sr $ui.RightL) + ' band=' + (& $sr $ui.Band) + ' word=' + $ui.BandWord.Width + ' stage=' + $ui.Stage.Width + ' line=' + (& $sr $ui.Light)
     if ($ui.View -eq 'run') { $m += ' name=' + (& $sr $ui.StepName) + ' bar=' + (& $sr $ui.StepBar) + '/m' + $ui.StepBar.Margin.Top + ' time=' + (& $sr $ui.StepTime) + '/m' + $ui.StepTime.Margin.Top + '/pref' + $ui.StepTime.PreferredSize.Height + ' [' + $ui.StepTime.Text + '] now=' + (& $sr $ui.Now) + '/m' + $ui.Now.Margin.Top + '/' + $ui.Now.Visible + ' row=' + $ui.StepRow.Height + ' frac=' + (& $sr $ui.StepFrac) }
     Write-Host $m } catch { Write-Host ('WIN r32 ' + $card + ' error=' + $_.Exception.Message) }
 }
@@ -173,11 +180,16 @@ function global:Get-RadeMain { $m = @($ui.B | Where-Object { $_.Visible -and [st
 # Prints the action row of the card on screen: its wrap width, the text column, and each button's place and left margin.
 function global:Write-RadeRow { Write-Host ('WIN row max=' + $ui.BtnRow.MaximumSize.Width + ' cw=' + $ui.ContentW + ' w=' + $ui.BtnRow.Width + ' ' + ((@(@($ui.BackB) + @($ui.B)) | Where-Object { $_.Visible } |
     ForEach-Object { $_.Text + ':' + $_.Left + '/' + $_.Top + '/' + $_.Width + '/m' + $_.Margin.Left }) -join ' ')) }
+# Plan engine-v48: the not-installed card (its one Install button), and on the first Run card the Cancel question, drawn
+# once, then "Keep installing" (the Run card again). Takes the view.
+function global:Step-RadeV48([string]$V) {
+  if ($V -eq 'notinst') { (Get-RadeMain).PerformClick(); return }
+  $global:RadeT.CancelQ = $true; & $ui.VCancelQ; Save-RadeCard 'cancelq'; & $ui.ShowRun }
 function global:Step-Rade {
   if (((Get-Date) - $global:RadeT.T0).TotalSeconds -gt 240) { Write-Host ('WIN TIMEOUT view=' + $ui.View + ' sent=' + $ui.Sent.Text); [Environment]::Exit(3) }
   if (-not $ui -or -not $ui.Form -or $ui.Form.IsDisposed -or -not $ui.Form.Visible -or -not $ui.View) { return }
   if (-not $global:RadeT.Env) {
-    $global:RadeT.Env = $true; $sc = [System.Windows.Forms.Screen]::PrimaryScreen; Write-Host ('WIN high=' + [bool]$ui.High + ' fonts=' + $ui.FontNote + ' standard=' + $ui.Standard)
+    $global:RadeT.Env = $true; $sc = [System.Windows.Forms.Screen]::PrimaryScreen; Write-Host ('WIN high=' + [bool]$ui.High + ' dark=' + [bool]$ui.Dark + ' fonts=' + $ui.FontNote + ' standard=' + $ui.Standard)
     Write-Host ('WINENV ps=' + $PSVersionTable.PSVersion + ' dpi=' + $ui.Dpi + ' screen=' + $sc.Bounds.Width + 'x' + $sc.Bounds.Height + ' working=' + $sc.WorkingArea.Width + 'x' + $sc.WorkingArea.Height + ' form=' + $ui.Form.Width + 'x' + $ui.Form.Height + ' interactive=' + [Environment]::UserInteractive)
     foreach ($k in @($ui.F.Keys | Sort-Object)) { $f = $ui.F[$k]; Write-Host ('MEASURE ' + $k + ' ' + $f.Name + ' ' + $f.SizeInPoints + ' ' + $f.Style + ' = ' + [System.Windows.Forms.TextRenderer]::MeasureText('The quick brown fox jumps over the lazy dog 0123456789', $f, (New-Object System.Drawing.Size(9999, 99)), [System.Windows.Forms.TextFormatFlags]'NoPadding, NoPrefix, SingleLine').Width + ' h=' + [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $f).Height) }
   }
@@ -200,6 +212,7 @@ function global:Step-Rade {
     Write-Host 'WIN BAD no choice for the application'; [Environment]::Exit(4)
   }
   elseif ($v -eq 'maint') { Write-RadeRow; if (-not $global:RadeT.ToolsDone) { $global:RadeT.ToolsDone = $true; Save-RadeTools } else { & $ui.OnOpt 10 } }   # the Maintenance card (the Restore cards once), then the Repair or Update row (Start would start the application)
+  elseif ($v -eq 'notinst' -or ($v -eq 'run' -and $ui.Running -and $ui.StepI -and -not $global:RadeT.CancelQ)) { Step-RadeV48 $v }   # plan engine-v48: the not-installed card, the Cancel question
   elseif ($v -eq 'site') { $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }
   elseif ($v -in 'fail', 'need') {
     $id = [string]@($script:appChecks)[([int]($ui.Kick.Text -replace '^CHECK (\d+) OF .*$', '$1')) - 1]
@@ -212,7 +225,7 @@ function global:Step-Rade {
   }
   elseif ($v -eq 'ready') {
     if (-not $global:RadeT.Opened) { $global:RadeT.Opened = $true; & $ui.VRecord; Save-RadeCard 'record'; & $ui.CloseRecord }
-    $ib = @($ui.B | Where-Object { $_.Visible -and $_.Text -in 'Install', 'Run' })[0]; $ib.PerformClick()
+    $ib = @($ui.B | Where-Object { $_.Visible -and $_.Text -in 'Install', 'Run', 'Install (Enter)', 'Run (Enter)' })[0]; $ib.PerformClick()
   }
   elseif ($v -eq 'hand') {
     if (-not $global:RadeT.NoAddr -and $ui.FieldRow.Visible) {   # R28 N1: the same step with no address: no address row (its own picture and self-check)
@@ -222,11 +235,10 @@ function global:Step-Rade {
     $hf = @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'It failed' })[0]   # B3: Done (primary) is the last button
     if (-not $hf) { (Get-RadeMain).PerformClick() } elseif ($global:RadeT.Hand -eq 'fail') { $hf.PerformClick() } else { (Get-RadeMain).PerformClick() }
   }
-  elseif ($v -eq 'answer') {
-    if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }; Step-RadeR31 $v }
+  elseif ($v -eq 'answer') { if ($ui.FieldRow.Visible) { $ui.Field.Text = 'Sample note' }; Step-RadeR31 $v }
   elseif ($v -in 'tour', 'answerfail', 'feedback') { Step-RadeR31 $v }
   elseif ($v -eq 'handfail') { $ui.ErrBox.Text = 'Import failed: flow https://usaf.dps.mil/sites/fake/x not found'; $ui.B[0].PerformClick() }
-  elseif ($v -in 'done', 'review', 'stopped') {
+  elseif ($v -in 'done', 'review', 'stopped', 'stepfail') {
     foreach ($l in @($ui.Log)) { if ([string]$l -match 'failed|FAILED|STOPPED|could not') { Write-Host ('WIN log ' + ([string]$l).Trim()) } }
     & $ui.VRecord; Save-RadeCard ($v + '-record'); & $ui.CloseRecord
     $ll = @((& $ui.LayLine) -split "`r`n"); Write-Host ('WIN line ' + $ll[0]); foreach ($l in $ll) { if ($l -like 'SCALE *') { Write-Host ('WIN ' + $l) } }   # the scaling facts (numbers only)

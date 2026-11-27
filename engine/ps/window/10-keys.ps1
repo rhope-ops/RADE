@@ -2,7 +2,7 @@
 # saved and restored, and the call that shows the form. It is the last window part.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
-# ---- Keys: F1 = Help (the RADE tour); F2 = the Record (Page Down and Page Up move its check list, and on a card that is taller than the window its text); Esc = close the Record, else Back, and on Choose (no Back) it exits; 1 to 9 = a choice. Tab reaches every control.
+# ---- Keys: F1 = Help (the RADE tour); F2 = the Record (Page Down and Page Up move its check list, and on a card that is taller than the window its text); Esc = close the Record, else Back where $ui.EscViews says, the Cancel question on Run, and on Choose (no Back) it exits; Enter = the main button; 1 to 9 = a choice.
 $ui.Form.Add_KeyDown({
   $k = [string]$_.KeyCode
   if ($_.Control -and $k -eq 'C' -and (& $ui.CopyText $ui.Form.ActiveControl)) { $_.SuppressKeyPress = $true }   # Ctrl+C copies the selected card text
@@ -13,7 +13,10 @@ $ui.Form.Add_KeyDown({
     $_.SuppressKeyPress = $true; try { $y = [math]::Abs($ui.RecScroll.AutoScrollPosition.Y) + $(if ($k -in 'PageDown', 'Next') { 1 } else { -1 }) * [math]::Max((& $ui.Sc 40), $ui.RecScroll.ClientSize.Height - (& $ui.Sc 40)); $ui.RecScroll.AutoScrollPosition = New-Object System.Drawing.Point(0, [math]::Max(0, $y)) } catch { $null = $_ } }
   elseif (-not $ui.RecOn -and $ui.Scrolls -and $k -in 'PageDown', 'Next', 'PageUp', 'Prior' -and -not (& $ui.InField)) {   # the text of a card that is taller than the window, by keyboard
     $_.SuppressKeyPress = $true; try { $y = [math]::Abs($ui.Scroll.AutoScrollPosition.Y) + $(if ($k -in 'PageDown', 'Next') { 1 } else { -1 }) * [math]::Max((& $ui.Sc 40), $ui.Scroll.ClientSize.Height - (& $ui.Sc 40)); $ui.Scroll.AutoScrollPosition = New-Object System.Drawing.Point(0, [math]::Max(0, $y)) } catch { $null = $_ } }
-  elseif ($k -eq 'Escape') { $_.SuppressKeyPress = $true; if ($ui.RecOn) { & $ui.CloseRecord } elseif ($ui.Back -and -not $ui.Busy -and -not $ui.Running) { & $ui.Back } elseif ($ui.View -eq 'choose' -and -not $ui.Busy) { $ui.Form.Close() } }
+  elseif ($k -eq 'Escape') { $_.SuppressKeyPress = $true   # Cards v2: Back only where it is safe ($ui.EscViews); on the Run card the Cancel question; else nothing
+    if ($ui.RecOn) { & $ui.CloseRecord } elseif ($ui.View -eq 'run' -and $ui.Running) { & $ui.VCancelQ } elseif ($ui.Back -and $ui.EscViews -contains $ui.View -and -not $ui.Busy -and -not $ui.Running) { & $ui.Back } elseif ($ui.View -eq 'choose' -and -not $ui.Busy) { $ui.Form.Close() } }
+  elseif ($k -in 'Return', 'Enter' -and -not $ui.RecOn -and $ui.Form.AcceptButton -and -not ($ui.BoxNoEnter -and (& $ui.InField)) -and -not (($ui.Form.ActiveControl -is [System.Windows.Forms.TextBoxBase]) -and -not $ui.Form.ActiveControl.ReadOnly -and $ui.Form.ActiveControl.Multiline)) {
+    $_.SuppressKeyPress = $true; $ui.Form.AcceptButton.PerformClick() }   # Enter = the main button also when the card's text has the focus (a box that takes several lines keeps its Enter)
   elseif ($k -match '^(D|NumPad)([1-9])$' -and -not $ui.RecOn -and -not $ui.Busy -and $ui.Opts.Visible -and -not (& $ui.InField)) {
     $n = [int]$Matches[2]; foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Key -eq $n) { $_.SuppressKeyPress = $true; $o.PerformClick(); break } } } })
 # Window size and place (R28, the Administrator, 2026-11-17): the window opens where the user last closed it (RADE\Config\rade-window.json;

@@ -268,26 +268,27 @@ def engine_for_app(ui_text):
     return engine.replace('@@HOME@@', APP['home']).replace('@@PREFIX@@', APP['prefix']).replace('@@APP@@', APP['folder'])
 
 
-def app_logo_bytes():
-    """Return the bytes of the application's logo: the PNG file that the manifest's application.logo names (a path in
-    the application repo), or no bytes when it names none. The window shows it under the RADE logo once the user
-    chooses the application (the Administrator, 2026-11-18). Stops the build when the path leaves the application repo
-    (an absolute path, a '..' part, or a link that resolves outside), or when the file is missing or is not a PNG.
+def app_logo_bytes(field='logo'):
+    """Return the bytes of the PNG that application.<field> names, or b'' when it names none. Stops the build on a path
+    that leaves the application repo, a missing file or not a PNG.
+
+    Args:
+        field: 'logo', or 'logoDark' (the logo of the dark mode, plan engine-v48 D6).
 
     Returns:
-        The PNG bytes, or b'' when application.logo is not set.
+        The PNG bytes, or b'' when the field is not set.
     """
-    rel = APP.get('logo')
+    rel = APP.get(field)
     if not rel:
         return b''
     path = (ROOT / rel).resolve()
     if rel.startswith('/') or '..' in Path(rel).parts or not path.is_relative_to(ROOT):
-        sys.exit('application.logo: the path must stay inside the application repo: ' + rel)
+        sys.exit('application.%s: the path must stay inside the application repo: %s' % (field, rel))
     if not path.is_file():
-        sys.exit('application.logo: no file at ' + rel)
+        sys.exit('application.%s: no file at %s' % (field, rel))
     data = path.read_bytes()
     if not data.startswith(b'\x89PNG\r\n\x1a\n'):
-        sys.exit('application.logo: not a PNG file: ' + rel)
+        sys.exit('application.%s: not a PNG file: %s' % (field, rel))
     return data
 
 
@@ -300,14 +301,14 @@ def bundle_body(b, ui_text):
     # Support scripts that keep their names (they load each other) and samples: made by the app, so cleanup may recycle them.
     known = sorted({f.name for d, pat in APP['knownDirs'] for f in (ROOT / d).glob(pat)})
     logo = base64.b64encode(LOGO.read_bytes()).decode('ascii')   # the window's logo
-    app_logo = base64.b64encode(app_logo_bytes()).decode('ascii')   # the application's logo under it ('' when none)
+    app_logo, app_dark = (base64.b64encode(app_logo_bytes(f)).decode('ascii') for f in ('logo', 'logoDark'))   # the application's logos ('' when none)
     go = q('https://raw.githubusercontent.com/' + APP['repo'] + '/main/go.md')
     rel = q('https://raw.githubusercontent.com/' + APP['repo'] + '/main/rade-release.json')
     parts = [
         ('Settings', ['$goUrl = %s' % go, '$releaseUrl = %s' % rel, "$webAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) RADE'",
-                      "$logoPng = '%s'" % logo, '$scriptExts = @(' + ', '.join(q(x) for x in SCRIPT_EXTS) + ')', "$appLogoPng = '%s'" % app_logo, rade_tokens.font_lines(),
-                      '$ownPatterns = @(' + ', '.join(q(p) for p in APP['own']) + ')', '$round = %s' % q(b['round']), '$appFolder = %s' % q(APP['folder']),
-                      '$appDisplay = %s' % q(APP.get('displayName', '')),
+                      "$logoPng = '%s'" % logo, '$scriptExts = @(' + ', '.join(q(x) for x in SCRIPT_EXTS) + ')', "$appLogoPng = '%s'" % app_logo,
+                      "$appLogoDarkPng = '%s'" % app_dark, rade_tokens.font_lines(), '$ownPatterns = @(' + ', '.join(q(p) for p in APP['own']) + ')',
+                      '$round = %s' % q(b['round']), '$appFolder = %s' % q(APP['folder']), '$appDisplay = %s' % q(APP.get('displayName', '')),
                       rade_fields.name_spot(APP), "$usersRoot = 'C:\\Users'"]),
         ('Shared blocks (%d): each is written back into the files that name it' % len(shared), ['$shared = @{}'] + shared),
         ('Files written to this computer (%d)' % len(b['files']), ['$files = @()'] + files),

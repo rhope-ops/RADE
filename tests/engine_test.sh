@@ -84,6 +84,16 @@ sed -i 's#"logo": "assets/sample-logo.png"#"logo": "../sample-logo.png"#' "$t/ap
 for bad in "/etc/sample-logo.png" "assets/../../sample-logo.png"; do sed -i "s#\"logo\": \"[^\"]*\"#\"logo\": \"$bad\"#" "$t/app/scripts/paste_bundles.json"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: the path must stay inside the application repo" "$t/lg.txt" && ok || bad "build stops on application logo $bad"; done
 sed -i 's#"logo": "[^"]*"#"logo": "assets/sample-logo.png"#' "$t/app/scripts/paste_bundles.json"
 mv "$t/sl.png" "$t/app/assets/sample-logo.png"; build || bad "rebuild after the application logo checks"
+# Dark is opt-in (review of PR 211): engine/rade_ui.ps1 alone takes the light set also when the Windows app mode says dark (an
+# app window copies that file); only the RADE window's setup reads the app mode. The probe with $ui.Dark set shows the test sees dark.
+[ "$(pwsh -NoProfile -Command 'function Get-ItemPropertyValue { 0 }; $t = Get-Content engine/rade_ui.ps1 -Raw; $a = $t.IndexOf("# ---- UI tokens"); $b = $t.IndexOf("# ---- Fonts, sizes and buttons")
+  foreach ($d in @($null, $true)) { $ui = @{ Dark = $d }; . ([scriptblock]::Create($t.Substring($a, $b - $a))); ($ui.C.White.ToArgb() -band 0xFFFFFF).ToString("X6") + "/" + $ui.Dark }' 2>&1 | tr '\n' ' ')" = "FFFFFF/False 15171D/True " ] &&
+  ! grep -q "AppsUseLightTheme" engine/rade_ui.ps1 && grep -q "^\$ui.Dark = \[bool\](& \$ui.DarkOn)$" engine/ps/window/01-setup.ps1 && ok || bad "dark is opt-in: rade_ui.ps1 alone is light; the RADE window reads the app mode"
+# application.logoDark (plan engine-v48 D6): the logo of the dark mode, with the rules of logo; without it the bundle's value is empty.
+grep -q "^\$appLogoDarkPng = ''$" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" && sed -i 's#"logo": "assets/sample-logo.png"#"logo": "assets/sample-logo.png", "logoDark": "assets/sample-logo.png"#' "$t/app/scripts/paste_bundles.json" &&
+  python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1 && grep -q "^\$appLogoDarkPng = 'iVBORw0KGgo" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" &&
+  sed -i 's#"logoDark": "assets/sample-logo.png"#"logoDark": "assets/no-such-logo.png"#' "$t/app/scripts/paste_bundles.json" && ! python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1 &&
+  grep -q "application.logoDark: no file at assets/no-such-logo.png" "$t/lg.txt" && sed -i 's#, "logoDark": "assets/no-such-logo.png"##' "$t/app/scripts/paste_bundles.json" && build && ok || bad "application.logoDark: in the bundle, and the build stops on a missing file"
 b="$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1"
 grep -q "Name = 'Sample app (deploy)'.*Mode = 'deploy'; Version = '1.0.0'" "$b" && ! grep "Name = 'Sample app (deploy)'" "$b" | grep -q "'outlook'" && ok || bad "catalog: deploy app has Mode, Version and no outlook check"
 grep "Name = 'Sample app'" "$b" | grep -q "'outlook'.*Mode = 'test'; Version = ''" && ok || bad "catalog: test app keeps the outlook check and Mode test"
@@ -127,8 +137,8 @@ case('case', case_sp, "answers: the choices of 'flow-count' must differ (case an
 P
 # ---- sizes and text lengths (docs/window-design.md "Sizes", "Text lengths"; the Administrator, 2026-11-15)
 # Every button is made with a named kind (its size is in $ui.Z), and no other place sets a button's size.
-# (The bottom line's own minimum height, 46, is not a button size: R24. The logo block has no minimum: it is as tall as its rows, 2026-11-18.)
-[ "$(cat $engine_src $ui_src | grep -o '& \$ui\.Btn [^;)]*' | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_ui.ps1 | wc -l)" = 1 ] && [ "$(cat $engine_src | grep -c 'MinimumSize = ')" = 4 ] && grep -q '^\$ui.Btn = { param(\[string\]\$Kind) \$b = New-Object System.Windows.Forms.Button; \$b.AutoSize = \$false;' engine/rade_ui.ps1 && grep -q 'ui.Head.MinimumSize = ' engine/ps/window/04-record-parts.ps1 && ok || bad "sizes: a button is made without a kind, or sets its own size"
+# (The bottom line's own minimum height, 46, is not a button size: R24. Cards v2: the running step's row and the WHAT TO DO box are as wide as the card's text.)
+[ "$(cat $engine_src $ui_src | grep -o '& \$ui\.Btn [^;)]*' | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_ui.ps1 | wc -l)" = 1 ] && [ "$(cat $engine_src | grep -c 'MinimumSize = ')" = 5 ] && grep -q '^\$ui.Btn = { param(\[string\]\$Kind) \$b = New-Object System.Windows.Forms.Button; \$b.AutoSize = \$false;' engine/rade_ui.ps1 && grep -q 'ui.Head.MinimumSize = ' engine/ps/window/04-record-parts.ps1 && ok || bad "sizes: a button is made without a kind, or sets its own size"
 grep -q 'ui.BtnRow.MinimumSize = ' engine/ps/window/04-record-parts.ps1 && ok || bad "sizes: the action row is as wide as the column (B3)"
 # The limits in the document are the limits of the build.
 python3 - <<'P' && ok || bad "text lengths: docs/window-design.md and TEXT_LIMITS (engine/rade_build.py) differ"
