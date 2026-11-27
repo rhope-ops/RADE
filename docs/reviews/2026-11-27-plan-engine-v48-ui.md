@@ -50,5 +50,6 @@ Released engine-v48 at 9b9b158 (PRs 211 and 212); the Windows job passed 16 of 1
 - Text mode has no Uninstall (window only, as before).
 - The engine test "r31 L6: the tour and Help" fails at random (also before engine-v48): find the cause.
 - After the last app's Uninstall, the same window saves no place or tour mark until it opens again.
+- Defect (found by the 90-161.Z R48 build): an Uninstall while a test round runs moves the whole app folder but Backups to the Recycle Bin, and a round uses the same folder (its task folders, Rounds\<round>, the round state); a test round writes no install record. Fix in the next engine: the clean-up keeps the folders of a running round (or Uninstall is off while a round runs). Until then rounds leave Uninstall out.
 - The Release Manager tags kit v15.1.0; then the kit sync to RADE and 90-161.Z.
 - R49: the Kanon window in the same style and dark mode, colors from engine/ui-tokens.json (90-161.Z DECISIONS 2026-11-27).
