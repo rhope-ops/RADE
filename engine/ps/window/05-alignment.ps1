@@ -253,7 +253,7 @@ $ui.PaintOpt = { param($P, $G)
     $yy = $y + $h1
     if ($o.Sub) { & $ui.Word $G ([string]$o.Sub) $(if ($o.Off) { $ui.F.SmallB } else { $ui.F.Small }) $(if ($o.Off -and -not $o.Soon) { $ui.C.Navy } else { $ui.C.Gray }) $x $yy $tw ($pl.S1 * $h2) $wrap; $yy += $pl.S1 * $h2 }
     if ($o.Sub2) { & $ui.Word $G ([string]$o.Sub2) $ui.F.Small $ui.C.Navy $x $yy $tw ($pl.S2 * $h2) $wrap; $yy += $pl.S2 * $h2 }
-    if ($pl.Under) { & $ui.Word $G ((@($o.R1, $o.R2) | Where-Object { $_ }) -join $dot) $ui.F.Small $ui.C.Navy $x $yy $tw $h2 $one; $yy += $h2 }
+    if ($pl.Under) { & $ui.Word $G ((@($o.R1, $o.R2) | Where-Object { $_ }) -join $dot) $ui.F.Small $(if ($o.Soon) { $ui.C.Gray } elseif ($o.Danger) { $ui.C.Red } else { $ui.C.Navy }) $x $yy $tw $h2 $one; $yy += $h2 }   # the row's own color: gray when not set up, dark red for Uninstall (review of PR 209)
     if ($o.Note) { & $ui.Word $G ([string]$o.Note) $ui.F.SmallB $ui.C.Navy $x $yy $tw ($pl.NL * $h2) $wrap }
     if ($rw -and -not $pl.Under) {
       $rx = $w - $pad - $rw
