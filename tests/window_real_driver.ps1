@@ -38,8 +38,13 @@ function global:Save-RadeUninstall([string]$bp, [string]$nm) {
   $acc = $(if ($ui.Form.AcceptButton) { [string]$ui.Form.AcceptButton.Text } else { '' })
   Write-Host ('WIN uninstall-backups view=' + $ui.View + ' main=' + $acc + ' back=' + $ui.BackB.Visible)
   @($ui.B | Where-Object { $_.Visible -and $_.Text -like 'Remove the Backups folder too*' })[0].PerformClick(); Save-RadeCard 'unconfirm-remove'
-  Write-Host ('WIN uninstall-remove view=' + $ui.View + ' keep=' + [bool]$ui.UninstallKeep + ' choice=' + [bool](@($ui.P | Where-Object { $_.Text -like '*Your choice: remove the Backups folder too.' }).Count))
+  # The choice sentence is in the third paragraph, before the last-app sentence when no other app has a record (run 223520b:
+  # an end-anchored match missed it). The shown text is the raw text with long words broken ($ui.BreakAll keeps $ui.Raw).
+  $said = { param($Want) [bool](@($ui.P | Where-Object { $_.Visible } | ForEach-Object { $e = $ui.Raw[$_]; $(if ($e -and [string]$_.Text -ceq [string]$e.Out) { [string]$e.Raw } else { [string]$_.Text }) } |
+        Where-Object { $_.Contains($Want) }).Count) }
+  Write-Host ('WIN uninstall-remove view=' + $ui.View + ' keep=' + [bool]$ui.UninstallKeep + ' choice=' + (& $said 'Your choice: remove the Backups folder too.'))
   & $ui.VUninstall; @($ui.B | Where-Object { $_.Visible -and $_.Text -like 'Keep the Backups folder*' })[0].PerformClick(); Save-RadeCard 'unconfirm'
+  Write-Host ('WIN uninstall-keep view=' + $ui.View + ' keep=' + [bool]$ui.UninstallKeep + ' choice=' + (& $said 'Your choice: keep the Backups folder.'))
   Write-Host ('WIN uninstall-confirm view=' + $ui.View + ' danger=' + [bool]@($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Uninstall' -and $ui.Kinds[$_] -eq 'danger' }).Count)
   $ui.Field.Text = 'wrong name'; & $ui.UninstallGo; Save-RadeCard 'unconfirm-wrongname'
   # engine-v48: the Done lines of the clean-up (Invoke-Uninstall, Get-CleanLine), Backups kept; the path is the Backups folder.

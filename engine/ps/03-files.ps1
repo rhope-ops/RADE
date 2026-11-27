@@ -30,12 +30,28 @@ function Get-CleanupPlan([string]$Base) {
   }
   return $res
 }
-function Move-ToRecycleBin([string]$Path, [switch]$Folder) {
-  # Windows: to the Recycle Bin (restore from there). Elsewhere (tests only): plain delete.
+<#
+.SYNOPSIS
+Moves a file or a folder to the Recycle Bin (Windows: restore from there). Elsewhere (tests only): a plain delete.
+.DESCRIPTION
+-AskFirst (engine-v48, review MINOR 3; the Uninstall clean-up of the app folder only): Windows shows its dialogs, so an
+item too large for the Recycle Bin is not deleted for good without a question; a cancel throws OperationCanceledException.
+Every other caller keeps OnlyErrorDialogs.
+.PARAMETER Path
+The file or folder.
+.PARAMETER Folder
+The path is a folder.
+.PARAMETER AskFirst
+Windows shows all its dialogs (UIOption AllDialogs).
+.OUTPUTS
+None.
+#>
+function Move-ToRecycleBin([string]$Path, [switch]$Folder, [switch]$AskFirst) {
   if ($env:OS -eq 'Windows_NT') {
     Add-Type -AssemblyName Microsoft.VisualBasic
-    if ($Folder) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($Path, 'OnlyErrorDialogs', 'SendToRecycleBin') }
-    else { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($Path, 'OnlyErrorDialogs', 'SendToRecycleBin') }
+    $ux = $(if ($AskFirst) { 'AllDialogs' } else { 'OnlyErrorDialogs' })
+    if ($Folder) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($Path, $ux, 'SendToRecycleBin') }
+    else { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($Path, $ux, 'SendToRecycleBin') }
   } else { Remove-Item -LiteralPath $Path -Force -Recurse:$Folder }
 }
 # Moves the files of the clean-up plan, then the folders left empty, to the Recycle Bin and says what it did. Takes the

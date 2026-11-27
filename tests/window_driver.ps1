@@ -370,7 +370,7 @@ function global:Test-RadeRecordOpen {
     & $ui.Next
   }
   elseif ($v -eq 'ready') {
-    Test-RadeStack
+    Test-RadeStack; Test-RadeV48Fact
     if ($env:RADE_T_START -eq 'maint') { return }   # Start on Maintenance: the window starts the application when the checks have passed
     if ($env:RADE_T_LINK -and $ui.FieldRow.Shown -and -not $global:RadeT.Linked) {   # R29 N8: a folder that does not exist is refused; then the folder of the test
       $global:RadeT.Linked = $true; $ui.Field.Text = (Join-Path $env:RADE_T_LINK 'no-such-folder'); Push-RadeButton 'Install'; Write-Host ('WIN link-bad view=' + $ui.View + ' note=' + $ui.Note.Text) }

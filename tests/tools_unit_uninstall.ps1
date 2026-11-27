@@ -35,8 +35,13 @@ Assert-Case 'uninstall: a backup that misses a list stops it before any step' ($
 # The Recycle Bin of the test (engine-v48): Move-ToRecycleBin moves each item into $bin and names it in $script:binLog,
 # so a case can read what went there (off Windows the engine's helper deletes for good; the real Recycle Bin is Windows only).
 $bin = Join-Path $Dir 'bin'; $null = New-Item -ItemType Directory -Path $bin -Force; $script:binLog = New-Object System.Collections.Generic.List[string]
-# Stands in for the engine's Move-ToRecycleBin (engine/ps/03-files.ps1). Takes the path and whether it is a folder.
-function Move-ToRecycleBin([string]$Path, [switch]$Folder) { $null = $Folder; $to = Join-Path $bin ([string]($script:binLog.Count + 1) + '-' + (Split-Path -Leaf $Path))
+$script:binAsk = New-Object System.Collections.Generic.List[string]; $script:binCancel = ''; $script:binFail = ''
+# Stands in for the engine's Move-ToRecycleBin (engine/ps/03-files.ps1). Takes the path, whether it is a folder and whether
+# Windows asks first (-AskFirst: logged in $script:binAsk; a path in $script:binCancel acts as a cancel of that question).
+function Move-ToRecycleBin([string]$Path, [switch]$Folder, [switch]$AskFirst) { $null = $Folder
+  if ($AskFirst) { $script:binAsk.Add($Path); if ($Path -eq $script:binCancel) { throw (New-Object System.OperationCanceledException) } }
+  if ($Path -eq $script:binFail) { throw (New-Object System.IO.IOException 'the file is in use') }
+  $to = Join-Path $bin ([string]($script:binLog.Count + 1) + '-' + (Split-Path -Leaf $Path))
   Move-Item -LiteralPath $Path -Destination $to; $script:binLog.Add($Path) }
 $rade = Join-Path $Dir 'RADE'; $rp = Get-RunnerPath
 # Makes the app's runner copy files (.ps1, .ico, .lnk.txt; the shortcut it names is not there, as off Windows). Takes nothing.
@@ -93,6 +98,13 @@ $u = Invoke-Uninstall $base $null $null $false
 Assert-Case 'uninstall (engine-v48): Backups removed: the whole app folder is in the Recycle Bin' ($u.State -eq 'done' -and -not (Test-Path -LiteralPath $base) -and
   @($script:binLog | Select-Object -Skip $n0) -contains $base -and $u.Lines[1] -eq 'Moved to the Recycle Bin: 1 app folder, 3 runner copy files, 1 install record.' -and
   @($u.Lines) -contains 'The Backups folder is in the Recycle Bin.' -and -not $u.Path -and (Test-Path -LiteralPath (Join-Path $rade 'Config\installed\bbbbbbbbbbbb.json')))
+Assert-Case 'uninstall (review MINOR 3): Windows asks first only for the app folder with its Backups folder (no delete for good without a question)' (
+  (@($script:binAsk) -join '|') -eq $base)
+# The person cancels that question of Windows: the app folder stays, and the Done card names it.
+$null = New-Item -ItemType Directory -Path $base -Force; Reset-SampleInstall; $script:binCancel = $base
+$u = Invoke-Uninstall $base $null $null $false; $script:binCancel = ''
+Assert-Case 'uninstall (review MINOR 3): a canceled move leaves the app folder; the Done card names it' ($u.State -eq 'done' -and (Test-Path -LiteralPath (Join-Path $base 'Backups')) -and
+  @($u.Lines) -contains ('Not moved: the app folder ' + $appFolder + '. You canceled the move.') -and $u.Lines[1] -eq 'Moved to the Recycle Bin: 3 runner copy files, 1 install record.')
 # Another app of the same paste (the same folder), and the same app on another site: the folder, the runner copy and the
 # shortcut that record uses stay.
 $null = New-Item -ItemType Directory -Path $base -Force; Reset-SampleInstall; $kSelf = Get-InstalledKey $script:app
@@ -120,14 +132,21 @@ Assert-Case 'uninstall (engine-v48): the app folder name test takes plain names 
 # names, the Backups folder and the files outside RADE stay.
 Remove-Item -LiteralPath (Join-Path $rade 'Config\installed\bbbbbbbbbbbb.json'); Set-Content -LiteralPath (Join-Path $rade 'rade-runner.ps1') -Value '# runner'
 $null = New-Item -ItemType Directory -Path (Join-Path $rade 'Other') -Force
-# First: the record cannot be saved after the clean-up (a stand-in Save-Uninstalled). The record and RADE\Config stay,
-# and the lines do not say "select Uninstall again" (the clean-up took the saved site).
+# First: the record cannot be saved (a stand-in Save-Uninstalled). The save comes before the clean-up (review MINOR 1),
+# so nothing moves: a retry finds every file, the saved site included; the lines say so.
 $keepSave = ${function:Save-Uninstalled}; ${function:Save-Uninstalled} = { param([bool]$Whole, [string]$Key) $null = $Whole; $null = $Key; 'the file is read-only' }
-$u = Invoke-Uninstall $base $null $null; ${function:Save-Uninstalled} = $keepSave
-Assert-Case 'uninstall (engine-v48): a record that cannot be saved after the clean-up stays, with RADE\Config; the lines say so' ($u.State -eq 'review' -and
-  (Test-Path -LiteralPath (Read-InstalledRaw $kSelf).Path) -and (Test-Path -LiteralPath (Join-Path $rade 'Config')) -and (Test-Path -LiteralPath (Join-Path $rade 'runners')) -and
-  $u.Lines[1] -like 'The install record stays: *' -and @($u.Lines) -contains 'NOTE: the install record could not be saved: the file is read-only' -and
-  -not (Test-Path -LiteralPath (Join-Path $base 'Uninstall')) -and $u.Path -eq (Join-Path $base 'Backups'))
+$n0 = $script:binLog.Count; $u = Invoke-Uninstall $base $null $null; ${function:Save-Uninstalled} = $keepSave
+Assert-Case 'uninstall (review MINOR 1): the record is saved before the clean-up; a record that cannot be saved moves nothing; the lines say so' ($u.State -eq 'review' -and
+  $script:binLog.Count -eq $n0 -and (Test-Path -LiteralPath (Read-InstalledRaw $kSelf).Path) -and (Test-Path -LiteralPath (Join-Path $rade 'Config')) -and
+  (Test-Path -LiteralPath $rp) -and (Test-Path -LiteralPath (Join-Path $base 'Config')) -and (Test-Path -LiteralPath (Join-Path $base 'U01')) -and
+  $u.Lines[0] -like '*Nothing on this computer was moved.' -and @($u.Lines) -contains 'NOTE: the install record could not be saved: the file is read-only' -and
+  $u.Path -like '*uninstall-*.txt' -and (Test-Path -LiteralPath $u.Path))
+# Then: the record cannot move to the Recycle Bin (in use). It is still a record, so RADE\Config stays (review MINOR 2).
+Reset-SampleInstall; $script:binFail = (Read-InstalledRaw $kSelf).Path
+$u = Invoke-Uninstall $base $null $null; $script:binFail = ''
+Assert-Case 'uninstall (review MINOR 2): a record that did not move keeps RADE\Config (the last-app test counts it)' ($u.State -eq 'done' -and
+  (Test-Path -LiteralPath (Read-InstalledRaw $kSelf).Path) -and (Test-Path -LiteralPath (Join-Path $rade 'Config')) -and -not $script:radeConfigGone -and
+  @($u.Lines) -contains 'Not moved: the install record [IOException]')
 Reset-SampleInstall
 $u = Invoke-Uninstall $base $null $null
 Assert-Case 'uninstall (engine-v48): the last app clears RADE shared files; Backups, other folders and files outside RADE stay' ($u.State -eq 'done' -and

@@ -99,9 +99,10 @@ Stops before any step when the site is not a test site or the backup missed a li
 process with the step contract and RADE_MODE=uninstall, RADE_MADE (Invoke-RoundStep); a script step that only prints
 SKIP found nothing to remove and counts as done. A hand step shows its card (Invoke-GuideStep); Skip there is not done.
 The first step that is not done stops the run: the steps after it do not run (they can need it), and nothing on this
-computer moves. engine-v48 (DECISIONS 2026-11-26): every step done, the clean-up runs (Get-UninstallCleanPlan), then
-Save-Uninstalled, then the record goes to the Recycle Bin (Clear-UninstallRecord). A whole Uninstall writes no report
-file (the app folder goes): its lines are the report.
+computer moves. engine-v48 (DECISIONS 2026-11-26; order: review of engine-v48, MINOR 1): every step done,
+Save-Uninstalled first (a record that cannot be saved: nothing moves), then the clean-up (Get-UninstallCleanPlan), then
+the record goes to the Recycle Bin (Clear-UninstallRecord). A whole Uninstall writes no report file (the app folder
+goes): its lines are the report.
 .PARAMETER Base
 The RADE app folder.
 .PARAMETER Tick
@@ -142,26 +143,26 @@ function Invoke-Uninstall([string]$Base, [scriptblock]$Tick, [scriptblock]$OnSte
   finally { $script:stepEnvExtra = $null }
   $whole = ($done -eq $all.Count)
   $left = $all.Count - $done - 1; if (-not $whole -and $left -gt 0) { $lines += ('Not run: ' + $left + ' step(s) after "' + $stop + '".') }
-  $key = Get-InstalledKey $script:app; $tally = @{ Moved = @{}; Bad = New-Object System.Collections.Generic.List[string] }; $cl = @()   # the key before the clean-up (Save-Uninstalled)
+  $key = Get-InstalledKey $script:app; $tally = @{ Moved = @{}; Bad = New-Object System.Collections.Generic.List[string] }; $cl = @()   # the key before the clean-up
+  # Review of engine-v48 (MINOR 1): the record first. It needs nothing the clean-up moves; if it cannot be saved, nothing moves.
+  $sv = Save-Uninstalled $whole $key; $noRec = [bool]($sv -and $whole)
+  if ($sv) { $lines += ('NOTE: the install record could not be saved: ' + $sv); $whole = $false }   # the record still says installed: every file stays
   # A whole Uninstall ends saved progress of this round too: a later install must not resume and keep steps whose items are gone.
   if ($whole) { $cs = Clear-RoundState $Base; if ($cs) { $lines += ('NOTE: the saved progress of this round could not be removed: ' + $cs) }
-    $plan = Get-UninstallCleanPlan $Base $KeepBackups $key; foreach ($r in @($plan.Refused)) { $tally.Bad.Add($r) }; Invoke-CleanItem $plan.Items $tally }
-  $sv = Save-Uninstalled $whole $key; $noRec = [bool]($sv -and $whole)
-  if ($sv) { $lines += ('NOTE: the install record could not be saved: ' + $sv); $whole = $false }   # the record still says installed: it stays
-  if ($whole) { Clear-UninstallRecord $key $tally }
-  if ($whole -or $noRec) { $cl = @(Get-CleanLine $tally $Base) }
+    $plan = Get-UninstallCleanPlan $Base $KeepBackups $key; foreach ($r in @($plan.Refused)) { $tally.Bad.Add($r) }; Invoke-CleanItem $plan.Items $tally
+    Clear-UninstallRecord $key $tally; $cl = @(Get-CleanLine $tally $Base) }
   $head = $(if ($whole) { $script:app.Name + ' is uninstalled from the test site. ' + $done + ' of ' + $all.Count + ' steps done.' }
-    elseif ($noRec) { 'Every Uninstall step is done, but RADE could not save the install record.' }
+    elseif ($noRec) { 'Every Uninstall step is done, but RADE could not save the install record. Nothing on this computer was moved.' }
     else { 'Uninstall stopped at "' + $stop + '". ' + $done + ' of ' + $all.Count + ' steps done.' })
   $tail = $(if ($whole) { $cl[0] }
-    elseif ($noRec) { 'The install record stays: the app shows as installed. To run Uninstall again, first restore the app files from the Recycle Bin.' }   # the clean-up took the saved site
+    elseif ($noRec) { 'Select "Uninstall" again: RADE saves a backup, runs the steps again and tries to save the record.' }
     else { 'Read the report, fix the cause, then select "Uninstall" again. The backups stay on this computer.' })
   if ($whole) { $cl = @($cl | Select-Object -Skip 1) }
   $p = ''; $bk = Join-Path $Base 'Backups'
-  if ($whole -or $noRec) { if (Test-Path -LiteralPath $bk -PathType Container) { $p = $bk } }   # the folder that stays; no report file: the clean-up took the app folder
+  if ($whole) { if (Test-Path -LiteralPath $bk -PathType Container) { $p = $bk } }   # the folder that stays; no report file: the clean-up took the app folder
   elseif (Test-Path -LiteralPath $Base -PathType Container) {
     try { $p = Join-Path (Join-Path $Base 'Uninstall') ('uninstall-' + $stamp + '.txt')
-      Write-FileWhole $p ((@($head, '') + $cl + $lines + @('', 'Log:') + @($log) -join "`r`n") + "`r`n") } catch { $p = '' } }
+      Write-FileWhole $p ((@($head, '') + $lines + @('', 'Log:') + @($log) -join "`r`n") + "`r`n") } catch { $p = '' } }
   return @{ State = $(if ($whole) { 'done' } else { 'review' }); Path = $p; Lines = @(@($head, $tail) + $cl + $lines) }
 }
 
@@ -220,7 +221,7 @@ $true keeps the Backups folder.
 .PARAMETER Key
 This app's record key.
 .OUTPUTS
-@{ Items; Refused }: Items are @{ P (path); F (a folder); Kind; N (its name in a line) }; Refused are "Not moved" lines.
+@{ Items; Refused }: Items are @{ P (path); F (a folder); Kind; N (its name in a line); Ask (the app folder: Windows asks before a delete for good) }; Refused are "Not moved" lines.
 #>
 function Get-UninstallCleanPlan([string]$Base, [bool]$KeepBackups, [string]$Key) {
   $items = @(); $no = @(); $others = @(Get-OtherRecordKey $Key); $name = [string]$script:app.Name
@@ -231,7 +232,7 @@ function Get-UninstallCleanPlan([string]$Base, [bool]$KeepBackups, [string]$Key)
     $no += ('Not moved: the app folder ' + (ConvertTo-Masked $Base) + '. It is not an app folder in the RADE folder.') }
   elseif ($sameDir) { $no += 'Not moved: the app folder. Another install record on this computer uses it.' }
   elseif (Test-Path -LiteralPath $bp -PathType Container) {
-    if (-not $KeepBackups) { $items += @{ P = $bp; F = $true; Kind = 'appdir'; N = ('the app folder ' + $appFolder) } }
+    if (-not $KeepBackups) { $items += @{ P = $bp; F = $true; Kind = 'appdir'; Ask = $true; N = ('the app folder ' + $appFolder) } }   # Ask: review MINOR 3
     else { foreach ($c in @(Get-ChildItem -LiteralPath $bp -Force | Where-Object { $_.Name -ne 'Backups' })) {
         $items += @{ P = $c.FullName; F = [bool]$c.PSIsContainer; Kind = 'app'; N = ($appFolder + '\' + $c.Name) } } } }
   if ($sameApp) { $no += 'Not moved: the runner copy and the shortcut. Another install record of this app uses them.'; return @{ Items = $items; Refused = $no } }
@@ -260,8 +261,9 @@ function Invoke-CleanItem($Items, $Tally) {
   foreach ($i in @($Items | Where-Object { $_ })) {
     $ok = $(if ($i.Kind -eq 'shortcut') { [string]$i.P -match '\.lnk$' } else { Test-InRadeFolder $i.P })
     if (-not $ok) { $Tally.Bad.Add('Not moved: ' + $i.N + '. It is not in the RADE folder.'); continue }
-    try { Move-ToRecycleBin $i.P -Folder:([bool]$i.F); $Tally.Moved[$i.Kind] = 1 + [int]$Tally.Moved[$i.Kind] }
-    catch { $Tally.Bad.Add('Not moved: ' + $i.N + ' [' + $_.Exception.GetType().Name + ']') } }
+    try { Move-ToRecycleBin $i.P -Folder:([bool]$i.F) -AskFirst:([bool]$i.Ask); $Tally.Moved[$i.Kind] = 1 + [int]$Tally.Moved[$i.Kind] }
+    catch { $ty = $_.Exception.GetType().Name   # the person canceled the question of Windows (-AskFirst): the item stays
+      $Tally.Bad.Add($(if ($ty -eq 'OperationCanceledException') { 'Not moved: ' + $i.N + '. You canceled the move.' } else { 'Not moved: ' + $i.N + ' [' + $ty + ']' })) } }
 }
 
 <#
@@ -279,8 +281,8 @@ The counts and lines of the clean-up (Invoke-CleanItem).
 None.
 #>
 function Clear-UninstallRecord([string]$Key, $Tally) {
-  Invoke-CleanItem @(@{ P = (Get-InstalledFile $Key); F = $false; Kind = 'record'; N = 'the install record' }) $Tally
-  if (@(Get-OtherRecordKey $Key).Count) { return }
+  $rec = Get-InstalledFile $Key; Invoke-CleanItem @(@{ P = $rec; F = $false; Kind = 'record'; N = 'the install record' }) $Tally
+  if ((Test-Path -LiteralPath $rec) -or @(Get-OtherRecordKey $Key).Count) { return }   # review MINOR 2: a record that did not move is still a record
   $root = Get-RadePath
   $shared = @(@{ P = (Join-Path $root 'Config'); F = $true; Kind = 'shared'; N = 'RADE\Config' }, @{ P = (Join-Path $root 'runners'); F = $true; Kind = 'shared'; N = 'RADE\runners' },
     @{ P = (Join-Path $root 'rade-runner.ps1'); F = $false; Kind = 'shared'; N = 'RADE\rade-runner.ps1' })
