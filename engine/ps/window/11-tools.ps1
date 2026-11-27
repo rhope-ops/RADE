@@ -210,7 +210,7 @@ $ui.VUninstall = {
   $ui.UninstallSite = [string]$siteCheck.Name; $all = @($script:app.Uninstall); $n = @($script:app.Backup).Count
   $rows = @(for ($i = 0; $i -lt $all.Count; $i++) { $st = $steps[[int]$all[$i]]
       ([string]($i + 1) + '. ' + (Get-StepTitle $st) + $(if ($st.Kind -eq 'guide') { ' (you do this step)' } else { '' })) })
-  $what = 'RADE first backs up ' + $n + ' list(s). Then it runs these ' + $all.Count + ' steps of ' + $script:app.Name + '.'
+  $what = 'RADE first backs up ' + $n + ' list(s). Then it runs ' + $(if ($all.Count -eq 1) { 'this step' } else { 'these ' + $all.Count + ' steps' }) + ' of ' + $script:app.Name + '.'
   $what += ' They remove what the install made on the site.'
   # engine-v48 (DECISIONS 2026-11-26): after the steps, the clean-up (Invoke-Uninstall, part 13); the last app's also takes RADE's shared files.
   $clean = 'After the steps, RADE moves the app files, the runner copy, the shortcut and the install record to the Recycle Bin. The Backups folder stays.'

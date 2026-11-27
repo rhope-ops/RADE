@@ -43,7 +43,7 @@ function Get-AppFact($A, $Hist) {
   foreach ($k in $A.Steps) { $est += (Get-StepWeight $Hist $steps[$k]).Seconds; if ($steps[$k].Kind -eq 'guide') { $you++ } }
   $n = @($A.Steps).Count
   $t = [string]$n + $(if ($n -eq 1) { ' step' } else { ' steps' }) + $(if ($you) { ', ' + $you + $(if ($you -eq 1) { ' needs you' } else { ' need you' }) } else { '' })
-  $t += $dot + 'about ' + [math]::Max(1, [int][math]::Round($est / 60)) + ' min' + $dot + @($A.Checks).Count + ' checks'
+  $t += $dot + 'about ' + [math]::Max(1, [int][math]::Round($est / 60)) + ' min' + $dot + @($A.Checks).Count + $(if (@($A.Checks).Count -eq 1) { ' check' } else { ' checks' })
   $i = Get-InstalledText $A; if ($i) { $i = $i.Substring(0, 1).ToUpperInvariant() + $i.Substring(1) }
   return @{ Steps = $t; Installed = $i }
 }

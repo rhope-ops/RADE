@@ -227,7 +227,7 @@ $ui.VFail = { param([int]$I, [int]$Count)
   & $ui.SetCard @{ View = 'fail'; Light = 'bad'; Kicker = ('Check ' + ($I + 1) + ' of ' + $ids.Count + $dot + 'FAILED'); Sentence = $(if ($Count -eq 1) { 'One check failed.' } else { [string]$Count + ' checks failed. This is the first.' })
     P = @([string]$d.Name, [string]$r.Detail, $(if ($r.Fix) { 'What to do: ' + $r.Fix } else { '' }))
     Buttons = @($again, $(if (& $ui.NeedSite) { @{ Text = 'Change the site address'; Act = { & $ui.VSite } } } else { $null }))
-    Foot = ([string]$ok + ' of ' + $ids.Count + ' checks passed. RADE changes nothing until every check passes.'); Back = { & $ui.VChoose } }
+    Foot = ([string]$ok + ' of ' + (& $ui.Counted $ids.Count 'check') + ' passed. RADE changes nothing until every check passes.'); Back = { & $ui.VChoose } }
   & $ui.ToFront }
 # Shows the card of a check that needs the user (a sign-in, a look-and-answer, or not run yet). Takes the check number.
 $ui.VNeed = { param([int]$I)
@@ -285,7 +285,7 @@ $ui.VReady = {
   $runB = @{ Text = $(if ($dep) { 'Install' } else { 'Run' }); Kind = $(if ($hasWork -and -not $startPrimary) { 'primary' } elseif ($hasWork) { '' } else { 'off' }); Act = { & $ui.Run } }
   if ($resB) { $runB = @{ Text = 'Start over'; Act = { & $ui.StartOver } } }   # in the place of Install or Run
   & $ui.SetCard @{ View = 'ready'
-    Kicker = $(if ($warn.Count) { [string]($ids.Count - $warn.Count) + ' checks passed' + $dot + $warn.Count + $(if ($warn.Count -eq 1) { ' warning' } else { ' warnings' }) } else { 'All ' + $ids.Count + ' checks passed' })
+    Kicker = $(if ($warn.Count) { (& $ui.Counted ($ids.Count - $warn.Count) 'check') + ' passed' + $dot + (& $ui.Counted $warn.Count 'warning') } elseif ($ids.Count -eq 1) { 'The check passed' } else { 'All ' + $ids.Count + ' checks passed' })
     Sentence = $(if ($dep) { 'Ready to install ' + $script:app.Name + ' ' + $script:app.Version + '.' } else { 'Ready to run round ' + $round + '.' })
     P = @(('Writes to ' + $plan.Shown + ': ' + $new + ' new files, ' + $rep + ' replaced, ' + $rec + ' moved to the Recycle Bin.'),
       ([string]$n + $(if ($n -eq 1) { ' step' } else { ' steps' }) + ', about ' + [math]::Max(1, [int][math]::Round($est / 60)) + ' min. ' + $you + $(if ($done) { ' ' + $done + ' already done for this version and off.' } else { '' })),
