@@ -213,7 +213,8 @@ $ui.OptPlan = { param($o, [int]$w)
   if ($o.Inline -and $rw) { foreach ($fc in @($o.Facts)) { if ($fc) { $rw = [math]::Max($rw, [System.Windows.Forms.TextRenderer]::MeasureText([string]$fc, $ui.F.SmallB).Width) } }   # the list's widest fact: one layout for all rows
     $nc = $gap; foreach ($nm in @($o.Names)) { $nc = [math]::Max($nc, [System.Windows.Forms.TextRenderer]::MeasureText([string]$nm, $ui.F.Body).Width + $gap) }
     $sw = $inner - $rw - $gap - $nc
-    if ($sw -ge (& $ui.Sc 120)) { $sl = & $ui.Rows ([string]$o.Sub) $ui.F.Small $sw $h2 2; $ni = [math]::Max($h1, $sl * $h2); $hi = [math]::Max((& $ui.Sc 40), ($ni + (& $ui.Sc 16)))
+    $fits = ($sw -ge (& $ui.Sc 120)); if ($fits) { foreach ($sb in @($o.Subs)) { if ($sb -and (& $ui.Rows ([string]$sb) $ui.F.Small $sw $h2 3) -gt 2) { $fits = $false; break } } }   # every text of the list in 2 lines, else the whole list takes the Choose layout (review of PR 209: a long app name or version)
+    if ($fits) { $sl = & $ui.Rows ([string]$o.Sub) $ui.F.Small $sw $h2 2; $ni = [math]::Max($h1, $sl * $h2); $hi = [math]::Max((& $ui.Sc 40), ($ni + (& $ui.Sc 16)))
       return @{ Inline = $true; H = [int]$hi; Pad = $pad; X = $x; Tw = [int]($inner - $rw - $gap); Rw = $rw; Under = $false; S1 = $sl; S2 = 0; NL = 0; H1 = $h1; H2 = $h2; Vw = 0; Nw = $nw; Nc = [int]$nc; Sw = [int]$sw; Y = 0 } } }
   $sf = $(if ($o.Off) { $ui.F.SmallB } else { $ui.F.Small }); $s1 = & $ui.Rows ([string]$o.Sub) $sf $tw $h2 4
   if ($rw -and -not $under -and -not $o.Off -and -not $o.Inline -and ($s1 -gt 2 -or $tw -lt [int]($inner * 0.6))) { $under = $true; $tw = $inner; $s1 = & $ui.Rows ([string]$o.Sub) $sf $tw $h2 4 }   # the summary takes the whole width when the facts leave it a narrow column (Windows job of PR 209: 2 short lines and a cut notice)

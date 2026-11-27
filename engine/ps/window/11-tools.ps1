@@ -18,7 +18,7 @@ $ui.ToolRows = {
   $n = @($script:app.Backup).Count; $lists = $(if ($n -eq 1) { '1 list' } elseif ($n) { [string]$n + ' lists' } else { 'No lists named' })
   # Short texts and facts (engine-v47, review of PR 209): each row is one line on the Maintenance card, with 2 lines at most
   # for its text, also at 150 % and in a narrow window (the PFM, 2026-11-26: no cut text).
-  @(@{ Index = 0; Name = 'Diagnose'; Ver = ''; Sub = 'Checks the install. Changes nothing.'; R1 = 'Report' },
+  @(@{ Index = 0; Name = 'Diagnose'; Ver = ''; Sub = 'Checks the install. Changes nothing.'; R1 = 'Writes a report' },
     @{ Index = 1; Name = 'Back up'; Ver = ''; Sub = 'Saves the lists to this computer.'; R1 = $lists },
     $(if ($script:app.Restore) { @{ Index = 2; Name = 'Restore'; Ver = ''; Sub = 'Puts missing rows back. Test sites only.'; R1 = 'Changes the site' } }
       else { @{ Off = $true; Index = 2; Name = 'Restore'; Ver = ''; Sub = 'Puts missing rows back from a backup.'; R1 = 'Not set up'; Soon = $true } })) }
