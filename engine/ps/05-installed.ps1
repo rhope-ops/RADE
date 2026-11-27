@@ -66,9 +66,9 @@ function Read-InstalledRaw([string]$Key) {
 # $false.
 function Test-InstalledNewer($A) { return ((Read-InstalledRaw (Get-InstalledKey $A)).State -eq 'newer') }
 $newerRadeText = 'a newer RADE installed this application: get the newest script from the RADE page'
-function Get-InstalledBlock($A) {
-  # '' or why this app's record must not be written, so the app is not deployed (S1, S2).
-  switch ((Read-InstalledRaw (Get-InstalledKey $A)).State) {
+function Get-InstalledBlock($A, [string]$Key = '') {
+  # '' or why this app's record must not be written, so the app is not deployed (S1, S2). $Key: the record key ('' = read it now).
+  switch ((Read-InstalledRaw $(if ($Key) { $Key } else { Get-InstalledKey $A })).State) {
     'newer' { return $newerRadeText }
     'foreign' { return 'the install record file of this application holds the record of another application (RADE\Config\installed). RADE did not change it: ask for help before you install' }
     'unreadable' { return 'the install record of this application could not be read (another program may be using the file). Wait a minute, then run again' }

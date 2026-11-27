@@ -198,8 +198,9 @@ $ui.VUninstall = {
   Uninstall, the confirm card (view unconfirm; engine-v40, 90-161.Z R43 E3, the PFM, 2026-11-25).
   .DESCRIPTION
   Test sites only (the Restore gate: a site that only lacks the local mark goes to the mark card first, then back here).
-  The card names the test site, the backup, the app's Uninstall steps (a hand step says so) and what stays; the person
-  types the app name, then "Uninstall" (dark red: the one destructive action) runs it. Takes no parameter.
+  The card names the test site, the backup, the app's Uninstall steps (a hand step says so) and what goes to the Recycle
+  Bin after them (engine-v48); the person types the app name, then "Uninstall" (dark red: the one destructive action)
+  runs it. Takes no parameter.
   #>
   if ($ui.Busy) { return }
   $siteCheck = Test-UninstallSite (Get-BasePath)
@@ -210,9 +211,12 @@ $ui.VUninstall = {
   $rows = @(for ($i = 0; $i -lt $all.Count; $i++) { $st = $steps[[int]$all[$i]]
       ([string]($i + 1) + '. ' + (Get-StepTitle $st) + $(if ($st.Kind -eq 'guide') { ' (you do this step)' } else { '' })) })
   $what = 'RADE first backs up ' + $n + ' list(s). Then it runs these ' + $all.Count + ' steps of ' + $script:app.Name + '.'
-  $what += ' They remove what the install made on the site. Your local files and the backups stay on this computer.'
+  $what += ' They remove what the install made on the site.'
+  # engine-v48 (DECISIONS 2026-11-26): after the steps, the clean-up (Invoke-Uninstall, part 13); the last app's also takes RADE's shared files.
+  $clean = 'After the steps, RADE moves the app files, the runner copy, the shortcut and the install record to the Recycle Bin. The Backups folder stays.'
+  if (-not @(Get-OtherRecordKey (Get-InstalledKey $script:app)).Count) { $clean += ' No other app has an install record on this computer, so RADE\Config and RADE\runners go to the Recycle Bin too.' }
   & $ui.SetCard @{ View = 'unconfirm'; Light = 'you'; Kicker = [string]$ui.Kick.Text; Sentence = ('Uninstall ' + $script:app.Name + ' from the test site?')
-    P = @(('Test site: ' + $ui.UninstallSite), $what); Lines = $rows
+    P = @(('Test site: ' + $ui.UninstallSite), $what, $clean); Lines = $rows
     Field = @{ Label = ('Type ' + $script:app.Name + ' to confirm'); Text = ''; Name = 'The app name, to confirm Uninstall' }; Focus = 'field'
     Buttons = @(@{ Text = 'Uninstall'; Kind = 'danger'; Act = { & $ui.UninstallGo } }); Back = { & $ui.VMaint $ui.MaintInst } } }
 
@@ -233,48 +237,10 @@ $ui.UninstallGo = {
   $ui.Busy = $true; [System.Windows.Forms.Application]::DoEvents(); $res = $null
   # Before each step: the run card names it. Takes the step, its number and the count.
   $onStep = { param($St, $I, $N) & $card ('Uninstall step ' + $I + ' of ' + $N + ': ' + (Get-StepTitle $St)); [System.Windows.Forms.Application]::DoEvents() }
-  try { $res = Invoke-Uninstall (Get-BasePath) { [System.Windows.Forms.Application]::DoEvents() } $onStep }
+  # KeepBackups: $true, the default choice "Keep the Backups folder". The card has no radio pair yet (engine-v48 worker 2: SetCard has no radio part).
+  try { $res = Invoke-Uninstall (Get-BasePath) { [System.Windows.Forms.Application]::DoEvents() } $onStep $true }
   catch { $why = 'Uninstall stopped with an error [' + $_.Exception.GetType().Name + '].'
     $res = @{ State = 'failed'; Path = ''; Lines = @($why, 'Select "Uninstall" again: its steps remove only what is still there.') } }
   finally { $ui.Busy = $false }
   if ($ui.Form.IsDisposed -or $script:closing) { return }
   & $ui.ToolResult 'Uninstall' $res }
-
-$ui.VRemoveRade = {
-  <#
-  .SYNOPSIS
-  Remove RADE from this computer, its first card (engine-v40; 90-161.Z R43 E3 b, the PFM, 2026-11-25: option A).
-  .DESCRIPTION
-  While any app is installed (view rmblock) the card names those apps and says to uninstall them first; nothing can be
-  removed. Else the confirm card (view rmrade): what goes to the Recycle Bin and what stays, the box "Type RADE to
-  confirm" and the dark red button "Remove RADE". Takes no parameter.
-  #>
-  if ($ui.Busy) { return }
-  $apps = @(Get-InstalledAppName)
-  if ($apps.Count) { & $ui.SetCard @{ View = 'rmblock'; Light = 'bad'; Sentence = 'Uninstall these apps first.'
-      P = @('Remove RADE is off while an app is installed. Uninstall each app from its Maintenance card, then select "Remove RADE" again.'); Lines = $apps
-      Buttons = @(@{ Text = 'Done'; Kind = 'primary'; Act = { & $ui.VChoose } }); Back = { & $ui.VChoose } }; return }
-  $what = 'RADE moves these to the Recycle Bin: RADE\Config, the RADE runners, the shortcuts RADE made, and the files in each app folder. The Backups folders stay.'
-  & $ui.SetCard @{ View = 'rmrade'; Light = 'you'; Sentence = 'Remove RADE from this computer?'
-    P = @('No app is installed.', $what, 'To use RADE again later, paste a RADE script again.')
-    Field = @{ Label = 'Type RADE to confirm'; Text = ''; Name = 'The word RADE, to confirm Remove RADE' }; Focus = 'field'
-    Buttons = @(@{ Text = 'Remove RADE'; Kind = 'danger'; Act = { & $ui.RemoveRadeGo } }); Back = { & $ui.VChoose } } }
-
-$ui.RemoveRadeGo = {
-  <#
-  .SYNOPSIS
-  Remove RADE, the run: checks the typed word, moves the files (Invoke-RemoveRade, part 13), shows the result card.
-  .DESCRIPTION
-  The word must be RADE, in capitals. The result card's one button closes RADE. Takes no parameter.
-  #>
-  if ($ui.Busy) { return }
-  if ($ui.Field.Text.Trim() -cne 'RADE') { & $ui.Say1 'Type RADE in capital letters.'; return }
-  $ui.Busy = $true; $res = $null
-  try { $res = Invoke-RemoveRade }
-  catch { $res = @{ State = 'review'; Path = ''; Lines = @(('Remove RADE stopped with an error [' + $_.Exception.GetType().Name + '].'), 'Close RADE, then open the Recycle Bin to see what moved.') } }
-  finally { $ui.Busy = $false }
-  if ($res.State -eq 'blocked') { & $ui.VRemoveRade; return }   # an app was installed in the meantime
-  $sent = $(if ($res.State -eq 'done') { 'RADE is removed from this computer.' } else { 'RADE did not remove everything.' })
-  & $ui.SetCard @{ View = 'toolres'; Light = $(if ($res.State -eq 'done') { '' } else { 'bad' }); Sentence = $sent
-    P = @($res.Lines | Select-Object -First 2); Lines = @($res.Lines | Select-Object -Skip 2)
-    Buttons = @(@{ Text = 'Close RADE'; Kind = 'primary'; Act = { $ui.Form.Close() } }) } }

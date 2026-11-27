@@ -1,4 +1,4 @@
-# RADE test: the Maintenance tools Diagnose, Back up and Restore (engine/ps/13-maintenance.ps1; Uninstall and Remove RADE in
+# RADE test: the Maintenance tools Diagnose, Back up and Restore (engine/ps/13-maintenance.ps1; Uninstall and its clean-up in
 # part 2, tools_unit_uninstall.ps1, run at the end), on the engine parts themselves
 # (no bundle, no window), with the fake PnP.PowerShell of tests/fake-pnp (no SharePoint, no network).
 # Run by tests/resume_test.sh: pwsh -NoProfile -File tests/tools_unit.ps1 <scratch folder>.
@@ -393,6 +393,6 @@ $st2 = Invoke-ChildScript "'STAGE signin'`r`nStart-Sleep -Seconds 20`r`n'RESULT 
 $env:RADE_SIGNIN_TEST = '1'; $rpErr = $null; try { Start-SignInReport; Stop-SignInReport } catch { $rpErr = $_ }; $env:RADE_SIGNIN_TEST = $null
 Assert-Case 'sign-in stage (engine-v43): STAGE none ends the limit; a frozen sign-in stops and is named; the report compiles' (
   -not $st1.Stage -and @($st1.Lines) -contains 'RESULT ok' -and $st2.Stage -eq 'signin' -and @($st2.Lines) -notcontains 'RESULT ok' -and -not $rpErr -and [bool]('RadeSignIn.Report1' -as [type]))
-# Uninstall and Remove RADE (engine-v40): their cases are in tools_unit_uninstall.ps1, run here in this scope (they use the fake site and the app above).
+# Uninstall (engine-v40) and its clean-up (engine-v48): their cases are in tools_unit_uninstall.ps1, run here in this scope (they use the fake site and the app above).
 . (Join-Path $PSScriptRoot 'tools_unit_uninstall.ps1')
 Write-Host ('TOOLS-UNIT pass=' + $script:pass + ' fail=' + $script:fail)
