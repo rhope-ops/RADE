@@ -145,16 +145,18 @@ $ui.VMaint = { param($Inst)
   $ui.StartAfter = $false; $startB = $null
   if ([string]$script:app.Start -and (Get-StartPath)) { $startB = @{ Text = 'Start ' + (Get-AppWord); Kind = $(if ([string]$Inst.version -eq [string]$script:app.Version) { 'primary' } else { '' }); Act = { $ui.StartAfter = $true; & $ui.Checks $false } } }
   $ui.MaintVerb = $verb   # read when a row is clicked (a scriptblock does not keep this card's local variables)
-  $fix = @{ Index = 10; Name = $verb; Ver = ''; Sub = $(if ($verb -eq 'Repair') { 'Adds what is missing. Keeps your data.' } else { 'Installs ' + $script:app.Version + ' and keeps your data.' }); R1 = 'Runs the checks first' }
+  $fix = @{ Index = 10; Name = $verb; Ver = ''; Sub = $(if ($verb -eq 'Repair') { 'Adds what is missing. Keeps your data.' } else { 'Installs ' + $script:app.Version + ' and keeps your data.' }); R1 = 'Checks first' }
   # Uninstall (engine-v40): dark red and on for an app with Uninstall steps, else not available (answer 4A of the PFM, 2026-11-25).
-  $un = $(if (@($script:app.Uninstall).Count) { @{ Index = 20; Name = 'Uninstall'; Ver = ''; Danger = $true; Sub = ('Removes ' + (Get-AppWord) + ' from the test site, after a backup.'); R1 = 'Changes the site' } }
-    else { @{ Off = $true; Soon = $true; Index = 20; Name = 'Uninstall'; Ver = ''; Sub = ($script:app.Name + ' has no Uninstall steps.'); R1 = 'Not set up by this app' } })
+  $un = $(if (@($script:app.Uninstall).Count) { @{ Index = 20; Name = 'Uninstall'; Ver = ''; Danger = $true; Sub = ('Removes ' + (Get-AppWord) + ' from the test site.'); R1 = 'Changes the site' } }
+    else { @{ Off = $true; Soon = $true; Index = 20; Name = 'Uninstall'; Ver = ''; Sub = ($script:app.Name + ' has no Uninstall steps.'); R1 = 'Not set up' } })
   & $ui.SetCard @{ View = 'maint'; Kicker = ((Get-AppWord) + ' ' + [string][char]0x2022 + ' ' + $Inst.version); Sentence = ((Get-AppWord) + ' ' + $Inst.version + ' is installed.')
     Options = (& $ui.InlineRows (@($fix) + @(& $ui.ToolRows) + @($un))); OnOption = { param($j) & $ui.MaintPick $j }
     Buttons = @($startB); Focus = 'button'; Back = { & $ui.VChoose } } }   # Focus: Start when it is the primary, else the first row
 # Marks the rows of a list as inline rows (one line each: name, text, fact; $ui.OptPlan) and gives each the names of the
-# list, so the name column is as wide as the widest name. Takes the rows; gives them back.
-$ui.InlineRows = { param($Rows) $r = @($Rows | Where-Object { $_ }); $names = @($r | ForEach-Object { [string]$_.Name }); foreach ($o in $r) { $o.Inline = $true; $o.Names = $names }; return , $r }
+# list and their facts, so the name and fact columns are as wide as the widest of the list (every row takes the same
+# layout). Takes the rows; gives them back.
+$ui.InlineRows = { param($Rows) $r = @($Rows | Where-Object { $_ }); $names = @($r | ForEach-Object { [string]$_.Name }); $facts = @($r | ForEach-Object { [string]$_.R1 })
+  foreach ($o in $r) { $o.Inline = $true; $o.Names = $names; $o.Facts = $facts }; return , $r }   # one name and one fact column for the whole list
 # A click on a row of the Maintenance card: 10 = Update or Repair (the checks, then the install run), 20 = Uninstall (its
 # confirm card, part 11), else a tool row (Diagnose, Back up, Restore: $ui.RunTool, part 11). Takes the row's index.
 $ui.MaintPick = { param([int]$J)

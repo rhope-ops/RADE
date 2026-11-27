@@ -210,7 +210,8 @@ $ui.OptPlan = { param($o, [int]$w)
   # Inline rows (engine-v47, the Maintenance card, mock option A): the name in a column as wide as the widest name of the
   # list ($o.Names), the text beside it (2 lines at most), the fact on the right, so 5 rows fit without a scroll
   # (Windows job of PR 209: the card scrolled at 1020 x 616 with rows of the Choose height). Too narrow: the Choose layout.
-  if ($o.Inline -and $rw) { $nc = $gap; foreach ($nm in @($o.Names)) { $nc = [math]::Max($nc, [System.Windows.Forms.TextRenderer]::MeasureText([string]$nm, $ui.F.Body).Width + $gap) }
+  if ($o.Inline -and $rw) { foreach ($fc in @($o.Facts)) { if ($fc) { $rw = [math]::Max($rw, [System.Windows.Forms.TextRenderer]::MeasureText([string]$fc, $ui.F.SmallB).Width) } }   # the list's widest fact: one layout for all rows
+    $nc = $gap; foreach ($nm in @($o.Names)) { $nc = [math]::Max($nc, [System.Windows.Forms.TextRenderer]::MeasureText([string]$nm, $ui.F.Body).Width + $gap) }
     $sw = $inner - $rw - $gap - $nc
     if ($sw -ge (& $ui.Sc 120)) { $sl = & $ui.Rows ([string]$o.Sub) $ui.F.Small $sw $h2 2; $ni = [math]::Max($h1, $sl * $h2); $hi = [math]::Max((& $ui.Sc 40), ($ni + (& $ui.Sc 16)))
       return @{ Inline = $true; H = [int]$hi; Pad = $pad; X = $x; Tw = [int]($inner - $rw - $gap); Rw = $rw; Under = $false; S1 = $sl; S2 = 0; NL = 0; H1 = $h1; H2 = $h2; Vw = 0; Nw = $nw; Nc = [int]$nc; Sw = [int]$sw; Y = 0 } } }

@@ -16,10 +16,12 @@ $ui.SignInHint = 'A sign-in window may open. If you do not see it, press Alt+Tab
 # The tool rows of the Maintenance card (indexes 0 to 2). Diagnose and Back up (engine-v30); Restore (engine-v31) for an app that names it.
 $ui.ToolRows = {
   $n = @($script:app.Backup).Count; $lists = $(if ($n -eq 1) { '1 list' } elseif ($n) { [string]$n + ' lists' } else { 'No lists named' })
-  @(@{ Index = 0; Name = 'Diagnose'; Ver = ''; Sub = 'Checks the install and runs the checks again. Changes nothing.'; R1 = 'Report on this computer' },
-    @{ Index = 1; Name = 'Back up'; Ver = ''; Sub = "Saves the app's lists to this computer. Changes nothing on the site."; R1 = $lists },
-    $(if ($script:app.Restore) { @{ Index = 2; Name = 'Restore'; Ver = ''; Sub = 'Puts missing rows back from a backup, after a dry run. Test sites only.'; R1 = 'Writes to the site' } }
-      else { @{ Off = $true; Index = 2; Name = 'Restore'; Ver = ''; Sub = 'Puts missing rows back from a backup, after a dry run.'; R1 = 'Not set up by this app'; Soon = $true } })) }
+  # Short texts and facts (engine-v47, review of PR 209): each row is one line on the Maintenance card, with 2 lines at most
+  # for its text, also at 150 % and in a narrow window (the PFM, 2026-11-26: no cut text).
+  @(@{ Index = 0; Name = 'Diagnose'; Ver = ''; Sub = 'Checks the install. Changes nothing.'; R1 = 'Report' },
+    @{ Index = 1; Name = 'Back up'; Ver = ''; Sub = 'Saves the lists to this computer.'; R1 = $lists },
+    $(if ($script:app.Restore) { @{ Index = 2; Name = 'Restore'; Ver = ''; Sub = 'Puts missing rows back. Test sites only.'; R1 = 'Changes the site' } }
+      else { @{ Off = $true; Index = 2; Name = 'Restore'; Ver = ''; Sub = 'Puts missing rows back from a backup.'; R1 = 'Not set up'; Soon = $true } })) }
 
 $ui.RunTool = {
   <#
