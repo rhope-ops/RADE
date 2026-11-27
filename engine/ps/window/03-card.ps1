@@ -120,6 +120,9 @@ $ui.MkBox = { param($Tb, [int]$W)
   $p.Add_Paint({ try { $pn = New-Object System.Drawing.Pen($ui.C.Edge); $_.Graphics.DrawRectangle($pn, 0, 0, ($this.ClientSize.Width - 1), ($this.ClientSize.Height - 1)); $pn.Dispose() } catch { $null = $_ } })
   $p.Add_SizeChanged({ & $ui.BoxFit $this }); $p.Add_Click({ try { [void]$this.Controls[0].Focus() } catch { $null = $_ } }); $ui.Boxes += $p; $p }
 $ui.Field = New-Object System.Windows.Forms.TextBox
+# On a card with BoxNoEnter (the hand card) Enter in the box answers nothing: the main button is not the Enter button
+# while the box has the focus (review of PR 211: Enter in the address box answered Done).
+$ui.Field.Add_GotFocus({ if ($ui.BoxNoEnter) { $ui.Form.AcceptButton = $null } }); $ui.Field.Add_LostFocus({ if ($ui.BoxNoEnter) { $ui.Form.AcceptButton = $ui.AcceptOn } })
 $ui.FieldBox = & $ui.MkBox $ui.Field $ui.Z.FieldM; $ui.FieldBox.Margin = (& $ui.Pad $ui.Z.G2 $ui.Z.M $ui.Z.M $ui.Z.M)   # 8 from the label; 4 + the button's 4 = 8 to the button
 $ui.FieldB = & $ui.Btn 'compact'
 $ui.FieldB.Add_Click({ if ($ui.FieldDo) { & $ui.FieldDo } })
@@ -181,6 +184,8 @@ $ui.Dress = {
   foreach ($x in @($ui.PctRow, $ui.RunBar, $ui.RunRow)) { $x.Visible = [bool]$C.StepRow }
   if (-not $C.StepRow) { $ui.RunA.Visible = $false; $ui.RunB.Visible = $false }
   $ui.Todo.Visible = [bool]$C.Todo; $ui.TodoT.Text = [string]$C.Todo
+  $om = & $ui.Sc $(if (@($C.Options | Where-Object { $_ -and $_.Inline }).Count) { $ui.Z.G4 } else { $ui.Z.G6 }); $m = $ui.Opts.Margin   # one-line rows (Maintenance): 16 above the list
+  if ($m.Top -ne $om) { $ui.Opts.Margin = New-Object System.Windows.Forms.Padding($m.Left, $om, $m.Right, $m.Bottom) }
   $ui.P[0].Font = $(if ($C.Strong) { $ui.F.Turn } else { $ui.F.Body }) }   # the Done card's summary line is strong
 # Says whether a button text fits the widest button (B1: 240 x 40) with the button's padding, as $ui.BtnSize measures it. A
 # main button whose text with " (Enter)" does not fit keeps its text alone (Enter still selects it). Takes the text.
@@ -199,7 +204,8 @@ $ui.SetButtons = {
   $bs = @(@($C.Buttons | Where-Object { $_ -and [string]$_.Kind -ne 'primary' }) + @($C.Buttons | Where-Object { $_ -and [string]$_.Kind -eq 'primary' }))
   $ui.Acts = @(); $ui.First = $null; $ui.Accept = $null; $ui.BOn = @($false) * $ui.NB; $ui.BMain = @($false) * $ui.NB; $ui.Always = @($false) * $ui.NB
   $ui.Back = $C.Back; $ui.BackOn = ([bool]$C.Back -and -not $ui.RecOn); $ui.BackB.Visible = $ui.BackOn   # B6: Back at the left end of the action row
-  $ui.BackB.Text = $(if ($ui.EscViews -contains [string]$C.View) { 'Back (Esc)' } else { 'Back' })
+  $ui.BackB.Text = $(if ($ui.EscViews -contains [string]$C.View) { 'Back (Esc)' } else { 'Back' }); $ui.BackB.AccessibleName = $ui.BackB.Text   # "(Esc)" only where Esc works
+  $ui.BoxNoEnter = [bool]$C.BoxNoEnter   # Enter in a box of this card answers nothing (the hand card's address box)
   for ($k = 0; $k -lt $ui.NB; $k++) {
     $b = $ui.B[$k]
     if ($k -ge $bs.Count) { $b.Visible = $false; $ui.Acts += $null; continue }
@@ -208,4 +214,4 @@ $ui.SetButtons = {
     if ($b.Enabled -and -not $ui.First) { $ui.First = $b }; if ($b.Enabled -and -not $ui.Accept -and $main) { $ui.Accept = $b } }
   & $ui.Apart
   $ui.BtnRow.Visible = [bool]($bs.Count -or $ui.BackOn)
-  $ui.Form.AcceptButton = $(if ($C.NoAccept) { $null } else { $ui.Accept }) }   # Enter = the primary button ("(Enter)" in its text)
+  $ui.Form.AcceptButton = $(if ($C.NoAccept) { $null } else { $ui.Accept }); $ui.AcceptOn = $ui.Form.AcceptButton }   # Enter = the primary button ("(Enter)" in its text)

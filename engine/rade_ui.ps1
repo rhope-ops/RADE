@@ -61,14 +61,12 @@ $ui.Color = { param([string]$Role)
   if (-not $t) { return [System.Drawing.Color]::Black }
   if ($ui.Dark -and $ui.TokDark[$Role]) { $t = $ui.TokDark[$Role] }   # the dark set (plan engine-v48 D6)
   return [System.Drawing.Color]::FromArgb([int]$t[0], [int]$t[1], [int]$t[2]) }
-# Themes (the PFM, 2026-11-27, plan engine-v48 D6): the window reads the Windows app mode once when it opens. The value
-# AppsUseLightTheme 0 = dark (Kanon in Fulcrum colors); 1 or no value = light (Kanon in USAF colors). A contrast theme
-# wins over both ($ui.High). Takes nothing; gives back $true for dark. No registry (not Windows): light.
-$ui.DarkOn = { try { $v = Get-ItemPropertyValue -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'AppsUseLightTheme' -ErrorAction Stop; return ([int]$v -eq 0) } catch { return $false } }
 # Puts the colors for a theme into $ui.C in place (every builder and paint handler reads them there). Takes $true for the
 # system colors of a contrast theme, $false for the own colors.
 $ui.UseColors = { param([bool]$High) $ui.High = $High; foreach ($k in @($ui.Tok.Keys)) { $ui.C[$k] = & $ui.Color $k } }
-$ui.Dark = [bool](& $ui.DarkOn); $ui.C = @{}; & $ui.UseColors (& $ui.HighOn)
+# The dark set is opt-in (review of PR 211): a window that wants it sets $ui.Dark before this file runs (the RADE window:
+# engine/ps/window/01-setup.ps1, from the Windows app mode). An app window that copies this file has no $ui.Dark: light.
+$ui.Dark = [bool]$ui.Dark; $ui.C = @{}; & $ui.UseColors (& $ui.HighOn)
 # ---- Fonts, sizes and buttons
 # Cosmetics never stop the window (R06: Font('Segoe UI', 10, 'Bold') failed with "Multiple ambiguous overloads"): a typed
 # style and size, and the window font when a font cannot be made.

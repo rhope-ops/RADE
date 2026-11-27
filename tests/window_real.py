@@ -70,7 +70,7 @@ def device(k):
 CONTRAST = [(r"\$ui\.HighOn = \{ try \{ return \[bool\]\[System\.Windows\.Forms\.SystemInformation\]::HighContrast \} catch \{ return \$false \} \}",
              "$ui.HighOn = { return $true }")]
 # The swap of a dark run (a name that starts with "dark-" or holds "-dark"): the window reads the Windows app mode as dark.
-DARK = [(r"\$ui\.Dark = \[bool\]\(& \$ui\.DarkOn\);", "$ui.Dark = $true;")]
+DARK = [(r"\$ui\.Dark = \[bool\]\(& \$ui\.DarkOn\)", "$ui.Dark = $true")]
 DEVICE_150 = [
     (r"\$ui\.Form\.AutoScaleDimensions = New-Object System\.Drawing\.SizeF\(96, 96\)", "$ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(64, 64)"),
     (r"if \(\$d -gt 0\) \{ \$ui\.Dpi = \$d \}", "if ($d -gt 0) { $ui.Dpi = $d * 1.5 }"),
@@ -204,10 +204,10 @@ def r32_why(lines, name):
     if any(l.startswith("WIN r32 ") and " error=" in l for l in lines):
         why.append("an r32 measure line has an error")
     if name.startswith("device150-"):
-        rows = [re.search(r" name=(\d+)/(\d+) bar=(\d+)/.* frac=(\d+)/", l) for l in lines if l.startswith("WIN r32 ") and "-run " in l]
+        rows = [re.search(r" name=(\d+)/(\d+) bar=(\d+)/(\d+)/.* frac=(\d+)/(\d+)", l) for l in lines if l.startswith("WIN r32 ") and "-run " in l]
         rows = [tuple(int(x) for x in m.groups()) for m in rows if m]
-        # Cards v2 (plan engine-v48 step 3): the bar is under the title, and the count is on the bar's line (its top within 30 px)
-        if len(rows) < 3 or any(not (bar >= top + high - 1 and abs(frac - bar) <= 30) for top, high, bar, frac in rows):
+        # Cards v2 (plan engine-v48 step 3): the bar is under the title, and the count's middle is within 1 px of the bar's
+        if len(rows) < 3 or any(not (bar >= top + high - 1 and abs((frac + fh / 2) - (bar + bh / 2)) <= 1) for top, high, bar, bh, frac, fh in rows):
             why.append("the step's bar is not under the title, or the count is not on the bar's line: %s" % rows[:4])
     return why
 

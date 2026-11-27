@@ -53,9 +53,12 @@ $ui.MakeRunList = { param($Sel)
   $ui.RunList = @(); if ($cleanup.Count -and $ui.Clean -and -not $script:resume) {   # a resume runs no clean-up (Invoke-Round)
   $ui.RunList += @{ Key = 'Clean-up'; Title = 'Clean-up'; Sub = ''; State = '' } }
   for ($k = 0; $k -lt $steps.Count; $k++) { if ($Sel[$k]) { $ui.RunList += @{ Key = [string]$steps[$k].Name; Title = (Get-StepTitle $steps[$k]); Sub = [string]$steps[$k].Doing; State = '' } } } }
-# The number of drawn rows the Run card has room for beside the running one: 4 in a tall card, 2 in a middle one, none in a
-# small one (811 x 469: the card does not scroll). Takes nothing; gives back the number.
-$ui.RunSlots = { $h = [int]$ui.Card.ClientSize.Height; if ($h -ge (& $ui.Sc 560)) { return 4 }; if ($h -ge (& $ui.Sc 440)) { return 2 }; return 0 }
+# The room the Run card has for drawn rows: the card's height less its header, its body without the lists and its
+# buttons (each as tall as its parts ask for), so the card never scrolls for its lists (the Windows job of PR 211: fixed
+# thresholds made the Run card scroll at 1004 x 577 with long texts). Takes nothing; gives back pixels (0 at least).
+$ui.RunRoom = { $ph = { param($C) $h = 0; try { $h = [int]$C.GetPreferredSize((New-Object System.Drawing.Size(0, 0))).Height } catch { $null = $_ }; [math]::Max($h, [int]$C.Height) }   # no measure: its height
+  return [int][math]::Max(0, [int]$ui.Card.ClientSize.Height - (& $ph $ui.Head) - (& $ph $ui.Body) - (& $ph $ui.Tail) - (& $ui.Sc $ui.Z.G2)) }
+$ui.RunMost = 4   # at most 4 drawn rows beside the running one (the Cards v2 mock: 5 rows in all)
 # The width of a drawn row's texts (the row less the status column and the side room). Takes the row width.
 $ui.RunTextW = { param([int]$W) [int][math]::Max(1, $W - (& $ui.Sc 120) - 2 * (& $ui.Sc $ui.Z.G2)) }
 # The height of one drawn row: its name and its second line, each wrapped to 2 lines at most, 44 px at least. Takes the row and the width.
@@ -69,10 +72,12 @@ $ui.SizeRuns = { param($P) $h = 0; foreach ($r in @($P.Tag)) { $h += & $ui.RunRo
 # Takes nothing; sets the lists, the running row's summary, and lays the card out.
 $ui.PlaceRuns = {
   $all = @($ui.RunList); $r = -1; for ($i = 0; $i -lt $all.Count; $i++) { if ($all[$i].State -eq 'RUNNING') { $r = $i } }
-  $n = & $ui.RunSlots; $a = @(); if ($r -gt 0 -and $n -gt 0) { $a = @($all[$r - 1]) }
-  $b = @(); for ($i = $r + 1; $i -lt $all.Count -and $b.Count -lt ($n - $a.Count); $i++) { $b += $all[$i] }
-  $ui.RunA.Tag = $a; $ui.RunB.Tag = $b; foreach ($p in @($ui.RunA, $ui.RunB)) { & $ui.SizeRuns $p; $p.Visible = [bool]@($p.Tag).Count }   # only the Run card shows them ($ui.Dress hides them)
+  foreach ($p in @($ui.RunA, $ui.RunB)) { $p.Tag = @(); $p.Visible = $false }   # first the card with no list: its room ($ui.RunRoom)
   $ui.StepSum.Text = $(if ($r -ge 0) { [string]$all[$r].Sub } else { '' }); $ui.StepSum.Visible = [bool]$ui.StepSum.Text
+  try { $ui.Card.PerformLayout() } catch { $null = $_ }; $room = & $ui.RunRoom; $w = [int]$ui.RunA.Width; $a = @(); $b = @()
+  if ($r -gt 0) { $h = & $ui.RunRowH $all[$r - 1] $w; if ($h -le $room) { $a = @($all[$r - 1]); $room -= $h } }   # the step before, then the steps after, while they fit
+  for ($i = $r + 1; $i -lt $all.Count -and ($a.Count + $b.Count) -lt $ui.RunMost; $i++) { $h = & $ui.RunRowH $all[$i] $w; if ($h -gt $room) { break }; $b += $all[$i]; $room -= $h }
+  $ui.RunA.Tag = $a; $ui.RunB.Tag = $b; foreach ($p in @($ui.RunA, $ui.RunB)) { & $ui.SizeRuns $p; $p.Visible = [bool]@($p.Tag).Count }   # only the Run card shows them ($ui.Dress hides them)
   $ui.RunA.Invalidate(); $ui.RunB.Invalidate(); & $ui.Squeeze }
 # Marks the step that starts as running, and a row that was running and has no result as done. Takes the step name.
 $ui.RunStart = { param([string]$Name) foreach ($x in @($ui.RunList)) { if ($x.State -eq 'RUNNING') { $x.State = 'DONE' } }
@@ -111,6 +116,10 @@ $ui.RunIcon = { param($G, [string]$Word, $Color, [int]$X, [int]$Y) $d = & $ui.Sc
   elseif ($Word -in 'FAILED', 'NEEDS REVIEW', 'STOPPED') { $G.DrawLine($pn, $X, $t, ($X + $d), ($t + $d)); $G.DrawLine($pn, ($X + $d), $t, $X, ($t + $d)) }
   elseif ($Word -eq 'WAITING') { $G.DrawEllipse($pn, $X, $t, $d, $d) } else { $G.DrawLine($pn, $X, $Y, ($X + $d), $Y) }
   $pn.Dispose() }
+# The installed part of this app's install record, or $null (the row the person sees next on Maintenance: $ui.RowVerb).
+$ui.InstNow = { $e = $null; try { $e = Read-Installed (Get-InstalledKey $script:app) } catch { $null = $_ }; if ($e -and $e.installed) { return $e.installed }; return $null }   # no record: not installed
+# A count with its noun, singular for 1 ("1 step", "3 checks"). Takes the number and the noun.
+$ui.Counted = { param([int]$N, [string]$One) [string]$N + ' ' + $One + $(if ($N -ne 1) { 's' } else { '' }) }
 # The Cancel question (Cards v2; critique change 10): Cancel or Esc on the Run card asks first. "Stop the install" lets the
 # step that runs now finish and then stops the run ($script:stopAfter, engine/ps/06-round.ps1); "Keep installing" shows the
 # Run card again. The run goes on while the question shows; during the setup, before the first step, it says so. Takes nothing.
@@ -118,7 +127,7 @@ $ui.VCancelQ = {
   if (-not $ui.Running -or $ui.View -ne 'run') { return }
   $t = & $ui.TitleOf $ui.StepNow; $dep = Test-Deploy; $verb = $(if ($dep) { 'install' } else { 'round' })
   & $ui.SetCard @{ View = 'cancelq'; Light = 'you'; Kicker = $ui.Kick.Text; Sentence = ('Stop the ' + $verb + '?')
-    P = @($(if ($ui.StepI -and $t) { 'RADE stops after "' + $t + '". The steps that passed stay done.' } else { 'RADE stops before the first step.' }), $(if ($dep) { 'To finish the install later, select "Install ' + $script:app.Version + '" again.' } else { '' }))
+    P = @($(if ($ui.StepI -and $t) { 'RADE stops after "' + $t + '". The steps that passed stay done.' } else { 'RADE stops before the first step.' }), $(if ($dep) { 'To finish the install later, select "' + (& $ui.RowVerb (& $ui.InstNow)) + '" again.' } else { '' }))
     Buttons = @(@{ Text = ('Stop the ' + $verb); Kind = 'dangerline'; Always = $true; Act = { $script:stopAfter = $true; & $ui.ShowRun; & $ui.Say1 'RADE stops after the step that runs now.' } },
       @{ Text = $(if ($dep) { 'Keep installing' } else { 'Keep running' }); Kind = 'primary'; Always = $true; Act = { & $ui.ShowRun } }) } }
 # Shows the run card: step k of n, the step name, the bars, Cancel and the next step that needs you.
@@ -272,9 +281,9 @@ $ui.VPassed = {
   # Start (R28 fix: after a first install the Done card had no Start button): the checks passed before the install.
   $startB = $(if ($inst -and [string]$script:app.Start -and (Get-StartPath)) { @{ Text = 'Start ' + $w; Kind = 'primary'; Act = { & $ui.StartApp } } } else { $null })
   & $ui.SetCard @{ View = 'done'; Light = 'pass'; Tick = $true; KickColor = 'GreenInk'; Strong = $true
-    Kicker = $(if (($dep -and -not $inst) -or $n -ne $all) { 'Passed' } else { 'All ' + $n + ' steps passed' })
+    Kicker = $(if (($dep -and -not $inst) -or $n -ne $all) { 'Passed' } else { $(if ($n -eq 1) { 'The step passed' } else { 'All ' + $n + ' steps passed' }) })
     Sentence = $(if (-not $dep) { 'Round ' + $round + ' is done.' } elseif ($inst) { $w + ' ' + $script:app.Version + ' is installed.' } else { 'The run passed, but version ' + $script:app.Version + ' is not recorded as installed.' })
-    P = @(([string]$n + ' steps and ' + $m + ' checks passed in ' + $ui.Took + '.'), $(if ($dep -and -not $inst) { 'Some steps were off or skipped. Run again with every step on.' } else { '' }), $(if ($dep) { 'Nothing was sent. The report stays on this computer.' } else { $ui.Mail }), $made, $iconNote)
+    P = @(((& $ui.Counted $n 'step') + ' and ' + (& $ui.Counted $m 'check') + ' passed in ' + $ui.Took + '.'), $(if ($dep -and -not $inst) { 'Some steps were off or skipped. Run again with every step on.' } else { '' }), $(if ($dep) { 'Nothing was sent. The report stays on this computer.' } else { $ui.Mail }), $made, $iconNote)
     Buttons = @(@{ Text = 'Open results folder'; Act = { & $ui.Open } }, @{ Text = 'Copy summary'; Act = { & $ui.Copy } }, @{ Text = 'Close'; Kind = $(if ($startB) { '' } else { 'primary' }); Act = { $ui.Form.Close() } }, $startB)
     Test = (-not $dep) } }
 $ui.VStepFail = {

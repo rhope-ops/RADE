@@ -299,7 +299,7 @@ function global:Push-RadeButton([string]$Text) {
 function global:Test-RadeStack {
   if (-not $global:RadeT.Stack) { $global:RadeT.Stack = $true; $ui.Narrow = $true; & $ui.Apart   # D4: a narrow window stacks the buttons, 240 wide, the main one 16 px over the others
     $sw = (@(@($ui.B) + @($ui.BackB) | Where-Object { $_.Shown } | ForEach-Object { $_.Width }) -join ','); $low = (Get-RadeMain).Margin.Bottom; $ui.Narrow = $false; & $ui.Apart
-    Write-Host ('WIN stack widths=' + $sw + ' main-low=' + $low + ' row=' + (@(@($ui.B) + @($ui.BackB) | Where-Object { $_.Shown } | ForEach-Object { $_.Width }) -join ',')) }
+    Write-Host ('WIN stack widths=' + $sw + ' main-low=' + $low + ' row=' + (@(@($ui.B) + @($ui.BackB) | Where-Object { $_.Shown } | ForEach-Object { $_.Width }) -join ',')); Write-Host ('WIN counted ' + (& $ui.Counted 1 'step') + '|' + (& $ui.Counted 3 'check') + ' rows=' + (& $ui.RowVerb $null) + '|' + (& $ui.RowVerb @{ version = '0.0.1' }) + '|' + (& $ui.RowVerb @{ version = [string]$script:app.Version }) + ' back-name=' + $ui.BackB.AccessibleName) }
 }
 <#
 .SYNOPSIS
@@ -395,7 +395,7 @@ function global:Test-RadeRecordOpen {
     Write-Host ('WIN hand-order address-above-lines=' + ($bc.IndexOf($ui.FieldRow) -lt $bc.IndexOf($ui.Guide)) + ' lines-above-path=' + ($bc.IndexOf($ui.Guide) -lt $bc.IndexOf($ui.PathL) -and $bc.IndexOf($ui.PathL) + 1 -eq $bc.IndexOf($ui.PathT)) + ' path-above-links=' + ($bc.IndexOf($ui.PathT) -lt $bc.IndexOf($ui.LinkRow)) + ' closing-above-buttons=' + ($tc.IndexOf($ui.Close) + 1 -eq $tc.IndexOf($ui.BtnRow)) + ' closing-gap=' + $ui.BtnRow.Margin.Top)
     Write-Host ('WIN F tokens=' + ((@($ui.F.Keys) | Sort-Object) -join ',') + ' mono-only-in-record=' + [bool]([object]::ReferenceEquals($ui.RecText.Font, $ui.F.Mono) -and -not @($ui.F.Keys | Where-Object { $_ -ne 'Mono' -and $ui.F[$_].Name -eq 'Consolas' }).Count) + ' sent=' + $ui.F.Sent.Name + $ui.F.Sent.SizeInPoints + ' body=' + $ui.F.Body.Name + $ui.F.Body.SizeInPoints + ' small=' + $ui.F.Small.SizeInPoints + ' smallb=' + $ui.F.SmallB.Name + $ui.F.SmallB.SizeInPoints + ' help=' + $ui.Help.Font.SizeInPoints + ' kick=' + $ui.Kick.Font.Name + ' label=' + $ui.FieldL.Font.Name + ' plainbtn=' + $ui.B[1].Font.Name + ' link=' + $ui.CopyPathB.Font.Name + ' now=' + $ui.Now.Font.Name)
     if (-not $ui.Field.Shown -or [string]$ui.Form.Values['AcceptButton'].Text -notlike '* (Enter)') { Write-Host 'WIN BAD hand card: no address box, or Enter does not answer Done' }
-    $ui.FieldB.PerformClick(); if ($ui.CopyPathB.Shown) { $ui.CopyPathB.PerformClick() }; Write-Host ('WIN hand-note=' + $ui.Note.Text + ' clip=' + [bool][RadeStub.Driver]::Clip)
+    [void]$ui.Field.Focus(); $ui.Form.Key('Return'); Write-Host ('WIN enter-box answer=[' + $ui.Answer + '] accept=' + [bool]$ui.Form.Values['AcceptButton']); [void]$ui.AcceptOn.Focus(); $ui.FieldB.PerformClick(); if ($ui.CopyPathB.Shown) { $ui.CopyPathB.PerformClick() }; Write-Host ('WIN hand-note=' + $ui.Note.Text + ' clip=' + [bool][RadeStub.Driver]::Clip)
     if (-not $global:RadeT.NoAddr) {   # R28: one text for the lines (copy across lines gives the lines as written); a broken path copies whole; no address row without an address
       $global:RadeT.NoAddr = $true
       Write-Host ('WIN guide one-box=' + ($ui.Guide -is [System.Windows.Forms.RichTextBox]) + ' rtf=' + [bool]([string]$ui.Guide.Values['Rtf'] -match '\\li(\d+)\\fi-\1\\tx\1.* 1\.\\tab Open the import page\.') + ' selectable=' + ($ui.Guide.ReadOnly -and $ui.Guide.Values['ContextMenuStrip'] -eq $ui.Menu))

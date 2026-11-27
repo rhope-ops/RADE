@@ -207,7 +207,7 @@ $ui.OptPlan = { param($o, [int]$w)
   if ($rw -and -not $under -and -not $o.Off -and -not $o.Inline -and ($s1 -gt 2 -or $tw -lt [int]($inner * 0.6))) { $under = $true; $tw = $inner; $s1 = & $ui.Rows ([string]$o.Sub) $sf $tw $h2 4 }   # the summary takes the whole width when the facts leave it a narrow column (Windows job of PR 209: 2 short lines and a cut notice)
   $s2 = & $ui.Rows ([string]$o.Sub2) $ui.F.Small $tw $h2 2; $nl = & $ui.Rows ([string]$o.Note) $ui.F.SmallB $tw $h2 3
   $need = $h1 + ($s1 + $s2 + $nl + [int]$under) * $h2
-  $hh = [math]::Max((& $ui.Sc 66), ($need + (& $ui.Sc 20)))
+  $hh = [math]::Max((& $ui.Sc $(if ($o.Off -and -not ($o.Sub -or $o.Sub2 -or $o.Note)) { 40 } else { 66 })), ($need + (& $ui.Sc 20)))   # a row that is off and has no text under its name: one line
   return @{ H = [int]$hh; Pad = $pad; X = $x; Tw = [int]$tw; Rw = $rw; Under = $under; S1 = $s1; S2 = $s2; NL = $nl; H1 = $h1; H2 = $h2; Vw = $vw; Nw = $nw; Y = [int](($hh - $need) / 2) } }
 $ui.PaintOpt = { param($P, $G)
   # One choice: a key (1 to 9), the name and version, the summary, an optional notice, and two facts. An application
@@ -260,7 +260,7 @@ $ui.FillOpts = { param($List)
       $c = New-Object System.Windows.Forms.Button; $c.FlatStyle = 'Flat'; $c.FlatAppearance.BorderSize = 0; $c.UseVisualStyleBackColor = $false; $c.Text = ''; $c.AccessibleName = ('Choice ' + $n + ': ' + $said)
       $c.Add_Click({ if ($ui.OnOpt -and -not $ui.Busy -and (& $ui.Settled)) { & $ui.OnOpt ([int]$this.Tag.Index) } }); $c.Add_GotFocus({ $this.Invalidate() }); $c.Add_LostFocus({ $this.Invalidate() })
     }
-    $c.Tag = $o; $c.BackColor = $ui.C.White; $c.Margin = (& $ui.Pad 0 0 0 (& $ui.Sc 8))
+    $c.Tag = $o; $c.BackColor = $ui.C.White; $c.Margin = (& $ui.Pad 0 0 0 (& $ui.Sc $(if ($o.Inline) { $ui.Z.G1 } else { $ui.Z.G2 })))   # one-line rows (Maintenance) 4 apart: 6 rows fit (Windows job of PR 211)
     $hh = & $ui.Sc $(if ($o.Note -or $o.Sub2) { 86 } else { 66 }); try { $hh = (& $ui.OptPlan $o $ui.ContentW).H } catch { $null = $_ }   # as tall as its lines, 66 at least
     $c.Size = New-Object System.Drawing.Size($ui.ContentW, $hh)
     $c.Add_Paint({ & $ui.PaintOpt $this $_.Graphics })
@@ -391,6 +391,7 @@ $ui.SetCard = { param($c)
   $f = $null
   if ($c.Focus -eq 'field') { $f = $ui.Field } elseif ($c.Focus -eq 'fieldbutton') { $f = $ui.FieldB } elseif ($c.Focus -eq 'err') { $f = $ui.ErrBox } elseif ($c.Focus -eq 'text') { $f = $(if ($ui.Guide.Visible) { $ui.Guide } else { $ui.Sent }) }   # a card with no box: the focus on its text, so Enter answers nothing
   elseif ($c.Focus -eq 'button' -and $ui.Accept) { $f = $ui.Accept }   # engine-v47: the Maintenance card, Enter = Start (review of PR 209)
+  elseif ($c.Focus -eq 'main') { $f = $(if ($ui.Accept) { $ui.Accept } elseif ($ui.Guide.Visible) { $ui.Guide } else { $ui.Sent }) }   # the hand card: Done, else its text (Enter never falls to Skip or It failed)
   elseif ($ui.Opts.Controls.Count) { foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off) { $f = $o; break } } }
   if (-not $f) { $f = $ui.Accept }; if (-not $f) { $f = $ui.First }; if (-not $f) { $f = $ui.RecB }
   if (-not $ui.RecOn) { try { [void]$f.Focus() } catch { $null = $_ } }
