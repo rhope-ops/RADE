@@ -60,6 +60,10 @@ try { Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System
 # engine-v43 S3 (the PFM, 2026-11-26): the host of this RADE run, for the sign-in lines of the run log; the child scripts
 # and steps get it too (RADE_HOST): ise (inside ISE), child (the ISE handoff, R44 E3), shortcut (a runner copy), console.
 $env:RADE_HOST = $(if ([string]$Host.Name -eq 'Windows PowerShell ISE Host') { 'ise' } elseif ($env:RADE_FROM_ISE) { 'child' } elseif (Test-RunnerStart) { 'shortcut' } else { 'console' })
+# engine-v47 (the PFM, 2026-11-26): no DPI-aware sign-in. Steps and checks get RADE_SIGNIN_DPI=0, so an app's older copy of
+# the sign-in block (engine-v46, which turns the DPI call off only on '0') does not make the sign-in wait about 90 s.
+# A person who sets '1' before the paste keeps it on (the R47 test of the setting).
+if ($env:RADE_SIGNIN_DPI -ne '1') { $env:RADE_SIGNIN_DPI = '0' }
 if ($gui) {
   $pol = ''; try { $pol = [string](Get-ExecutionPolicy) } catch { $pol = 'unknown' }
   $ise = Get-IseHandoff ([string]$Host.Name) $pol

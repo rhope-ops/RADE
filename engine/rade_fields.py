@@ -54,10 +54,12 @@ def name_spot(app):
         app: the manifest's application object (productName and subtitle are optional).
 
     Returns:
-        One text with $appProduct and $appSubtitle, each an ASCII PowerShell string ('' when not set). The bundle field
-        "label" of engine-v45 is gone: no round text shows beside the word.
+        One text with $appProduct, $appSubtitle and $appName (the application's own name, engine-v47: the line under the
+        word names the application, not the chosen round), each an ASCII PowerShell string ('' when not set). The bundle
+        field "label" of engine-v45 is gone: no round text shows beside the word.
     """
-    return '\n'.join('$%s = %s' % (k, qx(v)) for k, v in (('appProduct', app.get('productName', '')), ('appSubtitle', app.get('subtitle', ''))))
+    return '\n'.join('$%s = %s' % (k, qx(v)) for k, v in (('appProduct', app.get('productName', '')), ('appSubtitle', app.get('subtitle', '')),
+                                                            ('appName', app.get('name', ''))))
 
 
 def hand_part(s):

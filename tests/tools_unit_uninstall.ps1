@@ -147,7 +147,8 @@ Assert-Case 'title and names (R44 E2, L1, engine-v46): a runner copy start is kn
 $appProduct = 'Kanon'; $appSubtitle = 'Forms'
 $w1 = Get-AppWord; $u1 = Get-AppSubtitle; $appSubtitle = ''; $u2 = Get-AppSubtitle
 $appProduct = ''; $appSubtitle = 'Forms'; $w0 = Get-AppWord; $u0 = Get-AppSubtitle; $appSubtitle = ''
+$appProduct = 'Kanon'; $appSubtitle = 'Forms'; $appName = 'Sample'; $u3 = Get-AppSubtitle; $appName = ''; $appProduct = ''; $appSubtitle = ''   # engine-v47: the application's own name
 $b = [string][char]0x2022; $gone = -not (Get-Command Get-AppVersionText -ErrorAction SilentlyContinue)
 Assert-Case 'name spot L3: the word and the line under it; no version text' ($w1 -eq 'Kanon' -and $u1 -eq ([string]$script:app.Name + ' ' + $b + ' Forms') -and
-  $u2 -eq [string]$script:app.Name -and $w0 -eq [string]$script:app.Name -and $u0 -eq 'Forms' -and $gone)
+  $u2 -eq [string]$script:app.Name -and $w0 -eq [string]$script:app.Name -and $u0 -eq 'Forms' -and $u3 -eq ('Sample ' + $b + ' Forms') -and $gone)
 $appDisplay = ''; $script:app.Version = $keepVer; $script:startFile = $keepStart

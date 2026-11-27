@@ -428,8 +428,8 @@ amb=$(pwsh -NoProfile -c 'Add-Type -AssemblyName System.Drawing.Common; try { $n
 # Outlook draft: made when Outlook answers, with a fallback text when it does not (the run above shows the fallback).
 grep -q '\$script:draftMade = (-not \$why)' $engine_src && grep -q "Outlook draft could not be created" $engine_src && ok || bad "Outlook draft fallback"
 
-# The tagline (the Administrator, 18 Nov 26): "Test, deploy, enjoy"; no "DoD".
-! grep -q "for your DoD organization" $engine_src && grep -q "'Test, deploy, enjoy'" $engine_src && ok || bad "tagline"
+# The tagline: RADE's full name under the word RADE (engine-v47, the PFM, 2026-11-26; "Test, deploy, enjoy" before); no "DoD".
+! grep -q "for your DoD organization" $engine_src && grep -q "'Redacted Application Deployment Engine'" $engine_src && ! grep -q "Test, deploy, enjoy" $engine_src && ok || bad "tagline"
 psclose; gather   # wait for the groups and add their results
 echo "ENGINE pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

@@ -368,7 +368,7 @@ Assert-Case 'sign-in block (engine-v44, v46): Connect-RadeSite prints STAGE sign
   $cLines[2] -match '^SIGNIN seconds=\d+$' -and $cLines[3] -eq 'STAGE none')
 # engine-v46 (90-161.Z R45 finding 1): a script policy block is a result with no PASS or SKIP line and an error that says
 # Windows did not load the script; a step that printed a line, or failed another way, is not one. The policy line names
-# each scope. RADE_SIGNIN_DPI=0 turns the DPI setting off.
+# each scope. The DPI setting is off unless RADE_SIGNIN_DPI=1 (engine-v47).
 $pb1 = Test-PolicyBlock @{ Pass = 0; Skip = 0; Lines = 0; Err = "File C:\x.ps1 cannot be`nloaded because running scripts is disabled on this system.`n" }
 $pb2 = Test-PolicyBlock @{ Pass = 1; Skip = 0; Lines = 1; Err = 'running scripts is disabled' }
 # Review of PR 206: a step that printed lines did work, so no second run.
@@ -377,9 +377,11 @@ $script:helped = @{}; $h1 = Get-WhatToDo 'loaded because running scripts is disa
 $h2 = Get-WhatToDo '+ FullyQualifiedErrorId : UnauthorizedAccess'
 $pb3 = Test-PolicyBlock @{ Pass = 0; Skip = 0; Lines = 0; Err = 'Access to the path is denied. UnauthorizedAccess' }
 $pl = Get-PolicyLine; $env:RADE_SIGNIN_DPI = '0'; $dOff = Set-SignInDpiAware; Remove-Item Env:\RADE_SIGNIN_DPI
-Assert-Case 'policy block (engine-v46): only a script Windows did not load that printed nothing; one help line; the policy line; DPI off' (
+# engine-v47 (the PFM, 2026-11-26: the DPI sign-in opened its window after about 90 s): off with no setting; on only with '1'.
+$dNone = Set-SignInDpiAware; $env:RADE_SIGNIN_DPI = '1'; $dOn = Set-SignInDpiAware; Remove-Item Env:\RADE_SIGNIN_DPI
+Assert-Case 'policy block (engine-v46): only a script Windows did not load that printed nothing; one help line; the policy line; DPI off unless 1 (engine-v47)' (
   $pb1 -and -not $pb2 -and -not $pb3 -and -not $pb4 -and $h1 -match 'script policy' -and -not $h2 -and
-  $pl -match '^Policy: .+; in effect: \S+$' -and $dOff -eq 'SIGNIN-DPI aware=off')
+  $pl -match '^Policy: .+; in effect: \S+$' -and $dOff -eq 'SIGNIN-DPI aware=off' -and $dNone -eq 'SIGNIN-DPI aware=off' -and $dOn -match '^SIGNIN-DPI aware=(yes|was|no)$')
 # R43 E4 (the PFM, 2026-11-25): the rights check gives its sign-in time (engine-v44: no watch= part).
 $script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Marker = $null }
 $env:RADE_SIGNIN_TEST = '1'; $sr1 = Get-SiteRightsCheck $base 'https://usaf.dps.mil/sites/fake' $null; $env:RADE_SIGNIN_TEST = $null

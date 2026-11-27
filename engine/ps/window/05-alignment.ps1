@@ -197,8 +197,9 @@ $ui.Card.Add_SizeChanged({ try { & $ui.Fit } catch { $null = $_ } })
 $ui.Rows = { param([string]$Text, $Font, [int]$W, [int]$LineH, [int]$Most) if (-not $Text) { return 0 }; [math]::Min($Most, [math]::Max(1, [int][math]::Round((& $ui.Meas $Text $Font $W).Height / [math]::Max(1, $LineH)))) }
 $ui.OptPlan = { param($o, [int]$w)
   # Where the parts of one choice go, and how tall it is. The name gets its width first. The two facts stay on the
-  # right when the name and they fit on one line; else they go on one line under the summary. The summary, a blocked
-  # application's reason and its "What to do" wrap to 2 lines each, then end with "...".
+  # right when the name and they fit on one line and the summary needs 2 lines or fewer beside them; else they go on one
+  # line under the summary, also when they leave the summary less than 60 % of the row. The summary wraps to 4 lines, the notice to 3 (engine-v47, the PFM, 2026-11-26: the summary was cut at full
+  # and at half width; 2 lines before), a blocked application's reason and its "What to do" to 2 lines each; then "...".
   $pad = & $ui.Sc 16; $x = $pad + (& $ui.Sc 38); $inner = $w - $x - $pad; $gap = & $ui.Sc 12
   $h1 = [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $ui.F.Body).Height; $h2 = [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $ui.F.Small).Height
   $vw = 0; if ($o.Ver) { $vw = [System.Windows.Forms.TextRenderer]::MeasureText([string]$o.Ver, $ui.F.Small).Width }
@@ -206,13 +207,26 @@ $ui.OptPlan = { param($o, [int]$w)
   $rw = 0; foreach ($r in @($o.R1, $o.R2)) { if ($r) { $rw = [math]::Max($rw, [System.Windows.Forms.TextRenderer]::MeasureText([string]$r, $ui.F.SmallB).Width) } }
   $under = [bool]($rw -and -not $o.Off -and ($nw + $vw + $gap + $rw) -gt $inner)
   $tw = $inner; if ($rw -and -not $under) { $tw = $inner - $rw - $gap }
-  $s1 = & $ui.Rows ([string]$o.Sub) $(if ($o.Off) { $ui.F.SmallB } else { $ui.F.Small }) $tw $h2 2; $s2 = & $ui.Rows ([string]$o.Sub2) $ui.F.Small $tw $h2 2; $nl = & $ui.Rows ([string]$o.Note) $ui.F.SmallB $tw $h2 2
+  # Inline rows (engine-v47, the Maintenance card, mock option A): the name in a column as wide as the widest name of the
+  # list ($o.Names), the text beside it (2 lines at most), the fact on the right, so 5 rows fit without a scroll
+  # (Windows job of PR 209: the card scrolled at 1020 x 616 with rows of the Choose height). Too narrow: the Choose layout.
+  if ($o.Inline -and $rw) { foreach ($fc in @($o.Facts)) { if ($fc) { $rw = [math]::Max($rw, [System.Windows.Forms.TextRenderer]::MeasureText([string]$fc, $ui.F.SmallB).Width) } }   # the list's widest fact: one layout for all rows
+    $nc = $gap; foreach ($nm in @($o.Names)) { $nc = [math]::Max($nc, [System.Windows.Forms.TextRenderer]::MeasureText([string]$nm, $ui.F.Body).Width + $gap) }
+    $sw = $inner - $rw - $gap - $nc
+    $fits = ($sw -ge (& $ui.Sc 120)); if ($fits) { foreach ($sb in @($o.Subs)) { if ($sb -and (& $ui.Rows ([string]$sb) $ui.F.Small $sw $h2 3) -gt 2) { $fits = $false; break } } }   # every text of the list in 2 lines, else the whole list takes the Choose layout (review of PR 209: a long app name or version)
+    if ($fits) { $sl = & $ui.Rows ([string]$o.Sub) $ui.F.Small $sw $h2 2; $ni = [math]::Max($h1, $sl * $h2); $hi = [math]::Max((& $ui.Sc 40), ($ni + (& $ui.Sc 16)))
+      return @{ Inline = $true; H = [int]$hi; Pad = $pad; X = $x; Tw = [int]($inner - $rw - $gap); Rw = $rw; Under = $false; S1 = $sl; S2 = 0; NL = 0; H1 = $h1; H2 = $h2; Vw = 0; Nw = $nw; Nc = [int]$nc; Sw = [int]$sw; Y = 0 } } }
+  if ($o.Inline -and $rw) { $under = $true; $tw = $inner }   # the fallback of an inline list: every row puts its fact under its text, which takes the whole width (review of PR 209)
+  $sf = $(if ($o.Off) { $ui.F.SmallB } else { $ui.F.Small }); $s1 = & $ui.Rows ([string]$o.Sub) $sf $tw $h2 4
+  if ($rw -and -not $under -and -not $o.Off -and -not $o.Inline -and ($s1 -gt 2 -or $tw -lt [int]($inner * 0.6))) { $under = $true; $tw = $inner; $s1 = & $ui.Rows ([string]$o.Sub) $sf $tw $h2 4 }   # the summary takes the whole width when the facts leave it a narrow column (Windows job of PR 209: 2 short lines and a cut notice)
+  $s2 = & $ui.Rows ([string]$o.Sub2) $ui.F.Small $tw $h2 2; $nl = & $ui.Rows ([string]$o.Note) $ui.F.SmallB $tw $h2 3
   $need = $h1 + ($s1 + $s2 + $nl + [int]$under) * $h2
   $hh = [math]::Max((& $ui.Sc 66), ($need + (& $ui.Sc 20)))
   return @{ H = [int]$hh; Pad = $pad; X = $x; Tw = [int]$tw; Rw = $rw; Under = $under; S1 = $s1; S2 = $s2; NL = $nl; H1 = $h1; H2 = $h2; Vw = $vw; Nw = $nw; Y = [int](($hh - $need) / 2) } }
 $ui.PaintOpt = { param($P, $G)
   # One choice: a key (1 to 9), the name and version, the summary, an optional notice, and two facts. An application
-  # that cannot run here is not a button: a red cross, the reason, what to do, and the word FAILED.
+  # that cannot run here is not a button: a red cross, the reason, what to do, and the word FAILED. A Danger row (the
+  # one destructive action, Uninstall on the Maintenance card; engine-v47) has a dark red edge, name and right text.
   try {
     $o = $P.Tag; $w = $P.ClientSize.Width; $h = $P.ClientSize.Height; $G.Clear($ui.C.White)
     $pl = & $ui.OptPlan $o $w; $pad = $pl.Pad; $x = $pl.X; $y = $pl.Y; $h1 = $pl.H1; $h2 = $pl.H2; $tw = $pl.Tw; $rw = $pl.Rw
@@ -224,21 +238,26 @@ $ui.PaintOpt = { param($P, $G)
       else { $G.DrawLine($cp, $cx, $cy, ($cx + $d), ($cy + $d)); $G.DrawLine($cp, ($cx + $d), $cy, $cx, ($cy + $d)) }; $cp.Dispose()
     } else {
       $foc = [bool]$P.Focused; $t = $(if ($foc) { & $ui.Sc 2 } else { 1 })
-      $pn = New-Object System.Drawing.Pen($(if ($foc) { $ui.C.Navy } else { $ui.C.Edge }), [single]$t); $i = [int]($t / 2); $G.DrawRectangle($pn, $i, $i, ($w - 1 - 2 * $i), ($h - 1 - 2 * $i)); $pn.Dispose()
+      $pn = New-Object System.Drawing.Pen($(if ($foc) { $ui.C.Navy } elseif ($o.Danger) { $ui.C.Red } else { $ui.C.Edge }), [single]$t); $i = [int]($t / 2); $G.DrawRectangle($pn, $i, $i, ($w - 1 - 2 * $i), ($h - 1 - 2 * $i)); $pn.Dispose()
       $k = & $ui.Sc 24; $ky = [int](($h - $k) / 2); $kp = New-Object System.Drawing.Pen($ui.C.Edge); $G.DrawRectangle($kp, $pad, $ky, $k, $k); $kp.Dispose()
       & $ui.Word $G ([string]$o.Key) $ui.F.SmallB $ui.C.Gray $pad $ky $k $k 'HorizontalCenter, VerticalCenter, NoPrefix, SingleLine'
     }
+    if ($pl.Inline) {   # one line: name, text, fact (the Maintenance card)
+      & $ui.Word $G ([string]$o.Name) $ui.F.Body $(if ($o.Off) { $ui.C.Gray } elseif ($o.Danger) { $ui.C.Red } else { $ui.C.Navy }) $x ([int](($h - $h1) / 2)) ($pl.Nc - (& $ui.Sc 4)) $h1 $one
+      $sh = $pl.S1 * $h2; & $ui.Word $G ([string]$o.Sub) $ui.F.Small $ui.C.Gray ($x + $pl.Nc) ([int](($h - $sh) / 2)) $pl.Sw $sh $wrap
+      & $ui.Word $G ([string]$o.R1) $ui.F.Small $(if ($o.Soon) { $ui.C.Gray } elseif ($o.Off -or $o.Danger) { $ui.C.Red } else { $ui.C.Navy }) ($w - $pad - $rw) ([int](($h - $h2) / 2)) $rw $h2 'Right, Top, NoPrefix, SingleLine'
+      return }
     $nw = [math]::Max((& $ui.Sc 40), [math]::Min($pl.Nw, ($tw - $pl.Vw)))   # the name first; the version keeps its place after it
-    & $ui.Word $G ([string]$o.Name) $ui.F.Body $(if ($o.Off) { $ui.C.Gray } else { $ui.C.Navy }) $x $y $nw $h1 $one
+    & $ui.Word $G ([string]$o.Name) $ui.F.Body $(if ($o.Off) { $ui.C.Gray } elseif ($o.Danger) { $ui.C.Red } else { $ui.C.Navy }) $x $y $nw $h1 $one
     if ($o.Ver) { & $ui.Word $G ([string]$o.Ver) $ui.F.Small $ui.C.Gray ($x + $nw) $y ([math]::Max(1, ($tw - $nw))) $h1 $one }
     $yy = $y + $h1
     if ($o.Sub) { & $ui.Word $G ([string]$o.Sub) $(if ($o.Off) { $ui.F.SmallB } else { $ui.F.Small }) $(if ($o.Off -and -not $o.Soon) { $ui.C.Navy } else { $ui.C.Gray }) $x $yy $tw ($pl.S1 * $h2) $wrap; $yy += $pl.S1 * $h2 }
     if ($o.Sub2) { & $ui.Word $G ([string]$o.Sub2) $ui.F.Small $ui.C.Navy $x $yy $tw ($pl.S2 * $h2) $wrap; $yy += $pl.S2 * $h2 }
-    if ($pl.Under) { & $ui.Word $G ((@($o.R1, $o.R2) | Where-Object { $_ }) -join $dot) $ui.F.Small $ui.C.Navy $x $yy $tw $h2 $one; $yy += $h2 }
+    if ($pl.Under) { & $ui.Word $G ((@($o.R1, $o.R2) | Where-Object { $_ }) -join $dot) $ui.F.Small $(if ($o.Soon) { $ui.C.Gray } elseif ($o.Danger) { $ui.C.Red } else { $ui.C.Navy }) $x $yy $tw $h2 $one; $yy += $h2 }   # the row's own color: gray when not set up, dark red for Uninstall (review of PR 209)
     if ($o.Note) { & $ui.Word $G ([string]$o.Note) $ui.F.SmallB $ui.C.Navy $x $yy $tw ($pl.NL * $h2) $wrap }
     if ($rw -and -not $pl.Under) {
       $rx = $w - $pad - $rw
-      if ($o.R1) { & $ui.Word $G ([string]$o.R1) $(if ($o.Off) { $ui.F.SmallB } else { $ui.F.Small }) $(if ($o.Soon) { $ui.C.Gray } elseif ($o.Off) { $ui.C.Red } else { $ui.C.Navy }) $rx ($y + (& $ui.Sc 2)) $rw $h2 'Right, Top, NoPrefix, SingleLine' }
+      if ($o.R1) { & $ui.Word $G ([string]$o.R1) $(if ($o.Off) { $ui.F.SmallB } else { $ui.F.Small }) $(if ($o.Soon) { $ui.C.Gray } elseif ($o.Off -or $o.Danger) { $ui.C.Red } else { $ui.C.Navy }) $rx ($y + (& $ui.Sc 2)) $rw $h2 'Right, Top, NoPrefix, SingleLine' }
       if ($o.R2) { & $ui.Word $G ([string]$o.R2) $ui.F.Small $ui.C.Gray $rx ($y + $h1) $rw $h2 'Right, Top, NoPrefix, SingleLine' }
     }
   } catch { $null = $_ } }
@@ -417,6 +436,7 @@ $ui.SetCard = { param($c)
   try { $ui.Scroll.AutoScrollPosition = New-Object System.Drawing.Point(0, 0) } catch { $null = $_ }; & $ui.Squeeze   # a new card starts at its top
   $f = $null
   if ($c.Focus -eq 'field') { $f = $ui.Field } elseif ($c.Focus -eq 'fieldbutton') { $f = $ui.FieldB } elseif ($c.Focus -eq 'err') { $f = $ui.ErrBox } elseif ($c.Focus -eq 'text') { $f = $(if ($ui.Guide.Visible) { $ui.Guide } else { $ui.Sent }) }   # a card with no box: the focus on its text, so Enter answers nothing
+  elseif ($c.Focus -eq 'button' -and $accept) { $f = $accept }   # engine-v47: the Maintenance card, Enter = Start (review of PR 209)
   elseif ($ui.Opts.Controls.Count) { foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off) { $f = $o; break } } }
   if (-not $f) { $f = $accept }; if (-not $f) { $f = $first }; if (-not $f) { $f = $ui.RecB }
   if (-not $ui.RecOn) { try { [void]$f.Focus() } catch { $null = $_ } }

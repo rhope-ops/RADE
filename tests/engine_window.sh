@@ -111,24 +111,25 @@ has "WIN surrogate pieces=3 whole=True" "WIN shorten=abcd... body-break=True" &&
 # box is as tall as the compact button measured; a row that wraps is aligned line by line (the check box alone on the
 # second line of the test extras is no defect; on the first line, 39 px low, it is).
 has "WIN rule wrapped=0 one-line=1 ~ LAYOUT fixture TestRow OkBox midpoint: 58, the row midpoint is 19" && ok || { bad "window 1e: rows that wrap"; grep "WIN rule" "$wd/win.txt" | cut -c1-300; }
-# 2. A second deploy with a blocked application, Maintenance (Esc = Back, then the same choice: 2 Maintenance cards),
+# 2. A second deploy with a blocked application, Maintenance (Esc = Back, then the same choice, then back from Diagnose and
+# Back up: 4 Maintenance cards; engine-v47: one card with the tool rows),
 # the site address, a failed check that runs again (2 cards), a sign-in check that failed (its card offers the sign-in),
 # the look-and-answer check, and a hand step that failed: needs review with the help line.
 win 1 fail 0 1
-has "opts=OFF Sample app; 1 Sample app (deploy) 1.0.0" "[Check this computer again]" "[Remove RADE]" "view=maint light=off kick=SAMPLE APP (DEPLOY) • 1.0.0 sent=" "sent=Maintenance" "p=Maintenance holds Repair, Diagnose, Back up and Restore. / Start runs the checks, then opens Sample app (deploy)." "btn=(Uninstall) [Maintenance] [Start Sample app (deploy)]" "view=tools light=off kick=SAMPLE APP (DEPLOY) • 1.0.0 sent=" "opts=1 Diagnose; 2 Back up; OFF Restore" "btn=[Repair]" "WIN tools main=Repair help=True" \
+has "opts=OFF Sample app; 1 Sample app (deploy) 1.0.0" "[Check this computer again]" "[Remove RADE]" "view=maint light=off kick=SAMPLE APP (DEPLOY) • 1.0.0 sent=Sample app (deploy) 1.0.0 is installed." "opts=1 Repair; 2 Diagnose; 3 Back up; OFF Restore; OFF Uninstall" "btn=[Start Sample app (deploy)]" "WIN tools main=Repair help=True" \
   "view=toolrun light=off kick=SAMPLE APP (DEPLOY) • 1.0.0 sent=" "sent=Diagnose is running." "view=toolres light=failed" "sent=Diagnose found " \
   "p=Diagnose of Sample app (deploy) 1.0.0, " "PASS: The installed version, 1.0.0, is the version in this paste" "WIN toolres Diagnose path=diagnose-" \
   "sent=Back up has no lists to save." "p=Sample app (deploy) names no lists to back up, so Back up saved nothing." "btn=[Done]" \
   "view=site light=off kick= sent=Which site does the application go to?" "WIN site-note=The address must look like https://rade-test.invalid/sites/name" "view=fail light=failed kick=CHECK 9 OF 11 · FAILED sent=One check failed. p=Your SharePoint site can be reached" "btn=[Change the site address] [Run checks again]" "WIN esc" "WIN again" "sent=One check failed. p=You can change the site (sign in with your CAC) / Sign-in was not finished" "btn=[Change the site address] [Sign in and check site rights]" \
   "view=need light=your turn kick=CHECK 10 OF 11 sent=One check needs you." "btn=[Sign in and check site rights]" "btn=[Check Power Automate]" "sent=Check Power Automate" "btn=[No: one is missing] [Not now] [Yes: I see both]" "steps=1. Select Open in browser. Power Automate opens; sign in with your CAC if asked. ~ 2. Look at the left menu" "rest=You look in Power Automate and answer (about 2 minutes, an estimate). Nothing is changed. close=When you finish in the browser, come back to this window and select \"Yes: I see both\"." "kick=ALL 11 CHECKS PASSED" "btn=[Install] [Change the site address] [Start Sample app (deploy)] foot=Site: fake" "WIN start-button=Start Sample app (deploy) main=Start Sample app (deploy)" \
-  "view=handfail" "view=review light=failed kick=NEEDS REVIEW sent=The install is not complete. p=T02 Sample import r1: FAILED (reported by you)" "flow <SITE> not found" "help=For help, ask in the Teams channel" "btn=[Open results folder] [Close] [Copy summary]" && [ "$(grep -c "^WIN view=maint" "$wd/win.txt")" = 3 ] && [ "$(grep -c "^WIN view=fail .*CHECK 9 OF 11" "$wd/win.txt")" = 2 ] && ! grep -q "^WIN view=answer" "$wd/win.txt" && ok || { bad "window 2: Maintenance, checks that fail or need you, needs review (and no question after It failed)"; grep "view=maint\|view=ready" "$wd/win.txt" | cut -c1-900; tail -5 "$wd/win.txt" | cut -c1-300; }
+  "view=handfail" "view=review light=failed kick=NEEDS REVIEW sent=The install is not complete. p=T02 Sample import r1: FAILED (reported by you)" "flow <SITE> not found" "help=For help, ask in the Teams channel" "btn=[Open results folder] [Close] [Copy summary]" && [ "$(grep -c "^WIN view=maint" "$wd/win.txt")" = 4 ] && [ "$(grep -c "^WIN view=fail .*CHECK 9 OF 11" "$wd/win.txt")" = 2 ] && ! grep -q "^WIN view=answer" "$wd/win.txt" && ok || { bad "window 2: Maintenance, checks that fail or need you, needs review (and no question after It failed)"; grep "view=maint\|view=ready" "$wd/win.txt" | cut -c1-900; tail -5 "$wd/win.txt" | cut -c1-300; }
 # 2b. Start (R28): the installed application has the Start button; selecting it runs the start script of the local copy in its own
 # powershell.exe process and closes RADE. A test application (no start script) has none.
 start=1 win 1 done 0 0
 has "WIN start-button=Start Sample app (deploy) main=Start Sample app (deploy)" "WIN start-process powershell.exe" "WIN started=True closed=True" && ok || { bad "window 2b: Start"; grep "start" "$wd/win.txt" | cut -c1-200; }
 # 2b2. Start on Maintenance (R28 fix): it runs the checks, then starts the application (no Ready card click), and RADE closes.
 start=maint win 1 done 0 0
-has "view=maint" "btn=(Uninstall) [Maintenance] [Start Sample app (deploy)]" "view=ready " "WIN start-process powershell.exe" "WIN maint-start started=True closed=True" && ok || { bad "window 2b2: Start on Maintenance"; grep "maint\|start\|view=ready" "$wd/win.txt" | cut -c1-200; }
+has "view=maint" "btn=[Start Sample app (deploy)]" "view=ready " "WIN start-process powershell.exe" "WIN maint-start started=True closed=True" && ok || { bad "window 2b2: Start on Maintenance"; grep "maint\|start\|view=ready" "$wd/win.txt" | cut -c1-200; }
 # 2c. Cancel on the checking card (in group W: it runs on the install state that 1 to 2b2 left, as before the split).
 cancel=1 win 1 done 0 0
 has "WIN cancel busy=" "view=checking light=off kick= sent=Checking this computer and your access." "btn=[Cancel]" "view=run " && [ "$(grep -c "^WIN view=choose" "$wd/win.txt")" -ge 2 ] && ok || { bad "window 2c: Cancel on the checking card"; grep "WIN cancel\|view=checking\|view=choose" "$wd/win.txt" | cut -c1-200; }
@@ -211,7 +212,7 @@ grep -q "^WIN script-warn mismatch view=choose text=\[This script does not match
   grep -q "^WIN script-warn own match choose text=\[Last round on this computer: none recorded yet.\] red=False$" "$wd/win.txt" &&
   grep -q "^WIN script-warn own match ready text=\[Site: example | Script check: line\] red=False$" "$wd/win.txt" &&
   grep -q "^WIN script-warn own match boot text=\[\] red=False$" "$wd/win.txt" && ok || bad "script hash warning: red line and the full Script check line on a mismatch, the full line on Ready (E1), none on boot or Choose on a match or when not available"
-grep -q "^WIN topbar title=RADE - engine-v[0-9][0-9]* - R[0-9][0-9]* spot=Test, deploy, enjoy shown=True same-font=True approw=False right=\[\]$" "$wd/win.txt" && grep -q "right=[0-9]* %\( \|$\)" "$wd/win.txt" && ! grep -q "right=RADE is working\|right=Your turn\|right=[0-9]* % ·" "$wd/win.txt" && ok || bad "top bar: title (RADE - engine-vNN - round; R44 E2), tagline spot, percent only"
+grep -q "^WIN topbar title=RADE - engine-v[0-9][0-9]* - R[0-9][0-9]* spot=Redacted Application Deployment Engine shown=True same-font=True approw=False right=\[\]$" "$wd/win.txt" && grep -q "right=[0-9]* %\( \|$\)" "$wd/win.txt" && ! grep -q "right=RADE is working\|right=Your turn\|right=[0-9]* % ·" "$wd/win.txt" && ok || bad "top bar: title (RADE - engine-vNN - round; R44 E2), tagline spot, percent only"
 # L4: the last card of a test round (after the last step); its text is in the report under its own line, masked. L5: the 2 state texts.
 has "view=feedback light=your turn kick=LAST QUESTION sent=Anything else about this round or the app? p=This is optional. Do not type names or addresses. btn=[Continue]" "right= app=" "WIN feedback max=10000 enter=Continue focus=True" "WIN paste ok=True text=line one line two cut=xxxxx joined=a b c note=" "WIN paste-cut ok=True inserted=3 note=The paste was too long: 1,234 characters did not fit. shown=True" "WIN paste-cut one=The paste was too long: 1 character did not fit." "WIN paste-cut none=[]" 'foot=RADE asks you one last question at the end. Until then, keep this window open.' &&
   grep -q "^Other feedback: The second card was slow. Mail <EMAIL>" "$wr" && ! grep -q "someone@\|RADE is waiting for you" "$wd/win.txt" "$wr" && [ "$(cat $engine_src $ui_src | grep -c "RADE is waiting for you")" = 0 ] && ok || { bad "r31 L4, L5: the last card, its report line, the state texts"; grep "view=feedback\|Other feedback\|foot=" "$wd/win.txt" "$wr" | cut -c1-260; }
@@ -262,3 +263,14 @@ P
 # A deploy asks no last question.
 ! grep -q "view=feedback" "$t/w1/win.txt" && ! grep -q "^Other feedback" "$t/w1/u/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && ok || bad "r31 L4: a deploy has no last question"
 echo "GROUP $pass $fail"; } > "$t/grp-W4.log" 2>&1 &
+go W5; {   # group W5: an app with application.productName (engine-v47, the PFM, 2026-11-26: "Kanon icon and name")
+wgo w5
+cp -r "$t/app" "$wd/kapp"; python3 -c "import json,sys; p=sys.argv[1]; m=json.load(open(p)); m['application'].update(productName='Kanon', subtitle='Publications and Forms Management'); json.dump(m,open(p,'w'),indent=2)" "$wd/kapp/scripts/paste_bundles.json"
+python3 engine/rade_build.py --app-root "$wd/kapp" > "$wd/kbuild.txt" 2>&1 || cat "$wd/kbuild.txt"
+swap "$wd/kapp/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" "$wd/kb.ps1" "$wd/u"
+# A first deploy of the Kanon variant: the headline asks for the version, each choice is "Kanon <version or round>", the
+# title is "Kanon - <round>" on Choose and "Kanon - <version>" once the install is chosen, the app's row shows from boot.
+win 1 done 0 0 "$wd/kb.ps1"
+has "view=boot" "view=choose light=off kick= sent=What version of Kanon do you want to install?" "Kanon 1.0.0" "Kanon R01" "sent=Ready to install Sample app (deploy) 1.0.0." && \
+  grep -q "^WIN topbar title=Kanon - R01 spot=Redacted Application Deployment Engine shown=[A-Za-z]* same-font=True approw=True " "$wd/win.txt" && ok || { bad "window W5: Kanon (productName): headline, choice names, title, app row from boot"; grep "view=choose\|WIN topbar" "$wd/win.txt" | cut -c1-300; tail -3 "$wd/win.txt" | cut -c1-300; }
+echo "GROUP $pass $fail"; } > "$t/grp-W5.log" 2>&1 &
