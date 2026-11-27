@@ -63,8 +63,7 @@ $ui.VChoose = {
   & $ui.SetCard @{ View = 'choose'; Sentence = (& $ui.ChooseSentence $dep)
     P = @($(if ($nr) { 'A newer round, ' + $nr + ', is in the repository. Close this window and run ' + $nr + ' instead.' } else { '' })); Options = $list; OnOption = { param($j) & $ui.Pick $j }
     PageLink = [bool](@($ui.Newer.Values | Where-Object { $_ }).Count)
-    Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Kind = 'primary'; Act = { & $ui.Boot } } } else { $null }),
-      $(if ($dep) { @{ Text = 'Remove RADE'; Kind = ''; Act = { & $ui.VRemoveRade } } } else { $null }))   # engine-v40 (E3 b): deploy bundles only
+    Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Kind = 'primary'; Act = { & $ui.Boot } } } else { $null }))   # no "Remove RADE" (engine-v48; the PFM, 2026-11-26): the last app's Uninstall clears RADE's shared folder
     Foot = $(if ($dep) { '' } else { Get-LastRoundText $ui.Hist }) } }
 # Shows "Checking this computer", runs the base checks and then shows Choose; shows the error card when they stop. Takes
 # nothing.

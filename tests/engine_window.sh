@@ -113,9 +113,9 @@ has "WIN rule wrapped=0 one-line=1 ~ LAYOUT fixture TestRow OkBox midpoint: 58, 
 # 2. A second deploy with a blocked application, Maintenance (Esc = Back, then the same choice, then back from Diagnose and
 # Back up: 4 Maintenance cards; engine-v47: one card with the tool rows),
 # the site address, a failed check that runs again (2 cards), a sign-in check that failed (its card offers the sign-in),
-# the look-and-answer check, and a hand step that failed: needs review with the help line.
+# the look-and-answer check, and a hand step that failed: needs review with the help line. Choose has no "Remove RADE" (engine-v48).
 win 1 fail 0 1
-has "opts=OFF Sample app; 1 Sample app (deploy) 1.0.0" "[Check this computer again]" "WIN esc-fail view=fail back=Back" "[Remove RADE]" "view=maint light=off kick=SAMPLE APP (DEPLOY) • 1.0.0 sent=Sample app (deploy) 1.0.0 is installed." "opts=OFF Install 1.0.0; 1 Repair; 2 Diagnose; 3 Back up; OFF Restore; OFF Uninstall" "btn=[Start Sample app (deploy)]" "WIN tools main=Repair help=True" \
+has "opts=OFF Sample app; 1 Sample app (deploy) 1.0.0" "[Check this computer again]" "WIN esc-fail view=fail back=Back" "view=maint light=off kick=SAMPLE APP (DEPLOY) • 1.0.0 sent=Sample app (deploy) 1.0.0 is installed." "opts=OFF Install 1.0.0; 1 Repair; 2 Diagnose; 3 Back up; OFF Restore; OFF Uninstall" "btn=[Start Sample app (deploy)]" "WIN tools main=Repair help=True" \
   "view=toolrun light=off kick=SAMPLE APP (DEPLOY) • 1.0.0 sent=" "sent=Diagnose is running." "view=toolres light=failed" "sent=Diagnose found " \
   "p=Diagnose of Sample app (deploy) 1.0.0, " "PASS: The installed version, 1.0.0, is the version in this paste" "WIN toolres Diagnose path=diagnose-" \
   "sent=Back up has no lists to save." "p=Sample app (deploy) names no lists to back up, so Back up saved nothing." "btn=[Done (Enter)]" \
@@ -123,6 +123,7 @@ has "opts=OFF Sample app; 1 Sample app (deploy) 1.0.0" "[Check this computer aga
   "view=need light=your turn kick=CHECK 10 OF 11 sent=One check needs you." "btn=[Sign in and check site rights]" "btn=[Check Power Automate (Enter)]" "sent=Check Power Automate" "btn=[Not now] [No: one is missing] [Yes: I see both (Enter)]" "steps=1. Select Open in browser. Power Automate opens; sign in with your CAC if asked. ~ 2. Look at the left menu" "rest=You look in Power Automate and answer (about 2 minutes, an estimate). Nothing is changed. close=When you finish in the browser, come back to this window and select \"Yes: I see both\"." "kick=ALL 11 CHECKS PASSED" \
   "btn=[Install] [Change the site address] [Start Sample app (deploy)] foot=Site: fake" "WIN start-button=Start Sample app (deploy) main=Start Sample app (deploy)" \
   "view=handfail" "view=stepfail light=failed kick=× STEP 3 OF 4 FAILED sent=A step failed: Import the sample flow. p=Import failed: flow <SITE> not found" "help=For help, ask in the Teams channel" "btn=[Copy summary] [Close] [Try again (Enter)]" && [ "$(grep -c "^WIN view=maint" "$wd/win.txt")" = 4 ] && [ "$(grep -c "^WIN view=fail .*CHECK 9 OF 11" "$wd/win.txt")" = 2 ] && ! grep -q "^WIN view=answer" "$wd/win.txt" && ok || { bad "window 2: Maintenance, checks that fail or need you, a step that failed (and no question after It failed)"; grep "view=maint\|view=ready" "$wd/win.txt" | cut -c1-900; tail -5 "$wd/win.txt" | cut -c1-300; }
+! grep -q "Remove RADE" "$wd/win.txt" && ok || bad "window 2: Choose has no \"Remove RADE\" button (engine-v48)"
 # 2b. Start (R28): the installed application has the Start button; selecting it runs the start script of the local copy in its own
 # powershell.exe process and closes RADE. A test application (no start script) has none.
 start=1 win 1 done 0 0

@@ -1,4 +1,4 @@
-# RADE test: the Maintenance tools Uninstall and Remove RADE (engine-v40; 90-161.Z R43 E3), part 2 of tests/tools_unit.ps1.
+# RADE test: the Maintenance tool Uninstall (engine-v40; 90-161.Z R43 E3) and its clean-up (engine-v48), part 2 of tests/tools_unit.ps1.
 # Dot-sourced by tests/tools_unit.ps1 at its end: it uses that file's scope (the engine parts, the fake PnP site, Assert-Case,
 # $base, $Dir); it does not run alone.
 # Network: none (the fake PnP refuses every address but the fake site's).
@@ -55,33 +55,7 @@ $nbA = @(Get-ChildItem -LiteralPath (Join-Path $base 'Backups') -Directory).Coun
 $u = Invoke-Uninstall $base $null $null; [System.IO.File]::WriteAllText($recPath, $recText); $nbB = @(Get-ChildItem -LiteralPath (Join-Path $base 'Backups') -Directory).Count
 Assert-Case 'uninstall: a record of a newer RADE stops it before the backup and any step' ($u.State -eq 'refused' -and ($u.Lines -join ' ') -like '*a newer RADE installed*' -and
   $nbB -eq $nbA -and -not (Test-Path -LiteralPath (Join-Path $base 'U01')))
-# ---- Remove RADE (engine-v40, E3 b, option A): off while an app is installed; then RADE's own files go, Backups stay.
-$keepRec = [System.IO.File]::ReadAllText((Read-InstalledRaw $key).Path)
-$script:app.Uninstall = @(); $null = Save-Installed 'PASSED' $true @{ 'T01-make' = @{ state = 'PASSED'; made = @() } }
-$rr = Invoke-RemoveRade
-$cfgThere = Test-Path -LiteralPath (Join-Path $Dir 'RADE\Config')
-Assert-Case 'remove RADE: blocked while an app is installed; the card names it' ($rr.State -eq 'blocked' -and ($rr.Lines -join ' ') -like '*Sample app*' -and $cfgThere)
-[System.IO.File]::WriteAllText((Read-InstalledRaw $key).Path, $keepRec)   # back to the uninstalled record
-Set-Content -LiteralPath (Join-Path $Dir 'RADE\rade-runner.ps1') -Value '# runner'; $null = New-Item -ItemType Directory -Path (Join-Path $Dir 'RADE\Other') -Force
-$rr = Invoke-RemoveRade; $left = @(Get-ChildItem -LiteralPath $base -Force | ForEach-Object { $_.Name })
-Assert-Case 'remove RADE: Config, the runner and the app files go; Backups stays' ($rr.State -eq 'done' -and -not (Test-Path -LiteralPath (Join-Path $Dir 'RADE\Config')) -and
-  -not (Test-Path -LiteralPath (Join-Path $Dir 'RADE\rade-runner.ps1')) -and ($left -join ',') -eq 'Backups')
-Assert-Case 'remove RADE: a folder that no record names stays' (Test-Path -LiteralPath (Join-Path $Dir 'RADE\Other'))
-# A record whose key names a folder outside RADE ("..") or an odd name: no folder outside RADE is touched.
-$null = New-Item -ItemType Directory -Path (Join-Path $Dir 'RADE\Config\installed') -Force; Set-Content -LiteralPath (Join-Path $Dir 'keep.txt') -Value 'x'
-'{"schema":"rade-installed/2","key":"../x","installed":null}' | Set-Content -LiteralPath (Join-Path $Dir 'RADE\Config\installed\aaaaaaaaaaaa.json')
-'{"schema":"rade-installed/2","key":"Config./z","installed":null}' | Set-Content -LiteralPath (Join-Path $Dir 'RADE\Config\installed\cccccccccccc.json')
-'{"schema":"rade-installed/2","key":"Other/y","installed":null}' | Set-Content -LiteralPath (Join-Path $Dir 'RADE\Config\installed\bbbbbbbbbbbb.json')
-$odd = @(Get-RadeAppDir | ForEach-Object { Split-Path -Leaf $_ })
-Assert-Case 'remove RADE: a key with ".." or "Config." names no folder; a plain one names its folder' (-not ($odd -contains '..') -and -not ($odd -like 'Config*') -and ($odd -contains 'Other') -and
-  @($odd | Where-Object { -not (Test-Path -LiteralPath (Join-Path (Join-Path $Dir 'RADE') $_)) }).Count -eq 0)
-$okNames = @('SampleApp', '90-161.Z', 'App_1', 'A b') | Where-Object { Test-RadeAppName $_ }
-$noNames = @('..', '.', './x', 'Config', 'config', 'Config.', 'x.', 'x ', ' x', '.git', 'Backups', 'C:', '') | Where-Object { Test-RadeAppName $_ }
-Assert-Case 'remove RADE: the app folder name test takes plain names only (no trim to another name, not Config or Backups)' (@($okNames).Count -eq 4 -and @($noNames).Count -eq 0)
-$null = Invoke-RemoveRade
-Assert-Case 'remove RADE: nothing outside the RADE folder is touched' (Test-Path -LiteralPath (Join-Path $Dir 'keep.txt'))
 # ---- Back up stall (engine-v42; 90-161.Z R44 E4): the sign-in time line, the site check and the stage time limit.
-Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake'   # Remove RADE above took RADE\Config, so the site address goes back
 $script:app.Backup = @('Sample Tasks'); $fk = Get-Content -LiteralPath $env:RADE_FAKE_PNP -Raw | ConvertFrom-Json
 $env:RADE_SIGNIN_TEST = '1'; Start-Sleep -Seconds 1; $b1 = Invoke-Backup $base $null; $env:RADE_SIGNIN_TEST = $null
 Assert-Case 'back up (R44 E4, engine-v44): the result gives the sign-in time; the run log has the SIGNIN line with the host' ($b1.State -eq 'done' -and
@@ -98,7 +72,7 @@ Assert-Case 'back up (R44 E4): a sign-in that runs past the stage limit is stopp
 $fk.PSObject.Properties.Remove('signinSleep'); Set-Fake $fk
 Assert-Case 'back up (R44 E4): the stage words name the list' ((Get-StageText 'list 1' @('Sample Tasks')) -eq 'the read of the list "Sample Tasks"' -and
   (Get-StageText 'site' @()) -eq 'the site check' -and (Get-StageText 'list 9' @('A')) -eq 'the stage "list 9"')
-# ---- One shortcut for each app (engine-v42; 90-161.Z R44 E1): names, the runner path, the .ico container, Remove RADE.
+# ---- One shortcut for each app (engine-v42; 90-161.Z R44 E1): names, the runner path, the .ico container.
 $appDisplay = 'Sample - Kanon'; $keepVer = $script:app.Version; $script:app.Version = '0.1.0'
 Assert-Case 'shortcut (engine-v46): the name is the app word, no version; the display name is not in it' ((Get-ShortcutName) -eq [string]$script:app.Name -and
   $(& { $appProduct = 'Kanon'; (Get-ShortcutName) -eq 'Kanon' }))
@@ -114,8 +88,6 @@ $saved = Save-RunnerCopy; $script:selfText = "`$buildId = '" + $buildId + "'`n`$
 Set-Content -LiteralPath $rp -Value ("`$engineRelease = " + ($engineRelease + 1))
 $script:selfText = "`$buildId = '" + $buildId + "'`n`$engineRelease = " + $engineRelease + "`n"; $newerStays = -not (Save-RunnerCopy)
 Assert-Case 'shortcut (R44 E1): the runner copy is saved; a higher engine release stays' ($saved -and $older -and $newerStays)
-$null = Invoke-RemoveRade
-Assert-Case 'remove RADE (engine-v42): the runners folder goes' (-not (Test-Path -LiteralPath (Join-Path (Join-Path $Dir 'RADE') 'runners')))
 $appDisplay = ''; $script:app.Version = $keepVer
 # ---- ISE start (engine-v42; 90-161.Z R44 E3): from ISE the window goes to a child powershell.exe -STA, with plain fallbacks.
 $script:selfText = "`$buildId = '" + $buildId + "'"; $h1 = Get-IseHandoff 'Windows PowerShell ISE Host' 'RemoteSigned'; $h2 = Get-IseHandoff 'ConsoleHost' 'RemoteSigned'
@@ -126,7 +98,6 @@ Assert-Case 'ISE start (R44 E3): ISE goes to the child; ConsoleHost stays; AllSi
   -not $h3.Go -and $h3.Why -eq 'the execution policy is AllSigned' -and -not $h4.Go -and $h4.Why -eq 'RADE_ISE_CHILD=0' -and
   -not $h5.Go -and $h5.Why -eq 'RADE could not read its own text' -and -not $h6.Go)
 # R44 E4: a site check that cannot read the site gives its own words (not "the sign-in did not finish").
-Save-SiteUrl $base 'https://usaf.dps.mil/sites/fake'   # Remove RADE above took RADE\Config again
 $fk | Add-Member -NotePropertyName webError -NotePropertyValue $true -Force; Set-Fake $fk
 Start-Sleep -Seconds 1; $script:app.Backup = @('Sample Tasks'); $b5 = Invoke-Backup $base $null
 Assert-Case 'back up (R44 E4): a site check that fails is named as the site check' ($b5.State -eq 'failed' -and
