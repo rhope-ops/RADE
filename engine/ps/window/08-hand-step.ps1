@@ -5,7 +5,7 @@
 # ---- A step you do by hand, or a check you answer by looking (R13, R14, R18): the card holds the numbered lines, the
 # address (it can be changed; it is remembered in Config), the file path on the clipboard, and the answers. The engine
 # waits in $script:guideUi until an answer is set: OK = Done or Yes, No, Abort = It failed (with the error text),
-# Cancel = Skip, Not now, or the window closed. Enter never answers here: Done needs a deliberate click.
+# Cancel = Skip, Not now, or the window closed. Enter = Done (plan engine-v48 step 4; before: a click only).
 $ui.VHand = {
   $st = $ui.G.Step; $file = [string]$ui.G.File; $hide = @($st.Hide)
   $clip = $(if (-not $file) { '' } elseif (Copy-TextToClipboard $file) { 'The path of ' + $st.File + ' is on the clipboard.' } else { 'Select "Copy file path" to put the path of ' + $st.File + ' on the clipboard.' })
@@ -14,12 +14,12 @@ $ui.VHand = {
   $addr = [bool]($ui.GUrl -or $st.UrlConfig); $dw = $(if ($st.DoneText) { [string]$st.DoneText } else { 'Done' })
   # E1 (the Administrator, 2026-11-19): the step's "hide" takes buttons off the card; one button always stays (the build checks it).
   $one = @{ Text = $dw; Kind = 'primary'; Act = { $ui.Answer = 'OK' } }; $three = @{ Text = $(if ($st.SkipText) { [string]$st.SkipText } else { 'Skip' }); Act = { $ui.Answer = 'Cancel' } }
-  $bs = @($(if ($hide -notcontains 'done') { $one }), $(if ($hide -notcontains 'failed') { $two }), $(if ($hide -notcontains 'skip') { $three }))
+  $bs = @($(if ($hide -notcontains 'done') { $one }), $(if ($hide -notcontains 'skip') { $three }), $(if ($hide -notcontains 'failed') { $two }))   # Cards v2: Done, then Skip and It failed
   $close = $(if ($hide -contains 'done') { '' } elseif ($addr) { 'When you finish in the browser, come back to this window and select "' + $dw + '".' } else { 'When you finish, select "' + $dw + '".' })
   & $ui.SetCard @{ View = 'hand'; Light = 'you'; Kicker = $(if ($ui.Running -and $ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN } else { '' }); Sentence = (Get-StepTitle $st)
     P = @([string]$st.Note); Lines = @($st.Guide); Close = $close
     Field = $(if ($addr) { @{ Label = 'Address'; Text = $ui.GUrl; Name = 'Address to open'; Button = 'Open in browser'; Act = { & $ui.OpenUrl } } } else { $null }); Path = $file; Links = [bool]$file; Note = $clip
-    Buttons = $bs; NoAccept = $true; Focus = $(if ($addr) { 'fieldbutton' } else { 'text' }) } }
+    Buttons = $bs; Focus = $(if ($addr) { 'fieldbutton' } else { 'text' }) } }   # Cards v2 (critique change 3): Enter = Done ("Done (Enter)")
 # Shows the card where the user pastes the error of a hand step that failed; its button sets the answer to Abort. Takes
 # nothing.
 $ui.VHandFail = {

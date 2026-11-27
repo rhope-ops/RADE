@@ -53,6 +53,10 @@ RUNS = [
     ("device200-full", 0, "done", "0", "", False),
     ("device150-logo", 0, "done", "0", "956x1081", False),   # engine-v43 L1: an application logo and a subtitle (the 90-161.Z case)
     ("contrast-full", 0, "done", "0", "", False),
+    # plan engine-v48 D6 (the PFM, 2026-11-27): the dark theme (Kanon in Fulcrum colors), at 100 % and at the PFM's half size
+    # at 150 % (956 x 1081: under 700 px at 100 %, so the band shows its half-size parts and the buttons stack)
+    ("dark-full", 0, "done", "0", "", False),
+    ("device150-dark", 0, "done", "0", "956x1081", False),
 ]
 # Swaps for a "device150-" run: the form's sizes are given at 64 dpi, so Windows Forms scales it by 1.5 on a 96 dpi screen,
 # and the form's dpi reads 144 (the engine's $ui.Sc and its font factor follow it), as on a screen with 150 % scaling.
@@ -65,6 +69,8 @@ def device(k):
 # The swap of the contrast run: the window reads a contrast theme as on ($ui.HighOn), so every color is a system color.
 CONTRAST = [(r"\$ui\.HighOn = \{ try \{ return \[bool\]\[System\.Windows\.Forms\.SystemInformation\]::HighContrast \} catch \{ return \$false \} \}",
              "$ui.HighOn = { return $true }")]
+# The swap of a dark run (a name that starts with "dark-" or holds "-dark"): the window reads the Windows app mode as dark.
+DARK = [(r"\$ui\.Dark = \[bool\]\(& \$ui\.DarkOn\);", "$ui.Dark = $true;")]
 DEVICE_150 = [
     (r"\$ui\.Form\.AutoScaleDimensions = New-Object System\.Drawing\.SizeF\(96, 96\)", "$ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(64, 64)"),
     (r"if \(\$d -gt 0\) \{ \$ui\.Dpi = \$d \}", "if ($d -gt 0) { $ui.Dpi = $d * 1.5 }"),
@@ -200,9 +206,9 @@ def r32_why(lines, name):
     if name.startswith("device150-"):
         rows = [re.search(r" name=(\d+)/(\d+) bar=(\d+)/.* frac=(\d+)/", l) for l in lines if l.startswith("WIN r32 ") and "-run " in l]
         rows = [tuple(int(x) for x in m.groups()) for m in rows if m]
-        # the bar and the count start inside the title's rows: they are on its line, not on a line of their own under it
-        if len(rows) < 3 or any(not (top <= bar < top + high and top <= frac < top + high) for top, high, bar, frac in rows):
-            why.append("the step's bar or count is not on the title's line: %s" % rows[:4])
+        # Cards v2 (plan engine-v48 step 3): the bar is under the title, and the count is on the bar's line (its top within 30 px)
+        if len(rows) < 3 or any(not (bar >= top + high - 1 and abs(frac - bar) <= 30) for top, high, bar, frac in rows):
+            why.append("the step's bar is not under the title, or the count is not on the bar's line: %s" % rows[:4])
     return why
 
 
@@ -262,12 +268,14 @@ def restore_why(lines):
 
 
 def swaps_for(name):
-    """The swaps of a run's test copy, by the start of its name: device150-, device125-, device175-, device200- (the scale) or contrast-.
+    """The swaps of a run's test copy, by the start of its name: device150-, device125-, device175-, device200- (the scale) or contrast-,
+    and the dark theme for a name that starts with "dark-" or holds "-dark".
     200 % on the job's 1920 x 1080 screen is 960 x 540 at 100 %, smaller than 1020 x 616, so its text may scroll too (main)."""
+    dark = list(DARK) if name.startswith("dark-") or "-dark" in name else []
     for k, v in (("device150-", DEVICE_150), ("device125-", device(1.25)), ("device175-", device(1.75)), ("device200-", device(2)), ("contrast-", CONTRAST)):
         if name.startswith(k):
-            return v
-    return ()
+            return list(v) + dark
+    return dark
 
 
 def ui_why(lines, d, name):

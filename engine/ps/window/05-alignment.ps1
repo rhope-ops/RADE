@@ -12,62 +12,28 @@
 # (1/6 em, rounded up). R24 job: a formula and a with/without-NoPadding measure both missed by 3 to 6 px.
 # One edge per card at $ui.Sc 10 from the card's column: room for the largest text inset (a 22 pt headline: about 7)
 # and for a button's 4 px margin, because a negative margin is taken as 0 in a table cell (R24 job).
-$ui.FitEdges = { try {
+$ui.FitEdges = {
+  <#
+  .SYNOPSIS
+  Puts the ink of each part of the card on one edge, $ui.Sc 10 into the card's column (the help above).
+  .DESCRIPTION
+  Texts by their measured ink; the buttons by their own 4 px margin; a list or a box (the Run card's lists and bar, the
+  WHAT TO DO box) by its own edge; the YOUR TURN chip by its yellow box, else the line in capitals by its ink.
+  .OUTPUTS
+  Nothing. Changes left margins; a part that cannot be measured keeps its margin until the next fit.
+  #>
+  try {
     $mm = & $ui.Sc $ui.Z.M; $x = & $ui.Sc 10; $ui.EdgeX = $x
-    foreach ($l in @($ui.Kick, $ui.Turn, $ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathL, $ui.PathT, $ui.Note, $ui.Help, $ui.Foot, $ui.Close, $ui.Now, $ui.FieldL, $ui.TestL)) { & $ui.SetLeft $l ($x - (& $ui.Ink $l)) }
+    foreach ($l in @($ui.P[0], $ui.P[1], $ui.P[2], $ui.P[3], $ui.PathL, $ui.PathT, $ui.Note, $ui.Help, $ui.Foot, $ui.Close, $ui.FieldL, $ui.TestL)) { & $ui.SetLeft $l ($x - (& $ui.Ink $l)) }
     & $ui.SetLeft $ui.TickP 0; & $ui.SetLeft $ui.SentRow ($x - $(if ($ui.TickP.Visible) { & $ui.Ink $ui.TickP } else { & $ui.Ink $ui.Sent }))
-    & $ui.FitStepEdge; & $ui.SetLeft $ui.ErrRow ($x - $ui.ErrBox.Margin.Left)
+    & $ui.SetLeft $ui.PctRow ($x - (& $ui.Ink $ui.PctL)); foreach ($b in @($ui.RunBar, $ui.RunA, $ui.RunRow, $ui.RunB, $ui.Todo)) { & $ui.SetLeft $b $x }   # a list or a box: its edge on the card edge
+    & $ui.SetLeft $ui.ErrRow ($x - $ui.ErrBox.Margin.Left)
     & $ui.SetLeft $ui.BtnRow ($x - $mm)   # a button's own 4 px margin (room for the ring)
     $l1 = @($ui.LinkRow.Controls | Where-Object { $_.Visible })[0]; if ($l1) { & $ui.SetLeft $ui.LinkRow ($x - $mm - (& $ui.Ink $l1)) }   # a link's text is in the middle of its box
     if ($ui.Guide.Visible) { & $ui.SetLeft $ui.Guide ($x - (& $ui.GuideInk)) }   # the widest number sits on the edge; shorter ones are right-aligned to it
-    & $ui.SetLeft $ui.Opts $x } catch { $null = $_ }
-  & $ui.FitHead }
-# The step title's ink on the card's edge, and nothing after it in the step row moves when a new title starts with
-# another letter (the Administrator, 2026-11-19): the row is 8 px left of the edge, and the title's left and right
-# margins share those 8 px (left = 8 - the ink of its first letter). Takes nothing; uses $ui.EdgeX.
-$ui.FitStepEdge = { $sd = & $ui.Sc 8; & $ui.SetLeft $ui.StepRow ([int]$ui.EdgeX - $sd); $il = [int][math]::Max(0, [math]::Min($sd, $sd - (& $ui.Ink $ui.StepName))); $m = $ui.StepName.Margin
-  if ($m.Left -ne $il -or $m.Right -ne $sd - $il) { $ui.StepName.Margin = New-Object System.Windows.Forms.Padding($il, $m.Top, ($sd - $il), $m.Bottom) } }
-# The edges of the logo block's columns (R29b V1, L1, L2): the help is in the block.
-$ui.FitHead = {
-  <#
-  .SYNOPSIS
-  Puts the ink of each column of the logo block on one edge and sizes the lines.
-  .DESCRIPTION
-  R29b V1, L1 (the PFM, 2026-11-26): in each column the word and its subtitle start their ink on one edge, and when both
-  rows start at the same x (both logos, or neither) the two columns share that edge. Each part sits at the same x in its
-  row and draws its text ink-tight ($ui.InkText); what is left of a difference (measured) moves each to the largest. L2:
-  the line under a word is as wide as the word's ink and starts where it starts. Name spot L3 (engine-v46): no version
-  text beside the word, and once an application with a logo is chosen only its column shows.
-  .OUTPUTS
-  Nothing. Changes the left margins of the words, the lines and the subtitles and the widths of the lines. Before the
-  window has a handle nothing can be measured: the next fit sets them.
-  #>
-  try {
-    $cols = @(& $ui.HeadCols); $same = & $ui.HeadPair; $all = @()
-    foreach ($c in $cols) { $c.IW = & $ui.Ink $c.W; $c.IS = $(if ($c.Sub) { & $ui.Ink $c.S } else { 0 }); $c.E = [math]::Max($c.IW, $c.IS); $all += $c.E }
-    $top = [int]($all | Measure-Object -Maximum).Maximum
-    foreach ($c in $cols) { $e = $(if ($same) { $top } else { $c.E })
-      & $ui.SetLeft $c.W ($e - $c.IW); if ($c.Sub) { & $ui.SetLeft $c.S ($e - $c.IS) }
-      # R34: the width comes from the ink Windows drew in the panel ($ui.InkBox, the measure of the self-check), not from the
-      # panel's width: at 150 % in ISE the panel was 114 wide and the drawn word 93 (each card had the defect).
-      & $ui.SetLeft $c.R $e; $rw = & $ui.RuleW $c.W; if ($c.R.Width -ne $rw) { $c.R.Width = $rw } } } catch { $null = $_ } }   # no measure (no window handle yet): the next fit sets the edges
-# The columns of the logo block that show: the RADE column while its row shows ($ui.RadeRowOn; L3: an application with a
-# logo hides it), and the application column when its row shows. Each is @{ W (word); R (line); S (subtitle); Sub (the
-# subtitle shows) }. Takes nothing.
-$ui.HeadCols = { $o = @(); if ($ui.RadeRowOn) { $o += @{ W = $ui.WordL; R = $ui.HeadRule; S = $ui.TagL; Sub = $true } }
-  if ($ui.AppRow.Visible) { $o += @{ W = $ui.AppWordL; R = $ui.AppRule; S = $ui.AppL; Sub = [bool]($ui.AppL.Visible -and [string]$ui.AppL.Text) } }
-  $o }
-# The width of the line under a word: the width of the word's drawn ink, measured once for each text, font and panel
-# size. Takes the word's panel; gives back the width in pixels (at least 1).
-$ui.RuleW = { param($W) $f = $W.Font; $k = 'rule|' + [string]$W.Text + '|' + $f.Name + '|' + $f.SizeInPoints + '|' + $W.Width + 'x' + $W.Height
-  if ($ui.Inks.ContainsKey($k)) { return [int]$ui.Inks[$k] }
-  $b = & $ui.InkBox $W; $v = [math]::Max(1, [int]$b.Right - [int]$b.Left)
-  $all = ([int]$b.Left -eq 0 -and [int]$b.Top -eq 0 -and [int]$b.Right -eq [int]$W.Width -and [int]$b.Bottom -eq [int]$W.Height)
-  if (-not $all) { $ui.Inks[$k] = $v }   # only a measure is kept (review of PR 123: also when the ink is as wide as the panel); the whole box is the fallback
-  return $v }   # no measure (no window handle yet): the next fit sets the edges
-# Whether the application row shows and starts its text at the same x as the RADE row (both logos, or neither), so both
-# columns share one edge. Takes nothing; gives back $true or $false.
-$ui.HeadPair = { [bool]($ui.RadeRowOn -and $ui.AppRow.Visible -and ([bool]$ui.Logo -eq [bool]$ui.AppLogo)) }
+    & $ui.SetLeft $ui.Opts $x
+    # The header row: the chip's box starts on the edge (its yellow is the part a person sees), else the kicker's ink does.
+    if ($ui.Chip.Visible) { & $ui.SetLeft $ui.Chip $x; & $ui.SetLeft $ui.Kick 0 } else { & $ui.SetLeft $ui.Kick ($x - (& $ui.Ink $ui.Kick)) } } catch { $null = $_ } }
 # The x of a control inside one of its parents (the sum of the lefts on the way up). Takes the control and the parent;
 # gives back the pixels.
 $ui.LeftIn = { param($C, $P) $x = 0; $c = $C; while ($c -and -not [object]::ReferenceEquals($c, $P)) { $x += [int]$c.Left; $c = $c.Parent }; $x }
@@ -87,17 +53,23 @@ $ui.AlignTick = { try {
     $bm = [double]$ui.StepBar.Margin.Top + [double]$ui.StepBar.Height / 2.0
     foreach ($l in @($ui.StepTime, $ui.StepFrac)) { $hl = [int](& $ui.LabelH $l); $t = [int][math]::Max(0, [math]::Round($bm - $hl / 2.0, [System.MidpointRounding]::AwayFromZero)); $m = $l.Margin
       if ($m.Top -ne $t) { $l.Margin = New-Object System.Windows.Forms.Padding($m.Left, $t, $m.Right, $m.Bottom) } } } catch { $null = $_ } }   # no bar yet: the next fit aligns the row
-# R32 (the Administrator, 2026-11-18: "too much dead space", "the bar is not on the middle of the sentence"): in a narrow
-# window a step title of some length left no room for the 200 px bar, so the bar went to a line of its own under the
-# title. The bar now takes the room that is left beside the title and the time (200 px at most, 60 at least, at 100 %)
-# and goes under the title only when even 60 does not fit. Takes nothing; changes the width of $ui.StepBar.
-$ui.FitBar = { try {
-    $full = & $ui.Sc 200; $m = $ui.StepBar.Margin; $row = [int]$ui.StepRow.MaximumSize.Width; if ($row -le 0) { return }
-    $tw = [int]$ui.StepTime.Width   # one size from its widest value ($ui.FixW), so the bar keeps its width while the time counts
-    $fw = [int]$ui.StepFrac.Width + $ui.StepFrac.Margin.Left   # the count is in the row also when it is empty: with no room it took a line of its own, which was the empty space under the title
-    $room = $row - [int]$ui.StepName.Width - $ui.StepName.Margin.Left - $ui.StepName.Margin.Right - $m.Left - $m.Right - $tw - $fw - (& $ui.Sc 8)
-    $w = $(if ($room -ge (& $ui.Sc 60)) { [int][math]::Min($full, $room) } else { $full })
-    if ($ui.StepBar.Width -ne $w) { $ui.StepBar.Width = $w } } catch { $null = $_ } }   # no measure yet: the next fit sets it
+$ui.FitBar = {
+  <#
+  .SYNOPSIS
+  Sizes the Run card's parts for the card's width (Cards v2): the bar of the whole run and the step lists as wide as the
+  card's text; in the running step's row the name with RUNNING at the right end, the summary and the now-doing line
+  wrapped to the row, and the step bar as wide as the room beside the time and the count (R47: it starts where the name does).
+  .OUTPUTS
+  Nothing. Changes widths, wrap widths and margins; a size that cannot be read waits for the next fit.
+  #>
+  try { $cw = [int]$ui.ContentW; if ($cw -le 0) { return }; $pad = & $ui.Sc $ui.Z.G2; $in = $cw - 2 * $pad
+    $ui.RunBar.Width = $cw; foreach ($r in @($ui.RunA, $ui.RunB)) { $r.Width = $cw; & $ui.SizeRuns $r }
+    foreach ($r in @($ui.RunRow, $ui.Todo)) { $r.MinimumSize = New-Object System.Drawing.Size($cw, 0); $r.MaximumSize = New-Object System.Drawing.Size($cw, 0) }
+    $ww = [int]$ui.RunWord.PreferredSize.Width; & $ui.SetWrap $ui.StepName ($in - $ww - (& $ui.Sc $ui.Z.G3)); & $ui.SetWrap $ui.StepSum $in; & $ui.SetWrap $ui.Now $in; & $ui.SetWrap $ui.TodoT ($cw - 2 * (& $ui.Sc $ui.Z.G3))
+    $m = $ui.StepName.Margin; $gr = [int][math]::Max(0, $in - [int]$ui.StepName.Width - $ww); if ($m.Right -ne $gr) { $ui.StepName.Margin = New-Object System.Windows.Forms.Padding(0, $m.Top, $gr, $m.Bottom) }   # RUNNING at the right end
+    $ui.StepRow.MaximumSize = New-Object System.Drawing.Size($in, 0); $bm = $ui.StepBar.Margin
+    $w = $in - $bm.Left - $bm.Right - [int]$ui.StepTime.Width - [int]$ui.StepFrac.Width - $ui.StepFrac.Margin.Left - (& $ui.Sc 2)   # the time and the count keep one size ($ui.FixW): the bar keeps its width
+    $w = [int][math]::Max((& $ui.Sc 60), $w); if ($ui.StepBar.Width -ne $w) { $ui.StepBar.Width = $w } } catch { $null = $_ } }   # no measure yet: the next fit sets it
 # Centers a row of controls up and down by changing their top and bottom margins. Takes the controls and the top margin
 # of the row; gives back nothing.
 $ui.AlignRow = { param($Parts, [int]$Base)
@@ -105,11 +77,11 @@ $ui.AlignRow = { param($Parts, [int]$Base)
     for ($i = 0; $i -lt $Parts.Count; $i++) { $m = $Parts[$i].Margin; $t = $Base + [int][math]::Floor(($hh - $hs[$i]) / 2); $b = $Base + $hh - $hs[$i] - ($t - $Base)
       if ($m.Top -ne $t -or $m.Bottom -ne $b) { $Parts[$i].Margin = New-Object System.Windows.Forms.Padding($m.Left, $t, $m.Right, $b) } } } catch { $null = $_ } }
 # Returns the controls of one aligned row (Top, FieldRow, ...). Takes the row name.
-$ui.RowParts = { param([string]$Row) switch ($Row) { 'Top' { @(@($ui.Logo, $ui.TitleCol) | Where-Object { $_ }) } 'AppRow' { @(@($ui.AppLogo, $ui.AppCol) | Where-Object { $_ }) } 'FieldRow' { @($ui.FieldL, $ui.FieldBox) + @($(if ($ui.FieldBOn) { $ui.FieldB })) } 'TestRow' { @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox) } } }
+$ui.RowParts = { param([string]$Row) switch ($Row) { 'Head' { @(@($ui.Chip, $ui.Kick) | Where-Object { $_.Visible }) } 'FieldRow' { @($ui.FieldL, $ui.FieldBox) + @($(if ($ui.FieldBOn) { $ui.FieldB })) } 'TestRow' { @($ui.TestL, $ui.ToBoxF, $ui.DraftB, $ui.OkBox) } } }
 # Lines up every fixed row: box heights, the text box in its frame, then each row on one center line.
 $ui.AlignRows = { try { $bh = [int]$ui.FieldB.Height; if ($bh -gt 0) { foreach ($p in $ui.Boxes) { if ($p.Height -ne $bh) { $p.Height = $bh } } } } catch { $null = $_ }   # a box is as tall as the compact button, measured
   foreach ($p in $ui.Boxes) { & $ui.BoxFit $p }   # the text box fills its frame (R24 job: a frame whose size never changed kept a 100 px text box at its top)
-  & $ui.AlignRow (& $ui.RowParts 'Top') 0; if ($ui.AppLogo) { & $ui.AlignRow (& $ui.RowParts 'AppRow') 0 };   # a row of one part (no application logo) keeps its margins (review of PR 106: a row of one part set it to 0)
+  & $ui.AlignRow (& $ui.RowParts 'Head') 0   # the chip and the line in capitals on one midpoint
   $mm = & $ui.Sc $ui.Z.M; & $ui.AlignRow (& $ui.RowParts 'TestRow') $mm; & $ui.AlignTick
   # L3 (the Administrator, 2026-11-19): a label above its box (a text answer). The box is on the next line, on the card's edge, 4 px under the label.
   if ($ui.FieldAbove) { $ui.FieldL.Margin = New-Object System.Windows.Forms.Padding($ui.FieldL.Margin.Left, $mm, 0, 0); $ui.FieldBox.Margin = New-Object System.Windows.Forms.Padding([int]$ui.EdgeX, (& $ui.Sc $ui.Z.G1), $mm, $mm) }
@@ -148,24 +120,38 @@ $ui.FitRow = {
     $ui.FieldBox.Width = [math]::Max((& $ui.Sc 160), [math]::Min((& $ui.Sc $ui.Z.FieldM), [int]$left)) } catch { $null = $_ } }
 $ui.Apart = {
   # UI standard v1 (B3, the Administrator, 2026-11-20): the primary button is the last one and stands alone at the right
-  # end of the action row ("Back (Esc)" at the left end, the others after it). When the row is too narrow for that, the
-  # primary button starts its own row.
+  # end of the action row ("Back (Esc)" at the left end, the others after it), 24 px at least after the others (Cards v2).
+  # When the row is too narrow for that, the primary button starts its own row. A narrow window stacks them ($ui.StackBtns).
   try { $mm = & $ui.Sc $ui.Z.M; $n = -1; $prev = -1; $used = 0
     for ($k = 0; $k -lt $ui.NB; $k++) { $ui.BtnRow.SetFlowBreak($ui.B[$k], $false); $ui.B[$k].Margin = (& $ui.Pad $mm $mm $mm $mm); if ($ui.BOn[$k] -and $ui.BMain[$k]) { $n = $k } }   # every button: a hidden one keeps no old margin
     $bt = $mm + $(if (@($ui.BOn | Where-Object { $_ }).Count) { [int][math]::Floor(((& $ui.Sc $ui.Z.ActionH) - $ui.BackB.Height) / 2) } else { 0 })   # Back (Esc) on the midpoint of the 40 px buttons
     $ui.BackB.Margin = (& $ui.Pad $mm $bt $mm $mm); $ui.BtnRow.SetFlowBreak($ui.BackB, $false)
+    & $ui.BtnOrder ([bool]$ui.Narrow) $n; if ($ui.Narrow) { & $ui.StackBtns $n; return }
+    foreach ($b in @(@($ui.B) + @($ui.BackB))) { if ($ui.Wide[$b]) { $ui.Wide.Remove($b); & $ui.FitBtn $b } }   # a row: each button at the size its text needs   # D4: under about 700 px, a stack at the right edge
     if ($n -lt 0) { try { $ui.BtnRow.PerformLayout() } catch { $null = $_ }; return }   # no layout yet: the card's layout does it
     if ($ui.BackOn) { $prev = -2; $used += $ui.BackB.Width + 2 * $mm }   # a flag, not .Visible: the row can still be hidden from the card before
     for ($k = 0; $k -lt $n; $k++) { if ($ui.BOn[$k]) { $prev = $k; $used += $ui.B[$k].Width + 2 * $mm } }
     if ($prev -eq -1) { $used = 0 }
     $room = $(if ($ui.BtnRow.MaximumSize.Width -gt 0) { [int]$ui.BtnRow.MaximumSize.Width } else { $ui.ContentW + 2 * $mm }) - (& $ui.Sc 2)   # the width the row really wraps at, 2 px slack
     $left = $room - $used - $ui.B[$n].Width - $mm
-    if ($left -lt $mm) { if ($prev -ge 0) { $ui.BtnRow.SetFlowBreak($ui.B[$prev], $true) } elseif ($prev -eq -2) { $ui.BtnRow.SetFlowBreak($ui.BackB, $true) }; $left = $room - $ui.B[$n].Width - $mm }   # too narrow: its own row
+    if ($left -lt (& $ui.Sc $ui.Z.G6)) { if ($prev -ge 0) { $ui.BtnRow.SetFlowBreak($ui.B[$prev], $true) } elseif ($prev -eq -2) { $ui.BtnRow.SetFlowBreak($ui.BackB, $true) }; $left = $room - $ui.B[$n].Width - $mm }   # too narrow: its own row
     $ui.B[$n].Margin = (& $ui.Pad ([int][math]::Max($mm, $left)) $mm $mm $mm); $ui.BtnRow.PerformLayout()
     $f = $(if ($ui.BackOn) { $ui.BackB } else { @(for ($k = 0; $k -lt $n; $k++) { if ($ui.BOn[$k]) { $ui.B[$k] } })[0] })   # the row still wrapped: the primary at the right end of its own row
     if ($f -and -not [object]::ReferenceEquals($f, $ui.B[$n]) -and $ui.B[$n].Top -gt $f.Top + $f.Height) { $ui.B[$n].Margin = (& $ui.Pad ([int][math]::Max($mm, $room - $ui.B[$n].Width - $mm)) $mm $mm $mm) }
     $ui.BtnRow.PerformLayout()   # the row's height is right before the frame is placed ($ui.Squeeze)
   } catch { $null = $_ } }
+# The order of the action row's buttons (D4, the PFM, 2026-11-27): in a row Back first and the primary last; in the stack
+# of a narrow window the primary first and Back last. Tab follows the order. Takes whether it is the stack and the index
+# of the primary (-1: none); a host that cannot reorder keeps the row order.
+$ui.BtnOrder = { param([bool]$Stack, [int]$N) try { $all = @($ui.B | ForEach-Object { $_ })
+    $o = $(if ($Stack -and $N -ge 0) { @($ui.B[$N]) + @($all | Where-Object { -not [object]::ReferenceEquals($_, $ui.B[$N]) }) + @($ui.BackB) } elseif ($Stack) { $all + @($ui.BackB) } else { @($ui.BackB) + $all })
+    for ($i = 0; $i -lt $o.Count; $i++) { $ui.BtnRow.Controls.SetChildIndex($o[$i], $i); $o[$i].TabIndex = $i } } catch { $null = $_ } }   # the stand-ins cannot reorder: the row keeps its order
+# Stacks the action row at the right edge of the card's text (D4; Cards v2): each button 240 px wide, one under the
+# other, the primary on top and 16 px under it the others, 8 apart. Takes the index of the primary (-1: none).
+$ui.StackBtns = { param([int]$N) $mm = & $ui.Sc $ui.Z.M; foreach ($b in @(@($ui.B) + @($ui.BackB))) { $ui.Wide[$b] = $true; & $ui.FitBtn $b } $room = $(if ($ui.BtnRow.MaximumSize.Width -gt 0) { [int]$ui.BtnRow.MaximumSize.Width } else { $ui.ContentW + 2 * $mm }) - (& $ui.Sc 2)
+  foreach ($b in @(@($ui.B) + @($ui.BackB))) { $x = [int][math]::Max($mm, $room - $b.Width - $mm); $low = $(if ($N -ge 0 -and [object]::ReferenceEquals($b, $ui.B[$N])) { (& $ui.Sc $ui.Z.G4) - $mm } else { $mm })
+    $b.Margin = (& $ui.Pad $x $mm $mm $low); try { $ui.BtnRow.SetFlowBreak($b, $true) } catch { $null = $_ } }   # the stand-ins have no flow breaks
+  try { $ui.BtnRow.PerformLayout() } catch { $null = $_ } }   # no layout yet: the card's layout does it
 # Places the card frame (L1) and lets the card's text scroll when the card is taller than the window (the help below).
 $ui.Squeeze = {
   <#
@@ -184,8 +170,8 @@ $ui.Squeeze = {
     $need = $hh + $bh + $th; if ($need -gt $H - $top) { $top = [math]::Max(0, $H - $need) }   # a tall card moves up before it gets a scroll bar
     $avail = $H - $top - $hh - $th; $sh = $bh; $bar = 0
     if ($bh -gt $avail) { $sh = [math]::Max((& $ui.Sc 80), $avail); $bar = [System.Windows.Forms.SystemInformation]::VerticalScrollBarWidth + (& $ui.Sc 4) }
-    $ui.Scrolls = [bool]$bar; $gap = [math]::Max(0, $min - $hh - $sh - $th)
-    $ui.Frame = @{ WantTop = $want; MinH = $min; Moved = ($top -ne $want) }
+    $ui.Scrolls = [bool]$bar; $gap = $(if ($ui.Narrow) { 0 } else { [math]::Max(0, $min - $hh - $sh - $th) })   # D4: in a narrow window the buttons stand right under the text
+    $ui.Frame = @{ WantTop = $want; MinH = $(if ($ui.Narrow) { 0 } else { $min }); Moved = ($top -ne $want) }
     if ($ui.Scroll.Width -ne ($bw + $bar) -or $ui.Scroll.Height -ne $sh) { $ui.Scroll.Size = New-Object System.Drawing.Size(($bw + $bar), $sh) }
     if ($ui.Gap.Height -ne $gap) { $ui.Gap.Height = $gap }; if ($ui.Gap.Visible -ne [bool]$gap) { $ui.Gap.Visible = [bool]$gap }
     try { if ([int]$ui.CardRows[0].Height -ne $top) { $ui.CardRows[0].Height = $top } } catch { $null = $_ }   # stand-in types: no row styles
@@ -283,31 +269,14 @@ $ui.FillOpts = { param($List)
 $ui.Measure = { param([string]$Card)
   # The numbers for RowBad and EdgeBad, from the real layout (screen pixels).
   $out = @(); $sr = { param($C) $C.RectangleToScreen($C.ClientRectangle) }
-  foreach ($row in 'Top', 'AppRow', 'FieldRow', 'TestRow') {
+  foreach ($row in 'Head', 'FieldRow', 'TestRow') {
     $ps = @(& $ui.RowParts $row); if ($ps.Count -lt 2 -or -not $ps[0].Parent.Visible) { continue }   # the parts AlignRow aligns (R5 review: one rule for both)
     $out += & $ui.RowBad $Card $row @($ps | ForEach-Object { $rr = & $sr $_; @{ N = (& $ui.NameOf $_); Top = $rr.Top; H = $rr.Height; Line = $rr.Top - $_.Margin.Top; Kind = $(if ($ui.Boxes -contains $_) { 'box' } elseif ($_ -is [System.Windows.Forms.Button] -and $_.FlatAppearance.BorderSize -gt 0) { 'button' } else { 'other' }) } })
   }
   # R32: the bottom line's link and its text at the right share one midpoint.
   if ($ui.RecB.Visible -and $ui.RightL.Visible -and [string]$ui.RightL.Text) { $out += & $ui.RowBad $Card 'Bottom' @(@($ui.RecB, $ui.RightL) | ForEach-Object { $rr = & $sr $_; @{ N = (& $ui.NameOf $_); Top = $rr.Top; H = $rr.Height; Line = 0; Kind = 'other' } }) }
-  # R29b: the header's two lines start their ink on one edge (no difference allowed), and the step's time and count sit on
-  # the bar's midpoint (1 px at any scale) when they are on the bar's line.
   # Returns where a control's ink starts (its left edge plus the measured ink offset: text, edge or drawing). Takes the control.
   $tx = { param($C) (& $sr $C).Left + (& $ui.Ink $C) }
-  # L1, L2: in each column of the logo block the word and its subtitle start on one edge, with the word, 4 px, the line,
-  # 4 px, the subtitle, measured on the ink Windows drew; the two columns share the edge when both rows start at one x.
-  $cols = @(& $ui.HeadCols)
-  if ($ui.WordL.Visible -or $ui.AppWordL.Visible) { foreach ($c in $cols) { $nw = & $ui.NameOf $c.W; $rw = & $sr $c.W
-      # Name spot L2, L3: a word that keeps room for descenders (the application column). The ink is the text's whole ink
-      # as Windows draws it with no panel around it ($ui.TextInk), so a panel or a line that cuts it shows.
-      $row = $null; if ($c.W.Tag.Desc) { $row = @(@{ N = $nw; Ink = (& $ui.TextInk $c.W $rw) })
-        $out += & $ui.VerBad $Card $row $(if ($c.Sub) { (& $sr $c.R).Top } else { $null }) }
-      if (-not $c.Sub) { continue }   # a name with no subtitle has no line and nothing under it to measure
-      $out += & $ui.HeadBad $Card @{ N = $nw; X = (& $tx $c.W) } @{ N = (& $ui.NameOf $c.S); X = (& $tx $c.S) }
-      $rr = & $sr $c.R; $ra = & $sr $c.S; $wi = & $ui.InkBox $c.W; $ai = & $ui.InkBox $c.S; $wb = $rw.Top + $wi.Bottom
-      if ($row) { $wb = [int](@($row | ForEach-Object { $_.Ink.Panel }) | Measure-Object -Maximum).Maximum }   # L2: the line comes under the word row's descender room
-      $out += & $ui.HeadRuleBad $Card @{ WordBottom = $wb; WordLeft = $rw.Left + $wi.Left; WordW = $wi.Right - $wi.Left; RuleTop = $rr.Top; RuleBottom = $rr.Bottom; RuleLeft = $rr.Left; RuleW = $rr.Width
-        AppTop = $(if ([string]$c.S.Text -cmatch '[A-Z0-9bdfhklt]') { $ra.Top + $ai.Top } else { $null }) } (& $ui.Sc $ui.Z.G1) }
-    if ((& $ui.HeadPair) -and $cols.Count -gt 1) { $out += & $ui.HeadBad $Card @{ N = 'WordL'; X = (& $tx $ui.WordL) } @{ N = (& $ui.NameOf $ui.AppWordL); X = (& $tx $ui.AppWordL) } } }
   if ($ui.FieldRow.Visible -and $ui.FieldAbove -and -not $ui.RecOn) { $rl = & $sr $ui.FieldL; $rb = & $sr $ui.FieldBox   # L3: the label above its box
     $out += & $ui.AboveBad $Card @{ LabelBottom = $rl.Bottom; BoxTop = $rb.Top; BoxLeft = $rb.Left; BoxW = $rb.Width; Edge = (& $tx $ui.FieldL); TextW = ($ui.ContentW - (& $ui.Sc 10)) } }
   if ($ui.Frame -and -not $ui.RecOn) { $rh = & $sr $ui.Head; $rt = & $sr $ui.Tail; $rc = & $sr $ui.Card   # L1: the header row at the fixed top, the frame at its minimum height at least
@@ -316,15 +285,15 @@ $ui.Measure = { param([string]$Card)
     foreach ($l in @($ui.StepTime, $ui.StepFrac)) { $rl = & $sr $l; if (($rl.Top - $l.Margin.Top) -eq ($rb.Top - $ui.StepBar.Margin.Top) -and $rl.Left -gt $rb.Left) { $out += & $ui.TickBad $Card @{ Top = $rb.Top; H = $rb.Height } @{ N = (& $ui.NameOf $l); Top = $rl.Top; H = $rl.Height } } } }
   if (-not $ui.RecOn) {
     $es = @()   # the card column: where each part's ink starts ($tx above)
-    if ($ui.Kick.Visible -and $ui.Kick.Text) { $es += @{ N = 'Kick'; X = (& $tx $ui.Kick) } }
-    if ($ui.Turn.Visible -and $ui.Turn.Text) { $es += @{ N = 'Turn'; X = (& $tx $ui.Turn) } }
+    if ($ui.Chip.Visible) { $es += @{ N = 'Chip'; X = (& $sr $ui.Chip).Left } } elseif ($ui.Kick.Visible -and $ui.Kick.Text) { $es += @{ N = 'Kick'; X = (& $tx $ui.Kick) } }   # the chip's box is its edge
     if ($ui.TickP.Visible) { $es += @{ N = 'TickP'; X = (& $tx $ui.TickP) } } elseif ($ui.Sent.Visible -and $ui.Sent.Text) { $es += @{ N = 'Sent'; X = (& $tx $ui.Sent) } }
-    foreach ($l in @(@($ui.P) + @($ui.PathL, $ui.PathT, $ui.Close, $ui.StepName, $ui.Now, $ui.FieldL, $ui.Note, $ui.Help, $ui.Foot, $ui.TestL))) { if ($l.Visible -and $l.Text) { $es += @{ N = (& $ui.NameOf $l); X = (& $tx $l) } } }
+    foreach ($l in @(@($ui.P) + @($ui.PathL, $ui.PathT, $ui.Close, $ui.PctL, $ui.FieldL, $ui.Note, $ui.Help, $ui.Foot, $ui.TestL))) { if ($l.Visible -and $l.Text -and $l.Parent.Visible) { $es += @{ N = (& $ui.NameOf $l); X = (& $tx $l) } } }
+    foreach ($b in @($ui.RunBar, $ui.RunA, $ui.RunRow, $ui.RunB, $ui.Todo)) { if ($b.Visible) { $es += @{ N = (& $ui.NameOf $b); X = (& $sr $b).Left } } }   # Cards v2: a list or a box starts on the edge; the texts inside it are indented
     if ($ui.Guide.Visible) { $es += @{ N = 'Guide'; X = (& $sr $ui.Guide).Left + (& $ui.GuideInk) } }   # the widest number of the numbered list
     if ($ui.ErrBox.Visible) { $es += @{ N = 'ErrBox'; X = (& $sr $ui.ErrBox).Left } }
     $k1 = @($ui.LinkRow.Controls | Where-Object { $_.Visible })[0]; if ($k1) { $es += @{ N = (& $ui.NameOf $k1); X = (& $tx $k1); D = ('link ink ' + (& $ui.Ink $k1) + ', width ' + $k1.Width + ', margin ' + $k1.Margin.Left + ', row margin ' + $ui.LinkRow.Margin.Left) } }
     $o1 = @($ui.Opts.Controls | Where-Object { $_.Visible })[0]; if ($o1) { $es += @{ N = 'choice 1'; X = (& $sr $o1).Left } }
-    $b1 = @(@($ui.BackB) + @($ui.B | Where-Object { [string]$ui.Kinds[$_] -ne 'primary' }) | Where-Object { $_.Visible })[0]; if ($b1) { $es += @{ N = (& $ui.NameOf $b1); X = (& $tx $b1) } }   # B3: the primary stands at the right end
+    $b1 = @(@($ui.BackB) + @($ui.B | Where-Object { [string]$ui.Kinds[$_] -ne 'primary' }) | Where-Object { $_.Visible })[0]; if ($b1 -and -not $ui.Narrow) { $es += @{ N = (& $ui.NameOf $b1); X = (& $tx $b1) } }   # B3: the primary stands at the right end
     $out += & $ui.EdgeBad $Card $es
   }
   return $out }
@@ -388,23 +357,21 @@ $ui.ScriptWarn = { param($c)
 $ui.SetRange = { param($R) foreach ($k in 'Kick', 'P0', 'StepName') { $box = $(if ($k -eq 'P0') { $ui.P[0] } else { $ui[$k] })
     $v = $(if ($R -and $R[$k]) { @($R[$k] | ForEach-Object { [string]$_ }) } else { $null }); if ($v) { $ui.Range[$box] = $v } else { $ui.Range.Remove($box) }; & $ui.Reflow $box } }
 $ui.SetCard = { param($c)
-  # Shows one card. $c names the parts: View, Light ('you' = yellow and "Your turn", 'bad' = dark red), Range ($ui.SetRange), Kicker, Sentence, Tick, P (up to 4
+  # Shows one card. $c names the parts: View, Light ('you' = yellow and YOUR TURN, 'bad' = the error color, 'pass' = green), KickColor, Strong, Todo, Range ($ui.SetRange), Kicker, Sentence, Tick, P (up to 4
   # paragraphs), Options + OnOption, Lines (guide lines, in order: numbered ones first, others after them; one selectable text), Path (a file path), StepRow, Field (Label, Text, Name, Button, Do, Max, Above), Err, Links, Note, Help, Close (the hand card's closing line),
   # Buttons (Text, Kind, Do, Apart; up to $ui.NB), Foot, Test, Right, Back, NoAccept, Focus ('field', 'fieldbutton', 'err' or 'text').
   & $ui.Check   # the card that goes away (test rounds only)
   $ui.Hot = $null; $ui.Down = $null   # no hover or pressed state is carried over (R4 review)
   if ($ui.RecOn -and ($c.Light -or $c.View -eq 'done')) { $ui.RecOn = $false; $ui.Rec.Visible = $false; $ui.Card.Visible = $true; $ui.RecB.Visible = $true }   # a card that needs you closes the Record
   $ui.View = [string]$c.View; $ui.Card.SuspendLayout()
-  $ui.Light.BackColor = $(if ($c.Light -eq 'you') { $ui.C.Yellow } elseif ($c.Light -eq 'bad') { $ui.C.Red } else { $ui.C.White })
-  $ui.Light.AccessibleName = 'Status light: ' + $(if ($c.Light -eq 'you') { 'your turn' } elseif ($c.Light -eq 'bad') { 'failed' } else { 'off' })
+  & $ui.Dress $c   # the light line, the stage now, the YOUR TURN chip, the Run card's parts (03-card.ps1)
   & $ui.SetRange $c.Range; $ui.Kick.Text = ([string]$c.Kicker).ToUpperInvariant()   # the line in capitals keeps its line also when empty
-  $ui.Turn.Text = $(if ($c.Light -eq 'you') { 'Your turn' } else { '' }); $ui.Turn.AccessibleName = $(if ($ui.Turn.Text) { 'Your turn' } else { 'Your turn line (empty)' })
   $ui.SentRaw = [string]$c.Sentence; $ui.Sent.Text = $ui.SentRaw; $ui.TickP.Visible = [bool]$c.Tick
   $ps = @($c.P | Where-Object { $_ }); for ($k = 0; $k -lt 4; $k++) { & $ui.Show $ui.P[$k] $(if ($k -lt $ps.Count) { [string]$ps[$k] } else { '' }) }
   $ui.OnOpt = $c.OnOption; & $ui.FillOpts $c.Options; $ui.Opts.Visible = [bool]$ui.Opts.Controls.Count
   & $ui.SetSteps $c.Lines
   $ui.PathL.Visible = [bool]$c.Path; & $ui.Show $ui.PathT ([string]$c.Path)
-  $ui.StepRow.Visible = [bool]$c.StepRow; $ui.NowRaw = ''; $ui.Now.Text = ''; $ui.Now.Visible = [bool]$c.StepRow; if ($c.StepRow) { $ui.StepTime.Text = '' }   # the run card keeps the now-doing room, empty until a text comes
+  $ui.NowRaw = ''; $ui.Now.Text = ''; if ($c.StepRow) { $ui.StepTime.Text = '' }   # the run card keeps the now-doing room, empty until a text comes
   $ui.FieldRow.Visible = [bool]$c.Field; $ui.FieldDo = $null
   $ui.FieldAbove = [bool]($c.Field -and $c.Field.Above); try { $ui.FieldRow.SetFlowBreak($ui.FieldL, $ui.FieldAbove) } catch { $null = $_ }   # L3: the box goes under its label
   if ($c.Field) { $ui.FieldL.Text = [string]$c.Field.Label; $ui.Field.Text = [string]$c.Field.Text; $ui.Field.AccessibleName = [string]$c.Field.Name; $ui.FieldB.Visible = [bool]$c.Field.Button; $ui.FieldBOn = [bool]$c.Field.Button; $ui.FieldB.Text = [string]$c.Field.Button; $ui.FieldDo = $c.Field.Act; $ui.Field.MaxLength = $(if ($c.Field.Max) { [int]$c.Field.Max } else { 32767 }); & $ui.FitRow }
@@ -413,21 +380,8 @@ $ui.SetCard = { param($c)
   & $ui.Show $ui.Note ([string]$c.Note); & $ui.Show $ui.Help ([string]$c.Help); & $ui.Show $ui.Foot ([string]$c.Foot); & $ui.Show $ui.Close ([string]$c.Close)
   & $ui.ScriptWarn $c   # the script's hash does not match: a red last line on the boot, Choose and Ready cards
   $bm = & $ui.Sc $(if ($c.Close) { $ui.Z.G2 - $ui.Z.M } else { $ui.Z.G4 - $ui.Z.M }); $bn = $ui.BtnRow.Margin; if ($bn.Top -ne $bm) { $ui.BtnRow.Margin = New-Object System.Windows.Forms.Padding($bn.Left, $bm, $bn.Right, $bn.Bottom) }   # 8 under the closing line, else 16
-  # UI standard v1 (B3, B4): the primary button goes last (Enter selects it); the others keep their order.
-  $bs = @(@($c.Buttons | Where-Object { $_ -and [string]$_.Kind -ne 'primary' }) + @($c.Buttons | Where-Object { $_ -and [string]$_.Kind -eq 'primary' }))
-  $ui.Acts = @(); $first = $null; $accept = $null; $ui.BOn = @($false) * $ui.NB; $ui.BMain = @($false) * $ui.NB; $ui.Always = @($false) * $ui.NB
-  $ui.Back = $c.Back; $ui.BackOn = ([bool]$c.Back -and -not $ui.RecOn); $ui.BackB.Visible = $ui.BackOn   # B6: Back (Esc) at the left end of the action row
-  for ($k = 0; $k -lt $ui.NB; $k++) {
-    $b = $ui.B[$k]
-    if ($k -lt $bs.Count) {
-      $b.Text = [string]$bs[$k].Text; & $ui.Style $b ([string]$bs[$k].Kind); $b.Visible = $true; $ui.Acts += $bs[$k].Act; $ui.BOn[$k] = $true; $ui.BMain[$k] = ([string]$bs[$k].Kind -eq 'primary'); $ui.Always[$k] = [bool]$bs[$k].Always
-      if ($b.Enabled -and -not $first) { $first = $b }; if ($b.Enabled -and -not $accept -and $bs[$k].Kind -eq 'primary') { $accept = $b }
-    } else { $b.Visible = $false; $ui.Acts += $null }
-  }
-  & $ui.Apart
-  $ui.BtnRow.Visible = [bool]($bs.Count -or $ui.BackOn)
+  & $ui.SetButtons $c   # the action row: the primary last with its key, Back, Enter (03-card.ps1)
   $ui.TestRow.Visible = [bool]$c.Test
-  $ui.Form.AcceptButton = $(if ($c.NoAccept) { $null } else { $accept })   # Enter = the primary button, except on a hand step
   $ui.CardNow = $c; $ui.TourB.Visible = ($ui.HelpViews -contains [string]$c.View -and -not $ui.RecOn)   # L6: Help on a card that can be shown again
   $ui.FeedB.Visible = [bool]((& $ui.NoteOn) -and -not $ui.RecOn -and [string]$c.View -notin $ui.NoNoteViews); $ui.RightL.Text = $(if ($c.Right) { [string]$c.Right } else { '' })   # R-top-bar (2026-11-19): no state words; only the percent, the time or a result word
   & $ui.FitSent; & $ui.FitEdges; & $ui.FitBar; & $ui.AlignRows   # the step bar's width for this card's step row before it is drawn (R35 job: the first Run card wrapped the time under the title)
@@ -436,9 +390,9 @@ $ui.SetCard = { param($c)
   try { $ui.Scroll.AutoScrollPosition = New-Object System.Drawing.Point(0, 0) } catch { $null = $_ }; & $ui.Squeeze   # a new card starts at its top
   $f = $null
   if ($c.Focus -eq 'field') { $f = $ui.Field } elseif ($c.Focus -eq 'fieldbutton') { $f = $ui.FieldB } elseif ($c.Focus -eq 'err') { $f = $ui.ErrBox } elseif ($c.Focus -eq 'text') { $f = $(if ($ui.Guide.Visible) { $ui.Guide } else { $ui.Sent }) }   # a card with no box: the focus on its text, so Enter answers nothing
-  elseif ($c.Focus -eq 'button' -and $accept) { $f = $accept }   # engine-v47: the Maintenance card, Enter = Start (review of PR 209)
+  elseif ($c.Focus -eq 'button' -and $ui.Accept) { $f = $ui.Accept }   # engine-v47: the Maintenance card, Enter = Start (review of PR 209)
   elseif ($ui.Opts.Controls.Count) { foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off) { $f = $o; break } } }
-  if (-not $f) { $f = $accept }; if (-not $f) { $f = $first }; if (-not $f) { $f = $ui.RecB }
+  if (-not $f) { $f = $ui.Accept }; if (-not $f) { $f = $ui.First }; if (-not $f) { $f = $ui.RecB }
   if (-not $ui.RecOn) { try { [void]$f.Focus() } catch { $null = $_ } }
   # Focus on the card's own text (a hand step with no address) must not scroll it: Windows scrolls a focused control into
   # view, so the card started scrolled to its end (R35 job: deploy-tour-small 08-noaddress-hand, 11 px). It starts at its top.

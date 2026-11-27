@@ -154,9 +154,9 @@ function global:Save-RadeCard([string]$Tag) {
   if ($ui.Scrolls -and -not $ui.RecOn) { try { $y0 = $ui.Scroll.AutoScrollPosition.Y; $ev = New-Object System.Windows.Forms.HandledMouseEventArgs('None', 0, 0, 0, -120)
       [System.Windows.Forms.Control].GetMethod('OnMouseWheel', [System.Reflection.BindingFlags]'NonPublic, Instance').Invoke($ui.Sent, [object[]]@($ev.PSObject.BaseObject))   # as Windows raises it on the headline: only the hook of $ui.WheelOn hands it on
       Write-Host ('WIN wheel ' + $card + ' moved=' + ($ui.Scroll.AutoScrollPosition.Y -ne $y0)); $ui.Scroll.AutoScrollPosition = New-Object System.Drawing.Point(0, 0) } catch { Write-Host ('WIN wheel ' + $card + ' error=' + $_.Exception.Message) } }
-  # R32 measures (screen pixels, top/height): the bottom line's two texts, the header's widths, and on the Run card the step row.
+  # R32 measures (screen pixels, top/height): the bottom line's two texts, the band and its line, and on the Run card the step row.
   try { $sr = { param($C) $q = $C.RectangleToScreen($C.ClientRectangle); [string]$q.Top + '/' + $q.Height }
-    $m = 'WIN r32 ' + $card + ' rec=' + (& $sr $ui.RecB) + ' right=' + (& $sr $ui.RightL) + ' word=' + $ui.WordL.Width + ' rule=' + $ui.HeadRule.Width + ' app=' + $ui.AppL.Width
+    $m = 'WIN r32 ' + $card + ' rec=' + (& $sr $ui.RecB) + ' right=' + (& $sr $ui.RightL) + ' band=' + (& $sr $ui.Band) + ' word=' + $ui.BandWord.Width + ' stage=' + $ui.Stage.Width + ' line=' + (& $sr $ui.Light)
     if ($ui.View -eq 'run') { $m += ' name=' + (& $sr $ui.StepName) + ' bar=' + (& $sr $ui.StepBar) + '/m' + $ui.StepBar.Margin.Top + ' time=' + (& $sr $ui.StepTime) + '/m' + $ui.StepTime.Margin.Top + '/pref' + $ui.StepTime.PreferredSize.Height + ' [' + $ui.StepTime.Text + '] now=' + (& $sr $ui.Now) + '/m' + $ui.Now.Margin.Top + '/' + $ui.Now.Visible + ' row=' + $ui.StepRow.Height + ' frac=' + (& $sr $ui.StepFrac) }
     Write-Host $m } catch { Write-Host ('WIN r32 ' + $card + ' error=' + $_.Exception.Message) }
 }
@@ -212,7 +212,7 @@ function global:Step-Rade {
   }
   elseif ($v -eq 'ready') {
     if (-not $global:RadeT.Opened) { $global:RadeT.Opened = $true; & $ui.VRecord; Save-RadeCard 'record'; & $ui.CloseRecord }
-    $ib = @($ui.B | Where-Object { $_.Visible -and $_.Text -in 'Install', 'Run' })[0]; $ib.PerformClick()
+    $ib = @($ui.B | Where-Object { $_.Visible -and $_.Text -in 'Install', 'Run', 'Install (Enter)', 'Run (Enter)' })[0]; $ib.PerformClick()
   }
   elseif ($v -eq 'hand') {
     if (-not $global:RadeT.NoAddr -and $ui.FieldRow.Visible) {   # R28 N1: the same step with no address: no address row (its own picture and self-check)

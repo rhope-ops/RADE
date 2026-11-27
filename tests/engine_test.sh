@@ -127,8 +127,8 @@ case('case', case_sp, "answers: the choices of 'flow-count' must differ (case an
 P
 # ---- sizes and text lengths (docs/window-design.md "Sizes", "Text lengths"; the Administrator, 2026-11-15)
 # Every button is made with a named kind (its size is in $ui.Z), and no other place sets a button's size.
-# (The bottom line's own minimum height, 46, is not a button size: R24. The logo block has no minimum: it is as tall as its rows, 2026-11-18.)
-[ "$(cat $engine_src $ui_src | grep -o '& \$ui\.Btn [^;)]*' | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_ui.ps1 | wc -l)" = 1 ] && [ "$(cat $engine_src | grep -c 'MinimumSize = ')" = 4 ] && grep -q '^\$ui.Btn = { param(\[string\]\$Kind) \$b = New-Object System.Windows.Forms.Button; \$b.AutoSize = \$false;' engine/rade_ui.ps1 && grep -q 'ui.Head.MinimumSize = ' engine/ps/window/04-record-parts.ps1 && ok || bad "sizes: a button is made without a kind, or sets its own size"
+# (The bottom line's own minimum height, 46, is not a button size: R24. Cards v2: the running step's row and the WHAT TO DO box are as wide as the card's text.)
+[ "$(cat $engine_src $ui_src | grep -o '& \$ui\.Btn [^;)]*' | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_ui.ps1 | wc -l)" = 1 ] && [ "$(cat $engine_src | grep -c 'MinimumSize = ')" = 5 ] && grep -q '^\$ui.Btn = { param(\[string\]\$Kind) \$b = New-Object System.Windows.Forms.Button; \$b.AutoSize = \$false;' engine/rade_ui.ps1 && grep -q 'ui.Head.MinimumSize = ' engine/ps/window/04-record-parts.ps1 && ok || bad "sizes: a button is made without a kind, or sets its own size"
 grep -q 'ui.BtnRow.MinimumSize = ' engine/ps/window/04-record-parts.ps1 && ok || bad "sizes: the action row is as wide as the column (B3)"
 # The limits in the document are the limits of the build.
 python3 - <<'P' && ok || bad "text lengths: docs/window-design.md and TEXT_LIMITS (engine/rade_build.py) differ"

@@ -125,7 +125,7 @@ $ui.StyleFont = { param([string]$Name)
 # Text styles (the Administrator, 2026-11-17; faces and sizes from the UI tokens, UI standard v1): Sent = headline; Body =
 # paragraphs, step lines, help line; Small = second lines, notes, box text; SmallB = the line in capitals, labels, every
 # button, key numbers, the Record's heads and result words; Link = SmallB underlined (a link is marked by more than
-# color); Word = RADE in the logo line; Mono = the Record's text box only; Turn = "Your turn" (in the accent color).
+# color); Word = the word in the band and the Run card's percent; Mono = the Record's text box only; Turn = the strong summary line of the Done card.
 $ui.F = @{}; foreach ($k in @($ui.Styles.Keys)) { $ui.F[$k] = & $ui.StyleFont $k }; $ui.F.Small = $ui.Form.Font
 # Sizes: the UI tokens above (gaps 4, 8, 12, 16, 24; a 4 px margin around a button or link for its focus ring).
 $ui.Pad = { param([int]$L, [int]$T, [int]$R, [int]$B) New-Object System.Windows.Forms.Padding($L, $T, $R, $B) }
@@ -235,13 +235,13 @@ $ui.Own = { param($B) $B.UseVisualStyleBackColor = $false; $B.Add_Paint({ & $ui.
 # shrinks with its text. $Kind: 'action' (a card's buttons: 160 x 40, or 240 x 40 when its label needs more room) or
 # 'compact' (96 x 30: beside a box, "Back (Esc)", the Record's buttons; 160 x 30 when its label needs more room). A label
 # that needs more than the widest size is cut, and the self-check reports it (rule B1). Sizes: $ui.Z.
-$ui.BtnKind = @{}
+$ui.BtnKind = @{}; $ui.Wide = @{}
 # The size of a button of a kind for its text: at 100 % before the window has its scale (Windows Forms scales it), else scaled.
 $ui.BtnSize = { param($B)
   $k = [string]$ui.BtnKind[$B]; $s = $(if ($ui.Scaled) { $ui.Sc } else { { param([double]$Px) [int]$Px } })
   $h = $(if ($k -eq 'compact') { $ui.Z.CompactH } else { $ui.Z.ActionH }); $ws = $(if ($k -eq 'compact') { @($ui.Z.CompactW, $ui.Z.ActionW) } else { @($ui.Z.ActionW, $ui.Z.WideW) })
   $need = 0; try { if ($B.Text) { $need = [int][System.Windows.Forms.TextRenderer]::MeasureText([string]$B.Text, $B.Font).Width + (& $ui.Sc (2 * $ui.Z.G2)) } } catch { $null = $_ }   # no measure: the first width
-  $w = $(if ($need -le (& $ui.Sc $ws[0])) { $ws[0] } else { $ws[1] })
+  $w = $(if ($need -le (& $ui.Sc $ws[0]) -and -not $ui.Wide[$B]) { $ws[0] } else { $ws[1] })   # $ui.Wide: the wide size for every text (a stack of buttons)
   return (New-Object System.Drawing.Size((& $s $w), (& $s $h))) }
 # Gives a button the size of its kind for its text ($ui.BtnSize). Takes the button.
 $ui.FitBtn = { param($B) try { $ns = & $ui.BtnSize $B; if ($B.Width -ne $ns.Width -or $B.Height -ne $ns.Height) { $B.Size = $ns } } catch { $null = $_ } }   # no size now: the next text sets it
@@ -316,22 +316,6 @@ $ui.RowBad = { param([string]$Card, [string]$Row, $Parts)
 $ui.EdgeBad = { param([string]$Card, $Edges)
   $out = @(); $tol = [math]::Max(1, (& $ui.Sc 1)); $es = @($Edges | Where-Object { $_ }); if ($es.Count -lt 2) { return $out }
   foreach ($e in $es) { if ([math]::Abs($e.X - $es[0].X) -gt $tol) { $out += ('LAYOUT ' + $Card + ' ' + $e.N + ' edge: starts at ' + $e.X + ', the card edge is ' + $es[0].X + ' (' + $es[0].N + ')' + $(if ($e.D) { ' [' + $e.D + ']' } else { '' })) } }
-  return $out }
-# HeadBad (R29b V1): the ink of the word RADE and of the line under it (@{ N; X }) start at the same x; any difference is a defect.
-$ui.HeadBad = { param([string]$Card, $Title, $Sub)
-  if ([int]$Title.X -eq [int]$Sub.X) { return @() }
-  return @('LAYOUT ' + $Card + ' header ' + $Sub.N + ' edge: starts at ' + $Sub.X + ', ' + $Title.N + ' starts at ' + $Title.X) }
-# HeadRuleBad (L2, the Administrator, 2026-11-19; it replaces the 4 px box gap of R29b V1): without an application logo,
-# under the word RADE comes a gap, a thin line as wide as the word's ink and on its left edge, the same gap, then the
-# capitals of the application name. Takes the card, the measured numbers @{ WordBottom; WordLeft; WordW; RuleTop;
-# RuleBottom; RuleLeft; RuleW; AppTop } (AppTop $null: a name with no capital, digit or tall letter is not measured) and
-# the gap it must be (4 px, scaled); the tolerance is 1 px, scaled. Gives back the defect lines.
-$ui.HeadRuleBad = { param([string]$Card, $M, [int]$Want)
-  $out = @(); $tol = [math]::Max(1, (& $ui.Sc 1))
-  $g1 = [int]$M.RuleTop - [int]$M.WordBottom; if ([math]::Abs($g1 - $Want) -gt $tol) { $out += ('LAYOUT ' + $Card + ' header gap: ' + $g1 + ' between the word RADE and the line, the gap is ' + $Want) }
-  if ($null -ne $M.AppTop) { $g2 = [int]$M.AppTop - [int]$M.RuleBottom; if ([math]::Abs($g2 - $Want) -gt $tol) { $out += ('LAYOUT ' + $Card + ' header gap: ' + $g2 + ' between the line and the application name, the gap is ' + $Want) } }
-  if ([math]::Abs([int]$M.RuleW - [int]$M.WordW) -gt $tol) { $out += ('LAYOUT ' + $Card + ' header line: ' + $M.RuleW + ' wide, the word RADE is ' + $M.WordW) }
-  if ([math]::Abs([int]$M.RuleLeft - [int]$M.WordLeft) -gt $tol) { $out += ('LAYOUT ' + $Card + ' header line: starts at ' + $M.RuleLeft + ', the word RADE starts at ' + $M.WordLeft) }
   return $out }
 # AboveBad (L3, the Administrator, 2026-11-19): a label above its box. The label's bottom is not under the box's top, the
 # box starts on the card's edge and it is as wide as the card's text (from the edge to the end of the text column), each
