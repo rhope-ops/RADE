@@ -66,7 +66,7 @@ function global:Save-RadeUninstall([string]$bp, [string]$nm) {
 function global:Save-RadeRestore {
   <#
   .SYNOPSIS
-  Draws the Restore cards once (engine-v31), from the Maintenance screen: the mark card (engine-v32) with a wrong and
+  Draws the Restore cards once (engine-v31), from the Maintenance card: the mark card (engine-v32) with a wrong and
   then the right site name, the backup list, the dry-run card, a wrong typed name and the result card.
   .DESCRIPTION
   Fake data: two backup folders of one list; the dry run and the result are set by the test (no SharePoint on the
@@ -116,20 +116,20 @@ function global:Save-RadeRestore {
   Get-ChildItem -LiteralPath $cfg -Filter '*-site.txt' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notin $had } | Remove-Item -Force
   if ($keepMark) { [System.IO.File]::WriteAllBytes($mk, $keepMark) } else { Remove-Item -LiteralPath $mk -Force -ErrorAction SilentlyContinue }
   Remove-Item -LiteralPath (Join-Path $bp 'Backups') -Recurse -Force -ErrorAction SilentlyContinue; $script:app.Backup = $keep.B; $script:app.Restore = $keep.R
-  & $ui.VTools $ui.MaintVerb }
+  & $ui.VMaint $ui.MaintInst }
 
 function global:Save-RadeTools {
   <#
   .SYNOPSIS
-  The Maintenance screen: draws the Restore cards once, then selects Repair or Update.
+  The Maintenance card (engine-v47: one card): draws the Restore cards once, then selects the Repair or Update row.
   .DESCRIPTION
   The timer stops while the Restore cards are drawn: their DoEvents could run a tick inside this one, which selected
   Repair and ran the whole install; this tick then selected the primary button of the Done card ("Start", which
-  closes RADE). Repair is selected only while the Maintenance screen is still shown. Takes no parameter.
+  closes RADE). Repair is selected only while the Maintenance card is still shown. Takes no parameter.
   #>
   $global:RadeTimer.Stop()
   try { Save-RadeRestore } finally { $global:RadeTimer.Start() }
-  if ($ui.View -eq 'tools') { (Get-RadeMain).PerformClick() } }
+  if ($ui.View -eq 'maint') { & $ui.OnOpt 10 } }   # row 10: Repair or Update
 
 function global:Save-RadeCard([string]$Tag) {
   $global:RadeT.N++; $card = ('{0:00}-{1}' -f $global:RadeT.N, $Tag)
@@ -199,7 +199,7 @@ function global:Step-Rade {
     foreach ($o in @($ui.Opts.Controls)) { if (-not $o.Tag.Off -and [int]$o.Tag.Index -eq $global:RadeT.App) { $o.PerformClick(); return } }
     Write-Host 'WIN BAD no choice for the application'; [Environment]::Exit(4)
   }
-  elseif ($v -eq 'maint') { Write-RadeRow; @($ui.B | Where-Object { $_.Visible -and $_.Text -eq 'Maintenance' })[0].PerformClick() } elseif ($v -eq 'tools') { Save-RadeTools }   # the Maintenance screen (and the Restore cards once), then Repair or Update (Start would start the application)
+  elseif ($v -eq 'maint') { Write-RadeRow; if (-not $global:RadeT.ToolsDone) { $global:RadeT.ToolsDone = $true; Save-RadeTools } else { & $ui.OnOpt 10 } }   # the Maintenance card (the Restore cards once), then the Repair or Update row (Start would start the application)
   elseif ($v -eq 'site') { $ui.Field.Text = 'https://rade-test.invalid/sites/fake'; $ui.B[0].PerformClick() }
   elseif ($v -in 'fail', 'need') {
     $id = [string]@($script:appChecks)[([int]($ui.Kick.Text -replace '^CHECK (\d+) OF .*$', '$1')) - 1]

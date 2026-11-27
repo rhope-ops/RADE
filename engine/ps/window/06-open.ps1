@@ -151,7 +151,7 @@ $ui.VMaint = { param($Inst)
     else { @{ Off = $true; Soon = $true; Index = 20; Name = 'Uninstall'; Ver = ''; Sub = ($script:app.Name + ' has no Uninstall steps.'); R1 = 'Not set up by this app' } })
   & $ui.SetCard @{ View = 'maint'; Kicker = ((Get-AppWord) + ' ' + [string][char]0x2022 + ' ' + $Inst.version); Sentence = ((Get-AppWord) + ' ' + $Inst.version + ' is installed.')
     Options = @(@($fix) + @(& $ui.ToolRows) + @($un)); OnOption = { param($j) & $ui.MaintPick $j }
-    Buttons = @($startB); Back = { & $ui.VChoose } } }
+    Buttons = @($startB); Focus = 'button'; Back = { & $ui.VChoose } } }   # Focus: Start when it is the primary, else the first row
 # A click on a row of the Maintenance card: 10 = Update or Repair (the checks, then the install run), 20 = Uninstall (its
 # confirm card, part 11), else a tool row (Diagnose, Back up, Restore: $ui.RunTool, part 11). Takes the row's index.
 $ui.MaintPick = { param([int]$J)

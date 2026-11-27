@@ -31,12 +31,12 @@ A list of ConvertTo-ToolLine tables.
 #>
 function Get-DiagnoseInstall {
   $e = Read-Installed (Get-InstalledKey $script:app); $out = @(); $pv = [string]$script:app.Version
-  $repair = 'Select "Repair" on the Maintenance screen'
+  $repair = 'Select "Repair" on the Maintenance card'
   if (-not ($e -and $e.installed)) { return @(ConvertTo-ToolLine 'FINDING' ('This computer has no install record of ' + $script:app.Name + ' that ended PASSED') $repair) }
   $iv = [string]$e.installed.version; $c = 0
   try { $c = ([version]$pv).CompareTo([version]$iv) } catch { $c = [string]::CompareOrdinal($pv, $iv) }
   if ($c -eq 0) { $out += ConvertTo-ToolLine 'PASS' ('The installed version, ' + $iv + ', is the version in this paste') '' }
-  elseif ($c -gt 0) { $out += ConvertTo-ToolLine 'FINDING' ('The installed version is ' + $iv + '; this paste has ' + $pv) ('Select "Update to ' + $pv + '" on the Maintenance screen') }
+  elseif ($c -gt 0) { $out += ConvertTo-ToolLine 'FINDING' ('The installed version is ' + $iv + '; this paste has ' + $pv) ('Select "Update to ' + $pv + '" on the Maintenance card') }
   else { $out += ConvertTo-ToolLine 'FINDING' ('The installed version, ' + $iv + ', is newer than this paste (' + $pv + ')') ('Use the newest paste of ' + $script:app.Name) }
   $ls = $(if ($e.lastRun) { [string]$e.lastRun.state } else { '' })
   if ($ls -and $ls -ne 'PASSED') { $out += ConvertTo-ToolLine 'FINDING' ('The last install run ended ' + $ls) $repair }
