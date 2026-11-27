@@ -12,6 +12,10 @@ Started: 2026-11-27 06:15 Central. Status: questions open (button layout). Sourc
 | D4 | Buttons at half size | Open: the PFM asked for a preview of all 3 options. Preview: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "UI pass after R47 (27 Nov)". |
 | D5 | Window layout | The PFM chose "B + C" (2026-11-27): the navy top band of UI pass 3 C with the quiet rows of B. Polished preview: same page, board "B + C polished" (not yet approved for the build). History: Open (the PFM, 2026-11-27, after the button preview: "I forgot how much I liked option A"): preview two hybrids of UI pass 3: the top band of C with the body of A, and with the body of B, at full and half size (same page). A hybrid replaces the "One thing" design (2026-11-14): a design change that needs the PFM's approval before a build. |
 
+| D6 | Themes | Both, in engine-v48 (the PFM, question dialog, 2026-11-27): light = Kanon in USAF colors, dark = Kanon in Fulcrum colors plus the added colors in [the critique](2026-11-27-ui-critique-bc.md) "Dark mode". The added colors also go to the kit's fulcrum.json as a separate kit change. |
+| D7 | Critique changes | 1 to 8 of [the critique](2026-11-27-ui-critique-bc.md) "Proposed changes" are in engine-v48; 10 (failure card, the card after "It failed", focus ring, Cancel question) is drawn before the build approval. |
+| D8 | Maintenance, not installed | Single Install button (the PFM, 2026-11-27; replaces D1 for the not-installed state): headline "Kanon is not installed.", what Install does, a blue Install button; the other options only after an install. D1 stays for the installed state. |
+
 ## Items (from the PFM's notes)
 
 1. Maintenance card when the app is not installed: headline "Select an option."; row 1 "Install <version>" in blue (an edge and text in blue, as Uninstall is in red); the other rows off unless an earlier install left data or backups (D1).
