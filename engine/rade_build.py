@@ -317,7 +317,8 @@ def collect_problems(b):
 
 def part_lines():
     """Return header lines listing each engine PowerShell part and its short SHA-256."""
-    rels = ['engine/rade_ui.ps1'] + ['engine/ps/' + x for x in ENGINE_PARTS + WINDOW_PARTS]
+    # engine/rade_ui.ps1 is listed where the build puts it: first in the window block, before the window parts.
+    rels = ['engine/ps/' + x for x in ENGINE_PARTS] + ['engine/rade_ui.ps1'] + ['engine/ps/' + x for x in WINDOW_PARTS]
     rows = [' '.join('%s, sha256 %s;' % (r, file_sha(r)) for r in rels[k:k + 4]) for k in range(0, len(rels), 4)]
     return '  Engine parts, in run order:\n' + ''.join('    %s\n' % r for r in rows)
 
