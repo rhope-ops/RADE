@@ -7,7 +7,7 @@
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 engine_src="engine/rade_build.py $(ls engine/ps/*.ps1 engine/ps/window/*.ps1 | tr '\n' ' ')"   # the build file and its PowerShell parts (docs/code-standard.md C10)
-ui_src="engine/ps/window/ui-theme.ps1"   # the shared UI theme module in build order
+ui_src="engine/rade_ui.ps1"   # the shared UI theme module in build order
 pass=0; fail=0
 # Every run below gets this variable, as a RADE started from a shortcut made before engine-v36 has it on Windows (its
 # -ExecutionPolicy setting hands it down). The engine must take it out (fleet v2, DEC 3): the child check's test script
@@ -85,9 +85,9 @@ for bad in "/etc/sample-logo.png" "assets/../../sample-logo.png"; do sed -i "s#\
 sed -i 's#"logo": "[^"]*"#"logo": "assets/sample-logo.png"#' "$t/app/scripts/paste_bundles.json"
 mv "$t/sl.png" "$t/app/assets/sample-logo.png"; build || bad "rebuild after the application logo checks"
 # Dark is opt-in (review of PR 211): ui-theme.ps1 alone takes the light set when $ui.Dark is not set.
-[ "$(pwsh -NoProfile -Command 'function Get-ItemPropertyValue { 0 }; $t = Get-Content engine/ps/window/ui-theme.ps1 -Raw; $a = $t.IndexOf("# ---- UI tokens"); $b = $t.IndexOf("# ---- Fonts, sizes and buttons")
+[ "$(pwsh -NoProfile -Command 'function Get-ItemPropertyValue { 0 }; $t = Get-Content engine/rade_ui.ps1 -Raw; $a = $t.IndexOf("# ---- UI tokens"); $b = $t.IndexOf("# ---- Fonts, sizes and buttons")
   foreach ($d in @($null, $true)) { $ui = @{ Dark = $d }; . ([scriptblock]::Create($t.Substring($a, $b - $a))); ($ui.C.White.ToArgb() -band 0xFFFFFF).ToString("X6") + "/" + $ui.Dark }' 2>&1 | tr '\n' ' ')" = "FFFFFF/False 15171D/True " ] &&
-  grep -q "^\$ui.Dark = \[bool\](& \$ui.DarkOn)$" engine/ps/window/ui-theme.ps1 && ok || bad "dark is opt-in: ui-theme.ps1 alone is light; the RADE window reads the app mode"
+  grep -q "^\$ui.Dark = \[bool\](& \$ui.DarkOn)$" engine/rade_ui.ps1 && ok || bad "dark is opt-in: ui-theme.ps1 alone is light; the RADE window reads the app mode"
 # application.logoDark (plan engine-v48 D6): the logo of the dark mode, with the rules of logo; without it the bundle's value is empty.
 grep -q "^\$appLogoDarkPng = ''$" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" && sed -i 's#"logo": "assets/sample-logo.png"#"logo": "assets/sample-logo.png", "logoDark": "assets/sample-logo.png"#' "$t/app/scripts/paste_bundles.json" &&
   python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1 && grep -A1 "^\$appLogoDarkPng = @'$" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" | grep -q "^iVBORw0KGgo" &&
@@ -137,7 +137,7 @@ P
 # ---- sizes and text lengths (docs/window-design.md "Sizes", "Text lengths"; the Administrator, 2026-11-15)
 # Every button is made with a named kind (its size is in $ui.Z), and no other place sets a button's size.
 # (The bottom line's own minimum height, 46, is not a button size: R24. Cards v2: the running step's row and the WHAT TO DO box are as wide as the card's text.)
-[ "$(cat $engine_src | grep -o '& \$ui\.Btn [^;)]*' | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/ps/window/ui-theme.ps1 | wc -l)" = 1 ] && [ "$(cat $engine_src | grep -c 'MinimumSize = ')" = 6 ] && grep -q '^\$ui.Btn = { param(\[string\]\$Kind) \$b = New-Object System.Windows.Forms.Button; \$b.AutoSize = \$false;' engine/ps/window/ui-theme.ps1 && grep -q 'ui.Head.MinimumSize = ' engine/ps/window/ui-cards.ps1 && ok || bad "sizes: a button is made without a kind, or sets its own size"
+[ "$(cat $engine_src | grep -o '& \$ui\.Btn [^;)]*' | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_ui.ps1 | wc -l)" = 1 ] && [ "$(cat $engine_src | grep -c 'MinimumSize = ')" = 6 ] && grep -q '^\$ui.Btn = { param(\[string\]\$Kind) \$b = New-Object System.Windows.Forms.Button; \$b.AutoSize = \$false;' engine/rade_ui.ps1 && grep -q 'ui.Head.MinimumSize = ' engine/ps/window/ui-cards.ps1 && ok || bad "sizes: a button is made without a kind, or sets its own size"
 grep -q 'ui.BtnRow.MinimumSize = ' engine/ps/window/ui-cards.ps1 && ok || bad "sizes: the action row is as wide as the column (B3)"
 # The limits in the document are the limits of the build.
 python3 - <<'P' && ok || bad "text lengths: docs/window-design.md and TEXT_LIMITS (engine/rade_build.py) differ"
