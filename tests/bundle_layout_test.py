@@ -26,10 +26,10 @@ BLOCK = ('# >>> demo-common: generated from scripts/gov/src/demo-common.ps1 by a
 RESULTS = []
 DISCARD = 'catch { $null = $_ }'   # the discarded-error form that rule X7 counts
 # Engine PowerShell sources that rule X7 covers (the files the bundle is made of).
-ENGINE_PS = ('engine/ps/*.ps1', 'engine/ps/window/*.ps1', 'engine/rade_ui.ps1', 'engine/rade_ui_text.ps1')
+ENGINE_PS = ('engine/ps/*.ps1', 'engine/ps/window/*.ps1')
 # Standards plan Stage 5 (the Administrator approved the plan, 2026-11-17; this count is an agent's work under it). Discarded-error catches with no reason on their line (106 of 129
 # on 2026-11-17). This number may only go down: lower it when you add reasons; never raise it.
-SILENT_CATCHES = 101
+SILENT_CATCHES = 99
 
 
 def check(ok, what):
@@ -168,16 +168,16 @@ def check_uninstall_field():
     """Check 6 (engine-v40; 90-161.Z R43 E3): the manifest field "uninstall" gives its step numbers, and the build stops
     for an install step named as an Uninstall step, an unknown step, or an app without mode deploy and "restore"."""
     sys.path.insert(0, str(ROOT / 'engine'))
-    import rade_fields
+    import rade_build
     b = {'steps': [{'name': 'T01'}, {'name': 'U01'}, {'name': 'U02', 'after': ['U01']}]}
     good = {'name': 'App', 'steps': ['T01'], 'mode': 'deploy', 'restore': {'testSites': 'local'}, 'backup': ['L'], 'uninstall': ['U01']}
-    check(rade_fields.uninstall_part(good, b) == '@(1)' and rade_fields.uninstall_part(dict(good, uninstall=[]), b) == '@()',
+    check(rade_build.uninstall_part(good, b) == '@(1)' and rade_build.uninstall_part(dict(good, uninstall=[]), b) == '@()',
           'uninstall: the step numbers, or @() for none')
     for why, a in (('an install step', dict(good, uninstall=['T01'])), ('an unknown step', dict(good, uninstall=['U09'])),
                    ('no restore', {k: v for k, v in good.items() if k != 'restore'}), ('not deploy', dict(good, mode='test')),
                    ('a step with "after"', dict(good, uninstall=['U02']))):
         try:
-            rade_fields.uninstall_part(a, b)
+            rade_build.uninstall_part(a, b)
             stopped = False
         except AssertionError:
             stopped = True

@@ -27,7 +27,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'engine'))
-import rade_hash  # noqa: E402
+import rade_build  # noqa: E402
 RESULTS = []
 # One pwsh process parses every cut: it reads the bundle and a list of line counts, and prints "N ok" or "N error".
 PARSE = r'''param($f, $list)
@@ -81,8 +81,8 @@ def main():
         lines = build(tmp)
         if lines and lines[-1] == '':
             lines = lines[:-1]
-        start = rade_hash.GUARD_START.rstrip('\n').split('\n')
-        end = rade_hash.GUARD_END.rstrip('\n').split('\n')
+        start = rade_build.GUARD_START.rstrip('\n').split('\n')
+        end = rade_build.GUARD_END.rstrip('\n').split('\n')
         at = lines.index(start[0]) if start[0] in lines else -1
         check('guard start right after the header comment', at > 0 and lines[at - 1] == '#>' and lines[at:at + len(start)] == start)
         check('guard end as the last lines', lines[-len(end):] == end)

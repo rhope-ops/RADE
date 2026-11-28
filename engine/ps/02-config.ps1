@@ -10,8 +10,6 @@ function Format-Duration([double]$Seconds) {
 # What the window calls a step to a person: its manifest "title", else its name. The log, the report, the summary, the results
 # files and every key keep the name.
 function Get-StepTitle($Step) { if ($Step -and [string]$Step.Title) { return [string]$Step.Title }; return [string]$Step.Name }
-# Says whether Word is running. Takes nothing; gives back $true or $false.
-function Test-WordOpen { return (@(Get-Process -Name WINWORD -ErrorAction SilentlyContinue).Count -gt 0) }
 # Says whether the text is one or more e-mail addresses separated by ";". Takes the text; gives back $true or $false.
 # Sends nothing.
 function Test-MailTo([string]$To) {
@@ -121,24 +119,24 @@ function Get-StepEstimate($Hist, [string]$Name) {
 }
 $helpRules = @(
   @{ Re = 'FOLDER not found|PROFILE folder'; Text = 'OneDrive is not set up in this Windows profile. Open OneDrive from the Start menu, sign in, wait until it says it is up to date, then run again.' },
-  @{ Re = 'being used by another process|cannot access the file'; Text = 'A file is open in another program. Close Word and any file or Explorer window from the RADE folder, then press Run again.' },
-  @{ Re = 'RPC_E_CALL_REJECTED|0x80010001|0x8001010A|server busy'; Text = 'Word was busy. Close every Word window, wait 10 seconds, then press Run again.' },
-  @{ Re = 'ran longer than'; Text = 'A step ran too long. Close Word (check the taskbar), then press Run again. If it happens twice, send the results as they are.' },
+  @{ Re = 'being used by another process|cannot access the file'; Text = 'A file is open in another program. Close any open file or Explorer window from the RADE folder, then press Run again.' },
+  @{ Re = 'ran longer than'; Text = 'A step ran too long. Close any hung program, then press Run again. If it happens twice, send the results as they are.' },
   @{ Re = 'LABEL (FAIL|not set)'; Text = 'The sensitivity label was not set. Keep the Config folder; see "Sensitivity label" in the repository (go.md).' },
   # engine-v46 (90-161.Z R45 finding 1): a script policy block, before the general rule below (its text was wrong for it).
   @{ Re = 'running scripts is disabled|is not digitally signed'; Covers = 'denied|UnauthorizedAccess'
     Text = 'Windows did not let a step script run (its script policy). RADE runs it once more. If the step still fails, send the results as they are.' },
   @{ Re = 'denied|UnauthorizedAccess'; Text = 'Windows blocked a file. Check that the RADE folder is in your own OneDrive and not read-only, then run again.' },
   @{ Re = 'Outlook draft could not be created'; Text = 'Open Outlook (classic), then press Make e-mail draft. Or send by hand: the results folder is open and the summary is on the clipboard.' },
-  @{ Re = 'FORMAT-FAIL'; Text = 'The renderer found a format problem. Send the results as they are; Claude fixes it.' },
-  @{ Re = 'NO IMAGES'; Text = 'The seal images are not on this computer yet. Send the results; Claude checks how the seal e-mails were delivered.' },
   @{ Re = 'Clean-up could not'; Text = 'A file could not go to the Recycle Bin (it may be open). Close it; the next round tries again.' },
   @{ Re = 'e-mail address does not look right'; Text = 'Type one address like name@example.com (several: separate with ;), or leave the box empty.' }
 )
 # Gives a "What to do: ..." help line for a log line that matches a known problem, once for each problem in a round;
-# else an empty text. Takes the log line; marks the problem as helped.
+# else an empty text. Checks app-declared $appHelpRules first, then generic $helpRules.
 function Get-WhatToDo([string]$Line) {
-  foreach ($h in $helpRules) {
+  $allRules = @()
+  if ($appHelpRules) { $allRules += $appHelpRules }
+  $allRules += $helpRules
+  foreach ($h in $allRules) {
     if ($Line -match $h.Re -and -not $script:helped.ContainsKey($h.Re)) { $script:helped[$h.Re] = $true
       if ($h.Covers) { $script:helped[[string]$h.Covers] = $true }   # engine-v46: a more exact rule keeps the general one quiet
       return ('What to do: ' + $h.Text) }

@@ -1,3 +1,55 @@
+# RADE window part 01, setup: asks Windows for the real screen dpi, creates the $ui table that holds every
+# window value, and creates the form. The window parts run inside "if ($gui) { try {" of 10-window.ps1 and use no other part before this one.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
+# The "One thing" window (the Administrator, 2026-11-14; docs/window-design.md): the window shows one statement or one
+# question at a time; everything else (all checks, the step boxes, the files, the made list, the log) is in the Record
+# (F2). Each answer moves on: there is no Next / Back row and no Exit button (Esc goes back, and exits on Choose; the window's X exits).
+# Every window value lives in $ui: handlers and the engine's callbacks run inside engine functions, where a plain
+# variable name could meet a local of the same name. A block stored in $ui reads only $ui and the bundle's globals.
+# R28 item 1 (the Administrator, 2026-11-17): text scales with the controls. Two ways were possible: (a) ask Windows for the real
+# dpi (SetProcessDPIAware, GetDpiForWindow: a native call from user32) and size everything from it, or (b) AutoScaleMode Font.
+# (b) scales by the form font, which Windows draws at 96 dpi on the R25 device (dpiX 96, autoScale 144, font 18 px): it gives
+# no scaling at all there. RADE takes (a) and keeps one scale source: the controls follow the form's auto-scale (as before),
+# and every font is made bigger by the same factor when the screen draws text smaller ($ui.FontScale in engine/rade_ui.ps1).
+# The native call is asked for before any form exists; it changes nothing when the process already has an awareness
+# (the call fails), and when a native call cannot be compiled (Constrained Language Mode) the window runs as before.
+# Inline C# (Add-Type -MemberDefinition) is forbidden by DEC-NIPR; use standard WinForms AutoScaleMode.Dpi.
+$script:native = $false
+$script:dpiThread = 'n/a'
+$script:taskbarId = 'n/a'
+[System.Windows.Forms.Application]::EnableVisualStyles()
+$ui = @{ View = ''; Running = $false; Busy = $false; RecOn = $false; Edit = $false; Answer = ''; Acts = @(); Back = $null; OnOpt = $null; FieldDo = $null
+  Log = (New-Object System.Collections.Generic.List[string]); Summary = @(); Sel = @{}; Clean = $true; StepState = @{}; Plan = $null; Picked = $false
+  BaseIds = @(); BaseRes = @{}; Blocked = @{}; Newer = @{}; Bars = @{}; G = $null; GUrl = ''; CurId = ''; StepI = 0; StepN = 0; StepNow = ''; BusyShown = $false; Always = @($false, $false, $false, $false, $false, $false); NB = 6; StartAfter = $false; Cancel = $false; Dpi = 96.0; ScreenDpi = 96.0; FontK = 1.0; FontDpi = 96.0; Scaled = $false; Full = @{}; Clock = [System.Diagnostics.Stopwatch]::StartNew(); CardAt = -1000000.0; GuardMs = 400; Calm = $false; ContentW = 780 }
+# Themes (the PFM, 2026-11-27, plan engine-v48 D6): the RADE window reads the Windows app mode once when it opens:
+# AppsUseLightTheme 0 = dark (Kanon in Fulcrum colors); 1 or no value = light (Kanon in USAF colors). A contrast theme
+# wins over both. engine/rade_ui.ps1 takes $ui.Dark as it is set here (an app window that copies that file stays light).
+# Takes nothing; gives back $true for dark. No registry (not Windows): light.
+$ui.DarkOn = { try { $v = Get-ItemPropertyValue -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'AppsUseLightTheme' -ErrorAction Stop; return ([int]$v -eq 0) } catch { return $false } }   # no value: light
+$ui.Dark = [bool](& $ui.DarkOn)
+$ui.OpenedAt = (Get-Date).AddSeconds(-1)   # E4: the SCALE lines of the RADE windows shown from this time on go into the round's results
+# engine-v47 (the PFM, 2026-11-26): the line under the word RADE is RADE's full name, "Redacted Application Deployment
+# Engine" (replaces the short tagline of L1). The RADE row shows only for an app with no productName and logo.
+$ui.Tagline = 'Redacted Application Deployment Engine'
+# Layout values from engine/window.json, put in by the build (text column share and cap, minimum window size, minimum height of the card frame; pixels at 100 %; the minimum time of a step on the Run card, ms).
+$ui.Layout = @{ Share = [double]'@@TEXT_SHARE@@'; MaxW = [int]'@@TEXT_MAX@@'; MinW = [int]'@@MIN_W@@'; MinH = [int]'@@MIN_H@@'; FrameMin = [int]'@@FRAME_MIN@@'; StepMs = [int]'@@MIN_STEP_MS@@' }
+$ui.Hist = Read-RoundHistory (Get-BasePath)
+$script:secret = Get-Secret (Get-ProfileLeaf) (Get-ProfileLeaf)   # saved checks are masked before they are written
+try { $ui.Calm = -not [System.Windows.Forms.SystemInformation]::UIEffectsEnabled } catch { $null = $_ }
+$ui.Form = New-Object System.Windows.Forms.Form
+# The title text (docs/window-design.md "Title bar"). engine-v47 (the PFM, 2026-11-26: "Kanon icon and name"): for an app with
+# application.productName, "<word> - <version>" for a chosen install ("Kanon - 0.1.0"), else "<word> - <round>" ("Kanon - R46";
+# from the shortcut, the version of the paste's install); the engine number is in Details (F2). Without a productName,
+# "RADE - engine-vNN - <round>" as before (90-161.Z R44 E2; from the shortcut: no round). Takes the chosen app or $null.
+$ui.TitleText = { param($App)
+  if (-not [string]$appProduct) { return ('RADE - engine-v' + $engineRelease + $(if (Test-RunnerStart) { '' } else { ' - ' + $round })) }
+  if (-not $App -and (Test-RunnerStart)) { $App = @($apps | Where-Object { [string]$_.Version })[0] }   # the shortcut opens the paste of an install
+  $v = $(if ($App -and [string]$App.Version) { [string]$App.Version } elseif (-not (Test-RunnerStart)) { [string]$round } else { '' })
+  return ([string]$appProduct + $(if ($v) { ' - ' + $v } else { '' })) }
+$ui.Form.Text = & $ui.TitleText $null
+$ui.Form.SuspendLayout()
+$ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(96, 96); $ui.Form.AutoScaleMode = 'Dpi'   # sizes below are at 100 % scaling
 # RADE shared UI file (engine/rade_ui.ps1): the theme tokens (colors, fonts, sizes), the builders for buttons, links and
 # card text, the drawing and measuring helpers (part 2: engine/rade_ui_text.ps1, right after this file), and the layout self-check. rade_build.py puts this text into every bundle
 # at its marker line (docs/engine.md "How an app gets the engine"); it runs inside the window's try block, after
@@ -40,7 +92,7 @@ $ui.Z = @{ ActionW = 160; WideW = 240; ActionH = 40; CompactW = 96; CompactH = 3
   G1 = 4; G2 = 8; G3 = 12; G4 = 16; G6 = 24
   FieldS = 240; FieldM = 420; FieldL = 600 }
 # Faces: name = @(family, the font file's name in the bundle ('' = none), the family used when the font cannot be loaded).
-$ui.Faces = @{ title = @('Sofia Sans Condensed SemiBold', 'SofiaSansCondensed-SemiBold.ttf', 'Segoe UI Semibold'); text = @('Sofia Sans', 'SofiaSans-Regular.ttf', 'Segoe UI'); strong = @('Sofia Sans SemiBold', 'SofiaSans-SemiBold.ttf', 'Segoe UI Semibold'); mono = @('Consolas', '', 'Consolas') }
+$ui.Faces = @{ title = @('Segoe UI Semibold', '', 'Segoe UI Semibold'); text = @('Segoe UI', '', 'Segoe UI'); strong = @('Segoe UI Semibold', '', 'Segoe UI Semibold'); mono = @('Consolas', '', 'Consolas') }
 # Text styles: name = @(face, size in points at 100 %, font style ('' = regular)); uses: the file.
 $ui.Styles = [ordered]@{}
 $ui.Styles.Sent = @('title', 22, ''); $ui.Styles.Word = @('title', 15, 'Bold'); $ui.Styles.Body = @('text', 12, ''); $ui.Styles.Small = @('text', 10, '')
@@ -80,46 +132,13 @@ $ui.Font = { param([string]$Fam, [double]$Pt, $Style) try { $pk = [single]($Pt *
 $ui.FontScale = { $ui.FontK = 1.0; $ui.FontDpi = 96.0
   try { $pf = New-Object System.Drawing.Font('Segoe UI', [single]100); $r = [double]$pf.Height / 177.3; try { $pf.Dispose() } catch { $null = $_ }
     if ($r -gt 0.6 -and $r -lt 4) { $k = [math]::Round(($ui.Dpi / 96.0) / $r * 4) / 4; if ($k -ge 0.5 -and $k -le 4) { $ui.FontK = [double]$k }; $ui.FontDpi = 96.0 * [math]::Max(1.0, [math]::Round($r * 4) / 4) } } catch { $null = $_ } }
-# ---- The RADE fonts (UI standard v1, the Administrator, 2026-11-20; docs/ui-standard.md B12): Sofia Sans Condensed for
-# titles and Sofia Sans for text, open fonts (engine/fonts/OFL.txt) that the bundle carries as base64 ($fontTtf). They are
-# loaded for this process only (no install, no administrator): GDI+ gets them in a PrivateFontCollection (the Font objects)
-# and GDI gets the same bytes as a memory font (AddFontMemResourceEx), because Windows Forms draws labels, boxes and
-# buttons with GDI, which knows no GDI+ private font. A font that cannot be loaded is replaced by its face's fallback
-# (Segoe UI), so the window always opens. $ui.FontNote says what was loaded (the SCALE line).
-$ui.FontFam = @{}; $ui.FontMem = @(); $ui.FontNote = 'fallback (no font files)'
-$ui.LoadFonts = {
-  <#
-  .SYNOPSIS
-  Loads the fonts of $fontTtf (the bundle's base64 font files) for this process.
-  .DESCRIPTION
-  Each file goes into one PrivateFontCollection (GDI+) and, when the native type can be made, into GDI as a memory font.
-  The memory of each file stays held while the process runs (GDI+ reads it when it draws). A bundle with no $fontTtf
-  (an app window that copies this file) and any failure leave $ui.FontFam empty: every style then uses its fallback.
-  .OUTPUTS
-  Nothing. Fills $ui.FontFam (family name = FontFamily) and sets $ui.FontNote.
-  #>
-  $ttf = $null; try { $ttf = $fontTtf } catch { $null = $_ }   # no font files (an app window that copies this file; strict mode): the fallback fonts
-  if (-not $ttf -or -not $ttf.Count) { return }
-  $gdi = $false
-  try { if (-not ('Rade.Fonts' -as [type])) { Add-Type -Namespace Rade -Name Fonts -MemberDefinition '[DllImport("gdi32.dll")] public static extern IntPtr AddFontMemResourceEx(IntPtr pbFont, uint cbFont, IntPtr pdv, ref uint pcFonts);' -ErrorAction Stop }; $gdi = $true } catch { $null = $_ }   # no GDI copy: GDI+ text still has the fonts
-  try { $pfc = New-Object System.Drawing.Text.PrivateFontCollection; $n = 0
-    foreach ($k in @($ttf.Keys | Sort-Object)) {
-      $b = [Convert]::FromBase64String([string]$ttf[$k]); $p = [System.Runtime.InteropServices.Marshal]::AllocCoTaskMem($b.Length)
-      [System.Runtime.InteropServices.Marshal]::Copy($b, 0, $p, $b.Length); $ui.FontMem += $p; $pfc.AddMemoryFont($p, $b.Length); $n++
-      if ($gdi) { $c = [uint32]0; if ([Rade.Fonts]::AddFontMemResourceEx($p, [uint32]$b.Length, [IntPtr]::Zero, [ref]$c) -eq [IntPtr]::Zero) { $gdi = $false } } }   # a failed GDI load: the note says GDI+ only
-    foreach ($fm in @($pfc.Families)) { $ui.FontFam[[string]$fm.Name] = $fm }
-    $ui.Pfc = $pfc; $ui.FontNote = 'loaded ' + $n + ' files, ' + $ui.FontFam.Count + ' families' + $(if ($gdi) { '' } else { ' (GDI+ only)' })
-  } catch { $ui.FontFam = @{}; $ui.FontNote = 'fallback (' + [string]$_.Exception.GetType().Name + ')' } }   # never stop the window for a font
-# The font of one text style ($ui.Styles): its face's font when it was loaded, else the face's fallback ($ui.Font). Takes
-# the style name; gives back a Font.
+# Native Windows fonts (Segoe UI / Segoe UI Semibold / Consolas): no embedded TTFs and no Add-Type P/Invoke (DEC-NIPR).
+$ui.FontFam = @{}; $ui.FontNote = 'native (Segoe UI / Consolas)'
 $ui.StyleFont = { param([string]$Name)
   $s = $ui.Styles[$Name]; $face = $ui.Faces[[string]$s[0]]; $pt = [double]$s[1]
   $st = $(if ([string]$s[2]) { [Enum]::Parse(('System.Drawing.FontStyle' -as [type]), [string]$s[2]) } else { $null })
-  $fm = $ui.FontFam[[string]$face[0]]   # no System.Drawing type names in this block: on the test stand-ins they would stop it as it is read
-  if ($fm) { $gu = $null; $rg = $null; try { $rg = [Enum]::Parse(('System.Drawing.FontStyle' -as [type]), 'Regular'); $gu = [Enum]::Parse(('System.Drawing.GraphicsUnit' -as [type]), 'Point') } catch { $null = $_ }   # no types: the fallback below
-    foreach ($fs in @(@($st, $rg) | Where-Object { $null -ne $_ })) { try { return (New-Object System.Drawing.Font($fm, [single]($pt * $ui.FontK), $fs, $gu)) } catch { $null = $_ } } }   # a style the one-weight file lacks (Bold): its own weight
   return (& $ui.Font ([string]$face[2]) $pt $st) }
-& $ui.FormDpi; & $ui.FontScale; & $ui.LoadFonts; $ui.Form.Font = (& $ui.StyleFont 'Small')
+& $ui.FormDpi; & $ui.FontScale; $ui.Form.Font = (& $ui.StyleFont 'Small')
 # Text styles (the Administrator, 2026-11-17; faces and sizes from the UI tokens, UI standard v1): Sent = headline; Body =
 # paragraphs, step lines, help line; Small = second lines, notes, box text; SmallB = the line in capitals, labels, every
 # button, key numbers, the Record's heads and result words; Link = SmallB underlined (a link is marked by more than
@@ -181,7 +200,7 @@ $ui.PasteLine = { param($Tb)
 $ui.MenuCopy.Add_Click({ $null = & $ui.CopyText $ui.Menu.SourceControl })
 $ui.MenuAll.Add_Click({ try { $ui.Menu.SourceControl.SelectAll() } catch { $null = $_ } })
 $ui.Menu.Add_Opening({ try { $ui.MenuCopy.Enabled = [bool]($ui.Menu.SourceControl.SelectionLength -gt 0) } catch { $null = $_ } })
-$ui.NoCaret = { param($C) try { if ($script:native) { $null = [Rade.Native]::HideCaret($C.Handle) } } catch { $null = $_ } }
+$ui.NoCaret = { param($C) $null = $C }
 $ui.Text = { param($Font, $Color, [int]$Top, [string]$Name)
   $t = New-Object System.Windows.Forms.TextBox; $t.Multiline = $true; $t.ReadOnly = $true; $t.WordWrap = $true; $t.ScrollBars = 'None'; $t.BorderStyle = 'None'; $t.TabStop = $false; $t.AutoSize = $false
   $t.Font = $Font; $t.ForeColor = $Color; $t.BackColor = $ui.C.White; $t.Margin = (& $ui.Pad 0 $Top 0 0); $t.Visible = $false; $t.ContextMenuStrip = $ui.Menu; $t.AccessibleName = $Name
@@ -256,6 +275,22 @@ $ui.LinkBtn = { param([string]$Text) $b = New-Object System.Windows.Forms.Button
   $b.FlatStyle = 'Flat'; $b.FlatAppearance.BorderSize = 0; $b.BackColor = $ui.C.White; $b.ForeColor = $ui.C.Link; $b.Font = $ui.F.Link; $ui.Links += $b; try { $b.FlatAppearance.MouseOverBackColor = $ui.C.White; $b.FlatAppearance.MouseDownBackColor = $ui.C.Hair } catch { $null = $_ }; & $ui.Cue $b; & $ui.Own $b   # no hover colors: the link still works
   & $ui.AutoName $b; $b.Add_TextChanged({ & $ui.AutoName $this }); $b }   # a link: Air Force blue, semibold and underlined (not color alone), 28 high
 $ui.Kinds = @{}; $ui.Links = @()   # the kind each button was last styled with; every link ($ui.Recolor styles them again)
+# Bars: RADE draws them (R17). A 30 ms timer eases the fill to its value; with Windows animations off it jumps. No bar
+# moves back inside a run (all) or a step (step). The bar on the bottom edge is all steps; the short one is this step.
+$ui.DrawBar = { param($P, $G) try { $b = $ui.Bars[[string]$P.Tag]; $G.Clear($(if ($b.On) { $ui.C.Track } else { $ui.C.White })); $fw = [int][math]::Round($P.ClientSize.Width * $b.Shown); if ($b.On -and $fw -gt 0) { $br = New-Object System.Drawing.SolidBrush($b.Fill); $G.FillRectangle($br, 0, 0, $fw, $P.ClientSize.Height); $br.Dispose() } } catch { $null = $_ } }
+# Makes one thin progress bar (a panel the engine draws itself) and registers it in $ui.Bars. Takes the bar name and its
+# screen-reader label; gives back the panel.
+$ui.MkBar = { param([string]$Name, [string]$Label)
+  $p = New-Object System.Windows.Forms.Panel; $p.Height = 4; $p.Tag = $Name; $p.AccessibleRole = 'ProgressBar'; $p.AccessibleName = $Label; $p.AccessibleDescription = '0 %'
+  try { [System.Windows.Forms.Control].GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]'NonPublic, Instance').SetValue($p, $true, $null) } catch { $null = $_ }
+  $ui.Bars[$Name] = @{ Panel = $p; Target = 0.0; Shown = 0.0; On = $false; Fill = $ui.C.Info }   # progress: the Info color (dark: blue, not the ember of the main button)
+  $p.Add_Paint({ & $ui.DrawBar $this $_.Graphics }); $p }
+# Sets what a bar shows. Takes the bar name, the fraction (0 to 1) and whether it is on; the fill eases to it, and a
+# smaller value jumps back at once. Gives back nothing.
+$ui.SetBar = { param([string]$Name, [double]$Value, [bool]$On)
+  $b = $ui.Bars[$Name]; $v = [math]::Max(0.0, [math]::Min(1.0, $Value))
+  if ($v -lt $b.Target - 0.001 -or $ui.Calm) { $b.Shown = $v }   # a new step starts at 0 with no slide back
+  $b.Target = $v; $b.On = $On; $b.Panel.AccessibleDescription = [string][int]($v * 100) + ' %'; $b.Panel.Invalidate() }
 # ---- A contrast theme that changes while the window is open (UI standard v1, B11; backlog item 24)
 # The form's SystemColorsChanged event (Windows sends WM_SYSCOLORCHANGE when a contrast theme comes on or goes off) calls
 # $ui.Recolor on the window's own thread: PowerShell code cannot run on the thread of SystemEvents, and the event goes with
@@ -428,3 +463,171 @@ $ui.Check = {
     if (-not $ui.RecOn) { foreach ($l in @(& $ui.RowRuleBad $card @($ui.B | Where-Object { $_.Visible } | ForEach-Object { [string]$ui.Kinds[$_] }))) { $ui.LayBad.Add([string]$l) } }
     foreach ($l in @(& $ui.Measure $card)) { $ui.LayBad.Add([string]$l) }
   } catch { $ui.LayBad.Add('LAYOUT ' + $card + ' the self-check stopped: ' + (ConvertTo-Masked ([string]$_.Exception.Message))) } }
+
+# RADE shared UI file, part 2 (engine/rade_ui_text.ps1): where ink starts, long words and
+# one-line texts, shortened text, and drawing and measuring ($ui.Ink to $ui.Meas). Moved out of engine/rade_ui.ps1 on
+# 2026-11-23 to keep each file at 450 lines or fewer (fleet v2 DEC 6). rade_build.py puts it into every bundle right
+# after engine/rade_ui.ps1, at the same marker line; an app window that copies engine/rade_ui.ps1 copies this file after
+# it, as it is. Its code runs when the window calls it (no part of engine/rade_ui.ps1 calls it while it loads).
+# ASCII only (a bundle is ASCII). Needs from engine/rade_ui.ps1: $ui.Sc, $ui.Pad, $ui.C, $ui.FontDpi, $ui.Scaled, $ui.Trash.
+# Network: none.
+# Writes: none (it measures and draws on the window only).
+# Credentials: none.
+# ---- Where ink starts
+$ui.Inks = @{}
+$ui.Ink = {
+  <#
+  .SYNOPSIS
+  Gives how far in from a control's left edge its ink starts, in pixels (the alignment rules: docs/window-design.md "Sizes").
+  .DESCRIPTION
+  Measured on what Windows drew (DrawToBitmap) and kept for each control kind, font, text start and size; an estimate
+  from the font size when it cannot be measured (the estimate is not kept). A button with an edge gives 0.
+  .PARAMETER C
+  The control.
+  .OUTPUTS
+  The number of pixels, as an int.
+  #>
+  param($C)
+  if ($C -is [System.Windows.Forms.ButtonBase] -and [int]$C.FlatAppearance.BorderSize -gt 0) { return 0 }
+  # R28 (the Kick fix): the control is brought to the size the layout will give it BEFORE the cache key is made. The key held
+  # the width the control had before it was resized, so a text measured at one width was used for another.
+  try { if ($C.AutoSize -and $C.Text) { $pz = $C.PreferredSize; if ($C.Width -ne $pz.Width -or $C.Height -ne $pz.Height) { $C.Size = $pz } } } catch { $null = $_ }
+  $f = $C.Font; $k = $C.GetType().Name + '|' + $f.Name + '|' + $f.SizeInPoints + '|' + $f.Style + '|' + ([string]$C.Text).PadRight(2).Substring(0, 2) + '|' +
+    $(if ($C -is [System.Windows.Forms.ButtonBase] -or $C -is [System.Windows.Forms.Panel]) { [string]$C.Width + 'x' + $C.Height } else { '' })
+  if ($ui.Inks.ContainsKey($k)) { return [int]$ui.Inks[$k] }
+  $v = [int][math]::Ceiling([double]$f.SizeInPoints * $ui.FontDpi / 72.0 / 6.0); $got = $false
+  if (-not $C.Text -and -not ($C -is [System.Windows.Forms.Panel])) { return $v }   # nothing drawn: nothing to measure
+  try { $w = [math]::Max(1, $C.Width); $h = [math]::Max(1, $C.Height); $bm = New-Object System.Drawing.Bitmap($w, $h)
+    try { $C.DrawToBitmap($bm, (New-Object System.Drawing.Rectangle(0, 0, $w, $h))); $bg = $C.BackColor; $hit = -1
+      for ($x = 0; $x -lt [math]::Min($w, (& $ui.Sc 40)) -and $hit -lt 0; $x++) { for ($y = 0; $y -lt $h; $y++) { $px = $bm.GetPixel($x, $y); if ([math]::Abs($px.R - $bg.R) +
+        [math]::Abs($px.G - $bg.G) + [math]::Abs($px.B - $bg.B) -gt 90) { $hit = $x; break } } }
+      if ($hit -ge 0) { $v = $hit; $got = $true } } finally { $bm.Dispose() } } catch { $null = $_ }
+  if ($got) { $ui.Inks[$k] = $v }; return $v }   # only a measure is kept; the estimate is tried again next time
+# Sets the left margin of a control to L pixels (0 at least), only when it differs. Takes the control and the margin.
+$ui.SetLeft = { param($C, [int]$L) $L = [math]::Max(0, $L); $m = $C.Margin; if ($m.Left -ne $L) { $C.Margin = New-Object System.Windows.Forms.Padding($L, $m.Top, $m.Right, $m.Bottom) } }
+# ---- Long words and one-line texts
+# A word wider than the line (no space in it) is cut into pieces that fit, one per line: it wraps by character and is
+# never clipped (R7 review). Only what the window shows changes; the report keeps the text.
+# The width a label needs to show a text in one line: asked of a label that is never shown, with the same font and flags
+# as the window's labels (R24 job: TextRenderer's default flags gave 3 to 9 px more than a label uses).
+$ui.Probe = New-Object System.Windows.Forms.Label; $ui.Probe.AutoSize = $true; $ui.Probe.UseMnemonic = $false;
+  $ui.Trash = @(@($ui.Trash) | Where-Object { $_ }) + @($ui.Probe)   # disposed when the window has closed
+# The width a label needs to show a text in one line ($ui.Probe). Takes the text and the font; gives back pixels.
+$ui.WordW = { param([string]$T, $F) try { $ui.Probe.Font = $F; $ui.Probe.Text = $T; return [int]$ui.Probe.PreferredSize.Width } catch { return [int][System.Windows.Forms.TextRenderer]::MeasureText($T,
+  $F).Width } }
+$ui.Most = @{}   # the widest values of each label of changing values ($ui.FixW)
+# A label that shows changing values (a percent, a count, a time; $ui.Most[label] = the widest values it can show) keeps one
+# size: as wide as the widest of them and one line tall, so nothing beside it moves when the value changes (the
+# Administrator, 2026-11-19). A value wider than all of them still fits: the label grows for it. Does nothing before the
+# window has its scale (Windows Forms would scale the size again). Takes the label; gives back nothing.
+$ui.FixW = { param($L) if (-not $ui.Scaled) { return }
+  try { $w = 0; foreach ($x in @(@($ui.Most[$L]) + @([string]$L.Text) | Where-Object { $_ })) { $w = [math]::Max($w, (& $ui.WordW ([string]$x) $L.Font)) }
+    $ui.Probe.Font = $L.Font; $ui.Probe.Text = '0'; $h = [int]$ui.Probe.PreferredSize.Height; if ($L.AutoSize) { $L.AutoSize = $false }
+    if ($L.Width -ne $w -or $L.Height -ne $h) { $L.Size = New-Object System.Drawing.Size($w, $h) } } catch { $null = $_ } }   # no measure: the next fit sets it
+# The height of one line of text in a font, as Windows draws it (TextRenderer: on a 150 % screen it can be taller than
+# what a text box gives itself; R35 "Field line cut: one line needs 32 high, has 27"). Takes the font; gives back pixels.
+$ui.LineH = { param($Font) [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $Font).Height }
+$ui.BreakLong = {
+  <#
+  .SYNOPSIS
+  Cuts each word of a text that is wider than the line into pieces that fit, one per line (the comment above).
+  .PARAMETER T
+  The text.
+  .PARAMETER F
+  The font it shows in.
+  .PARAMETER W
+  The line width, in pixels (0 or less: the text is not changed).
+  .OUTPUTS
+  The text with the long words cut, as a string; the line breaks of the text are kept.
+  #>
+  param([string]$T, $F, [int]$W)
+  if ($W -le 0 -or -not $T) { return $T }
+  $parts = foreach ($ln in ($T -split '(\r?\n)')) {   # line by line; the line breaks are kept
+    if ($ln -match '^\r?\n$') { $ln; continue }
+    $ws = foreach ($wd in ($ln -split ' ')) {
+      if ((& $ui.WordW $wd $F) -le $W) { $wd; continue }
+      # by text element (M4 review): a surrogate pair or a letter with its accents is never split
+      $pc = @(); $cur = ''; $en = [System.Globalization.StringInfo]::GetTextElementEnumerator($wd)
+      while ($en.MoveNext()) { $ch = [string]$en.GetTextElement(); if ($cur -and (& $ui.WordW ($cur + $ch) $F) -gt $W) { $pc += $cur; $cur = '' }; $cur += $ch }
+      $pc += $cur; $pc -join "`n" }
+    @($ws) -join ' ' }
+  return (@($parts) -join '') }
+# ---- Shortened text
+# A one-line text cut to fit a width with "..." at the end, measured by the control itself (M5 review: no AutoEllipsis,
+# which shows a tooltip). Binary search on the number of text elements.
+$ui.Shorten = { param($C, [string]$Full, [int]$W)
+  $C.Text = $Full; if ($C.PreferredSize.Width -le $W) { return }
+  $si = New-Object System.Globalization.StringInfo($Full); $lo = 0; $hi = $si.LengthInTextElements
+  while ($lo -lt $hi) { $mid = [int][math]::Ceiling(($lo + $hi) / 2.0); $C.Text = $si.SubstringByTextElements(0, $mid).TrimEnd() + '...';
+    if ($C.PreferredSize.Width -le $W) { $lo = $mid } else { $hi = $mid - 1 } }
+  $C.Text = $(if ($lo -gt 0) { $si.SubstringByTextElements(0, $lo).TrimEnd() } else { '' }) + '...' }
+# Cuts a text to N lines with "..." (the help below).
+$ui.FitLines = {
+  <#
+  .SYNOPSIS
+  Cuts a text to at most N lines at a width, with "..." at its end when it is cut (the Administrator, 2026-11-19).
+  .DESCRIPTION
+  Measured as a card text box wraps ($ui.Meas). Binary search on the number of text elements, so a letter with its accents
+  is never split. The text is not changed when it fits.
+  .PARAMETER T
+  The text.
+  .PARAMETER F
+  The font it shows in.
+  .PARAMETER W
+  The wrap width, in pixels.
+  .PARAMETER N
+  The most lines it may take.
+  .OUTPUTS
+  The text that fits, as a string.
+  #>
+  param([string]$T, $F, [int]$W, [int]$N)
+  if (-not $T -or $W -le 0 -or $N -le 0) { return $T }
+  $most = $N * (& $ui.Meas 'Ag' $F 100000).Height
+  if ((& $ui.Meas $T $F $W).Height -le $most) { return $T }
+  $si = New-Object System.Globalization.StringInfo($T); $lo = 0; $hi = $si.LengthInTextElements
+  while ($lo -lt $hi) { $mid = [int][math]::Ceiling(($lo + $hi) / 2.0); $x = $si.SubstringByTextElements(0, $mid).TrimEnd() + '...';
+    if ((& $ui.Meas $x $F $W).Height -le $most) { $lo = $mid } else { $hi = $mid - 1 } }
+  return ($(if ($lo -gt 0) { $si.SubstringByTextElements(0, $lo).TrimEnd() } else { '' }) + '...') }
+# The self-check's rule for it: a word of a text that wraps is never wider than the line the text may take (a label's
+# MaximumSize, a card text box's $ui.GetWrap; else the word is cut). Not the label's own width: a wrapping label is as wide
+# as its widest line by its own measure, about 1 % narrower than the probe's, so a cut piece that is the widest line would
+# always seem too wide (R28 job: 591/588, 597/591, 592/588).
+$ui.WordBad = { param([string]$Card, [string]$Name, [string]$Text, $F, [int]$W)
+  foreach ($wd in ($Text -split '\s+')) { if ($wd) { $ww = & $ui.WordW $wd $F; if ($ww -gt $W + 1) { return ('LAYOUT ' + $Card + ' ' + $Name + ' text: the word "' +
+    $(if ($wd -match '[\\/]') { '<a path>' } elseif ($wd.Length -gt 20) { $wd.Substring(0, 20) + '...' } else { $wd }) + '" needs ' + $ww + ', the line is ' + $W) } } }
+  return $null }
+# ---- Drawing and measuring
+# Draws a text in a box with TextRenderer. Takes the Graphics, the text, the font, the color, the box and the flags.
+$ui.Word = { param($G, [string]$Text, $Font, $Color, [int]$X, [int]$Y, [int]$W, [int]$H, [string]$Flags) [System.Windows.Forms.TextRenderer]::DrawText($G, $Text, $Font,
+  (New-Object System.Drawing.Rectangle($X, $Y, [math]::Max(1, $W), $H)), $Color, [System.Windows.Forms.TextFormatFlags]$Flags) }
+# The size of a text that wraps at a width (the real font; docs/window-design.md "Text lengths").
+$ui.Meas = { param([string]$Text, $Font, [int]$W) [System.Windows.Forms.TextRenderer]::MeasureText($Text, $Font, (New-Object System.Drawing.Size([math]::Max(1, $W), 0)),
+  [System.Windows.Forms.TextFormatFlags]'WordBreak, NoPrefix, TextBoxControl') }
+# ---- Copy and paste of card text (moved from engine/rade_ui.ps1 for engine-v48, to keep it at 450 lines or fewer)
+# Copy gives the text as written (R28 N4): a word that RADE broke to fit a line is whole again (the break is a lone line feed), and the
+# lines of a hand step (a rich text box) lose the tabs of their number column: "1. Open the page." on its own line.
+$ui.CopyText = { param($C)
+  try { if (-not ($C -is [System.Windows.Forms.TextBoxBase]) -or $C.SelectionLength -le 0) { return $false }
+    $s = [string]$C.SelectedText
+    if ($C -is [System.Windows.Forms.RichTextBox]) { $s = ($s -replace '\r?\n', "`n" -replace ([string][char]0x2007), '' -replace '\t', ' ') -replace "`n", "`r`n" }
+    elseif (& $ui.IsCardText $C) { $s = $s -replace '(?<!\r)\n', '' }
+    if ($s) { [System.Windows.Forms.Clipboard]::SetText($s); return $true } } catch { $null = $_ }
+  return $false }
+# R34 (the PFM: the answer box did not take a pasted block): a one-line box keeps only the first line of a paste, so a
+# paste into it comes here. $ui.OneLine joins the lines of a text with one space and cuts it to the room that is left.
+# Takes the text and the room (characters); gives back the text to put in.
+$ui.OneLine = { param([string]$T, [int]$Room)
+  $s = ($T -replace '\s*(\r\n|\r|\n)\s*', ' ' -replace '\t', ' ').Trim(); if ($Room -lt 0) { $Room = 0 }; if ($s.Length -gt $Room) { $s = $s.Substring(0, $Room) }; return $s }
+
+# The title-bar and taskbar icon: the app logo for an app with productName and a logo (engine-v47), else RADE's logo
+# (Fulcrum, the PFM, 2026-11-20); drawn at 32 px from the bundle's PNG. In the dark mode the app's logoDark when it has
+# one (plan engine-v48 D6): $ui.AppPng is the app logo of the theme, for the icon and the band (02-fixed-parts.ps1).
+$ui.AppPng = $(if ($ui.Dark -and -not $ui.High -and [string]$appLogoDarkPng) { [string]$appLogoDarkPng } else { [string]$appLogoPng })
+try {
+  $ib = New-Object System.Drawing.Bitmap((New-Object System.IO.MemoryStream(, [System.Convert]::FromBase64String($(if ([string]$appProduct -and $ui.AppPng) { $ui.AppPng } else { $logoPng })))))
+  $ui.Form.Icon = [System.Drawing.Icon]::FromHandle((New-Object System.Drawing.Bitmap($ib, 32, 32)).GetHicon())
+} catch { $null = $_ }   # a logo System.Drawing cannot read keeps the default icon
+$ui.Form.ClientSize = New-Object System.Drawing.Size(1020, 760)   # at 100 %; the minimum size is set when the window has its scale (Shown)
+$ui.Form.StartPosition = 'CenterScreen'; $ui.Form.KeyPreview = $true; $ui.Form.BackColor = $ui.C.White
+$ui.Form.ShowInTaskbar = $true; $ui.Form.MinimizeBox = $true   # its own taskbar button: a minimized window can be restored (R24)
+

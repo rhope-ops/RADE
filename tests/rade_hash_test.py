@@ -13,7 +13,7 @@ import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'engine'))
-import rade_hash  # noqa: E402
+import rade_build  # noqa: E402
 
 BASE = "# Sample test r1 (header)\n<#\n.SYNOPSIS\nSample\n#>\n$rev = 'r1'\nWrite-Host 'T05-sample-r1.ps1 ran'\n"
 CASES = [
@@ -26,7 +26,7 @@ CASES = [
 ]
 
 
-# The bundle hash end rule (engine/rade_hash.py canonical; E1, R41: the ISE paste drops the final LF).
+# The bundle hash end rule (engine/rade_build.py canonical; E1, R41: the ISE paste drops the final LF).
 REST = "$a = 1\nWrite-Host 'end'\n"
 END_CASES = [
     ('an exact copy keeps the bundle hash', REST, True),
@@ -40,14 +40,14 @@ END_CASES = [
 
 def main():
     """Run each case and print one line for it, then the summary line. Exits 1 on a failure."""
-    base, ok, bad = rade_hash.content_hash(BASE), 0, 0
-    whole = rade_hash.add_line(REST)
+    base, ok, bad = rade_build.content_hash(BASE), 0, 0
+    whole = rade_build.add_line(REST)
     for name, text, same in END_CASES:
-        good = (rade_hash.add_line(text) == whole) == same
+        good = (rade_build.add_line(text) == whole) == same
         ok, bad = ok + good, bad + (not good)
         print(('PASS ' if good else 'FAIL ') + name)
     for name, text, same in CASES:
-        good = (rade_hash.content_hash(text) == base) == same
+        good = (rade_build.content_hash(text) == base) == same
         ok, bad = ok + good, bad + (not good)
         print(('PASS ' if good else 'FAIL ') + name)
     print('RADE-HASH pass=%d fail=%d' % (ok, bad))

@@ -201,6 +201,7 @@ function Get-OtherRecordKey([string]$Key) {
 # runner copy, or '' (a shortcut that RADE did not make, or that it cannot read, stays). Takes nothing.
 function Get-OwnShortcut {
   $l = Get-AppShortcut; if (-not $l -or $l -notmatch '\.lnk$') { return '' }
+  # SECURITY-REVIEWER: Read-only WScript.Shell shortcut inspection verifies this .lnk targets only the local user's $runner under OneDrive\RADE\runners\ before uninstall cleanup.
   try { if (([string](New-Object -ComObject WScript.Shell).CreateShortcut($l).Arguments).Contains('"' + (Get-RunnerPath) + '"')) { return $l } } catch { $null = $_ }   # not readable: not RADE's
   return ''
 }

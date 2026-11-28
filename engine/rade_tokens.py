@@ -15,11 +15,9 @@ import base64, json, re, textwrap
 from pathlib import Path
 
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
-UI_FILE = ENGINE_ROOT / 'engine/rade_ui.ps1'
-# The font files and their licence (engine/fonts): engine files, as the logo is.
-FONT_FILES = sorted(str(p.relative_to(ENGINE_ROOT)) for p in (ENGINE_ROOT / 'engine/fonts').glob('*') if p.is_file() and (p.suffix == '.ttf' or p.name == 'OFL.txt'))
+UI_FILE = ENGINE_ROOT / 'engine/ps/window/ui-theme.ps1'
 # The engine files this module adds (engine/rade_build.py puts them into the engine's hash, ENGINE_SHA).
-FILES = ['engine/rade_tokens.py', 'engine/ui-tokens.json'] + FONT_FILES
+FILES = ['engine/rade_tokens.py', 'engine/ui-tokens.json']
 
 
 def q(s):

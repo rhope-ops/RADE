@@ -16,12 +16,23 @@ function ConvertTo-Masked([string]$Text) {
 }
 # Gives the name of the Windows profile folder (the DODID); an empty text when there is none. Takes nothing.
 function Get-ProfileLeaf { if ($env:USERPROFILE) { return (Split-Path -Leaf $env:USERPROFILE) }; return '' }
-# Gives the path of the user's OneDrive folder (under $usersRoot, from the profile folder name). It only builds the
-# path; takes nothing.
+# Gives the path of the user's OneDrive folder from $env:OneDriveCommercial, $env:OneDrive, or $env:USERPROFILE\OneDrive.
 function Get-OneDrivePath {
+  foreach ($cand in @($env:OneDriveCommercial, $env:OneDrive)) {
+    if ($cand -and (Test-Path -LiteralPath $cand -PathType Container)) { return $cand }
+  }
+  if ($env:OneDriveCommercial) { return $env:OneDriveCommercial }
+  if ($env:OneDrive) { return $env:OneDrive }
+  if ($env:USERPROFILE) {
+    $od = Join-Path $env:USERPROFILE 'OneDrive'
+    if (Test-Path -LiteralPath $od -PathType Container) { return $od }
+    $named = @(Get-ChildItem -LiteralPath $env:USERPROFILE -Directory -Filter 'OneDrive - *' -ErrorAction SilentlyContinue | Select-Object -First 1)
+    if ($named.Count) { return $named[0].FullName }
+    return $od
+  }
   $leaf = Get-ProfileLeaf
   if (-not $leaf) { $leaf = 'no-profile-folder' }
-  return (Join-Path (Join-Path $usersRoot $leaf) 'OneDrive - United States Air Force')
+  return (Join-Path (Join-Path $usersRoot $leaf) 'OneDrive')
 }
 # Gives the path of the RADE folder inside OneDrive (OneDrive\RADE). Takes nothing; creates nothing.
 function Get-RadePath { return (Join-Path (Get-OneDrivePath) 'RADE') }

@@ -39,8 +39,7 @@
         "round",
         "title",
         "files",
-        "steps",
-        "collect"
+        "steps"
       ],
       "additionalProperties": false,
       "properties": {
@@ -709,8 +708,8 @@
         },
         "start": {
           "type": "string",
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]*(/[A-Za-z0-9][A-Za-z0-9 ._-]*)*\\.ps1$",
-          "description": "Optional. A PowerShell script in the app's local install folder (OneDrive\\RADE\\<application folder>), as a path with / between folders, for example App/Start-App.ps1. After the checks pass, the Ready screen of an installed app shows a Start button that runs it in its own powershell.exe process from that folder (nothing is downloaded), then RADE closes. Without it there is no Start button. The script is one an install step or a bundle file puts there."
+          "pattern": "^(?:https://\\S+|[A-Za-z0-9][A-Za-z0-9 ._-]*(/[A-Za-z0-9][A-Za-z0-9 ._-]*)*\\.(?:ps1|html?|exe))$",
+          "description": "Optional. A local .ps1, .html/.htm, or .exe in the app's local install folder (OneDrive\\RADE\\<application folder>), or an https:// URL. After the checks pass, the Ready screen of an installed app shows a Start button that opens it, then RADE closes."
         },
         "steps": {
           "type": "array",
@@ -883,6 +882,43 @@
             "maxItems": 2
           },
           "description": "[folder, glob] pairs in the app repo: support files with fixed names that clean-up may also recycle."
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sharepoint": {
+              "oneOf": [
+                { "type": "boolean" },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "sitePrefix": { "type": "string" },
+                    "niprLabel": { "type": "string" }
+                  }
+                }
+              ]
+            },
+            "round": { "type": "boolean" },
+            "aumidPrefix": { "type": "string" }
+          },
+          "description": "Optional capability declarations (e.g. sharepoint, round, aumidPrefix)."
+        },
+        "helpRules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["re", "text"],
+            "additionalProperties": false,
+            "properties": {
+              "re": { "type": "string", "minLength": 1 },
+              "text": { "type": "string", "minLength": 1 },
+              "covers": { "type": "string" }
+            }
+          },
+          "description": "Optional app-specific What-to-do help rules."
         }
       }
     }

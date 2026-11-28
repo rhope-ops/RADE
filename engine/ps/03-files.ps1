@@ -130,12 +130,13 @@ function Save-RoundDownload([string]$Base, [scriptblock]$Say) {
     $dir = Join-Path $Base $f.Dir
     if (-not (Test-Path -LiteralPath $dir -PathType Container)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
     $path = Join-Path $dir $f.Name
-    $wc = New-Object System.Net.WebClient
+    $rs = $null
     try {
-      $wc.UseDefaultCredentials = $false
-      try { $wc.Headers['User-Agent'] = $webAgent } catch { $null = $_ }   # R21: as in Get-WebRequest
-      try { if ($wc.Proxy) { $wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials } } catch { $null = $_ }   # no proxy: nothing to sign in to
-      $wc.DownloadFile($f.Url, $path)
+      $rq = Get-WebRequest $f.Url 30000
+      $rs = $rq.GetResponse()
+      $inStream = $rs.GetResponseStream()
+      $outStream = [System.IO.File]::Create($path)
+      try { $inStream.CopyTo($outStream) } finally { $outStream.Dispose(); $inStream.Dispose() }
       if ($f.Sha) {
         $sha = [System.Security.Cryptography.SHA256]::Create(); $fs = [System.IO.File]::OpenRead($path)
         try { $got = ([System.BitConverter]::ToString($sha.ComputeHash($fs)) -replace '-', '').ToLowerInvariant() } finally { $fs.Dispose(); $sha.Dispose() }   # no Get-FileHash: it is a script function of a module and was not found on Windows PowerShell 5.1 in the Windows job
@@ -146,7 +147,7 @@ function Save-RoundDownload([string]$Base, [scriptblock]$Say) {
       $bad++
       if (Test-Path -LiteralPath $path -PathType Leaf) { try { Remove-Item -LiteralPath $path -Force } catch { $null = $_ } }   # no partial file left behind
       & $Say ('  Download failed   ' + $f.Dir + '\' + $f.Name + ': ' + (ConvertTo-Masked $_.Exception.Message) + $(if (Test-Deploy) { '' } else { ' (save it from the repository instead)' }))
-    } finally { $wc.Dispose() }
+    } finally { if ($rs) { try { $rs.Close() } catch { $null = $_ } } }
   }
   $line = 'Downloads: ' + $ok + ' saved, ' + $bad + ' failed.'
   if ($bad) { $script:roundBad = $true }

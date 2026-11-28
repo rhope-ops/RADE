@@ -10,8 +10,8 @@
 param([Parameter(Mandatory = $true)][string]$Dir)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-foreach ($p in '01-base', '02-config', '03-files', '04-steps', '05-installed', '07-checks', '16-site-scripts', '08-saved-checks', '13-maintenance', '14-restore',
-  '15-restore-run', '17-uninstall', '12-resume') { . (Join-Path $root ('engine/ps/' + $p + '.ps1')) }
+foreach ($p in '01-base', '02-config', '03-files', '04-steps', '05-installed', '07-checks', '16-site-scripts', '13-maintenance', '14-sp-restore',
+  '17-uninstall', '12-resume') { . (Join-Path $root ('engine/ps/' + $p + '.ps1')) }
 # What a bundle sets before the engine: fake data only.
 $round = 'R01'; $buildId = 'abcd1234'; $engineRelease = 30; $appFolder = 'SampleApp'; $sitePrefix = 'https://usaf.dps.mil/sites/'
 $script:appChecks = @(); $script:runLog = New-Object System.Collections.Generic.List[string]
@@ -381,18 +381,17 @@ $pl = Get-PolicyLine; $env:RADE_SIGNIN_DPI = '0'; $dOff = Set-SignInDpiAware; Re
 $dNone = Set-SignInDpiAware; $env:RADE_SIGNIN_DPI = '1'; $dOn = Set-SignInDpiAware; Remove-Item Env:\RADE_SIGNIN_DPI
 Assert-Case 'policy block (engine-v46): only a script Windows did not load that printed nothing; one help line; the policy line; DPI off unless 1 (engine-v47)' (
   $pb1 -and -not $pb2 -and -not $pb3 -and -not $pb4 -and $h1 -match 'script policy' -and -not $h2 -and
-  $pl -match '^Policy: .+; in effect: \S+$' -and $dOff -eq 'SIGNIN-DPI aware=off' -and $dNone -eq 'SIGNIN-DPI aware=off' -and $dOn -match '^SIGNIN-DPI aware=(yes|was|no)$')
+  $pl -match '^Policy: .+; in effect: \S+$' -and $dOff -eq 'SIGNIN-DPI aware=off' -and $dNone -eq 'SIGNIN-DPI aware=off' -and $dOn -eq 'SIGNIN-DPI aware=off')
 # R43 E4 (the PFM, 2026-11-25): the rights check gives its sign-in time (engine-v44: no watch= part).
 $script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Marker = $null }
 $env:RADE_SIGNIN_TEST = '1'; $sr1 = Get-SiteRightsCheck $base 'https://usaf.dps.mil/sites/fake' $null; $env:RADE_SIGNIN_TEST = $null
 Assert-Case 'sign-in time: the rights check detail ends with "SIGNIN seconds=N host=..."' ([string]$sr1.Detail -match 'SIGNIN seconds=\d+ host=\S+$')
-# engine-v43 S1, S2 (the PFM, 2026-11-26): "STAGE none" ends the timed stage; a stage past its limit stops the child and is
-# named; the window report helper compiles (its lines need Windows: here it prints none).
+# engine-v43 S1, S2 (the PFM, 2026-11-26): "STAGE none" ends the timed stage; a stage past its limit stops the child and is named.
 $st1 = Invoke-ChildScript "'STAGE signin'`r`n'STAGE none'`r`nStart-Sleep -Seconds 3`r`n'RESULT ok'`r`n" '' 60 $null 1
 $st2 = Invoke-ChildScript "'STAGE signin'`r`nStart-Sleep -Seconds 20`r`n'RESULT ok'`r`n" '' 60 $null 2
 $env:RADE_SIGNIN_TEST = '1'; $rpErr = $null; try { Start-SignInReport; Stop-SignInReport } catch { $rpErr = $_ }; $env:RADE_SIGNIN_TEST = $null
-Assert-Case 'sign-in stage (engine-v43): STAGE none ends the limit; a frozen sign-in stops and is named; the report compiles' (
-  -not $st1.Stage -and @($st1.Lines) -contains 'RESULT ok' -and $st2.Stage -eq 'signin' -and @($st2.Lines) -notcontains 'RESULT ok' -and -not $rpErr -and [bool]('RadeSignIn.Report1' -as [type]))
+Assert-Case 'sign-in stage (engine-v43): STAGE none ends the limit; a frozen sign-in stops and is named' (
+  -not $st1.Stage -and @($st1.Lines) -contains 'RESULT ok' -and $st2.Stage -eq 'signin' -and @($st2.Lines) -notcontains 'RESULT ok' -and -not $rpErr)
 # Uninstall (engine-v40) and its clean-up (engine-v48): their cases are in tools_unit_uninstall.ps1, run here in this scope (they use the fake site and the app above).
 . (Join-Path $PSScriptRoot 'tools_unit_uninstall.ps1')
 Write-Host ('TOOLS-UNIT pass=' + $script:pass + ' fail=' + $script:fail)

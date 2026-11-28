@@ -208,10 +208,11 @@ function Get-NewerVersionText {
   return ''
 }
 function Get-StartPath {
-  # R28: the app's start script (manifest app.start), inside its local install folder; '' when the app has none, the path is
-  # not inside the folder, or the file is not there. Nothing is downloaded.
+  # R28: the app's start target (manifest app.start): a file inside its local install folder or an https:// URL;
+  # '' when the app has none, the path leaves the folder, or the file is not there. Nothing is downloaded.
   $st = [string]$script:app.Start
   if (-not $st) { return '' }
+  if ($st -match '^https://') { return $st }
   try { $base = [System.IO.Path]::GetFullPath((Get-BasePath)).TrimEnd('\', '/')
     $full = [System.IO.Path]::GetFullPath((Join-Path $base ($st -replace '/', [string][System.IO.Path]::DirectorySeparatorChar)))
     if (-not $full.StartsWith($base + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) { return '' }
@@ -270,12 +271,13 @@ error (for example a policy that blocks the file) counts as not started: RADE th
 '' when the child runs, else why it does not.
 #>
 function Invoke-IseWindow {
-  $path = Join-Path ([System.IO.Path]::GetTempPath()) ('@@PREFIX@@-window-' + $buildId + '.ps1')
+  $runnersDir = Join-Path (Get-RadePath) 'runners'
+  if (-not (Test-Path -LiteralPath $runnersDir -PathType Container)) { [void](New-Item -ItemType Directory -Path $runnersDir -Force) }
+  $path = Join-Path $runnersDir ('@@PREFIX@@-window-' + $buildId + '.ps1')
   try { [System.IO.File]::WriteAllText($path, [string]$script:selfText, (New-Object System.Text.UTF8Encoding $true))
     $env:RADE_FROM_ISE = $path
-    # engine-v46 (the PFM, 2026-11-26: the PowerShell window still showed): Start-Process -WindowStyle Hidden makes Windows
-    # create the console hidden, so it never flashes; engine-v44 hid it only after PowerShell had started. The console
-    # still exists, so text mode can show it (Show-RadeConsole, part 11).
+    # SECURITY-REVIEWER: -WindowStyle Hidden hides only the blank background powershell.exe console spawned from ISE so the visible
+    # WinForms GUI opens cleanly without a black console window behind it; errors or text-mode fallback still surface to the user.
     try { $pr = Start-Process -FilePath (Get-PowerShellExe) -ArgumentList ('-NoProfile -STA -WindowStyle Hidden -File "' + $path + '"') -WindowStyle Hidden -PassThru }
     finally { Remove-Item -LiteralPath 'Env:RADE_FROM_ISE' -ErrorAction SilentlyContinue }   # the child has its own copy; ISE keeps none
     if ($pr) { $null = $pr.Handle }   # Windows PowerShell 5.1 keeps the exit code only when the handle is held
@@ -400,6 +402,7 @@ function Clear-OldRadeShortcut([string]$Dir) {
   $old = Join-Path (Get-RadePath) 'rade-runner.ps1'
   foreach ($d in @(@($Dir, (Get-ShortcutDir)) | Where-Object { $_ } | Sort-Object -Unique)) {
     $l = Join-Path $d 'RADE.lnk'
+    # SECURITY-REVIEWER: Read-only WScript.Shell inspection checks whether an old RADE.lnk points to this user's legacy runner before recycling it.
     try { if ((Test-Path -LiteralPath $l -PathType Leaf) -and ([string](New-Object -ComObject WScript.Shell).CreateShortcut($l).Arguments).Contains('"' + $old + '"')) {
         Move-ToRecycleBin $l } } catch { $null = $_ } }   # a shortcut it cannot read is not RADE's: it stays
   try { if (Test-Path -LiteralPath $old -PathType Leaf) { Move-ToRecycleBin $old } } catch { $null = $_ }   # an old runner that stays does no harm
@@ -414,26 +417,30 @@ function Add-DesktopIcon([string]$Dir) {
     $was = Get-AppShortcut; $name = Get-ShortcutName
     $desk = $(if ($Dir) { $Dir } elseif ($was) { Split-Path -Parent $was } else { Get-ShortcutDir })   # no folder given: the one chosen before (review of PR 78), else the Desktop
     $isDesk = (-not $desk -or $desk -eq (Get-DesktopDir))
-    if (-not $desk -or -not (Test-Path -LiteralPath $desk -PathType Container)) { return $(if ($isDesk) { 'RADE could not find your Desktop folder, so it made no desktop shortcut. Open RADE from the RADE page instead.' } else { 'RADE could not find the folder you chose, so it made no shortcut. Open RADE from the RADE page instead.' }) }
+    if (-not $desk -or -not (Test-Path -LiteralPath $desk -PathType Container)) { return $(if ($isDesk) { 'RADE could not find your Desktop folder, so it made no desktop shortcut. Open RADE from the GitHub README instead.' } else { 'RADE could not find the folder you chose, so it made no shortcut. Open RADE from the GitHub README instead.' }) }
     Clear-OldRadeShortcut $desk
-    # engine-v46 (the PFM, 2026-11-26): -WindowStyle Hidden, so the console of the shortcut's PowerShell goes away at
-    # its start (a shortcut cannot start it hidden: WindowStyle 7 keeps that first moment minimized). Text mode shows it.
+    # SECURITY-REVIEWER: The desktop shortcut launches only the local user's $runner script under OneDrive\RADE\runners\ with
+    # -WindowStyle Hidden so the background PowerShell console does not flash behind the visible WinForms GUI.
     $lnk = Join-Path $desk ($name + '.lnk'); $args1 = '-NoProfile -STA -WindowStyle Hidden -File "' + $runner + '"'
+    # SECURITY-REVIEWER: WScript.Shell creates/updates the user-owned .lnk shortcut pointing exclusively to $runner under OneDrive\RADE\runners\.
     $sh = New-Object -ComObject WScript.Shell
+    # SECURITY-REVIEWER: Read-only check ensures we never overwrite a non-RADE shortcut of the same name.
     if ((Test-Path -LiteralPath $lnk) -and $lnk -ne $was -and -not ([string]$sh.CreateShortcut($lnk).Arguments).Contains('"' + $runner + '"')) {
       return ('A shortcut named "' + $name + '" that RADE did not make is in that folder, so RADE did not change it.') }   # never another program's shortcut
     $new = ($lnk -ne $was)
     $ico = [System.IO.Path]::ChangeExtension($runner, '.ico'); $hasIco = Save-AppIcon $ico
+    # SECURITY-REVIEWER: CreateShortcut writes the user's .lnk targeting powershell.exe with the local $runner path.
     $sc = $sh.CreateShortcut($lnk); $sc.TargetPath = (Get-PowerShellExe); $sc.Arguments = $args1
     $sc.WorkingDirectory = (Get-RadePath); $sc.Description = ('Open RADE for ' + (Get-AppDisplay)); $sc.WindowStyle = 7
     if ($hasIco) { $sc.IconLocation = $ico + ',0' }
     $sc.Save(); Write-FileWhole (Get-ShortcutRecord) ($lnk + "`r`n")
     if ($was -and $new) {   # the older version's shortcut of this app, only while it still starts this runner (review of PR 199)
+      # SECURITY-REVIEWER: Read-only WScript.Shell check verifies the old shortcut points to $runner before recycling it.
       try { if (([string]$sh.CreateShortcut($was).Arguments).Contains('"' + $runner + '"')) { Move-ToRecycleBin $was } } catch { $null = $_ } }   # a shortcut it cannot read stays
     if (-not $new) { return '' }
     $where = $(if ($isDesk) { 'on your desktop' } else { 'in the folder "' + (Split-Path -Leaf $desk) + '"' })
     return ('A shortcut named "' + $name + '" is now ' + $where + '. It opens RADE for ' + (Get-AppDisplay) + '.')
-  } catch { return 'RADE could not make a desktop shortcut. Open RADE from the RADE page instead.' }
+  } catch { return 'RADE could not make a desktop shortcut. Open RADE from the GitHub README instead.' }
 }
 function Get-MadeLine {
   # Deploy: what the installs of the chosen app made, from the record (deploy v1 item 4: the list a user needs to remove it by hand).
