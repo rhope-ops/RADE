@@ -118,11 +118,20 @@ function Read-RestoreRecord {
 # Writes the record: every link and pending mark, the lists of this run and the others as read. Writes a new file, then
 # puts it in place, so a stop halfway never leaves a cut file. Throws when it cannot. Takes nothing.
 function Save-RestoreRecord {
+  if ($MapFile.Length -gt 240) { throw ('map path is too long (' + $MapFile.Length + ' > 240 chars)') }
   $out = [ordered]@{}; foreach ($title in @($record.Keys)) { $out[$title] = @($record[$title]) }
   foreach ($k in $keys) { $state = $info.Lists[$k]; $out[$state.Name] = @($state.Links) }
   $tmp = $MapFile + '.new'
   [System.IO.File]::WriteAllText($tmp, (ConvertTo-Json -InputObject $out -Depth 4), (New-Object System.Text.UTF8Encoding $true))
-  if (Test-Path -LiteralPath $MapFile) { [System.IO.File]::Replace($tmp, $MapFile, [NullString]::Value) } else { [System.IO.File]::Move($tmp, $MapFile) } }
+  for ($attempt = 1; $attempt -le 5; $attempt++) {
+    try {
+      if (Test-Path -LiteralPath $MapFile) { [System.IO.File]::Replace($tmp, $MapFile, [NullString]::Value) } else { [System.IO.File]::Move($tmp, $MapFile) }
+      break
+    } catch {
+      if ($attempt -ge 5) { throw }
+      Start-Sleep -Milliseconds (100 * $attempt)
+    }
+  } }
 
 <#
 .SYNOPSIS
@@ -247,21 +256,30 @@ None; sets Made, Failed, Skipped and Unlinked on the state.
 #>
 function Add-MissingRows($State) {
   $State.Made = 0; $State.Failed = 0; $State.Skipped = 0; $script:unlinked = 0
-  foreach ($row in @($State.Missing | Sort-Object { [int]$_.ID })) {
-    if ($null -ne (Get-OnList $State ([int]$row.ID))) { continue }   # back from the Recycle Bin, or another saved ID of the same row was made
-    $values = @{}
-    $unlinkedBefore = $script:unlinked   # a row that is not written does not add to the empty-lookup count
-    try { foreach ($field in $State.Fields) { $prop = $row.PSObject.Properties[$field.InternalName]; if (-not $prop) { continue }
-        $value = ConvertTo-WriteValue $field $prop.Value $info; if ($null -ne $value) { $values[$field.InternalName] = $value } } }
-    catch { $State.Skipped++; $script:unlinked = $unlinkedBefore; continue }   # a saved value that cannot be read (a bad date): not written, no mark; the next rows go on
-    $mark = 'p' + [int]$row.ID
-    try { $State.Links += $mark; Save-RestoreRecord } catch { $script:mapStop = $true; break }
-    try { $script:made = $null; $null = & { $script:made = Add-PnPListItem -List $State.Name -Values $values -ErrorAction Stop } *>&1; $newId = [int]$script:made.Id
-      if ($newId -le 0) { throw 'no ID' } }   # no ID back: the write is not confirmed, so the mark stays
-    catch { $State.Failed++; continue }   # the mark stays: the row may be on the list; the next runs leave it for a hand check
-    $State.Have[$newId] = $true; Join-Ids $State.Groups ([int]$row.ID) $newId; $State.Made++
-    $State.Links = @(@($State.Links | Where-Object { $_ -ne $mark }) + @([string]$row.ID + '-' + $newId))
-    try { Save-RestoreRecord } catch { $script:mapStop = $true; break } }   # the mark is on file: the row is not made again
+  try {
+    foreach ($row in @($State.Missing | Sort-Object { [int]$_.ID })) {
+      if ($null -ne (Get-OnList $State ([int]$row.ID))) { continue }   # back from the Recycle Bin, or another saved ID of the same row was made
+      $values = @{}
+      $unlinkedBefore = $script:unlinked   # a row that is not written does not add to the empty-lookup count
+      try { foreach ($field in $State.Fields) { $prop = $row.PSObject.Properties[$field.InternalName]; if (-not $prop) { continue }
+          $value = ConvertTo-WriteValue $field $prop.Value $info; if ($null -ne $value) { $values[$field.InternalName] = $value } } }
+      catch { $State.Skipped++; $script:unlinked = $unlinkedBefore; continue }   # a saved value that cannot be read (a bad date): not written, no mark; the next rows go on
+      $mark = 'p' + [int]$row.ID
+      $State.Links += $mark
+      try { $script:made = $null; $null = & { $script:made = Add-PnPListItem -List $State.Name -Values $values -ErrorAction Stop } *>&1; $newId = [int]$script:made.Id
+        if ($newId -le 0) { throw 'no ID' } }   # no ID back: the write is not confirmed, so the mark stays
+      catch {
+        $State.Failed++
+        $errMsg = (([string]$_.Exception.Message) -replace 'https?://\S+', '<url>' -replace '[\r\n]+', ' ').Trim()
+        if ($errMsg.Length -gt 120) { $errMsg = $errMsg.Substring(0, 120) }
+        'ROWERR ' + $_.Exception.GetType().Name + ': ' + $errMsg
+        continue }   # the mark stays: the row may be on the list; the next runs leave it for a hand check
+      $State.Have[$newId] = $true; Join-Ids $State.Groups ([int]$row.ID) $newId; $State.Made++
+      $State.Links = @(@($State.Links | Where-Object { $_ -ne $mark }) + @([string]$row.ID + '-' + $newId))
+    }
+  } finally {
+    try { Save-RestoreRecord } catch { $script:mapStop = $true }
+  }
   $State.Unlinked = $script:unlinked }
 
 # ---- The run.

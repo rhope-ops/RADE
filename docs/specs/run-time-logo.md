@@ -1,6 +1,6 @@
 # Spec: run-time logo
 
-Status: Approved 2026-11-17 · Owner: the Administrator · Updated: 2026-11-17
+Status: Approved 2026-11-17 · Administrator: the Administrator · Updated: 2026-11-17
 
 ## Goal
 RADE and every app draw their logo with code at run time on the work computer, so no PNG file is kept in a repo or sent in a bundle. A reviewer can read the logo as text, and bundles get smaller (90-161.Z R29a: about 72 KB of base64 PNG out of 585 KB).
@@ -51,7 +51,7 @@ Both logos (RADE Rho Bold, 90-161.Z W2) show in the window and as the SharePoint
 | A3 | R3, R4, E3 | Build test: each logo SVG converts; a sample SVG with an `<ellipse>` and one with a `B` path command fail with the element named | both pass and fail as stated |
 | A4 | R6, E2 | Windows job: the site-logo step writes a 512 px PNG to a temp folder; with a read-only temp folder it stops with its message | file exists and opens as a 512 x 512 image; message shown, exit without upload |
 | A5 | E1 | Windows job: run the window with `System.Drawing` load forced to fail | the app name shows as text; no crash |
-| A6 | R5, R6 | Work-computer round card: the PFM looks at the window logo and the site logo | the PFM answers "looks right" |
+| A6 | R5, R6 | Work-computer round card: the Administrator looks at the window logo and the site logo | the Administrator answers "looks right" |
 | A7 | R8 | `python3 scripts/code_standard.py` in both repos | `CODE-STANDARD pass` with no new debt |
 | A8 | Goal (size) | Bundle size of the next 90-161.Z round before and after | the new bundle is smaller |
 

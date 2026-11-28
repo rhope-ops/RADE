@@ -352,7 +352,7 @@ foreach ($c in $kids) { $perr = $null
   # E3, engine-v44: each child script that signs in holds the one sign-in block (no marker left) and signs in through it.
   $conn = $c.T.IndexOf('Connect-RadeSite $Site')
   Assert-Case ('sign-in block in: ' + $c.N) ($c.T.Contains($signInSize.TrimEnd()) -and -not $c.T.Contains('# <RADE sign-in window size>') -and $conn -gt $c.T.IndexOf('function Connect-RadeSite')) }
-# engine-v44 (the PFM, 2026-11-26): RADE never touches the CAC sign-in window. The block keeps its two marker lines (an
+# engine-v44 (the Administrator, 2026-11-26): RADE never touches the CAC sign-in window. The block keeps its two marker lines (an
 # app's build finds it by them), has no size watch and no SetWindowPos, and Connect-RadeSite still prints its lines.
 Assert-Case 'sign-in block (engine-v44): the marker lines stay; no size watch, no SetWindowPos, no RADE_SIGNIN_WATCH' (
   $signInSize -match '(?m)^# ---- RADE sign-in window size \(start' -and $signInSize -match '(?m)^# ---- RADE sign-in window size \(end\)' -and
@@ -377,16 +377,16 @@ $script:helped = @{}; $h1 = Get-WhatToDo 'loaded because running scripts is disa
 $h2 = Get-WhatToDo '+ FullyQualifiedErrorId : UnauthorizedAccess'
 $pb3 = Test-PolicyBlock @{ Pass = 0; Skip = 0; Lines = 0; Err = 'Access to the path is denied. UnauthorizedAccess' }
 $pl = Get-PolicyLine; $env:RADE_SIGNIN_DPI = '0'; $dOff = Set-SignInDpiAware; Remove-Item Env:\RADE_SIGNIN_DPI
-# engine-v47 (the PFM, 2026-11-26: the DPI sign-in opened its window after about 90 s): off with no setting; on only with '1'.
+# engine-v47 (the Administrator, 2026-11-26: the DPI sign-in opened its window after about 90 s): off with no setting; on only with '1'.
 $dNone = Set-SignInDpiAware; $env:RADE_SIGNIN_DPI = '1'; $dOn = Set-SignInDpiAware; Remove-Item Env:\RADE_SIGNIN_DPI
 Assert-Case 'policy block (engine-v46): only a script Windows did not load that printed nothing; one help line; the policy line; DPI off unless 1 (engine-v47)' (
   $pb1 -and -not $pb2 -and -not $pb3 -and -not $pb4 -and $h1 -match 'script policy' -and -not $h2 -and
   $pl -match '^Policy: .+; in effect: \S+$' -and $dOff -eq 'SIGNIN-DPI aware=off' -and $dNone -eq 'SIGNIN-DPI aware=off' -and $dOn -eq 'SIGNIN-DPI aware=off')
-# R43 E4 (the PFM, 2026-11-25): the rights check gives its sign-in time (engine-v44: no watch= part).
+# R43 E4 (the Administrator, 2026-11-25): the rights check gives its sign-in time (engine-v44: no watch= part).
 $script:app = @{ Name = 'Sample app'; Version = '1.0.0'; Marker = $null }
 $env:RADE_SIGNIN_TEST = '1'; $sr1 = Get-SiteRightsCheck $base 'https://usaf.dps.mil/sites/fake' $null; $env:RADE_SIGNIN_TEST = $null
 Assert-Case 'sign-in time: the rights check detail ends with "SIGNIN seconds=N host=..."' ([string]$sr1.Detail -match 'SIGNIN seconds=\d+ host=\S+$')
-# engine-v43 S1, S2 (the PFM, 2026-11-26): "STAGE none" ends the timed stage; a stage past its limit stops the child and is named.
+# engine-v43 S1, S2 (the Administrator, 2026-11-26): "STAGE none" ends the timed stage; a stage past its limit stops the child and is named.
 $st1 = Invoke-ChildScript "'STAGE signin'`r`n'STAGE none'`r`nStart-Sleep -Seconds 3`r`n'RESULT ok'`r`n" '' 60 $null 1
 $st2 = Invoke-ChildScript "'STAGE signin'`r`nStart-Sleep -Seconds 20`r`n'RESULT ok'`r`n" '' 60 $null 2
 $env:RADE_SIGNIN_TEST = '1'; $rpErr = $null; try { Start-SignInReport; Stop-SignInReport } catch { $rpErr = $_ }; $env:RADE_SIGNIN_TEST = $null

@@ -9,10 +9,10 @@
 #   of RADE sends the Windows sign-in to the address it asks (Get-WebRequest; the Administrator, 2026-11-17).
 
 # ---- Checks (PFM 14 Nov 26: RADE checks, from its window, that this computer can install the chosen app and
-# that the PFM has the rights to see it done end to end). Read-only except: one test file in the OneDrive folder and one
-# temporary script in the Windows temp folder, each deleted at once, the site address in Config when the PFM enters it,
+# that the Administrator has the rights to see it done end to end). Read-only except: one test file in the OneDrive folder and one
+# temporary script in the Windows temp folder, each deleted at once, the site address in Config when the Administrator enters it,
 # and the install record row on the site (the marker script of part 16, after a deploy step).
-# Kind: auto = runs on its own when the Check screen opens; signin = needs a CAC sign-in (button); guide = the PFM looks
+# Kind: auto = runs on its own when the Check screen opens; signin = needs a CAC sign-in (button); guide = the Administrator looks
 # in another program and answers (button). Advisory: a problem is a WARNING, never a FAILED.
 $checkDefs = @(
   @{ Id = 'nipr'; Group = 'Local'; Name = 'This computer is on NIPR (area52 domain)'; Kind = 'auto' },

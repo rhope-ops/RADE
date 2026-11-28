@@ -6,7 +6,7 @@
 # line in capitals (the header row), the sentence, up to four paragraphs, the choices, a box with its label, the lines of a hand step (one
 # selectable text: the numbered lines, then the unnumbered ones), the file path of a hand step, the step line (name, bar,
 # time in the step, count), the last log line, the error box, two file links, a note, the help line, the closing line of
-# a hand step, the buttons, a last gray line, and the owner's test extras. A card shows only the parts it names ($ui.SetCard).
+# a hand step, the buttons, a last gray line, and the Administrator's test extras. A card shows only the parts it names ($ui.SetCard).
 $ui.Card = New-Object System.Windows.Forms.TableLayoutPanel
 $ui.Card.Dock = 'Fill'; $ui.Card.ColumnCount = 3; $ui.Card.RowCount = 3; $ui.Card.BackColor = $ui.C.White
 # Three columns: a side, the text column, a side. The text column is $ui.Layout.Share % of the width and at most $ui.Layout.MaxW
@@ -29,7 +29,7 @@ $ui.Scroll = New-Object System.Windows.Forms.Panel
 $ui.Scroll.AutoScroll = $true; $ui.Scroll.Margin = (& $ui.Pad 0 0 0 0); $ui.Scroll.BackColor = $ui.C.White; $ui.Scroll.AccessibleName = 'Card text'
 $ui.Body.Location = New-Object System.Drawing.Point(0, 0); [void]$ui.Scroll.Controls.Add($ui.Body)
 $ui.Kick = & $ui.Text $ui.F.SmallB $ui.C.Gray 0 'Card line'; $ui.Kick.Visible = $true; $ui.MinLines[$ui.Kick] = 1   # one line tall also when the card has no line
-# The YOUR TURN chip (plan engine-v48 step 3; critique change 1, the PFM, 2026-11-27): on a card where RADE waits for the
+# The YOUR TURN chip (plan engine-v48 step 3; critique change 1, the Administrator, 2026-11-27): on a card where RADE waits for the
 # person (the yellow light), a yellow chip "YOUR TURN" stands before the line in capitals; the separate "Your turn" line of
 # R35 is gone. Yellow means only this (and the light line).
 $ui.Chip = & $ui.Label $ui.F.SmallB $ui.C.OnYellow 0; $ui.Chip.BackColor = $ui.C.Yellow; $ui.Chip.Text = 'YOUR TURN'; $ui.Chip.AccessibleName = 'Your turn'
@@ -145,7 +145,7 @@ $ui.BtnRow = & $ui.Flow $ui.Z.G4; $ui.BtnRow.WrapContents = $true; $ui.BtnRow.Ma
 [void]$ui.BtnRow.Controls.Add($ui.BackB)   # B6: Back (Esc) first, at the left end
 $ui.B = @(); foreach ($k in 0..($ui.NB - 1)) { $b = & $ui.Btn 'action'; $b.Tag = $k; $b.Add_Click({ $a = $ui.Acts[[int]$this.Tag]; if ($a -and (-not $ui.Busy -or $ui.Always[[int]$this.Tag]) -and (& $ui.Settled)) { & $a } }); $ui.B += $b; [void]$ui.BtnRow.Controls.Add($b) }
 $ui.Foot = & $ui.Text $ui.F.Small $ui.C.Gray ($ui.Z.G6 - $ui.Z.M) 'Last line'
-# The owner's test extras (test rounds only; they go away with the test branch): the results address, the e-mail draft
+# the Administrator's test extras (test rounds only; they go away with the test branch): the results address, the e-mail draft
 # and "the window displayed correctly". A deploy never shows them: it sends nothing.
 $ui.TestRow = & $ui.Flow ($ui.Z.G6 - $ui.Z.M); $ui.TestRow.WrapContents = $true; & $ui.Ring $ui.TestRow
 $ui.TestL = & $ui.Label $ui.F.SmallB $ui.C.Gray 10; $ui.TestL.Text = 'Test rounds only'; $ui.TestL.Visible = $true
@@ -166,7 +166,7 @@ $i = 0; foreach ($x in @($ui.BtnRow.Controls)) { $x.TabIndex = $i; $i++ }   # Ta
 $ui.Card.Controls.Add($ui.Stack, 1, 1); $ui.Card.SetColumnSpan($ui.Stack, 2)   # two columns: room for the scroll bar beside the text
 
 # ---- What a card shows around its text (plan engine-v48 steps 2 to 4; $ui.SetCard calls these)
-# Esc (Cards v2; critique change 4, the PFM, 2026-11-27): Back only on Choose, Maintenance and the not-installed card, and
+# Esc (Cards v2; critique change 4, the Administrator, 2026-11-27): Back only on Choose, Maintenance and the not-installed card, and
 # on the Run card Esc opens the Cancel question. Your turn and Done take no Esc; the Back of another card is a plain "Back".
 $ui.EscViews = @('choose', 'maint', 'notinst')
 $ui.Dress = {
@@ -232,7 +232,7 @@ $ui.RecHead = New-Object System.Windows.Forms.FlowLayoutPanel
 $ui.RecHead.AutoSize = $true; $ui.RecHead.WrapContents = $false; $ui.RecHead.BackColor = $ui.C.White; $ui.RecHead.Margin = (& $ui.Pad 0 0 0 4); & $ui.Ring $ui.RecHead
 $ui.RecClose = & $ui.Btn 'compact'; $ui.RecClose.Text = 'Back (Esc)'; $ui.RecClose.AccessibleName = 'Close Details (Esc)'
 $ui.RecTitle = & $ui.Label $ui.F.Body $ui.C.Navy 9; $ui.RecTitle.Margin = (& $ui.Pad 10 9 0 0); $ui.RecTitle.Text = 'Details'; $ui.RecTitle.Visible = $true
-# R33 (the PFM, 19 Nov 26): the check list and the step list are drawn, so they cannot be selected; Copy all puts the whole
+# R33 (the Administrator, 19 Nov 26): the check list and the step list are drawn, so they cannot be selected; Copy all puts the whole
 # Record (the checks with each detail, the steps, the files and the log) on the clipboard as plain text ($ui.RecAll).
 $ui.RecCopy = & $ui.Btn 'compact'; $ui.RecCopy.Text = 'Copy all'; $ui.RecCopy.AccessibleName = 'Copy all of Details as text'
 [void]$ui.RecHead.Controls.Add($ui.RecClose); [void]$ui.RecHead.Controls.Add($ui.RecCopy); [void]$ui.RecHead.Controls.Add($ui.RecTitle)

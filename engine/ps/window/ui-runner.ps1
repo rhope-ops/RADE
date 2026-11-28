@@ -229,7 +229,7 @@ $ui.Run = {
     $what = [string](Get-WhatToDo $msg); if ($what) { & $ui.Say $what }
     & $ui.VStopped $msg.Substring(9) $what
   } finally { $script:resume = $null; $ui.Running = $false; try { $ui.TimeT.Stop() } catch { $null = $_ }; $sv = $ui.StepState; & $ui.InitSel; $ui.StepState = $sv } }
-# Pause and resume (the PFM, 2026-11-20; docs/engine.md "Pause and resume"): runs the round again from its saved state.
+# Pause and resume (the Administrator, 2026-11-20; docs/engine.md "Pause and resume"): runs the round again from its saved state.
 # The steps that passed stay done; the step that was running and the steps after it run. Takes nothing.
 $ui.ResumeRun = {
   $st = Read-RoundState (Get-BasePath)
@@ -251,7 +251,7 @@ $ui.Copy = {
   try { [System.Windows.Forms.Clipboard]::SetText($t); & $ui.Say1 'Copied.' } catch { & $ui.Say1 'The clipboard is busy. Select the button again.' } }
 # Opens the results folder in Explorer, when there is one. Takes nothing.
 $ui.Open = { if ($script:resultsDir) { Start-Process -FilePath 'explorer.exe' -ArgumentList ('"' + $script:resultsDir + '"') } }
-# engine-v46 (the PFM, 2026-11-26: "I got no notification that a script was blocked"): the end card names each step
+# engine-v46 (the Administrator, 2026-11-26: "I got no notification that a script was blocked"): the end card names each step
 # whose script Windows blocked 2 times (Invoke-RoundStep), also when it is not the first problem. Takes nothing; gives
 # back the paragraph, or '' when no step was blocked.
 $ui.BlockedText = { $b = @($script:blockedSteps | Where-Object { $_ })
@@ -329,7 +329,7 @@ $ui.VStepFail = {
     P = @(($said + $(if ($More) { ' (and ' + $More + ' more in Details)' } else { '' })), (& $ui.BlockedText), $(if ($dep) { '' } else { $ui.Mail })); Help = (Get-HelpLine)
     Buttons = @(@{ Text = 'Copy summary'; Act = { & $ui.Copy } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } }, @{ Text = 'Try again'; Kind = 'primary'; Act = { & $ui.VReady } })
     Test = (-not $dep) } }
-# Shows the Paused card (the PFM, 2026-11-20): the sign-in failed in a step (the CAC is out), so the round paused at that
+# Shows the Paused card (the Administrator, 2026-11-20): the sign-in failed in a step (the CAC is out), so the round paused at that
 # step; Resume runs it again. Takes the reason ("INTERRUPTED: ..."); does nothing when the window is closing.
 $ui.VPaused = { param([string]$Why)
   if ($script:closing -or $ui.Form.IsDisposed) { return }
@@ -375,7 +375,7 @@ $ui.SignInHint = 'A sign-in window may open. If you do not see it, press Alt+Tab
 $ui.ToolRows = {
   $n = @($script:app.Backup).Count; $lists = $(if ($n -eq 1) { '1 list' } elseif ($n) { [string]$n + ' lists' } else { 'No lists named' })
   # Short texts and facts (engine-v47, review of PR 209): each row is one line on the Maintenance card, with 2 lines at most
-  # for its text, also at 150 % and in a narrow window (the PFM, 2026-11-26: no cut text).
+  # for its text, also at 150 % and in a narrow window (the Administrator, 2026-11-26: no cut text).
   @(@{ Index = 0; Name = 'Diagnose'; Ver = ''; Sub = 'Checks the install. Changes nothing.'; R1 = 'Writes a report' },
     @{ Index = 1; Name = 'Back up'; Ver = ''; Sub = 'Saves the lists to this computer.'; R1 = $lists },
     $(if ($script:app.Restore) { @{ Index = 2; Name = 'Restore'; Ver = ''; Sub = 'Puts missing rows back. Test sites only.'; R1 = 'Changes the site' } }
@@ -575,7 +575,7 @@ $ui.VUninstall = {
 $ui.VUninstallConfirm = {
   <#
   .SYNOPSIS
-  Uninstall, the confirm card (view unconfirm; engine-v40, 90-161.Z R43 E3, the PFM, 2026-11-25).
+  Uninstall, the confirm card (view unconfirm; engine-v40, 90-161.Z R43 E3, the Administrator, 2026-11-25).
   .DESCRIPTION
   The card names the test site, the backup, the app's Uninstall steps (a hand step says so), what goes to the Recycle
   Bin after them and the Backups choice of the card before ($ui.UninstallKeep; engine-v48); the person types the app

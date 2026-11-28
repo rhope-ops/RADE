@@ -68,7 +68,7 @@ One or two items for each engine release, in this order. Each has a test before 
 |---|---|---|
 | 5.1 Diagnose | First of the four missing maintenance run types: "is my install healthy" for files, the site record and, through the app's steps, its flows | Decided 19 Nov 26: 4 checks (files, lists and columns, flows, rights); fix step plus repair offer (DECISIONS) |
 | 5.2 Uninstall, Restore, Back up | The undo that makes a deploy safe at another unit | After 5.1 |
-| 5.3 Feedback inside the boundary | When the results e-mail ends, no failure at another unit reaches the owner. Design a results row on a list of the owner's own site, inside DoD365 (the boundary rule allows it) | Decided 19 Nov 26: Teams team RHOPE-OPS; design next |
+| 5.3 Feedback inside the boundary | When the results e-mail ends, no failure at another unit reaches the Administrator. Design a results row on a list of the Administrator's own site, inside DoD365 (the boundary rule allows it) | Decided 19 Nov 26: Teams team RHOPE-OPS; design next |
 | 5.4 Flow ownership | A flow belongs to the account that imported it, and only the installing account can update (docs/engine.md "Guardrails"). Add a hand step "add a second owner", and a way for a new person to take over an install | App session; RADE: the take-over path with 5.1 |
 | 5.5 Flow health after import | A check that the flow is on and its connections are valid | App session (step), RADE (shows it) |
 | 5.6 Drift check | docs/drift-check.md: also the place to see a data-policy change that turns a flow off. The ISSM sees the field list first | Handoff items 4 and 7 |
@@ -77,9 +77,9 @@ One or two items for each engine release, in this order. Each has a test before 
 
 | Item | What | State |
 |---|---|---|
-| 6.1 A second person | 2 or 3 people paste and run with no help from the owner; record where each one stops | The Administrator, after stage 1 |
+| 6.1 A second person | 2 or 3 people paste and run with no help from the Administrator; record where each one stops | The Administrator, after stage 1 |
 | 6.2 A second app | The smallest planned app, to test "RADE knows a platform, never an app's objects" | Decided 19 Nov 26: after the 90-161.Z pilot |
-| 6.3 A second maintainer | A second account with review rights, and a one-page take-over document | Decided 19 Nov 26: plan it |
+| 6.3 A second Administrator | A second account with review rights, and a one-page take-over document | Decided 19 Nov 26: plan it |
 | 6.4 Repo access review | Each quarter, recorded in docs/DECISIONS.md (STIG APSC-DV-003000) | Agent, first on 2027-02-18 |
 | 6.5 A second channel | If the work proxy blocks the page's host, no install is possible. Decide whether a copy on a SharePoint page is wanted | Decided 19 Nov 26: a copy of the existing page, hosted by the Administrator |
 | 6.6 Release rhythm | Agent REC: one engine release for each device round, so each release has a device result | Decided 19 Nov 26: accepted |

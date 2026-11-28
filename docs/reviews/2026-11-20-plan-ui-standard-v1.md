@@ -1,6 +1,6 @@
 # Plan: UI standard v1 (2026-11-20)
 
-Approved: the Administrator (as PFM), 2026-11-20, through the brief of the 90-161.Z session ("Start a separate RADE session now to build UI standard v1"). Scope: RADE engine, docs and tests; one RADE pull request; engine-v28 when green and reviewed. Data: fake only.
+Approved: the Administrator , 2026-11-20, through the brief of the 90-161.Z session ("Start a separate RADE session now to build UI standard v1"). Scope: RADE engine, docs and tests; one RADE pull request; engine-v28 when green and reviewed. Data: fake only.
 
 ## Steps (brief items)
 

@@ -8,11 +8,11 @@
 # Credentials: none here (the backup and the steps sign in with the CAC).
 # Joined into every bundle by engine/rade_build.py (engine/rade_parts.py ENGINE_PARTS); Windows PowerShell 5.1.
 
-# ---- Uninstall (engine-v40; 90-161.Z R43 E3, the PFM, 2026-11-25; docs/engine.md "Maintenance run types"). RADE gives
+# ---- Uninstall (engine-v40; 90-161.Z R43 E3, the Administrator, 2026-11-25; docs/engine.md "Maintenance run types"). RADE gives
 # the mode, the card and the record; the app gives the steps (manifest "uninstall": its own steps, never the install
 # steps). Test sites only (the Restore gate, Test-RestoreSite). Back up first: a backup that misses a list stops it
 # before any step. The steps run with RADE_MODE=uninstall and RADE_MADE (the made list as a JSON file). Answers 1A, 2A,
-# 4A of the PFM (2026-11-25). engine-v48 (DECISIONS 2026-11-26, the PFM): after every step is done, the clean-up below
+# 4A of the Administrator (2026-11-25). engine-v48 (DECISIONS 2026-11-26, the Administrator): after every step is done, the clean-up below
 # moves the app's files on this computer to the Recycle Bin.
 
 # Says whether Uninstall may run on the saved site: the Restore test-site gate, with Uninstall's own words. Takes the
@@ -60,7 +60,7 @@ function Save-UninstallMade([string]$Base, [string]$Stamp) {
 
 <#
 .SYNOPSIS
-Writes the result of an Uninstall run to the app's install record (answer 2A of the PFM, 2026-11-25).
+Writes the result of an Uninstall run to the app's install record (answer 2A of the Administrator, 2026-11-25).
 .DESCRIPTION
 Every Uninstall step done: "installed" is cleared (the app shows as not installed), "uninstalled" keeps the version,
 the time and the made list that the steps removed, "steps" is cleared (a new install runs every step again) and
@@ -166,7 +166,7 @@ function Invoke-Uninstall([string]$Base, [scriptblock]$Tick, [scriptblock]$OnSte
   return @{ State = $(if ($whole) { 'done' } else { 'review' }); Path = $p; Lines = @(@($head, $tail) + $cl + $lines) }
 }
 
-# ---- Uninstall clean-up (engine-v48; DECISIONS 2026-11-26 "Remove RADE and Uninstall", the PFM; plan
+# ---- Uninstall clean-up (engine-v48; DECISIONS 2026-11-26 "Remove RADE and Uninstall", the Administrator; plan
 # docs/reviews/2026-11-27-plan-engine-v48-ui.md step 6). RADE is never installed by itself: each app's Uninstall cleans
 # this computer. After every Uninstall step is done: the app folder (all of it, or all but Backups, as the person
 # picks), the app's runner copy and its shortcut go to the Recycle Bin; after the record is saved, the record goes too;

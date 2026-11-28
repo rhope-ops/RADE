@@ -80,7 +80,7 @@ Format: what, where, evidence, cost, proposed fix, risk.
 
 | # | Assumption | Where used | Source | Confidence |
 |---|---|---|---|---|
-| 1 | What works on the owner's NIPR computer works on every NIPR computer | DECISIONS 2026-11-14 (two Environment rows) | The Administrator's account; not measured | Medium |
+| 1 | What works on the Administrator's NIPR computer works on every NIPR computer | DECISIONS 2026-11-14 (two Environment rows) | The Administrator's account; not measured | Medium |
 | 2 | Paste-and-run needs no ISSM approval | DECISIONS 2026-11-14 | The Administrator's account; the row says "not verified by an agent against an official source" | Low |
 | 3 | A 600 KB paste is practical | DECISIONS 2026-11-14 bundle row | Paste time never measured; next 90-161.Z round measures it | Low |
 | 4 | Windows PowerShell 5.1 is always there | DECISIONS 2026-11-14 | The Administrator | Medium |
@@ -97,7 +97,7 @@ Tests for assumptions: 9 and 11 are checked (check.sh, curl). The device assumpt
 
 ## Tech-debt register
 
-| # | Item | Owner | Review date |
+| # | Item | Administrator | Review date |
 |---|---|---|---|
 | T1 | Denylist save repeated in two kit self-tests (scripts/first_use_check.py:95, scripts/pii_guard.py:530) | the Administrator | 2026-11-30 (next audit) |
 | T2 | Shared `"at"` pattern in two schemas | the Administrator | 2026-11-30 |

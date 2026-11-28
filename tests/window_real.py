@@ -34,7 +34,7 @@ RUNS = [
     # Maintenance card shows, with "Uninstall" at the right end (1020 wide) and on its own row (811 wide)
     ("deploy-616", 1, "done", "1", "1020x616", False),
     ("deploy-tour-small", 1, "fail", "1", "811x469", False),
-    # the Maintenance card and its tools screen at 150 % and with a contrast theme (the PFM's preview, 2026-11-20)
+    # the Maintenance card and its tools screen at 150 % and with a contrast theme (the Administrator's preview, 2026-11-20)
     ("device150-maint", 1, "done", "0", "956x1081", False),
     ("contrast-maint", 1, "done", "0", "", False),
     ("test-small", 0, "done", "0", "811x469", False),
@@ -49,11 +49,11 @@ RUNS = [
     # (scaled as the 150 % run is: device()), and once with a Windows contrast theme on (CONTRAST: the window takes the
     # system colors from its first frame; the job's theme itself stays as it is).
     ("device125-full", 0, "done", "0", "", False),
-    ("device175-full", 0, "done", "0", "", False),   # 175 % (tool retirement plan P4a, the Maintainer, 2026-11-23)
+    ("device175-full", 0, "done", "0", "", False),   # 175 % (tool retirement plan P4a, the Administrator, 2026-11-23)
     ("device200-full", 0, "done", "0", "", False),
     ("device150-logo", 0, "done", "0", "956x1081", False),   # engine-v43 L1: an application logo and a subtitle (the 90-161.Z case)
     ("contrast-full", 0, "done", "0", "", False),
-    # plan engine-v48 D6 (the PFM, 2026-11-27): the dark theme (Kanon in Fulcrum colors), at 100 % and at the PFM's half size
+    # plan engine-v48 D6 (the Administrator, 2026-11-27): the dark theme (Kanon in Fulcrum colors), at 100 % and at the Administrator's half size
     # at 150 % (956 x 1081: under 700 px at 100 %, so the band shows its half-size parts and the buttons stack)
     ("dark-full", 0, "done", "0", "", False),
     ("device150-dark", 0, "done", "0", "956x1081", False),
@@ -132,7 +132,7 @@ def bundle(t, long, keep=None, swaps=(), logo=False):
     if logo:   # engine-v43 L1: the application row with its own logo and a subtitle, as 90-161.Z has them
         shutil.copy(ROOT / "assets" / "logo" / "rho-fulcrum-128.png", app / "app-logo.png")
         m["application"]["logo"] = "app-logo.png"
-        # engine-v46 name spot L3 (the PFM, 2026-11-26): the 90-161.Z case: the word "KANON", the app row in the RADE row's place.
+        # engine-v46 name spot L3 (the Administrator, 2026-11-26): the 90-161.Z case: the word "KANON", the app row in the RADE row's place.
         m["application"]["productName"] = "Kanon"
         m["application"]["subtitle"] = "Publications and Forms Management"
     qa = json.loads((ROOT / "tests" / "fixture-app" / "answers.json").read_text(encoding="utf-8"))   # the hand step's questions, as in tests/engine_test.sh
@@ -364,10 +364,10 @@ def main():
         broken = [l for l in lines if l.startswith(("WIN PNG-FAILED", "WIN DRIVER-ERROR", "WIN TIMEOUT", "WIN BAD"))]
         if broken:
             why.append(broken[0][:120])
-        flat = [l for l in lines if l.startswith("WIN png=") and int(l.rsplit("=", 1)[1]) < 20]
+        flat = [line for line in lines if line.startswith("WIN png=") and int(line.rsplit("=", 1)[1]) < 20]
         if flat:
             why.append("a picture with fewer than 20 colors (the window was not drawn): " + flat[0])
-        maint += sum(1 for l in lines if l.startswith("WIN card=") and " view=maint " in l)
+        maint += sum(1 for line in lines if line.startswith("WIN card=") and " view=maint " in line)
         if why:
             bad += 1
             print("   FAIL " + name + ": " + "; ".join(why))

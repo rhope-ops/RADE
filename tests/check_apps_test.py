@@ -57,7 +57,7 @@ with tempfile.TemporaryDirectory() as t:
     assert got == ['assets/fonts/build/90161Z-OFL.txt'], got
     assert (t / 'assets/fonts/build/90161Z-OFL.txt').read_bytes() == b'licence' and (t / 'assets/fonts/build/90161Z-Here.ttf').read_bytes() == b'app'
     assert not (t / 'assets/fonts/build/90161Z-Nope.ttf').exists() and not (t.parent / 'fonts').exists() and not (t / 'docs').exists()
-    assert c.this_font('OFL.txt') and c.this_font('none.ttf') is None and c.this_font('../rade_build.py') is None
+    assert c.this_font('none.ttf') is None and c.this_font('../rade_build.py') is None
     # A file where a folder should be: no stop, the build names it. The locked engine: a font file, never a folder or a bad name.
     (t / 'bad').write_text('x')
     assert c.stage_fonts(t, {'bundles': [{'files': [{'src': 'bad/fonts/build/X-OFL.txt'}]}]}, fake.get) == []

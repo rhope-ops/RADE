@@ -61,17 +61,17 @@
     { "fg": "Red", "bg": "White", "kind": "non-text" }
   ],
   "dark": {
-    "_doc": "The dark set (Kanon in Fulcrum colors, Fulcrum 2.1.0 window roles; the PFM, 2026-11-27, plan engine-v48 D6): the same color names as \"colors\", each with its dark value; a name keeps its system role and its use. The window takes it when Windows apps use the dark mode (HKCU ...\\Themes\\Personalize AppsUseLightTheme = 0) and no contrast theme is on. Its pairs are the places where each dark color is drawn (a bar against its track, not the track against the page).",
+    "_doc": "The dark set (Kanon in Fulcrum colors, Fulcrum 2.1.0 window roles; the Administrator, 2026-11-27, plan engine-v48 D6): the same color names as \"colors\", each with its dark value; a name keeps its system role and its use. The window takes it when Windows apps use the dark mode (HKCU ...\\Themes\\Personalize AppsUseLightTheme = 0) and no contrast theme is on. Its pairs are the places where each dark color is drawn (a bar against its track, not the track against the page).",
     "colors": {
       "White": "#15171D",
       "Ink": "#F3EEE4",
       "Navy": "#F3EEE4",
       "Gray": "#A9ACB5",
-      "Blue": "#E4572E",
+      "Blue": "#EB653B",
       "OnBlue": "#15171D",
       "Link": "#8DB8F0",
-      "Focus": "#F3EEE4",
-      "Face": "#1E2129",
+      "Focus": "#FF8C66",
+      "Face": "#222631",
       "FaceInk": "#F3EEE4",
       "Edge": "#7A7F8C",
       "Hair": "#30343D",

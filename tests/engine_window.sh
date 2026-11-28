@@ -47,7 +47,7 @@ has "view=hand light=your turn kick=STEP 2 OF 3 sent=Import the sample flow p=Yo
   "step=Check this computer now-font=Segoe UI10" "step=T03 Sample verify r1" 'foot=RADE needs you next at "Import the sample flow". Until then, keep this window open.' \
   "box-text=Clean-up|1  Check this computer|2  T04 Sample optional r1|3  Import the sample flow  (needs you)|4  T03 Sample verify r1 box-name=1  Check this computer" \
   "WIN hand-order address-above-lines=True lines-above-path=True path-above-links=True closing-above-buttons=True closing-gap=4" "WIN F tokens=Body,Link,Mono,Sent,Small,SmallB,Turn,Word mono-only-in-record=True sent=Segoe UI Semibold22 body=Segoe UI12 small=10 smallb=Segoe UI Semibold10 help=12 kick=Segoe UI Semibold label=Segoe UI Semibold plainbtn=Segoe UI Semibold link=Segoe UI Semibold now=Segoe UI" && ok || { bad "window 1a: titles, hand card order, type styles"; grep "view=hand\|step=\|box-text\|WIN F\|hand-order\|BAD" "$wd/win.txt" | cut -c1-700; }
-# 1a2. R28 fixes (rhope-ops/90-161.Z round R28, the PFM's notes): N4 the lines of a hand step are ONE selectable rich text (numbers in a
+# 1a2. R28 fixes (rhope-ops/90-161.Z round R28, the Administrator's notes): N4 the lines of a hand step are ONE selectable rich text (numbers in a
 # right-aligned column by a right tab, text in a hanging indent); copying across lines gives the lines as written (no tabs) and a path that
 # RADE broke to fit copies whole; N1 a step with no address has no address row, a closing line without "browser", and the focus on its text
 # (Enter answers nothing); N6 the hand card shows the file's full path; N10 the step line has the time in the step ("4m 12s"); N8 the install
@@ -145,7 +145,7 @@ fault=boot win 0 done 0 0
 has "view=boot" "view=booterr light=failed kick=STOPPED sent=RADE could not check this computer. p=The test made the boot checks fail / Nothing was changed. / What to do: select \"Try again\"." "btn=[Close] [Try again (Enter)]" "help=For help, ask in the Teams channel" "view=choose" && ok || { bad "window 2c: boot error card"; grep "view=booterr" "$wd/win.txt" | cut -c1-300; }
 fault=noapps win 0 done 0 0
 has "view=noapps light=failed kick=NOTHING TO CHOOSE sent=No application is listed in this paste." "btn=[Close (Enter)]" && ok || { bad "window 2c: no application card"; grep "view=noapps" "$wd/win.txt" | cut -c1-300; }
-# 3. A test round: the owner's test extras show on Done; a deploy never shows them (1 and 2 have no "test=shown").
+# 3. A test round: the Administrator's test extras show on Done; a deploy never shows them (1 and 2 have no "test=shown").
 # Here Application.Run fails as when a message loop already runs on the thread: the window opens with ShowDialog.
 loop=1 win 0 done 0 0
 has "shown-by=ShowDialog" "sent=Ready to run round R01." "view=done light=passed kick=ALL 3 STEPS PASSED sent=Round R01 is done. p=3 steps and 8 checks passed in " "test=shown" "WIN draft-note=The Outlook draft could not be created" "WIN note link=True saved=True card=True masked=True" && ! grep -q "Sample app (deploy).*test=shown" "$wd/win.txt" && ok || { bad "window 3: test round"; tail -5 "$wd/win.txt" | cut -c1-300; }
@@ -272,7 +272,7 @@ P
 # A deploy asks no last question.
 ! grep -q "view=feedback" "$t/w1/win.txt" && ! grep -q "^Other feedback" "$t/w1/u/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && ok || bad "r31 L4: a deploy has no last question"
 echo "GROUP $pass $fail"; } > "$t/grp-W4.log" 2>&1 &
-go W5; {   # group W5: an app with application.productName (engine-v47, the PFM, 2026-11-26: "Kanon icon and name")
+go W5; {   # group W5: an app with application.productName (engine-v47, the Administrator, 2026-11-26: "Kanon icon and name")
 wgo w5
 cp -r "$t/app" "$wd/kapp"; python3 -c "import json,sys; p=sys.argv[1]; m=json.load(open(p)); m['application'].update(productName='Kanon', subtitle='Publications and Forms Management'); json.dump(m,open(p,'w'),indent=2)" "$wd/kapp/scripts/paste_bundles.json"
 python3 engine/rade_build.py --app-root "$wd/kapp" > "$wd/kbuild.txt" 2>&1 || cat "$wd/kbuild.txt"

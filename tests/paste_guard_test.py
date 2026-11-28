@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Paste guard test (engine/rade_hash.py GUARD_START, GUARD_END; tool retirement plan P4a, the Maintainer, 2026-11-23).
+"""Paste guard test (engine/rade_hash.py GUARD_START, GUARD_END; tool retirement plan P4a, the Administrator, 2026-11-23).
 Run by scripts/check.local.sh when an engine file changed.
 
 Builds the sample app (schemas/examples/sample-manifest.json + tests/fixture-app, in a temporary copy) and cuts the

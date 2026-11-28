@@ -10,6 +10,6 @@
 | 3 | 6 (no action after the taskbar), 7 (no red text: step cannot be done; red text can hold folder names), 8 (minor) | The taskbar click; the failure step only asks for help in the Teams channel and says not to paste the red text |
 | 4 | 5 (the same line is also in the header, so an early F5; medium), 4 and 6 (minor wording) | "at the bottom of the script pane"; "the top pane (the script pane)"; "the RADE window". No MAJOR mark left |
 
-Known limit: the steps are on the page the person copies from; after step 2 that page is behind Windows PowerShell ISE. The PFM chose the place (E1: steps at the top of the .txt copy).
+Known limit: the steps are on the page the person copies from; after step 2 that page is behind Windows PowerShell ISE. The Administrator chose the place (E1: steps at the top of the .txt copy).
 
 Result: round 4 has no MAJOR mark; its marks are fixed in the text as listed. Proof for the text itself: `tests/bundle_layout_test.py` check 1b (first lines, ASCII, no `#>`, step 5 names the real last line).

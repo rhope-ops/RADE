@@ -55,7 +55,7 @@ try {
     Write-Host 'Fix each one, then paste the round again.'
     return
   }
-  # Pause and resume (the PFM, 2026-11-20; docs/engine.md "Pause and resume"): R (or Enter) resumes, S starts over.
+  # Pause and resume (the Administrator, 2026-11-20; docs/engine.md "Pause and resume"): R (or Enter) resumes, S starts over.
   $rs = Read-RoundState (Get-BasePath)
   if ($rs.State -eq 'bad') { $null = Clear-RoundState (Get-BasePath); Write-Host ('The saved progress of this round could not be read (' + $rs.Why + '), so the round starts over.') }
   elseif ($rs.State -eq 'other') { $null = Clear-RoundState (Get-BasePath); Write-Host 'Saved progress of another build of this round was not used. The round starts over.' }

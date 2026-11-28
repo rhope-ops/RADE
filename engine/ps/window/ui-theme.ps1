@@ -22,14 +22,14 @@ $script:taskbarId = 'n/a'
 $ui = @{ View = ''; Running = $false; Busy = $false; RecOn = $false; Edit = $false; Answer = ''; Acts = @(); Back = $null; OnOpt = $null; FieldDo = $null
   Log = (New-Object System.Collections.Generic.List[string]); Summary = @(); Sel = @{}; Clean = $true; StepState = @{}; Plan = $null; Picked = $false
   BaseIds = @(); BaseRes = @{}; Blocked = @{}; Newer = @{}; Bars = @{}; G = $null; GUrl = ''; CurId = ''; StepI = 0; StepN = 0; StepNow = ''; BusyShown = $false; Always = @($false, $false, $false, $false, $false, $false); NB = 6; StartAfter = $false; Cancel = $false; Dpi = 96.0; ScreenDpi = 96.0; FontK = 1.0; FontDpi = 96.0; Scaled = $false; Full = @{}; Clock = [System.Diagnostics.Stopwatch]::StartNew(); CardAt = -1000000.0; GuardMs = 400; Calm = $false; ContentW = 780 }
-# Themes (the PFM, 2026-11-27, plan engine-v48 D6): the RADE window reads the Windows app mode once when it opens:
+# Themes (the Administrator, 2026-11-27, plan engine-v48 D6): the RADE window reads the Windows app mode once when it opens:
 # AppsUseLightTheme 0 = dark (Kanon in Fulcrum colors); 1 or no value = light (Kanon in USAF colors). A contrast theme
 # wins over both. engine/rade_ui.ps1 takes $ui.Dark as it is set here (an app window that copies that file stays light).
 # Takes nothing; gives back $true for dark. No registry (not Windows): light.
 $ui.DarkOn = { try { $v = Get-ItemPropertyValue -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'AppsUseLightTheme' -ErrorAction Stop; return ([int]$v -eq 0) } catch { return $false } }   # no value: light
 $ui.Dark = [bool](& $ui.DarkOn)
 $ui.OpenedAt = (Get-Date).AddSeconds(-1)   # E4: the SCALE lines of the RADE windows shown from this time on go into the round's results
-# engine-v47 (the PFM, 2026-11-26): the line under the word RADE is RADE's full name, "Redacted Application Deployment
+# engine-v47 (the Administrator, 2026-11-26): the line under the word RADE is RADE's full name, "Redacted Application Deployment
 # Engine" (replaces the short tagline of L1). The RADE row shows only for an app with no productName and logo.
 $ui.Tagline = 'Redacted Application Deployment Engine'
 # Layout values from engine/window.json, put in by the build (text column share and cap, minimum window size, minimum height of the card frame; pixels at 100 %; the minimum time of a step on the Run card, ms).
@@ -38,7 +38,7 @@ $ui.Hist = Read-RoundHistory (Get-BasePath)
 $script:secret = Get-Secret (Get-ProfileLeaf) (Get-ProfileLeaf)   # saved checks are masked before they are written
 try { $ui.Calm = -not [System.Windows.Forms.SystemInformation]::UIEffectsEnabled } catch { $null = $_ }
 $ui.Form = New-Object System.Windows.Forms.Form
-# The title text (docs/window-design.md "Title bar"). engine-v47 (the PFM, 2026-11-26: "Kanon icon and name"): for an app with
+# The title text (docs/window-design.md "Title bar"). engine-v47 (the Administrator, 2026-11-26: "Kanon icon and name"): for an app with
 # application.productName, "<word> - <version>" for a chosen install ("Kanon - 0.1.0"), else "<word> - <round>" ("Kanon - R46";
 # from the shortcut, the version of the paste's install); the engine number is in Details (F2). Without a productName,
 # "RADE - engine-vNN - <round>" as before (90-161.Z R44 E2; from the shortcut: no round). Takes the chosen app or $null.
@@ -81,8 +81,8 @@ $ui.Tok.OnYellow = @(11, 37, 69, 'HighlightText'); $ui.Tok.OffRed = @(139, 26, 2
 # The dark set (plan engine-v48 D6): name = @(red, green, blue); the system role is the light one.
 $ui.TokDark = [ordered]@{}
 $ui.TokDark.White = @(21, 23, 29); $ui.TokDark.Ink = @(243, 238, 228); $ui.TokDark.Navy = @(243, 238, 228); $ui.TokDark.Gray = @(169, 172, 181)
-$ui.TokDark.Blue = @(228, 87, 46); $ui.TokDark.OnBlue = @(21, 23, 29); $ui.TokDark.Link = @(141, 184, 240); $ui.TokDark.Focus = @(243, 238, 228)
-$ui.TokDark.Face = @(30, 33, 41); $ui.TokDark.FaceInk = @(243, 238, 228); $ui.TokDark.Edge = @(122, 127, 140); $ui.TokDark.Hair = @(48, 52, 61)
+$ui.TokDark.Blue = @(235, 101, 59); $ui.TokDark.OnBlue = @(21, 23, 29); $ui.TokDark.Link = @(141, 184, 240); $ui.TokDark.Focus = @(255, 140, 102)
+$ui.TokDark.Face = @(34, 38, 49); $ui.TokDark.FaceInk = @(243, 238, 228); $ui.TokDark.Edge = @(122, 127, 140); $ui.TokDark.Hair = @(48, 52, 61)
 $ui.TokDark.Track = @(58, 63, 74); $ui.TokDark.Off = @(38, 42, 51); $ui.TokDark.OffInk = @(149, 153, 163); $ui.TokDark.Yellow = @(212, 175, 55)
 $ui.TokDark.Red = @(244, 155, 145); $ui.TokDark.Green = @(95, 208, 142); $ui.TokDark.GreenInk = @(95, 208, 142); $ui.TokDark.Band = @(14, 16, 21)
 $ui.TokDark.BandInk = @(243, 238, 228); $ui.TokDark.BandMuted = @(169, 172, 181); $ui.TokDark.Info = @(141, 184, 240); $ui.TokDark.Tint = @(27, 36, 51)
@@ -613,14 +613,14 @@ $ui.CopyText = { param($C)
     elseif (& $ui.IsCardText $C) { $s = $s -replace '(?<!\r)\n', '' }
     if ($s) { [System.Windows.Forms.Clipboard]::SetText($s); return $true } } catch { $null = $_ }
   return $false }
-# R34 (the PFM: the answer box did not take a pasted block): a one-line box keeps only the first line of a paste, so a
+# R34 (the Administrator: the answer box did not take a pasted block): a one-line box keeps only the first line of a paste, so a
 # paste into it comes here. $ui.OneLine joins the lines of a text with one space and cuts it to the room that is left.
 # Takes the text and the room (characters); gives back the text to put in.
 $ui.OneLine = { param([string]$T, [int]$Room)
   $s = ($T -replace '\s*(\r\n|\r|\n)\s*', ' ' -replace '\t', ' ').Trim(); if ($Room -lt 0) { $Room = 0 }; if ($s.Length -gt $Room) { $s = $s.Substring(0, $Room) }; return $s }
 
 # The title-bar and taskbar icon: the app logo for an app with productName and a logo (engine-v47), else RADE's logo
-# (Fulcrum, the PFM, 2026-11-20); drawn at 32 px from the bundle's PNG. In the dark mode the app's logoDark when it has
+# (Fulcrum, the Administrator, 2026-11-20); drawn at 32 px from the bundle's PNG. In the dark mode the app's logoDark when it has
 # one (plan engine-v48 D6): $ui.AppPng is the app logo of the theme, for the icon and the band (02-fixed-parts.ps1).
 $ui.AppPng = $(if ($ui.Dark -and -not $ui.High -and [string]$appLogoDarkPng) { [string]$appLogoDarkPng } else { [string]$appLogoPng })
 try {

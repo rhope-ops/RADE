@@ -91,7 +91,7 @@ of findings.
 function Invoke-Diagnose([string]$Base, [scriptblock]$Tick) {
   $all = @(Get-DiagnoseInstall) + @(Get-DiagnoseCheck $Base $Tick) + @(Get-RestoreMarkNote $Base | Where-Object { $_ })   # the mark line: part 14 (engine-v33)
   $n = @($all | Where-Object { $_.State -eq 'FINDING' }).Count
-  $lines = @(('Diagnose of ' + $script:app.Name + ' ' + $script:app.Version + ', ' + (Get-NowText) + '. Read-only: nothing was changed.'),
+  $lines = @(('Diagnose of ' + $script:app.Name + ' ' + $script:app.Version + ', ' + (Get-Date -Format 'yyyy-MM-dd HH:mm') + '. Read-only: nothing was changed.'),
     $(if ($n) { [string]$n + ' finding(s). Each one says what to do.' } else { 'No findings.' }))
   foreach ($f in $all) { $lines += ($f.State + ': ' + $f.Text + $(if ($f.Fix) { '. What to do: ' + $f.Fix } else { '' })) }
   $lines = @($lines | ForEach-Object { ConvertTo-Masked $_ })

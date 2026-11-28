@@ -76,7 +76,7 @@ function Invoke-ChildScript([string]$Text, [string]$ArgText, [int]$Seconds, [scr
   finally { $script:child = $null; try { if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force } } catch { $null = $_ } }
   return $res
 }
-# engine-v43 S1 (the PFM, 2026-11-26): the time limit of the sign-in stage of the rights, install record and Restore children
+# engine-v43 S1 (the Administrator, 2026-11-26): the time limit of the sign-in stage of the rights, install record and Restore children
 # (Back up keeps its own stage limit, $toolStageSeconds). A frozen sign-in then ends with its stage named: no force close.
 $signInStageSeconds = 180
 <#
@@ -109,13 +109,13 @@ function Get-StageText([string]$Stage, [object[]]$Lists) {
   if ($Stage -match '^list (\d+)$' -and [int]$Matches[1] -ge 1 -and [int]$Matches[1] -le @($Lists).Count) { return ('the read of the list "' + [string]$Lists[[int]$Matches[1] - 1] + '"') }
   return ('the stage "' + $Stage + '"')
 }
-# E3 (R42 plan; the Owner, 2026-11-21): the one copy of the sign-in block. Each child script that signs in holds the
+# E3 (R42 plan; the Administrator, 2026-11-21): the one copy of the sign-in block. Each child script that signs in holds the
 # line "# <RADE sign-in window size>" in its place; Add-SignInSize puts the block there. An app copies the block (from its
 # start line to its end line) into its own task scripts, so both use the same code. The block, its variable and its two
 # marker lines keep their names (an app's build finds the block by them), though it no longer sizes a window.
 $signInSize = @'
-# ---- RADE sign-in window size (start; engine/ps/07-checks.ps1 $signInSize; E3, the Owner, 2026-11-21)
-# engine-v44 (the PFM, 2026-11-26): RADE never touches the CAC sign-in window of Connect-PnPOnline -UseWebLogin; it opens
+# ---- RADE sign-in window size (start; engine/ps/07-checks.ps1 $signInSize; E3, the Administrator, 2026-11-21)
+# engine-v44 (the Administrator, 2026-11-26): RADE never touches the CAC sign-in window of Connect-PnPOnline -UseWebLogin; it opens
 # at its own size. The size watch of engine-v35 to engine-v43 (Start-SignInSize) is gone: it froze the sign-in
 # (90-161.Z R44 r2, one host: watch on, 2 windows not responding at 9 s; watch off, signed in after 5 s).
 # The block holds the read-only window report (Start-SignInReport, Stop-SignInReport), the DPI setting of engine-v46
@@ -123,7 +123,7 @@ $signInSize = @'
 # Copy this block unchanged between its start and end lines (an app's task scripts may hold the same copy).
 # Windows PowerShell 5.1, no module. When the report helper cannot be compiled (Constrained Language Mode), the sign-in
 # goes on without it.
-# engine-v43 S2 (the PFM, 2026-11-26: R44 r1 froze at the sign-in with no data): while Connect-PnPOnline runs, a
+# engine-v43 S2 (the Administrator, 2026-11-26: R44 r1 froze at the sign-in with no data): while Connect-PnPOnline runs, a
 # background timer reads the windows of THIS process only, about every second, and prints one line at each change:
 # "SIGNIN-WIN t=<seconds> windows=<visible> owned=<visible with an owner> min=<minimized> size=<largest WxH>
 # hung=<not responding> front=<1 when the foreground window is one of them>". No title, no text, no other process.

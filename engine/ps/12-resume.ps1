@@ -1,4 +1,4 @@
-# RADE engine part 12, pause and resume (the PFM, 2026-11-20: every app needs a pause and resume for when the user
+# RADE engine part 12, pause and resume (the Administrator, 2026-11-20: every app needs a pause and resume for when the user
 # closes the window, removes the CAC or is stopped in any other way). After each step ends, the round state goes to
 # Rounds\<round>\rade-state.json; the same round of the same build can resume from it (docs/engine.md "Pause and resume").
 # Uses parts 01 to 06 (Write-FileWhole, Move-ToRecycleBin, the run table); called by 06-round.ps1, the window and text mode.
@@ -9,7 +9,7 @@
 
 $stateName = 'rade-state.json'   # the state file in the round's results folder; never attached to the e-mail draft
 $stateSchema = 'rade-state/1'
-# A step line that says the sign-in failed: the CAC may be out. Such a step is INTERRUPTED, not FAILED (the PFM, 2026-11-20).
+# A step line that says the sign-in failed: the CAC may be out. Such a step is INTERRUPTED, not FAILED (the Administrator, 2026-11-20).
 $signInLost = '(?i)smart ?card|sign-?in (failed|was cancel+ed|timed out)|authentication (failed|was cancel+ed)|user cancel+ed authentication'
 
 # Gives the path of the round state file. Takes the RADE app folder; gives back Rounds\<round>\rade-state.json.
@@ -32,7 +32,7 @@ function Save-RoundState($run, [bool[]]$Selected) {
 .SYNOPSIS
 Reads the round state file Rounds\<round>\rade-state.json.
 .DESCRIPTION
-Only a file of this round, this build and this application can resume; another build never resumes (the PFM,
+Only a file of this round, this build and this application can resume; another build never resumes (the Administrator,
 2026-11-20). Next and Total give "Resume at step Next of Total": Next is the first selected step that a resume runs.
 The state of another application of the same paste reads as 'none' and stays in place.
 .PARAMETER Base

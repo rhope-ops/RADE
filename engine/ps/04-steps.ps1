@@ -169,7 +169,7 @@ function Invoke-RoundStepOnce([string]$Base, $Step, [scriptblock]$Say, [scriptbl
 # Gives the state word for a step result: SKIPPED, INTERRUPTED, NEEDS REVIEW or PASSED. Takes the result table; gives back the word.
 function Get-StepState($R) {
   if ($R.Skipped) { return 'SKIPPED' }
-  if ($R.Fail -gt 0 -or $R.Exit -ne 0) { if ($R.SignIn) { return 'INTERRUPTED' }; return 'NEEDS REVIEW' }   # a failed sign-in (CAC out): resume re-runs it (the PFM, 2026-11-20)
+  if ($R.Fail -gt 0 -or $R.Exit -ne 0) { if ($R.SignIn) { return 'INTERRUPTED' }; return 'NEEDS REVIEW' }   # a failed sign-in (CAC out): resume re-runs it (the Administrator, 2026-11-20)
   if ($R.Pass -eq 0 -and $R.Skip -gt 0) { return 'SKIPPED' }   # the step found nothing to do (R18: was PASSED with 0 passed)
   return 'PASSED'
 }
@@ -281,7 +281,7 @@ function Get-GuideAnswerText($Q) {
 }
 # Adds one line to the run log, when a log exists. Takes the line; gives back nothing.
 function Add-RunLog([string]$T) { if ($null -ne $script:runLog) { $script:runLog.Add($T) } }
-# No scripts in results (the PFM, 2026-11-20): says whether a file is a script: a script extension ($scriptExts, from
+# No scripts in results (the Administrator, 2026-11-20): says whether a file is a script: a script extension ($scriptExts, from
 # the build's SCRIPT_EXTS), or (engine-v34) a saved copy of a bundle under any name: its first line that is not blank is
 # "# @@BUNDLE-HASH ..." (the .txt copy a person can save from a link; Test-BundleCopy). The first time a name is refused, one line goes to
 # the run log. Takes the file name and, when there is one, its full path; gives back $true for a script file.

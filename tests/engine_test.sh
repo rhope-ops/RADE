@@ -100,7 +100,7 @@ grep "Name = 'Sample app'" "$b" | grep -q "'outlook'.*Mode = 'test'; Version = '
 # 2026-11-17): the window (W, W2, W3), the install record on the site (MA, MC, MD, MG) and the cross-version runs (X).
 # ---- window: the window runs, in groups W, W2 and W3 (tests/engine_window.sh).
 . tests/engine_window.sh
-# ---- pause and resume, no scripts in results (tests/resume_test.sh; the PFM, 2026-11-20).
+# ---- pause and resume, no scripts in results (tests/resume_test.sh; the Administrator, 2026-11-20).
 . tests/resume_test.sh
 # ---- Guardrails 3 and 4, the shared-file helpers and the cross-version runs (groups MA, MC, MD, MG and X): tests/engine_marker.sh.
 . tests/engine_marker.sh
@@ -437,7 +437,7 @@ amb=$(pwsh -NoProfile -c 'Add-Type -AssemblyName System.Drawing.Common; try { $n
 # Outlook draft: made when Outlook answers, with a fallback text when it does not (the run above shows the fallback).
 grep -q '\$script:draftMade = (-not \$why)' $engine_src && grep -q "Outlook draft could not be created" $engine_src && ok || bad "Outlook draft fallback"
 
-# The tagline: RADE's full name under the word RADE (engine-v47, the PFM, 2026-11-26; "Test, deploy, enjoy" before); no "DoD".
+# The tagline: RADE's full name under the word RADE (engine-v47, the Administrator, 2026-11-26; "Test, deploy, enjoy" before); no "DoD".
 ! grep -q "for your DoD organization" $engine_src && grep -q "'Redacted Application Deployment Engine'" $engine_src && ! grep -q "Test, deploy, enjoy" $engine_src && ok || bad "tagline"
 # Local-only app (DEC-RADE): zero SharePoint config, optional collect, HTML start target, schema + build + parse clean.
 local_app="$t/local-app"; mkdir -p "$local_app/app" "$local_app/out"

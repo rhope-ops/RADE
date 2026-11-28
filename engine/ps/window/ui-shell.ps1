@@ -3,7 +3,7 @@
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
 
 # ---- The fixed parts: the band, the light line under it, the card, the bottom line and the bar on the bottom edge.
-# The band (plan engine-v48 D5, "B + C"; the PFM, 2026-11-27): 56 px in the band color, the logo at 36 px, the word in
+# The band (plan engine-v48 D5, "B + C"; the Administrator, 2026-11-27): 56 px in the band color, the logo at 36 px, the word in
 # capitals and "in RADE" under it; at the right the stage now (Choose, Check or Install: a disc with its number, a tick when
 # the run passed, and a 3 px underline, $ui.PaintStage). Full size also shows the subtitle line and, at the right, the
 # version and round; half size (a window narrower than $ui.Z.Narrow at 100 %) shows only the logo, the word, "in RADE" and
@@ -98,7 +98,7 @@ $ui.BandLH = { param($L) $h = 0; try { $h = [int]$L.GetPreferredSize((New-Object
   if ($h -le 0) { $h = [int](& $ui.LineH $L.Font) }; return $h }
 # Sets the texts and the logo of the band. Takes $true once an application is chosen (its logo, word and subtitle), else
 # RADE's own (the word RADE, RADE's full name as the subtitle). An app with productName and a logo shows its own from the
-# first screen (engine-v47, the PFM, 2026-11-26: "it should be the KANON logo").
+# first screen (engine-v47, the Administrator, 2026-11-26: "it should be the KANON logo").
 $ui.SetBand = { param([bool]$App)
   $own = [bool]($App -or ([string]$appProduct -and $ui.AppImg)); $img = $(if ($own -and $ui.AppImg) { $ui.AppImg } else { $ui.RadeImg })
   if (-not [object]::ReferenceEquals($ui.Logo.Image, $img)) { $ui.Logo.Image = $img }; $ui.Logo.AccessibleName = $(if ($own -and $ui.AppImg) { (Get-AppWord) + ' logo' } else { 'RADE logo' })
@@ -280,7 +280,7 @@ $ui.Apart = {
     if ($f -and -not [object]::ReferenceEquals($f, $ui.B[$n]) -and $ui.B[$n].Top -gt $f.Top + $f.Height) { $ui.B[$n].Margin = (& $ui.Pad ([int][math]::Max($mm, $room - $ui.B[$n].Width - $mm)) $mm $mm $mm) }
     $ui.BtnRow.PerformLayout()   # the row's height is right before the frame is placed ($ui.Squeeze)
   } catch { $null = $_ } }
-# The order of the action row's buttons (D4, the PFM, 2026-11-27): in a row Back first and the primary last; in the stack
+# The order of the action row's buttons (D4, the Administrator, 2026-11-27): in a row Back first and the primary last; in the stack
 # of a narrow window the primary first and Back last. Tab follows the order. Takes whether it is the stack and the index
 # of the primary (-1: none); a host that cannot reorder keeps the row order.
 $ui.BtnOrder = { param([bool]$Stack, [int]$N) try { $all = @($ui.B | ForEach-Object { $_ })
@@ -322,7 +322,7 @@ $ui.Rows = { param([string]$Text, $Font, [int]$W, [int]$LineH, [int]$Most) if (-
 $ui.OptPlan = { param($o, [int]$w)
   # Where the parts of one choice go, and how tall it is. The name gets its width first. The two facts stay on the
   # right when the name and they fit on one line and the summary needs 2 lines or fewer beside them; else they go on one
-  # line under the summary, also when they leave the summary less than 60 % of the row. The summary wraps to 4 lines, the notice to 3 (engine-v47, the PFM, 2026-11-26: the summary was cut at full
+  # line under the summary, also when they leave the summary less than 60 % of the row. The summary wraps to 4 lines, the notice to 3 (engine-v47, the Administrator, 2026-11-26: the summary was cut at full
   # and at half width; 2 lines before), a blocked application's reason and its "What to do" to 2 lines each; then "...".
   $pad = & $ui.Sc 16; $x = $pad + (& $ui.Sc 38); $inner = $w - $x - $pad; $gap = & $ui.Sc 12
   $h1 = [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $ui.F.Body).Height; $h2 = [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $ui.F.Small).Height
@@ -481,7 +481,7 @@ $ui.LayLine = {
 $ui.Show = { param($C, [string]$Text) $C.Text = $Text; $C.Visible = [bool]$Text }
 # A script whose hash does not match its own hash line (the Administrator, 2026-11-19; docs/specs/bundle-hash.md R3): on the
 # boot, choose and ready cards the last line says so in dark red, in place of the card's own last line, with the full
-# "Script check:" line under it (E1, R42 plan, the Owner, 2026-11-21: the values to compare, before Run). The Ready card
+# "Script check:" line under it (E1, R42 plan, the Administrator, 2026-11-21: the values to compare, before Run). The Ready card
 # (the card with Run) always shows the full "Script check:" line under its own last line: checked, does not match, or not
 # available. A match and a hash that cannot be read show nothing on the boot and choose cards. Takes the card; changes the
 # color and text of $ui.Foot.
@@ -584,7 +584,7 @@ $ui.VBootErr = { param([string]$Why)
     P = @($Why, 'Nothing was changed.', 'What to do: select "Try again". If it stops again, ask in the Teams channel.'); Help = (Get-HelpLine)
     Buttons = @(@{ Text = 'Try again'; Kind = 'primary'; Act = { & $ui.Boot } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } }) }
   & $ui.ToFront }
-# engine-v47 (the PFM, 2026-11-26): for an app with application.productName every choice is a version of one product, so a
+# engine-v47 (the Administrator, 2026-11-26): for an app with application.productName every choice is a version of one product, so a
 # choice reads "<word> <version>" ("Kanon 0.1.0") or, for a round, "<word> <round>" ("Kanon R46"), and the headline asks for
 # the version. Without a productName: the choice's name and its version, as before. Takes the choice; gives @{ Name; Ver }.
 $ui.ChoiceName = { param($A)
@@ -613,7 +613,7 @@ $ui.VChoose = {
   & $ui.SetCard @{ View = 'choose'; Sentence = (& $ui.ChooseSentence $dep)
     P = @($(if ($nr) { 'A newer round, ' + $nr + ', is in the repository. Close this window and run ' + $nr + ' instead.' } else { '' })); Options = $list; OnOption = { param($j) & $ui.Pick $j }
     PageLink = [bool](@($ui.Newer.Values | Where-Object { $_ }).Count)
-    Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Kind = 'primary'; Act = { & $ui.Boot } } } else { $null }))   # no "Remove RADE" (engine-v48; the PFM, 2026-11-26): the last app's Uninstall clears RADE's shared folder
+    Buttons = @($(if ($ui.Blocked.Count) { @{ Text = 'Check this computer again'; Kind = 'primary'; Act = { & $ui.Boot } } } else { $null }))   # no "Remove RADE" (engine-v48; the Administrator, 2026-11-26): the last app's Uninstall clears RADE's shared folder
     Foot = $(if ($dep) { '' } else { Get-LastRoundText $ui.Hist }) } }
 # Shows "Checking this computer", runs the base checks and then shows Choose; shows the error card when they stop. Takes
 # nothing.
@@ -664,7 +664,7 @@ $ui.Pick = { param([int]$J)
   & $ui.InitSel
   $e = $null; if (Test-Deploy) { $e = (Read-Installed (Get-InstalledKey $script:app)) }
   if ($e -and $e.installed) { & $ui.VMaint $e.installed } elseif (Test-Deploy) { & $ui.VNotInst } else { & $ui.Checks $false } }
-# The Maintenance card of an app that is not installed (plan engine-v48 D8, the PFM, 2026-11-27; Cards v2): one Install
+# The Maintenance card of an app that is not installed (plan engine-v48 D8, the Administrator, 2026-11-27; Cards v2): one Install
 # button; the other options come only after an install. Install runs the checks, then the Ready card. Takes nothing.
 $ui.VNotInst = { $w = Get-AppWord; $v = [string]$script:app.Version
   & $ui.SetCard @{ View = 'notinst'; Kicker = ($w + ' ' + $v); Sentence = ($w + ' is not installed.')
@@ -680,20 +680,20 @@ $ui.RowVerb = { param($Inst) $v = [string]$script:app.Version; if (-not $Inst) {
 $ui.VMaint = { param($Inst)
   $ui.MaintInst = $Inst   # Back from a tool's cards shows this card again
   # Maintenance (the Administrator, 2026-11-14; docs/engine.md "Maintenance run types"). engine-v47, option A of the mock
-  # (the PFM, 2026-11-26: "put all options that are maintenance actions directly on that screen, in the list, with uninstall
+  # (the Administrator, 2026-11-26: "put all options that are maintenance actions directly on that screen, in the list, with uninstall
   # last, including repair in it"): one card, one list: Update or Repair, Diagnose, Back up, Restore, then Uninstall in dark
   # red; "Start <word>" is the action button. The second screen "Maintenance" (view tools, engine-v30 to v46) is gone.
   $verb = & $ui.RowVerb $Inst
-  # Start (R28 fix: the PFM found no Start button): the installed application with a start script can be started from here.
+  # Start (R28 fix: the Administrator found no Start button): the installed application with a start script can be started from here.
   # It runs the checks first (Start comes only after they pass: AGENTS.md "RADE and the app"), then starts the application.
   # Primary when the installed version is this paste's version; else the Update row is the main action.
   $ui.StartAfter = $false; $startB = $null
   if ([string]$script:app.Start -and (Get-StartPath)) { $startB = @{ Text = 'Start ' + (Get-AppWord); Kind = $(if ([string]$Inst.version -eq [string]$script:app.Version) { 'primary' } else { '' }); Act = { $ui.StartAfter = $true; & $ui.Checks $false } } }
   $ui.MaintVerb = $verb   # read when a row is clicked (a scriptblock does not keep this card's local variables)
-  # D1 (the PFM, 2026-11-27): row 1 "Install <version>" stays, gray and off; row 2 Repair or Update, then the tools.
+  # D1 (the Administrator, 2026-11-27): row 1 "Install <version>" stays, gray and off; row 2 Repair or Update, then the tools.
   $off = @{ Off = $true; Soon = $true; Index = 0; Name = ('Install ' + $script:app.Version); Ver = ''; Sub = ''; R1 = '' }
   $fix = @{ Index = 10; Name = $verb; Ver = ''; Sub = $(if ($verb -eq 'Repair') { 'Adds what is missing. Keeps your data.' } else { 'Installs ' + $script:app.Version + ' and keeps your data.' }); R1 = 'Runs the checks' }
-  # Uninstall (engine-v40): dark red and on for an app with Uninstall steps, else not available (answer 4A of the PFM, 2026-11-25).
+  # Uninstall (engine-v40): dark red and on for an app with Uninstall steps, else not available (answer 4A of the Administrator, 2026-11-25).
   # The texts do not name the app (a long name made the row 3 lines and the card scroll: Windows job of PR 209, 624 x 682).
   $un = $(if (@($script:app.Uninstall).Count) { @{ Index = 20; Name = 'Uninstall'; Ver = ''; Danger = $true; Sub = 'Makes a backup, then removes the app.'; R1 = 'Changes the site' } }
     else { @{ Off = $true; Soon = $true; Index = 20; Name = 'Uninstall'; Ver = ''; Sub = 'This app has no Uninstall steps.'; R1 = 'Not set up' } })
@@ -820,7 +820,7 @@ $ui.VReady = {
   # checks pass. It is the main button when the installed version is this paste's version; when this paste is newer, Install stays
   # the main button.
   $startB = $null; $startPrimary = $false
-  # Pause and resume (the PFM, 2026-11-20): a saved state of this round and build offers "Resume at step N of M" (main
+  # Pause and resume (the Administrator, 2026-11-20): a saved state of this round and build offers "Resume at step N of M" (main
   # button) and "Start over". A state that cannot be read, or of another build, goes to the Recycle Bin with a plain line.
   $rs = Read-RoundState (Get-BasePath); $rsNote = ''
   if ($rs.State -eq 'bad') { $null = Clear-RoundState (Get-BasePath); $rsNote = 'The saved progress of this round could not be read (' + $rs.Why + '), so the round starts over.' }
@@ -846,7 +846,7 @@ $ui.VReady = {
     Field = $(if ($dep -and -not (Test-ShortcutMade)) { @{ Label = 'Shortcut in'; Text = (Get-ShortcutDir); Name = 'Folder for the shortcut'; Button = 'Browse'; Act = { & $ui.BrowseDir } } } else { $null })
     Back = { & $ui.VChoose } }
   if ($ui.StartAfter) { $ui.StartAfter = $false; if ($startB) { & $ui.StartApp } else { & $ui.Say1 ('The checks passed, but ' + $script:app.Name + ' cannot be started: it is not recorded as installed, or its start file was not found. Select "Install" to install it again.') } } }   # Start on Maintenance: the checks passed, so the application starts
-# R29 N8 (the PFM, 17 Nov 26): the install asks where the app's shortcut goes (engine-v42: one for each app); the box starts with the Desktop folder.
+# R29 N8 (the Administrator, 17 Nov 26): the install asks where the app's shortcut goes (engine-v42: one for each app); the box starts with the Desktop folder.
 $ui.BrowseDir = {
   $pick = New-Object System.Windows.Forms.FolderBrowserDialog
   try { $pick.Description = 'Choose the folder for the shortcut.'; $pick.ShowNewFolderButton = $true; $v = $ui.Field.Text.Trim(); if ($v -and (Test-Path -LiteralPath $v -PathType Container)) { $pick.SelectedPath = $v }

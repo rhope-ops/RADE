@@ -31,15 +31,23 @@ $installedSchema = 2
 function Write-FileWhole([string]$Path, [string]$Text) {
   # The file is whole or unchanged: the text goes to a temporary file in the same folder, which then takes the place of
   # the final file in one step. A stop in the middle leaves the old file as it was.
+  if ($Path.Length -gt 240) { throw ('path is too long (' + $Path.Length + ' > 240 chars)') }
   $dir = Split-Path -Parent $Path
   if (-not (Test-Path -LiteralPath $dir -PathType Container)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
   $tmp = $Path + '.tmp' + $PID
   try {
     [System.IO.File]::WriteAllText($tmp, $Text, (New-Object System.Text.UTF8Encoding $false))
-    if (Test-Path -LiteralPath $Path -PathType Leaf) {
-      if ((Get-Item -LiteralPath $Path -Force).IsReadOnly) { throw 'the file is read-only' }
-      [System.IO.File]::Replace($tmp, $Path, [NullString]::Value)   # $null would go in as an empty string, which Replace refuses
-    } else { [System.IO.File]::Move($tmp, $Path) }
+    if ((Test-Path -LiteralPath $Path -PathType Leaf) -and (Get-Item -LiteralPath $Path -Force).IsReadOnly) { throw 'the file is read-only' }
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+      try {
+        if (Test-Path -LiteralPath $Path -PathType Leaf) { [System.IO.File]::Replace($tmp, $Path, [NullString]::Value) }
+        else { [System.IO.File]::Move($tmp, $Path) }
+        break
+      } catch {
+        if ($attempt -ge 5) { throw }
+        Start-Sleep -Milliseconds (100 * $attempt)
+      }
+    }
   } finally { if (Test-Path -LiteralPath $tmp -PathType Leaf) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue } }
 }
 # Gives the path of the record file of one app: RADE\Config\installed\<12 hex of the key>.json. Takes the record key;
@@ -241,7 +249,7 @@ if ($env:RADE_FROM_ISE -and $PSCommandPath -and $PSCommandPath -eq $env:RADE_FRO
 .SYNOPSIS
 Says whether RADE, started from Windows PowerShell ISE, runs its window in a child powershell.exe -STA (R44 E3).
 .DESCRIPTION
-90-161.Z R44 E3 (the PFM, 2026-11-25): ISE and the shortcut's host (ConsoleHost) gave the same screen two dpi paths
+90-161.Z R44 E3 (the Administrator, 2026-11-25): ISE and the shortcut's host (ConsoleHost) gave the same screen two dpi paths
 (R43: ISE dpiX=96 fontScale=1.5; ConsoleHost dpiX=144 fontScale=1). So from ISE, RADE runs its window in the host the
 shortcut uses. It stays in ISE when the person turned it off (RADE_ISE_CHILD=0), when RADE cannot read its own text,
 or when the execution policy does not run a local script file (the child is started with -File, as the shortcut is;
@@ -327,7 +335,7 @@ $script:scriptCheck = Get-ScriptCheck
 
 # Gives the name a person sees for the chosen app: the manifest's application.displayName, else the app name. Takes nothing.
 function Get-AppDisplay { if ([string]$appDisplay) { return [string]$appDisplay }; return [string]$script:app.Name }
-# Name spot L2 (engine-v45; the PFM, 2026-11-26): the word of the application row is application.productName ("Kanon"),
+# Name spot L2 (engine-v45; the Administrator, 2026-11-26): the word of the application row is application.productName ("Kanon"),
 # else the app name. Takes nothing.
 function Get-AppWord { if ([string]$appProduct) { return [string]$appProduct }; return [string]$script:app.Name }
 # The line under the word: "<name> <bullet> <subtitle>" with a productName ("90-161.Z <bullet> Publications and Forms
@@ -342,7 +350,7 @@ function Test-RunnerStart {
   try { return [bool]($script:startFile -and (Split-Path -Parent $script:startFile) -eq (Join-Path (Get-RadePath) 'runners')) } catch { return $false }   # no RADE folder: not a runner
 }
 # Gives the name of the chosen app's shortcut, without ".lnk": the app's word (application.productName, "Kanon"), else
-# the app name; no version (engine-v46, the PFM, 2026-11-26; engine-v42 to v45: "<display> - <version>"). Takes nothing.
+# the app name; no version (engine-v46, the Administrator, 2026-11-26; engine-v42 to v45: "<display> - <version>"). Takes nothing.
 function Get-ShortcutName { return (Get-AppWord) }
 # Gives the path of the chosen app's runner copy, RADE\runners\<key>.ps1 (the folder may not be there yet). Takes nothing.
 function Get-RunnerPath { return (Join-Path (Join-Path (Get-RadePath) 'runners') ((Get-ShortHash ($appFolder + '/' + [string]$script:app.Name)) + '.ps1')) }
@@ -381,7 +389,7 @@ function Get-DesktopDir {
   return ''
 }
 function Get-ShortcutDir {
-  # R29 (the PFM, 17 Nov 26: "I should be asked where to install it, but have the desktop path prefilled"): the folder for the
+  # R29 (the Administrator, 17 Nov 26: "I should be asked where to install it, but have the desktop path prefilled"): the folder for the
   # RADE shortcut. RADE\Config\rade-shortcut.txt holds the folder the user chose; else the Desktop folder. '' when neither exists.
   try { $p = Get-RadeConfigFile 'rade-shortcut.txt'
     if (Test-Path -LiteralPath $p -PathType Leaf) { $v = ([string](Get-Content -LiteralPath $p -TotalCount 1)).Trim(); if ($v -and (Test-Path -LiteralPath $v -PathType Container)) { return $v } } } catch { $null = $_ }

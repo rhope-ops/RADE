@@ -7,7 +7,7 @@
 # ("811x469" = the window is set to this size: 1280 x 800 at 150 % scaling, in 100 % pixels; empty = as the engine sets it).
 # A check that cannot pass on the test computer is set to PASSED after its card has shown (the test is of the window).
 # The hand step's questions (manifest "answers"): one picture per kind (NN-answer-yesno, NN-answer-pick, NN-answer-text),
-# for the owner's approval of the look (the long-text run draws a first sentence that shrinks in the smallest window);
+# for the Administrator's approval of the look (the long-text run draws a first sentence that shrinks in the smallest window);
 # the driver selects the first button (a text gets a short fake note). R31: the tour cards (each one), the step that shows only
 # questions (the driver selects its answer that means a failure, then gives a fake error text) and the last card of a test round.
 Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing
@@ -19,7 +19,7 @@ $global:RadeT = @{ Seen = ''; N = 0; Out = [string]$env:RADE_T_OUT; App = [int]$
 function global:Save-RadeUninstall([string]$bp, [string]$nm) {
   <#
   .SYNOPSIS
-  Draws the Uninstall cards once (engine-v40; 90-161.Z R43 E3), for the PFM's preview.
+  Draws the Uninstall cards once (engine-v40; 90-161.Z R43 E3), for the Administrator's preview.
   .DESCRIPTION
   The Maintenance card with Uninstall on, the confirm card, a wrong typed name and three result cards. The saved site
   must be marked as a test site (Save-RadeRestore does it). The steps are two of the app's own, as stand-ins: nothing
@@ -59,7 +59,7 @@ function global:Save-RadeUninstall([string]$bp, [string]$nm) {
       '1 of 2 lists were not saved.') }
   Save-RadeCard 'toolres-uninstall-nobackup'
   $script:app.Uninstall = $keepU
-  # Back up (engine-v42; 90-161.Z R44 E4), for the PFM's preview: the card while it runs (the Alt+Tab line), a result
+  # Back up (engine-v42; 90-161.Z R44 E4), for the Administrator's preview: the card while it runs (the Alt+Tab line), a result
   # with the sign-in time and a result of a stage past its time limit (fake data; nothing runs).
   & $ui.SetCard @{ View = 'toolrun'; Kicker = 'MAINTENANCE'; Sentence = 'Back up is running.'; P = @('Reads the lists and saves them on this computer. Nothing on the site changes. ' + $ui.SignInHint) }
   Save-RadeCard 'toolrun-backup-hint'

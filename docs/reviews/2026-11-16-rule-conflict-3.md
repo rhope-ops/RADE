@@ -5,7 +5,7 @@ Fresh-context check of the rule lines changed against origin/main (`.claude/skil
 ## Changed line
 
 - `-` "... and a PreToolUse hook (...) checks each outgoing tool call."
-- `+` "... and a PreToolUse hook (`pii_guard.py --hook`, `.claude/settings.json`) checks the outgoing tool calls it names (list and gaps: `.claude/skills/personal-data/SKILL.md`)." The owner (kit decision; RADE: the Administrator) approved this exact text on 2026-11-16, because the old clause claimed more than the hook covers (claude.ai chats, `curl`/`gh` in Bash and Google Calendar are not covered).
+- `+` "... and a PreToolUse hook (`pii_guard.py --hook`, `.claude/settings.json`) checks the outgoing tool calls it names (list and gaps: `.claude/skills/personal-data/SKILL.md`)." The Administrator (kit decision; RADE: the Administrator) approved this exact text on 2026-11-16, because the old clause claimed more than the hook covers (claude.ai chats, `curl`/`gh` in Bash and Google Calendar are not covered).
 
 ## Result
 
