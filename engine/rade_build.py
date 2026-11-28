@@ -98,7 +98,14 @@ def q(s):
 
 
 def qx(s):
-    """Return `s` as a PowerShell string expression (ASCII-safe for older PowerShell hosts)."""
+    """Return `s` as a PowerShell string expression (ASCII-safe for older PowerShell hosts).
+
+    Args:
+        s: input string to encode.
+
+    Returns:
+        PowerShell single-quoted string or ASCII concatenation expression.
+    """
     if all(ord(c) < 128 for c in s):
         return q(s)
     parts, run = [], ''
@@ -135,7 +142,11 @@ def file_sha(rel):
 
 
 def engine_text():
-    """Join the engine's PowerShell parts in run order, placing WINDOW_PARTS inside 10-window.ps1."""
+    """Join the engine's PowerShell parts in run order, placing WINDOW_PARTS inside 10-window.ps1.
+
+    Returns:
+        Combined PowerShell engine script string starting with a newline.
+    """
     def read(rel):
         """Read one engine PowerShell part as UTF-8."""
         return (ENGINE_DIR / rel).read_text(encoding='utf-8')
@@ -209,7 +220,14 @@ def write(out, text, release):
 
 
 def content_hash(text):
-    """Return the SHA-256 content hash of a script with header comments and revision tokens normalized."""
+    """Return the SHA-256 content hash of a script with header comments and revision tokens normalized.
+
+    Args:
+        text: script source text.
+
+    Returns:
+        Hexadecimal SHA-256 digest string.
+    """
     lines = text.lstrip('\ufeff').replace('\r\n', '\n').replace('\r', '\n').split('\n')
     i, block = 0, False
     while i < len(lines):
@@ -242,7 +260,11 @@ def shared_blocks(texts):
 
 
 def window_values():
-    """Read and validate engine/window.json layout values."""
+    """Read and validate engine/window.json layout values.
+
+    Returns:
+        Dict mapping engine placeholder tokens to validated string values.
+    """
     w = json.loads(WINDOW_FILE.read_text(encoding='utf-8'))
     share, cap = float(w['textColumn']['sharePercent']), int(w['textColumn']['maxPx'])
     min_w, min_h = int(w['minSize']['width']), int(w['minSize']['height'])
@@ -313,7 +335,14 @@ def name_spot(app):
 
 
 def hand_part(s):
-    """Return the hide and answersOnly PowerShell fields for a guide step."""
+    """Return the hide and answersOnly PowerShell fields for a guide step.
+
+    Args:
+        s: step configuration dict from manifest.
+
+    Returns:
+        PowerShell hashtable fragment string (or '').
+    """
     def no(why):
         """Stop the build with the step name and error reason."""
         raise SystemExit('step %r: %s' % (s['name'], why))
@@ -331,7 +360,14 @@ def hand_part(s):
 
 
 def restore_part(a):
-    """Return the PowerShell hashtable for an app's restore configuration, or '$null'."""
+    """Return the PowerShell hashtable for an app's restore configuration, or '$null'.
+
+    Args:
+        a: application dict from manifest.
+
+    Returns:
+        PowerShell hashtable string or '$null'.
+    """
     r = a.get('restore')
     if not r:
         return '$null'
@@ -351,7 +387,15 @@ def restore_part(a):
 
 
 def uninstall_part(a, b):
-    """Return the PowerShell array of step indexes for an app's uninstall configuration."""
+    """Return the PowerShell array of step indexes for an app's uninstall configuration.
+
+    Args:
+        a: application dict from manifest.
+        b: bundle dict from manifest.
+
+    Returns:
+        PowerShell array expression string (for example '@()' or '@(1)').
+    """
     names = [s['name'] for s in b['steps']]
     un = a.get('uninstall', [])
     if not un:
@@ -393,7 +437,14 @@ def here(text):
 
 
 def app_lines(b):
-    """Return the $apps catalog lines for bundle `b`."""
+    """Return the $apps catalog lines for bundle `b`.
+
+    Args:
+        b: bundle dict from manifest.
+
+    Returns:
+        List of PowerShell '$apps += ...' lines.
+    """
     names = [s['name'] for s in b['steps']]
     apps = b.get('apps') or [{'name': b.get('app', APP['name']), 'summary': b['title'], 'steps': names}]
     out = []
@@ -445,7 +496,14 @@ def app_lines(b):
 
 
 def answers_part(s):
-    """Return the PowerShell Answers field for a guide step, or ''."""
+    """Return the PowerShell Answers field for a guide step, or ''.
+
+    Args:
+        s: step configuration dict from manifest.
+
+    Returns:
+        PowerShell hashtable fragment string (or '').
+    """
     if 'answers' not in s:
         return ''
     qs = s['answers']
@@ -511,7 +569,14 @@ def use_shared(text, shared):
 
 
 def file_parts(b):
-    """Return ($shared lines, $files lines) for the bundle's files."""
+    """Return ($shared lines, $files lines) for the bundle's files.
+
+    Args:
+        b: bundle dict from manifest.
+
+    Returns:
+        Tuple of (shared block assignment lines, file assignment lines).
+    """
     texts = {f['src']: source_text(f['src']) for f in b['files'] if (ROOT / f['src']).suffix.lower() in TEXT}
     shared = shared_blocks(texts)
     lines = ["$shared[%s] = %s" % (q(k), here(v)) for k, v in sorted(shared.items())]
@@ -532,7 +597,14 @@ def file_parts(b):
 
 
 def step_lines(b):
-    """Return the $steps lines for bundle `b`."""
+    """Return the $steps lines for bundle `b`.
+
+    Args:
+        b: bundle dict from manifest.
+
+    Returns:
+        List of PowerShell '$steps += ...' lines.
+    """
     steps = [
         '$steps += @{ Name = %s; Title = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; '
         'Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s; Makes = @(%s); After = @(%s); Optional = $%s; Help = %s }'
@@ -555,7 +627,14 @@ def step_lines(b):
 
 
 def fetch_lines(b):
-    """Return the $fetch lines for data files in bundle `b`."""
+    """Return the $fetch lines for data files in bundle `b`.
+
+    Args:
+        b: bundle dict from manifest.
+
+    Returns:
+        List of PowerShell '$fetch += ...' lines.
+    """
     fetch = []
     for f in b.get('fetch', []):
         if 'src' in f:
@@ -578,7 +657,11 @@ def help_rules_line():
 
 
 def engine_for_app():
-    """Substitute window.json, apps.json, and application placeholders into ENGINE."""
+    """Substitute window.json, apps.json, and application placeholders into ENGINE.
+
+    Returns:
+        Parameterized PowerShell engine script string for the current APP.
+    """
     ui_file = ENGINE_ROOT / 'engine/ps/window/ui-theme.ps1'
     rade_tokens.check_tokens(ui_file.read_text(encoding='utf-8'))
     in_ps = {k: v for k, v in site_values().items() if k != '@@RADE_REPO@@'}
@@ -592,7 +675,14 @@ def engine_for_app():
 
 
 def app_logo_bytes(field='logo'):
-    """Return PNG bytes for application.logo or application.logoDark, or b''."""
+    """Return PNG bytes for application.logo or application.logoDark, or b''.
+
+    Args:
+        field: manifest application key ('logo' or 'logoDark').
+
+    Returns:
+        Raw PNG bytes, or b'' if the field is unset.
+    """
     rel = APP.get(field)
     if not rel:
         return b''
@@ -608,7 +698,14 @@ def app_logo_bytes(field='logo'):
 
 
 def bundle_body(b):
-    """Return the bundle body (Settings, Shared blocks, Files, Steps, Applications, Engine)."""
+    """Return the bundle body (Settings, Shared blocks, Files, Steps, Applications, Engine).
+
+    Args:
+        b: bundle dict from manifest.
+
+    Returns:
+        Combined PowerShell bundle body string before header and paste guard.
+    """
     shared, files = file_parts(b)
     collect = ['$collect += @{ Dir = %s; Name = %s; Step = %s }' % (q(c['dir']), q(c['name']), q(c.get('step', ''))) for c in b.get('collect', [])]
     cleanup = ['$cleanup += @{ Path = %s; Kind = %s }' % (q(c['path']), q(c['kind'])) for c in b.get('cleanup', [])]
@@ -643,7 +740,15 @@ def bundle_body(b):
 
 
 def contents(head, body):
-    """Return the generated Contents comment with exact bundle line numbers."""
+    """Return the generated Contents comment with exact bundle line numbers.
+
+    Args:
+        head: header string preceding the Contents block.
+        body: bundle body string whose section banners are indexed.
+
+    Returns:
+        Generated Contents comment block ending with a newline.
+    """
     marks, inside = [], False
     for n, line in enumerate(body.split('\n'), 1):
         if inside:
@@ -658,7 +763,14 @@ def contents(head, body):
 
 
 def build(b):
-    """Build and return the complete signed bundle text for manifest bundle `b`."""
+    """Build and return the complete signed bundle text for manifest bundle `b`.
+
+    Args:
+        b: bundle dict from manifest.
+
+    Returns:
+        Complete bundle script string with SHA-256 hash line and paste guard.
+    """
     bad = collect_problems(b)
     if bad:
         sys.exit('\n'.join(bad))
@@ -684,7 +796,14 @@ def build(b):
 
 
 def text_lengths(b):
-    """Return WARNING lines for any manifest text field exceeding TEXT_LIMITS."""
+    """Return WARNING lines for any manifest text field exceeding TEXT_LIMITS.
+
+    Args:
+        b: bundle dict from manifest.
+
+    Returns:
+        List of formatted warning strings for fields exceeding limits.
+    """
     found = []
     def over(what, field, value):
         """Append a warning if `value` exceeds TEXT_LIMITS[field]."""

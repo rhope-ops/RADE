@@ -1,24 +1,39 @@
 # RADE window part 07, the run: the callbacks Invoke-Round uses (log line, tick, step state), the Run button,
 # and the Done, Needs review and Stopped cards. Uses the card parts and Invoke-Round.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+# Network: none.
+# Writes: none.
+# Credentials: none.
 
 # ---- The run. Invoke-Round calls back: a log line ($ui.Say), a tick ($ui.Tick), a step that starts ($ui.OnStatus) and
 # a step that ends ($ui.OnStep). A step you do by hand comes in through $script:guideUi, what a step does now through
 # $script:nowUi, and the last question of a test round through $script:feedbackUi.
-$ui.Say = { param($t) Add-RunLog $t; $ui.Log.Add([string]$t); if ($ui.RecOn) { try { $ui.RecText.AppendText([string]$t + "`r`n") } catch { $null = $_ } }; try { [System.Windows.Forms.Application]::DoEvents() } catch { $null = $_ } }
+$ui.Say = { param($t)
+  Add-RunLog $t; $ui.Log.Add([string]$t)
+  if ($ui.RecOn) { try { $ui.RecText.AppendText([string]$t + "`r`n") } catch { $null = $_ } }
+  try { [System.Windows.Forms.Application]::DoEvents() } catch { $null = $_ } }
 # L7 (the Administrator, 2026-11-19): the now-doing line under the step's bar. The engine calls this ($script:nowUi) with a
 # plain sentence for each item a step script reports (Get-NowText) and for a NOW line. Cards v2 (plan engine-v48 step 5):
 # the text as written, with no "..." added; it wraps to $ui.NowLines lines and the line keeps its room. Takes the text.
-$ui.ShowNow = { param([string]$Text) try { if ($ui.View -eq 'run') { $ui.NowRaw = $Text.Trim(); & $ui.CutNow; $ui.Now.Visible = $true } } catch { $null = $_ } }   # a line that cannot show never stops a step
+$ui.ShowNow = { param([string]$Text)
+  try { if ($ui.View -eq 'run') { $ui.NowRaw = $Text.Trim(); & $ui.CutNow; $ui.Now.Visible = $true } } catch { $null = $_ } }   # a line that cannot show never stops a step
 # Shows the whole now-doing text ($ui.NowRaw) in $ui.NowLines lines at the line's wrap width (a text longer than that, over
 # the manifest's 80 characters, is cut at the end of the last line); runs again after a resize ($ui.BreakAll). Takes nothing.
-$ui.CutNow = { try { $w = [int](& $ui.GetWrap $ui.Now); $x = [string]$ui.NowRaw; if ($x) { $x = & $ui.FitLines (& $ui.BreakLong $x $ui.Now.Font $w) $ui.Now.Font $w $ui.NowLines }; if ([string]$ui.Now.Text -cne $x) { $ui.Now.Text = $x } } catch { $null = $_ } }   # a line that cannot show never stops a step
+$ui.CutNow = {
+  try {
+    $w = [int](& $ui.GetWrap $ui.Now); $x = [string]$ui.NowRaw
+    if ($x) { $x = & $ui.FitLines (& $ui.BreakLong $x $ui.Now.Font $w) $ui.Now.Font $w $ui.NowLines }
+    if ([string]$ui.Now.Text -cne $x) { $ui.Now.Text = $x }
+  } catch { $null = $_ } }   # a line that cannot show never stops a step
 # The engine's callback for the now-doing line (Add-StepLine): shows the text and emits nothing. Takes the text.
 $script:nowUi = { param($t) $null = & $ui.ShowNow ([string]$t) }
 # L8 (the Administrator, 2026-11-19): a step stays on the Run card for $ui.Layout.StepMs (engine/window.json) at least, so a
 # run of fast steps does not flicker. Waits out the rest of that time since the step showed. Takes nothing.
 $ui.HoldStep = {
-  while ($ui.View -eq 'run' -and $null -ne $ui.StepAt -and -not $script:closing -and -not $ui.Form.IsDisposed -and ($ui.Clock.Elapsed.TotalMilliseconds - [double]$ui.StepAt) -lt [double]$ui.Layout.StepMs) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 15 } }
+  while ($ui.View -eq 'run' -and $null -ne $ui.StepAt -and -not $script:closing -and
+    -not $ui.Form.IsDisposed -and ($ui.Clock.Elapsed.TotalMilliseconds - [double]$ui.StepAt) -lt [double]$ui.Layout.StepMs) {
+    [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 15
+  } }
 # Draws the progress: both bars, the time in the step, the step fraction and the overall percent (the Administrator, 2026-11-19:
 # the percent only). Takes nothing; does nothing when no step runs.
 $ui.Paint = {
@@ -35,7 +50,13 @@ $ui.Elapsed = { param([double]$Sec) $q = [int][math]::Floor([math]::Max(0, $Sec)
   if ($h) { return ('{0}h {1:00}m {2:00}s' -f $h, $m, $x) }; return ('{0}m {1:00}s' -f $m, $x) }
 # Shows the time in this step on the step line, once for each second. The time keeps one size from its widest value
 # ($ui.FixW), so the bar beside it never changes its width. Takes nothing; a failure is ignored.
-$ui.ShowTime = { try { if ($ui.View -eq 'run' -and $script:stepStart) { $t = & $ui.Elapsed ((Get-Date) - $script:stepStart).TotalSeconds; if ($ui.StepTime.Text -ne $t) { $ui.StepTime.Text = $t } } } catch { $null = $_ } }
+$ui.ShowTime = {
+  try {
+    if ($ui.View -eq 'run' -and $script:stepStart) {
+      $t = & $ui.Elapsed ((Get-Date) - $script:stepStart).TotalSeconds
+      if ($ui.StepTime.Text -ne $t) { $ui.StepTime.Text = $t }
+    }
+  } catch { $null = $_ } }
 $ui.TimeT = New-Object System.Windows.Forms.Timer; $ui.TimeT.Interval = 1000; $ui.TimeT.Add_Tick({ & $ui.ShowTime })
 # The tick callback of a running step: repaints the bars and lets the window handle its events. Emits nothing.
 $ui.Tick = { $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }   # a callback must emit nothing: its output would join the engine function's return value
@@ -56,7 +77,9 @@ $ui.MakeRunList = { param($Sel)
 # The room the Run card has for drawn rows: the card's height less its header, its body without the lists and its
 # buttons (each as tall as its parts ask for), so the card never scrolls for its lists (the Windows job of PR 211: fixed
 # thresholds made the Run card scroll at 1004 x 577 with long texts). Takes nothing; gives back pixels (0 at least).
-$ui.RunRoom = { $ph = { param($C) $h = 0; try { $h = [int]$C.GetPreferredSize((New-Object System.Drawing.Size(0, 0))).Height } catch { $null = $_ }; [math]::Max($h, [int]$C.Height) }   # no measure: its height
+$ui.RunRoom = {
+  # Returns preferred or current height of a control.
+  $ph = { param($C) $h = 0; try { $h = [int]$C.GetPreferredSize((New-Object System.Drawing.Size(0, 0))).Height } catch { $null = $_ }; [math]::Max($h, [int]$C.Height) }   # no measure: its height
   return [int][math]::Max(0, [int]$ui.Card.ClientSize.Height - (& $ph $ui.Head) - (& $ph $ui.Body) - (& $ph $ui.Tail) - (& $ui.Sc $ui.Z.G2)) }
 $ui.RunMost = 4   # at most 4 drawn rows beside the running one (the Cards v2 mock: 5 rows in all)
 # The width of a drawn row's texts (the row less the status column and the side room). Takes the row width.
@@ -94,7 +117,13 @@ $ui.RunStart = { param([string]$Name) foreach ($x in @($ui.RunList)) { if ($x.St
 # Keeps the result of a step that ended in its row: the state word and the rest of its result line as its second line.
 # Takes the step name, the state word and the rest of the line.
 $ui.RunEnd = { param([string]$Name, [string]$State, [string]$Rest)
-  foreach ($x in @($ui.RunList)) { if ([string]$x.Key -ceq $Name) { $x.State = $State; $t = ($Rest.Substring([math]::Min($Rest.Length, $State.Length)) -replace '^[\s:(]+', '' -replace '\)$', '').Trim(); if ($t) { $x.Sub = $t } } } }
+  foreach ($x in @($ui.RunList)) {
+    if ([string]$x.Key -ceq $Name) {
+      $x.State = $State
+      $t = ($Rest.Substring([math]::Min($Rest.Length, $State.Length)) -replace '^[\s:(]+', '' -replace '\)$', '').Trim()
+      if ($t) { $x.Sub = $t }
+    }
+  } }
 $ui.PaintRuns = {
   <#
   .SYNOPSIS
@@ -108,7 +137,9 @@ $ui.PaintRuns = {
   Nothing; a failure draws nothing more.
   #>
   param($P, $G)
-  try { $G.Clear($ui.C.White); $G.SmoothingMode = 'AntiAlias'; $w = $P.ClientSize.Width; $y = 0; $pad = & $ui.Sc $ui.Z.G2; $mw = & $ui.Sc 120; $h1 = & $ui.LineH $ui.F.SmallB; $h2 = & $ui.LineH $ui.F.Small
+  try {
+    $G.Clear($ui.C.White); $G.SmoothingMode = 'AntiAlias'; $w = $P.ClientSize.Width; $y = 0
+    $pad = & $ui.Sc $ui.Z.G2; $mw = & $ui.Sc 120; $h1 = & $ui.LineH $ui.F.SmallB; $h2 = & $ui.LineH $ui.F.Small
     $wrap = 'Left, Top, NoPrefix, WordBreak, EndEllipsis, TextBoxControl'; $ln = New-Object System.Drawing.Pen($ui.C.Hair)
     foreach ($r in @($P.Tag)) { $h = [int]$ui.RunSlotH; $m = & $ui.RunMark ([string]$r.State); $col = $ui.C[[string]$m[1]]
       $tw = & $ui.RunTextW $w; $n1 = & $ui.Rows ([string]$r.Title) $ui.F.SmallB $tw $h1 2   # the name and the second line wrap to 2 lines each (Cards v2)
@@ -120,13 +151,41 @@ $ui.PaintRuns = {
     $ln.Dispose() } catch { $null = $_ } }   # a list that cannot be drawn: the running row and the percent still show
 # Draws the icon of a status, 10 px, centered on a point: a tick, a cross, a ring (WAITING) or a dash. Takes the graphics,
 # the word, the color and the point.
-$ui.RunIcon = { param($G, [string]$Word, $Color, [int]$X, [int]$Y) $d = & $ui.Sc 10; $t = $Y - [int]($d / 2); $pn = New-Object System.Drawing.Pen($Color, [single](& $ui.Sc 2))
-  if ($Word -in 'PASSED', 'DONE') { $G.DrawLines($pn, [System.Drawing.Point[]]@((New-Object System.Drawing.Point($X, ($t + [int]($d / 2)))), (New-Object System.Drawing.Point(($X + [int]($d / 3)), ($t + $d))), (New-Object System.Drawing.Point(($X + $d), $t)))) }
+$ui.RunIcon = {
+  <#
+  .SYNOPSIS
+  Draws a 10 px status icon (check, cross, circle, or dash) for a painted run list row.
+  .DESCRIPTION
+  Draws a vector glyph centered vertically at ($X, $Y) using the specified color on the Graphics surface.
+  .PARAMETER G
+  Graphics context from the Paint event.
+  .PARAMETER Word
+  Status label word ('PASSED', 'DONE', 'FAILED', 'NEEDS REVIEW', 'STOPPED', 'WAITING', etc.).
+  .PARAMETER Color
+  Pen color for drawing the glyph.
+  .PARAMETER X
+  Left X coordinate in pixels.
+  .PARAMETER Y
+  Vertical center Y coordinate in pixels.
+  .OUTPUTS
+  None.
+  #>
+  param($G, [string]$Word, $Color, [int]$X, [int]$Y)
+  $d = & $ui.Sc 10; $t = $Y - [int]($d / 2); $pn = New-Object System.Drawing.Pen($Color, [single](& $ui.Sc 2))
+  if ($Word -in 'PASSED', 'DONE') {
+    $pts = [System.Drawing.Point[]]@(
+      (New-Object System.Drawing.Point($X, ($t + [int]($d / 2)))),
+      (New-Object System.Drawing.Point(($X + [int]($d / 3)), ($t + $d))),
+      (New-Object System.Drawing.Point(($X + $d), $t)))
+    $G.DrawLines($pn, $pts)
+  }
   elseif ($Word -in 'FAILED', 'NEEDS REVIEW', 'STOPPED') { $G.DrawLine($pn, $X, $t, ($X + $d), ($t + $d)); $G.DrawLine($pn, ($X + $d), $t, $X, ($t + $d)) }
   elseif ($Word -eq 'WAITING') { $G.DrawEllipse($pn, $X, $t, $d, $d) } else { $G.DrawLine($pn, $X, $Y, ($X + $d), $Y) }
   $pn.Dispose() }
 # The installed part of this app's install record, or $null (the row the person sees next on Maintenance: $ui.RowVerb).
-$ui.InstNow = { $e = $null; try { $e = Read-Installed (Get-InstalledKey $script:app) } catch { $null = $_ }; if ($e -and $e.installed) { return $e.installed }; return $null }   # no record: not installed
+$ui.InstNow = {
+  $e = $null; try { $e = Read-Installed (Get-InstalledKey $script:app) } catch { $null = $_ }   # no record: not installed
+  if ($e -and $e.installed) { return $e.installed }; return $null }
 # A count with its noun, singular for 1 ("1 step", "3 checks"). Takes the number and the noun.
 $ui.Counted = { param([int]$N, [string]$One) [string]$N + ' ' + $One + $(if ($N -ne 1) { 's' } else { '' }) }
 # The Cancel question (Cards v2; critique change 10): Cancel or Esc on the Run card asks first. "Stop the install" lets the
@@ -135,30 +194,68 @@ $ui.Counted = { param([int]$N, [string]$One) [string]$N + ' ' + $One + $(if ($N 
 $ui.VCancelQ = {
   if (-not $ui.Running -or $ui.View -ne 'run') { return }
   $t = & $ui.TitleOf $ui.StepNow; $dep = Test-Deploy; $verb = $(if ($dep) { 'install' } else { 'round' })
+  $cqP1 = $(if ($ui.StepI -and $t) { 'RADE stops after "' + $t + '". The steps that passed stay done.' } else { 'RADE stops before the first step.' })
+  $cqP2 = $(if ($dep) { 'To finish the install later, select "' + (& $ui.RowVerb (& $ui.InstNow)) + '" again.' } else { '' })
   & $ui.SetCard @{ View = 'cancelq'; Light = 'you'; Kicker = $ui.Kick.Text; Sentence = ('Stop the ' + $verb + '?')
-    P = @($(if ($ui.StepI -and $t) { 'RADE stops after "' + $t + '". The steps that passed stay done.' } else { 'RADE stops before the first step.' }), $(if ($dep) { 'To finish the install later, select "' + (& $ui.RowVerb (& $ui.InstNow)) + '" again.' } else { '' }))
+    P = @($cqP1, $cqP2)
     Buttons = @(@{ Text = ('Stop the ' + $verb); Kind = 'dangerline'; Always = $true; Act = { $script:stopAfter = $true; & $ui.ShowRun; & $ui.Say1 'RADE stops after the step that runs now.' } },
       @{ Text = $(if ($dep) { 'Keep installing' } else { 'Keep running' }); Kind = 'primary'; Always = $true; Act = { & $ui.ShowRun } }) } }
 # Shows the run card: step k of n, the step name, the bars, Cancel and the next step that needs you.
 $ui.ShowRun = {
-  & $ui.SetCard @{ View = 'run'; Kicker = $(if ($ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN } else { 'Starting' }); Sentence = $(if (Test-Deploy) { 'Installing ' + (Get-AppWord) + ' ' + $script:app.Version + '.' } else { 'Running round ' + $round + '.' })
+  <#
+  .SYNOPSIS
+  Displays and configures the Run progress card with step rows, bars, summary ranges, and Cancel button.
+  .DESCRIPTION
+  Sets up the Run view, populates range metrics for stable layout, updates current step title and overall percent,
+  and refreshes edge alignment and elapsed step time.
+  .OUTPUTS
+  None.
+  #>
+  $runSent = $(if (Test-Deploy) { 'Installing ' + (Get-AppWord) + ' ' + $script:app.Version + '.' } else { 'Running round ' + $round + '.' })
+  $runFoot = $(if (@($ui.Guides).Count) { 'RADE needs you next at "' + (& $ui.TitleOf $ui.Guides[0]) + '". Until then, keep this window open.' }
+    elseif (-not (Test-Deploy) -and -not $ui.Asked) { 'RADE asks you one last question at the end. Until then, keep this window open.' }
+    else { 'Nothing is needed from you. Keep this window open.' })
+  & $ui.SetCard @{ View = 'run'; Kicker = $(if ($ui.StepI) { 'Step ' + $ui.StepI + ' of ' + $ui.StepN } else { 'Starting' }); Sentence = $runSent
     StepRow = $true; Buttons = @(@{ Text = 'Cancel (Esc)'; Always = $true; Act = { & $ui.VCancelQ } })   # Cards v2: the Cancel question first (the window's X still asks with a message)
     Range = @{ Kick = @('STARTING', 'STEP 00 OF 00'); StepName = @(@($steps | ForEach-Object { Get-StepTitle $_ }) + @('Clean-up')) }   # every step title: the step row keeps its place
-    Foot = $(if (@($ui.Guides).Count) { 'RADE needs you next at "' + (& $ui.TitleOf $ui.Guides[0]) + '". Until then, keep this window open.' } elseif (-not (Test-Deploy) -and -not $ui.Asked) { 'RADE asks you one last question at the end. Until then, keep this window open.' } else { 'Nothing is needed from you. Keep this window open.' }) }
+    Foot = $runFoot }
   $ui.Range[$ui.StepSum] = @($ui.RunList | ForEach-Object { [string]$_.Sub } | Where-Object { $_ }); & $ui.Reflow $ui.StepSum   # one height for every summary (R35)
-  $ui.StepName.Text = (& $ui.TitleOf $ui.StepNow); $ui.PctL.Text = [string][int]($ui.Bars['all'].Target * 100) + ' %'; $null = & $ui.PlaceRuns; $null = & $ui.FitEdges; $null = & $ui.FitBar; $null = & $ui.ShowTime }   # the edge follows the ink of the new text's first letter (titles start with any letter)
+  $ui.StepName.Text = (& $ui.TitleOf $ui.StepNow); $ui.PctL.Text = [string][int]($ui.Bars['all'].Target * 100) + ' %'
+  # the edge follows the ink of the new text's first letter (titles start with any letter)
+  $null = & $ui.PlaceRuns; $null = & $ui.FitEdges; $null = & $ui.FitBar; $null = & $ui.ShowTime }
 # Shows a new step on the Run card that is shown: its number in the line in capitals and its title. Both keep their size
 # ($ui.Range of the card), and the edges are fitted for the title's first letter. Takes the step number, the count and the name.
-$ui.ShowStep = { param([int]$I, [int]$N, [string]$Name) $ui.Kick.Text = ('Step ' + $I + ' of ' + $N).ToUpperInvariant(); $ui.StepName.Text = (& $ui.TitleOf $Name); $null = & $ui.FitEdges; $null = & $ui.FitBar }
+$ui.ShowStep = { param([int]$I, [int]$N, [string]$Name)
+  $ui.Kick.Text = ('Step ' + $I + ' of ' + $N).ToUpperInvariant(); $ui.StepName.Text = (& $ui.TitleOf $Name)
+  $null = & $ui.FitEdges; $null = & $ui.FitBar }
 # Invoke-Round calls this when a step starts: keeps its name, start and estimate, and moves the run card on.
 # Takes the step index, the step count, the name and the estimate.
-$ui.OnStatus = { param($i, $count, $name, $estimate)
+$ui.OnStatus = {
+  <#
+  .SYNOPSIS
+  Handles step-start notifications from Invoke-Round and advances the Run card display.
+  .DESCRIPTION
+  Holds the previous step minimally, records step timing metadata, marks the step RUNNING, updates the Run or
+  Cancel-question view, resets step progress bar, and pumps UI events.
+  .PARAMETER i
+  One-based index of the starting step.
+  .PARAMETER count
+  Total number of active steps in the run.
+  .PARAMETER name
+  Identifier name of the starting step.
+  .PARAMETER estimate
+  Estimated duration in seconds for progress calculations.
+  .OUTPUTS
+  None.
+  #>
+  param($i, $count, $name, $estimate)
   $null = & $ui.HoldStep
   $script:statusBase = $name; $script:stepStart = Get-Date; $script:stepEst = $estimate
   if ($i -le 1) { $null = & $ui.SetBar 'all' 0 $true }
   $ui.StepI = [int]$i; $ui.StepN = [int]$count; $ui.StepNow = [string]$name
   $null = & $ui.RunStart ([string]$name)
-  if ($ui.View -eq 'cancelq') { $ui.Kick.Text = ('Step ' + $i + ' of ' + $count).ToUpperInvariant() } elseif ($ui.View -ne 'run') { $null = & $ui.ShowRun } else { $null = & $ui.ShowStep $i $count $name; $null = & $ui.PlaceRuns }   # the Cancel question stays
+  if ($ui.View -eq 'cancelq') { $ui.Kick.Text = ('Step ' + $i + ' of ' + $count).ToUpperInvariant() }   # the Cancel question stays
+  elseif ($ui.View -ne 'run') { $null = & $ui.ShowRun } else { $null = & $ui.ShowStep $i $count $name; $null = & $ui.PlaceRuns }
   $null = & $ui.SetBar 'step' 0 $true; $ui.StepFrac.Text = ''; $null = & $ui.FitBar; $null = & $ui.ShowTime
   $null = & $ui.ShowNow ''; $ui.StepAt = $ui.Clock.Elapsed.TotalMilliseconds   # Cards v2: the step's doing text is its summary line ($ui.PlaceRuns); the now-doing line waits for its first item
   $null = & $ui.Paint; [System.Windows.Forms.Application]::DoEvents() }
@@ -170,10 +267,20 @@ $ui.OnStep = { param($k, $line)
   $ui.StepState[[int]$k] = $st; $null = & $ui.RunEnd ([string]$steps[$k].Name) $st $rest; $null = & $ui.Paint }
 # Gives the "Window: OK" or "Window: NOT OK" line for the report, with the layout self-check when it is on. Takes
 # nothing; gives back the text.
-$ui.WindowLine = { $w = $(if ($ui.OkBox.Checked) { 'Window: OK' } else { 'Window: NOT OK - write here what overlapped or was cut off' }); if ($ui.LayOn -and ($env:RADE_LAYOUT -eq '1' -or -not (Test-Deploy))) { $w += "`r`n" + (& $ui.LayLine) }
+$ui.WindowLine = {
+  $w = $(if ($ui.OkBox.Checked) { 'Window: OK' } else { 'Window: NOT OK - write here what overlapped or was cut off' })
+  if ($ui.LayOn -and ($env:RADE_LAYOUT -eq '1' -or -not (Test-Deploy))) { $w += "`r`n" + (& $ui.LayLine) }
   @(@($w) + @(& $ui.ScaleLines)) -join "`r`n" }   # E4: the SCALE line of each RADE window shown since this one opened
 $ui.StartApp = {
-  # The installed app opens from its local copy (.ps1, .html, .exe) or configured https:// URL; then RADE closes.
+  <#
+  .SYNOPSIS
+  Launches the installed application (.ps1, https:// URL, or executable) and closes RADE.
+  .DESCRIPTION
+  Clears any inherited Bypass execution-policy preference, starts the configured start target,
+  verifies immediate PowerShell launch exit codes, and closes the form on success.
+  .OUTPUTS
+  None.
+  #>
   $p = Get-StartPath; if (-not $p) { & $ui.Say1 'The start file of this application was not found. Select "Install" to put it back.'; return }
   # No -ExecutionPolicy setting (DEC 3): drop only a "Bypass" handed down by an old RADE shortcut (RADE closes after this)
   if ($env:PSExecutionPolicyPreference -ceq 'Bypass') { Remove-Item -LiteralPath 'Env:PSExecutionPolicyPreference' -ErrorAction SilentlyContinue }
@@ -181,7 +288,10 @@ $ui.StartApp = {
     if ($p -match '\.ps1$') {
       $pr = Start-Process -FilePath (Get-PowerShellExe) -ArgumentList ('-NoProfile -STA -File "' + $p + '"') -WorkingDirectory (Split-Path -Parent $p) -PassThru
       if ($pr) { $null = $pr.Handle }   # Windows PowerShell 5.1 keeps the exit code only when the handle is held
-      if ($pr -and $pr.WaitForExit(2500) -and $pr.ExitCode -ne 0) { & $ui.Say1 ('The application stopped as soon as it started (exit code ' + $pr.ExitCode + '). Ask in the Teams channel.'); return }
+      if ($pr -and $pr.WaitForExit(2500) -and $pr.ExitCode -ne 0) {
+        & $ui.Say1 ('The application stopped as soon as it started (exit code ' + $pr.ExitCode + '). Ask in the Teams channel.')
+        return
+      }
     } elseif ($p -match '^https://') {
       $null = Start-Process -FilePath $p
     } else {
@@ -191,17 +301,29 @@ $ui.StartApp = {
 # Starts the run: saves the shortcut folder, asks for the folder some steps need, then calls Invoke-Round with the
 # window callbacks and shows Done, Needs review or Stopped. Takes nothing.
 $ui.Run = {
+  <#
+  .SYNOPSIS
+  Validates options, prompts for any step folder inputs, executes Invoke-Round, and shows the outcome card.
+  .DESCRIPTION
+  Saves shortcut directory if applicable, collects AskParam folders, initializes progress bars, runs Invoke-Round
+  with UI callbacks, and routes to $ui.VDone or $ui.VStopped.
+  .OUTPUTS
+  None.
+  #>
   $ui.LinkDir = ''; $ui.FieldAsked = $false
   if ($ui.View -eq 'ready' -and $ui.FieldRow.Visible -and $ui.FieldL.Text -eq 'Shortcut in') {   # R29 N8: the folder for the app's shortcut (the label is the key: 06-open.ps1)
     $d = $ui.Field.Text.Trim().Trim('"')
-    if ($d -and -not (Test-Path -LiteralPath $d -PathType Container)) { & $ui.Say1 'That folder was not found. Select "Browse" to choose a folder, or empty the box for no shortcut.'; $script:resume = $null; return }
+    if ($d -and -not (Test-Path -LiteralPath $d -PathType Container)) {
+      & $ui.Say1 'That folder was not found. Select "Browse" to choose a folder, or empty the box for no shortcut.'; $script:resume = $null; return
+    }
     $ui.LinkDir = $d; $ui.FieldAsked = $true; if ($d) { Save-ShortcutDir $d } }
   $dep = Test-Deploy; $ui.Running = $true; $ui.Asked = $false; $ui.StepAt = $null; $ui.Summary = @(); $ui.Log.Clear(); $ui.StepState = @{}; $ui.StepI = 0; $ui.StepNow = ''; $ui.Edit = $false
   $to = ''; if (-not $dep) { $to = [string](Get-MailTo (Get-BasePath)); $ui.ToBox.Text = $to }
   $sel = @(); $ui.Guides = @()
-  for ($k = 0; $k -lt $steps.Count; $k++) { $on = [bool]($script:appSteps -contains $k -and $ui.Sel[[int]$k]); $sel += $on; if ($on -and $steps[$k].Kind -eq 'guide') { $ui.Guides += [string]$steps[$k].Name } }
-  # A step that needs a folder asks for it now (a Windows dialog); Cancel skips that step. A resume does not ask again
-  # for a step it keeps.
+  for ($k = 0; $k -lt $steps.Count; $k++) {
+    $on = [bool]($script:appSteps -contains $k -and $ui.Sel[[int]$k]); $sel += $on
+    if ($on -and $steps[$k].Kind -eq 'guide') { $ui.Guides += [string]$steps[$k].Name }
+  }
   $kept = $(if ($script:resume) { Get-ResumeKept $script:resume } else { @{} })
   $answers = @()
   for ($k = 0; $k -lt $steps.Count; $k++) {
@@ -209,12 +331,14 @@ $ui.Run = {
     if ($sel[$k] -and $steps[$k].AskParam -and -not $kept.ContainsKey([string]$steps[$k].Name)) {
       $pick = New-Object System.Windows.Forms.FolderBrowserDialog
       $pick.Description = $steps[$k].AskPrompt; $pick.ShowNewFolderButton = $false
-      if ([string]$pick.ShowDialog($ui.Form) -eq 'OK') { $a = [string]$pick.SelectedPath } else { $sel[$k] = $false; $ui.Guides = @($ui.Guides | Where-Object { $_ -ne [string]$steps[$k].Name }); $ui.Log.Add($steps[$k].Name + ': skipped (no folder picked)') }
+      if ([string]$pick.ShowDialog($ui.Form) -eq 'OK') { $a = [string]$pick.SelectedPath }
+      else { $sel[$k] = $false; $ui.Guides = @($ui.Guides | Where-Object { $_ -ne [string]$steps[$k].Name }); $ui.Log.Add($steps[$k].Name + ': skipped (no folder picked)') }
       $pick.Dispose()
     }
     $answers += $a
   }
-  $ui.Bars['all'].Fill = $ui.C.Info; $ui.Bars['run'].Fill = $ui.C.Info; $ui.Bars['step'].Fill = $ui.C.Info; & $ui.SetBar 'all' 0 $true; & $ui.SetBar 'run' 0 $true; & $ui.SetBar 'step' 0 $true
+  $ui.Bars['all'].Fill = $ui.C.Info; $ui.Bars['run'].Fill = $ui.C.Info; $ui.Bars['step'].Fill = $ui.C.Info
+  & $ui.SetBar 'all' 0 $true; & $ui.SetBar 'run' 0 $true; & $ui.SetBar 'step' 0 $true
   $script:stopAfter = $false; & $ui.MakeRunList $sel; $ui.RunKey = ''; & $ui.ShowRun; $ui.TimeT.Start()
   $checkLines = Get-CheckSummary $script:checkResults
   $script:roundStart = Get-Date
@@ -233,15 +357,34 @@ $ui.Run = {
 # The steps that passed stay done; the step that was running and the steps after it run. Takes nothing.
 $ui.ResumeRun = {
   $st = Read-RoundState (Get-BasePath)
-  if ($st.State -ne 'ok') { $null = Clear-RoundState (Get-BasePath); & $ui.VReady; & $ui.Say1 'The saved progress could not be read, so the round starts over. Select the main button to start.'; return }
+  if ($st.State -ne 'ok') {
+    $null = Clear-RoundState (Get-BasePath); & $ui.VReady
+    & $ui.Say1 'The saved progress could not be read, so the round starts over. Select the main button to start.'; return
+  }
   $sel = Get-ResumeSelection $st.Doc; for ($k = 0; $k -lt $steps.Count; $k++) { if ($script:appSteps -contains $k) { $ui.Sel[[int]$k] = [bool]$sel[$k] } }
   $script:resume = $st.Doc; & $ui.Run }
 # Start over: the saved state goes to the Recycle Bin, then the round runs from its first step. Takes nothing.
-$ui.StartOver = { $why = Clear-RoundState (Get-BasePath); if ($why) { & $ui.Say1 ('The saved progress could not be moved to the Recycle Bin (' + $why + ').'); return }; $script:resume = $null; & $ui.Run }
+$ui.StartOver = {
+  $why = Clear-RoundState (Get-BasePath)
+  if ($why) { & $ui.Say1 ('The saved progress could not be moved to the Recycle Bin (' + $why + ').'); return }
+  $script:resume = $null; & $ui.Run }
+# Summarizes artifacts created by previous installs of the selected application.
 $ui.MadeText = {
-  # Deploy: how many things the installs of this application made, by kind (the list is in the Record).
+  <#
+  .SYNOPSIS
+  Summarizes items created by past installs of the selected application by kind.
+  .DESCRIPTION
+  Reads the installation record for $script:app, counts created entries by kind, and formats a sentence
+  for the Done card.
+  .OUTPUTS
+  String summary sentence, or empty string if nothing was created.
+  #>
   $c = [ordered]@{}; $e = (Read-Installed (Get-InstalledKey $script:app))
-  if ($e -and $e.steps) { foreach ($n in @($e.steps.Keys)) { foreach ($m in @($e.steps[$n].made)) { if ($null -ne $m) { $k = [string]$m.kind; if ($c.Contains($k)) { $c[$k] = [int]$c[$k] + 1 } else { $c[$k] = 1 } } } } }
+  if ($e -and $e.steps) {
+    foreach ($n in @($e.steps.Keys)) {
+      foreach ($m in @($e.steps[$n].made)) { if ($null -ne $m) { $k = [string]$m.kind; if ($c.Contains($k)) { $c[$k] = [int]$c[$k] + 1 } else { $c[$k] = 1 } } }
+    }
+  }
   if (-not $c.Count) { return '' }
   $parts = @(); foreach ($k in @($c.Keys)) { $parts += ([string]$c[$k] + ' ' + $k + $(if ($c[$k] -ne 1) { 's' } else { '' })) }
   return ('The installs of this application made: ' + ($parts -join ', ') + '.') }
@@ -256,24 +399,47 @@ $ui.Open = { if ($script:resultsDir) { Start-Process -FilePath 'explorer.exe' -A
 # back the paragraph, or '' when no step was blocked.
 $ui.BlockedText = { $b = @($script:blockedSteps | Where-Object { $_ })
   if (-not $b.Count) { return '' }
-  return ('Windows blocked the script of ' + $(if ($b.Count -eq 1) { 'the step "' + $b[0] + '"' } else { [string]$b.Count + ' steps: "' + ($b -join '", "') + '"' }) + ' 2 times. Details shows the policy line.') }
+  $bDesc = $(if ($b.Count -eq 1) { 'the step "' + $b[0] + '"' } else { [string]$b.Count + ' steps: "' + ($b -join '", "') + '"' })
+  return ('Windows blocked the script of ' + $bDesc + ' 2 times. Details shows the policy line.') }
 # Shows the card at the end of a run: Done when every step passed ($ui.VPassed), else the step-failed card for the first
 # step that failed ($ui.VStepFail), or Needs review. Copies the summary and opens the folder in a test round. Takes nothing.
 $ui.VDone = {
+  <#
+  .SYNOPSIS
+  Handles end-of-round presentation by showing Done, StepFail, or Needs review cards.
+  .DESCRIPTION
+  Sets progress bar finish state, locates the first failed/needs-review step when applicable, displays the
+  corresponding card, and copies summary / opens results folder for test rounds.
+  .OUTPUTS
+  None.
+  #>
   $sum = @($ui.Summary); $dep = Test-Deploy; $bad = ([string]$sum[0] -match 'NEEDS REVIEW')
   $ui.Took = Format-Duration ((Get-Date) - $script:roundStart).TotalSeconds
   $ui.Bars['all'].Fill = $(if ($bad) { $ui.C.Red } else { $ui.C.Green }); & $ui.SetBar 'all' $(if ($bad) { $ui.Bars['all'].Target } else { 1 }) $true
-  $ui.Mail = $(if ($script:draftMade) { 'An Outlook draft is open with the summary and all result files. Review it, then select Send.' } else { 'The results folder is open and the summary is on the clipboard. Paste it into an e-mail and attach the files.' })
+  $ui.Mail = $(if ($script:draftMade) { 'An Outlook draft is open with the summary and all result files. Review it, then select Send.' }
+    else { 'The results folder is open and the summary is on the clipboard. Paste it into an e-mail and attach the files.' })
   if (-not $bad) { & $ui.VPassed } else {
     # The first step that failed or needs review, with its help line from the manifest; the rest is in Details.
     $one = ''; $what = ''; $more = 0
-    for ($k = 0; $k -lt $sum.Count; $k++) { if ([string]$sum[$k] -match ': (NEEDS REVIEW|FAILED) ') { if ($one) { $more++ } else { $one = [string]$sum[$k]; if ($k + 1 -lt $sum.Count -and [string]$sum[$k + 1] -match '^\s+What to do: ') { $what = ([string]$sum[$k + 1]).Trim() } } } }
-    $row = $null; $ri = 0; for ($i = 0; $i -lt @($ui.RunList).Count; $i++) { if ($one.StartsWith([string]$ui.RunList[$i].Key + ': ', [System.StringComparison]::Ordinal)) { $row = $ui.RunList[$i]; $ri = $i + 1; break } }
+    for ($k = 0; $k -lt $sum.Count; $k++) {
+      if ([string]$sum[$k] -match ': (NEEDS REVIEW|FAILED) ') {
+        if ($one) { $more++ }
+        else { $one = [string]$sum[$k]; if ($k + 1 -lt $sum.Count -and [string]$sum[$k + 1] -match '^\s+What to do: ') { $what = ([string]$sum[$k + 1]).Trim() } }
+      }
+    }
+    $row = $null; $ri = 0
+    for ($i = 0; $i -lt @($ui.RunList).Count; $i++) {
+      if ($one.StartsWith([string]$ui.RunList[$i].Key + ': ', [System.StringComparison]::Ordinal)) { $row = $ui.RunList[$i]; $ri = $i + 1; break }
+    }
     if ($row) { & $ui.VStepFail $row $ri $one $what $more } else {
       if (-not $one) { $one = 'A file, the clean-up or a result file needs review. Details shows which.' }
-      & $ui.SetCard @{ View = 'review'; Light = 'bad'; Kicker = 'Needs review'; Right = 'Needs review'; Sentence = $(if ($dep) { 'The install is not complete.' } else { 'The round needs review.' })
-        P = @(($one + $(if ($more) { ' (and ' + $more + ' more in Details)' } else { '' })), $what, (& $ui.BlockedText), $(if ($dep) { 'Steps that passed stay done. If you paste the block again, RADE runs only what is left.' } else { $ui.Mail }))
-        Help = $(if ($dep) { Get-HelpLine } else { '' }); Note = $(if ($dep) { '"Copy summary" puts the report on the clipboard. Paste it in the channel. Nothing was sent.' } else { '' })
+      $revP1 = $one + $(if ($more) { ' (and ' + $more + ' more in Details)' } else { '' })
+      $revP4 = $(if ($dep) { 'Steps that passed stay done. If you paste the block again, RADE runs only what is left.' } else { $ui.Mail })
+      $revNote = $(if ($dep) { '"Copy summary" puts the report on the clipboard. Paste it in the channel. Nothing was sent.' } else { '' })
+      & $ui.SetCard @{ View = 'review'; Light = 'bad'; Kicker = 'Needs review'; Right = 'Needs review'
+        Sentence = $(if ($dep) { 'The install is not complete.' } else { 'The round needs review.' })
+        P = @($revP1, $what, (& $ui.BlockedText), $revP4)
+        Help = $(if ($dep) { Get-HelpLine } else { '' }); Note = $revNote
         Buttons = @(@{ Text = 'Copy summary'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Open results folder'; Act = { & $ui.Open } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } })
         Test = (-not $dep); Back = { & $ui.VReady } } } }
   if (-not $dep) { & $ui.Copy; if (-not $script:draftMade) { & $ui.Open } }   # a test round: the summary is on the clipboard, and with no draft the folder opens
@@ -296,12 +462,21 @@ $ui.VPassed = {
   $inst = ($dep -and (Get-InstalledText $script:app) -match 'is installed$'); $w = Get-AppWord
   # Start (R28 fix: after a first install the Done card had no Start button): the checks passed before the install.
   $startB = $(if ($inst -and [string]$script:app.Start -and (Get-StartPath)) { @{ Text = 'Start ' + $w; Kind = 'primary'; Act = { & $ui.StartApp } } } else { $null })
+  $passKick = $(if (($dep -and -not $inst) -or $n -ne $all) { 'Passed' } else { $(if ($n -eq 1) { 'The step passed' } else { 'All ' + $n + ' steps passed' }) })
+  $passSent = $(if (-not $dep) { 'Round ' + $round + ' is done.' }
+    elseif ($inst) { $w + ' ' + $script:app.Version + ' is installed.' }
+    else { 'The run passed, but version ' + $script:app.Version + ' is not recorded as installed.' })
+  $passP1 = (& $ui.Counted $n 'step') + ' and ' + (& $ui.Counted $m 'check') + ' passed in ' + $ui.Took + '.'
+  $passP2 = $(if ($dep -and -not $inst) { 'Some steps were off or skipped. Run again with every step on.' } else { '' })
+  $passP3 = $(if ($dep) { 'Nothing was sent. The report stays on this computer.' } else { $ui.Mail })
+  $passBtns = @(
+    @{ Text = 'Open results folder'; Act = { & $ui.Open } },
+    @{ Text = 'Copy summary'; Act = { & $ui.Copy } },
+    @{ Text = 'Close'; Kind = $(if ($startB) { '' } else { 'primary' }); Act = { $ui.Form.Close() } },
+    $startB)
   & $ui.SetCard @{ View = 'done'; Light = 'pass'; Tick = $true; KickColor = 'GreenInk'; Strong = $true
-    Kicker = $(if (($dep -and -not $inst) -or $n -ne $all) { 'Passed' } else { $(if ($n -eq 1) { 'The step passed' } else { 'All ' + $n + ' steps passed' }) })
-    Sentence = $(if (-not $dep) { 'Round ' + $round + ' is done.' } elseif ($inst) { $w + ' ' + $script:app.Version + ' is installed.' } else { 'The run passed, but version ' + $script:app.Version + ' is not recorded as installed.' })
-    P = @(((& $ui.Counted $n 'step') + ' and ' + (& $ui.Counted $m 'check') + ' passed in ' + $ui.Took + '.'), $(if ($dep -and -not $inst) { 'Some steps were off or skipped. Run again with every step on.' } else { '' }), $(if ($dep) { 'Nothing was sent. The report stays on this computer.' } else { $ui.Mail }), $made, $iconNote)
-    Buttons = @(@{ Text = 'Open results folder'; Act = { & $ui.Open } }, @{ Text = 'Copy summary'; Act = { & $ui.Copy } }, @{ Text = 'Close'; Kind = $(if ($startB) { '' } else { 'primary' }); Act = { $ui.Form.Close() } }, $startB)
-    Test = (-not $dep) } }
+    Kicker = $passKick; Sentence = $passSent; P = @($passP1, $passP2, $passP3, $made, $iconNote)
+    Buttons = $passBtns; Test = (-not $dep) } }
 $ui.VStepFail = {
   <#
   .SYNOPSIS
@@ -344,11 +519,16 @@ $ui.VStopped = { param([string]$Why, [string]$What)
   if ($script:closing -or $ui.Form.IsDisposed) { return }
   $dep = Test-Deploy
   if ($Why -match '^INTERRUPTED: ') { & $ui.VPaused $Why; return }   # the sign-in failed (CAC out): Paused, not Stopped
-  & $ui.SetCard @{ View = 'stopped'; Light = 'bad'; Kicker = 'Stopped'; Right = 'Stopped'; Sentence = $(if ($dep) { 'The install stopped.' } else { 'The round stopped.' })
+  $stopBtns = @(@{ Text = 'Copy the log'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Try again'; Act = { & $ui.VReady } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } })
+  & $ui.SetCard @{ View = 'stopped'; Light = 'bad'; Kicker = 'Stopped'; Right = 'Stopped'
+    Sentence = $(if ($dep) { 'The install stopped.' } else { 'The round stopped.' })
     P = @(($Why.Substring(0, 1).ToUpperInvariant() + $Why.Substring(1)), $What, 'The report in the results folder says STOPPED.'); Help = $(if ($dep) { Get-HelpLine } else { '' })
-    Buttons = @(@{ Text = 'Copy the log'; Kind = 'primary'; Act = { & $ui.Copy } }, @{ Text = 'Try again'; Act = { & $ui.VReady } }, @{ Text = 'Close'; Act = { $ui.Form.Close() } }); Back = { & $ui.VReady } }
+    Buttons = $stopBtns; Back = { & $ui.VReady } }
   & $ui.ToFront }
-$ui.OkBox.Add_CheckedChanged({ if (-not $ui.OkBox.Checked) { & $ui.Say1 'Select "Make e-mail draft" to make a draft that says "Window: NOT OK".' } elseif ($ui.Note.Text -match '^Select "Make e-mail draft"') { & $ui.Say1 '' } })   # ticking again removes only this note
+# ticking again removes only this note
+$ui.OkBox.Add_CheckedChanged({
+  if (-not $ui.OkBox.Checked) { & $ui.Say1 'Select "Make e-mail draft" to make a draft that says "Window: NOT OK".' }
+  elseif ($ui.Note.Text -match '^Select "Make e-mail draft"') { & $ui.Say1 '' } })
 $ui.DraftB.Add_Click({
   $to = $ui.ToBox.Text.Trim()
   if ($to -and -not (Test-MailTo $to)) { & $ui.Say1 'The e-mail address does not look right.'; return }
@@ -631,12 +811,18 @@ $ui.Form.Add_SystemColorsChanged({ & $ui.Recolor $false })   # a contrast theme 
 $ui.Form.Add_FormClosing({
   # The window's X (there is no Exit button): ask first only while a step runs, because closing stops it (R17).
   if ($ui.Running -and -not $script:closing) {
-    $a = [System.Windows.Forms.MessageBox]::Show($ui.Form, 'A step is running. If you exit now, RADE stops it and the round ends as STOPPED (the report in the results folder says so). Exit now?', 'RADE - Exit', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning, [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
+    $exitMsg = 'A step is running. If you exit now, RADE stops it and the round ends as STOPPED (the report in the results folder says so). Exit now?'
+    $a = [System.Windows.Forms.MessageBox]::Show(
+      $ui.Form, $exitMsg, 'RADE - Exit',
+      [System.Windows.Forms.MessageBoxButtons]::YesNo,
+      [System.Windows.Forms.MessageBoxIcon]::Warning,
+      [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
     if ([string]$a -ne 'Yes') { $_.Cancel = $true; return }
   }
   $script:closing = $true; try { $ui.Anim.Stop(); $ui.ResizeT.Stop(); $ui.TimeT.Stop() } catch { $null = $_ }
   try { $f = $ui.Form; $ui.CloseAt = & $ui.WinNow; $st = [string]$f.WindowState; if ($st -eq 'Minimized') { $st = 'Normal' }
-    $b = $(if ([string]$f.WindowState -eq 'Normal') { $f.Bounds } else { $f.RestoreBounds }); $cp = ($ui.CloseAt -split '/'); $cs = ([string]$cp[0] -split 'x')   # split on / first: "Maximized" holds an x
+    $b = $(if ([string]$f.WindowState -eq 'Normal') { $f.Bounds } else { $f.RestoreBounds })
+    $cp = ($ui.CloseAt -split '/'); $cs = ([string]$cp[0] -split 'x')   # split on / first: "Maximized" holds an x
     Save-WindowState $b.X $b.Y $b.Width $b.Height $st ([int]$ui.Dpi) ([int]$cs[0]) ([int]$cs[1]) ([string]$cp[1])
     Write-Host ('RADE window at close: client ' + ($ui.CloseAt -replace '/', ', ') + '.') } catch { $null = $_ }
   if ($script:child -and -not $script:child.HasExited) { try { $script:child.Kill() } catch { $null = $_ } } })

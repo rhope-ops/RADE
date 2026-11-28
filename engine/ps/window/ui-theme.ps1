@@ -1,6 +1,9 @@
 # RADE window part 01, setup: asks Windows for the real screen dpi, creates the $ui table that holds every
 # window value, and creates the form. The window parts run inside "if ($gui) { try {" of 10-window.ps1 and use no other part before this one.
 # Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+# Network: none.
+# Writes: none.
+# Credentials: none.
 
 # The "One thing" window (the Administrator, 2026-11-14; docs/window-design.md): the window shows one statement or one
 # question at a time; everything else (all checks, the step boxes, the files, the made list, the log) is in the Record
@@ -19,21 +22,41 @@ $script:native = $false
 $script:dpiThread = 'n/a'
 $script:taskbarId = 'n/a'
 [System.Windows.Forms.Application]::EnableVisualStyles()
-$ui = @{ View = ''; Running = $false; Busy = $false; RecOn = $false; Edit = $false; Answer = ''; Acts = @(); Back = $null; OnOpt = $null; FieldDo = $null
-  Log = (New-Object System.Collections.Generic.List[string]); Summary = @(); Sel = @{}; Clean = $true; StepState = @{}; Plan = $null; Picked = $false
-  BaseIds = @(); BaseRes = @{}; Blocked = @{}; Newer = @{}; Bars = @{}; G = $null; GUrl = ''; CurId = ''; StepI = 0; StepN = 0; StepNow = ''; BusyShown = $false; Always = @($false, $false, $false, $false, $false, $false); NB = 6; StartAfter = $false; Cancel = $false; Dpi = 96.0; ScreenDpi = 96.0; FontK = 1.0; FontDpi = 96.0; Scaled = $false; Full = @{}; Clock = [System.Diagnostics.Stopwatch]::StartNew(); CardAt = -1000000.0; GuardMs = 400; Calm = $false; ContentW = 780 }
+$ui = @{
+  View = ''; Running = $false; Busy = $false; RecOn = $false; Edit = $false; Answer = ''
+  Acts = @(); Back = $null; OnOpt = $null; FieldDo = $null
+  Log = (New-Object System.Collections.Generic.List[string]); Summary = @(); Sel = @{}
+  Clean = $true; StepState = @{}; Plan = $null; Picked = $false; BaseIds = @()
+  BaseRes = @{}; Blocked = @{}; Newer = @{}; Bars = @{}; G = $null; GUrl = ''; CurId = ''
+  StepI = 0; StepN = 0; StepNow = ''; BusyShown = $false
+  Always = @($false, $false, $false, $false, $false, $false); NB = 6
+  StartAfter = $false; Cancel = $false; Dpi = 96.0; ScreenDpi = 96.0; FontK = 1.0
+  FontDpi = 96.0; Scaled = $false; Full = @{}
+  Clock = [System.Diagnostics.Stopwatch]::StartNew(); CardAt = -1000000.0; GuardMs = 400
+  Calm = $false; ContentW = 780
+}
 # Themes (the Administrator, 2026-11-27, plan engine-v48 D6): the RADE window reads the Windows app mode once when it opens:
 # AppsUseLightTheme 0 = dark (Kanon in Fulcrum colors); 1 or no value = light (Kanon in USAF colors). A contrast theme
 # wins over both. engine/rade_ui.ps1 takes $ui.Dark as it is set here (an app window that copies that file stays light).
 # Takes nothing; gives back $true for dark. No registry (not Windows): light.
-$ui.DarkOn = { try { $v = Get-ItemPropertyValue -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'AppsUseLightTheme' -ErrorAction Stop; return ([int]$v -eq 0) } catch { return $false } }   # no value: light
+$ui.DarkOn = {
+  $p = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+  try {
+    $v = Get-ItemPropertyValue -LiteralPath $p -Name 'AppsUseLightTheme' -ErrorAction Stop
+    return ([int]$v -eq 0)
+  } catch { return $false }   # no value: light
+}
 $ui.Dark = [bool](& $ui.DarkOn)
 $ui.OpenedAt = (Get-Date).AddSeconds(-1)   # E4: the SCALE lines of the RADE windows shown from this time on go into the round's results
 # engine-v47 (the Administrator, 2026-11-26): the line under the word RADE is RADE's full name, "Redacted Application Deployment
 # Engine" (replaces the short tagline of L1). The RADE row shows only for an app with no productName and logo.
 $ui.Tagline = 'Redacted Application Deployment Engine'
-# Layout values from engine/window.json, put in by the build (text column share and cap, minimum window size, minimum height of the card frame; pixels at 100 %; the minimum time of a step on the Run card, ms).
-$ui.Layout = @{ Share = [double]'@@TEXT_SHARE@@'; MaxW = [int]'@@TEXT_MAX@@'; MinW = [int]'@@MIN_W@@'; MinH = [int]'@@MIN_H@@'; FrameMin = [int]'@@FRAME_MIN@@'; StepMs = [int]'@@MIN_STEP_MS@@' }
+# Layout values from engine/window.json, put in by the build (text column share, cap, min window, min frame, step ms).
+$ui.Layout = @{
+  Share = [double]'@@TEXT_SHARE@@'; MaxW = [int]'@@TEXT_MAX@@'
+  MinW = [int]'@@MIN_W@@'; MinH = [int]'@@MIN_H@@'
+  FrameMin = [int]'@@FRAME_MIN@@'; StepMs = [int]'@@MIN_STEP_MS@@'
+}
 $ui.Hist = Read-RoundHistory (Get-BasePath)
 $script:secret = Get-Secret (Get-ProfileLeaf) (Get-ProfileLeaf)   # saved checks are masked before they are written
 try { $ui.Calm = -not [System.Windows.Forms.SystemInformation]::UIEffectsEnabled } catch { $null = $_ }
@@ -62,7 +85,9 @@ $ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(96, 96); $ui.Form
 # form scales to (its auto-scale dimensions; the form's sizes are given at 96). Every size RADE sets or draws after the
 # form has scaled goes through $ui.Sc. The screen dpi is only reported (the SCALE line).
 try { $gx = [System.Drawing.Graphics]::FromHwnd([IntPtr]::Zero); $ui.ScreenDpi = [double]$gx.DpiX; $gx.Dispose() } catch { $null = $_ }
+# Reads the form's current auto-scale DPI into $ui.Dpi.
 $ui.FormDpi = { try { $d = [double]$ui.Form.CurrentAutoScaleDimensions.Width; if ($d -gt 0) { $ui.Dpi = $d } } catch { $null = $_ } }
+# Scales a 100 % pixel size to current DPI pixels.
 $ui.Sc = { param([double]$Px) [int][math]::Round($Px * $ui.Dpi / 96.0) }   # a size at 100 % in screen pixels, for parts made or drawn after the form has scaled
 # ---- UI tokens (UI standard v1, the Administrator, 2026-11-20; docs/ui-standard.md): written from engine/ui-tokens.json
 # by python3 engine/rade_tokens.py --write. Do not edit these lines: a build stops when they differ from that file.
@@ -88,11 +113,13 @@ $ui.TokDark.Red = @(244, 155, 145); $ui.TokDark.Green = @(95, 208, 142); $ui.Tok
 $ui.TokDark.BandInk = @(243, 238, 228); $ui.TokDark.BandMuted = @(169, 172, 181); $ui.TokDark.Info = @(141, 184, 240); $ui.TokDark.Tint = @(27, 36, 51)
 $ui.TokDark.OnYellow = @(21, 23, 29); $ui.TokDark.OffRed = @(201, 143, 137)
 # Sizes, gaps and field widths, in pixels at 100 % (every size set after the form has scaled goes through $ui.Sc).
-$ui.Z = @{ ActionW = 160; WideW = 240; ActionH = 40; CompactW = 96; CompactH = 30; LinkH = 28; BarTop = 11; M = 4; Inset = 24; BandH = 56; BandLogo = 36; Disc = 20; LineIdle = 4; LineLoud = 8; Narrow = 700
+$ui.Z = @{
+  ActionW = 160; WideW = 240; ActionH = 40; CompactW = 96; CompactH = 30; LinkH = 28; BarTop = 11; M = 4; Inset = 24; BandH = 56; BandLogo = 36; Disc = 20; LineIdle = 4; LineLoud = 8; Narrow = 700
   G1 = 4; G2 = 8; G3 = 12; G4 = 16; G6 = 24
   FieldS = 240; FieldM = 420; FieldL = 600 }
 # Faces: name = @(family, the font file's name in the bundle ('' = none), the family used when the font cannot be loaded).
-$ui.Faces = @{ title = @('Segoe UI Semibold', '', 'Segoe UI Semibold'); text = @('Segoe UI', '', 'Segoe UI'); strong = @('Segoe UI Semibold', '', 'Segoe UI Semibold'); mono = @('Consolas', '', 'Consolas') }
+$ui.Faces = @{ title = @('Segoe UI Semibold', '', 'Segoe UI Semibold'); text = @('Segoe UI', '', 'Segoe UI')
+  strong = @('Segoe UI Semibold', '', 'Segoe UI Semibold'); mono = @('Consolas', '', 'Consolas') }
 # Text styles: name = @(face, size in points at 100 %, font style ('' = regular)); uses: the file.
 $ui.Styles = [ordered]@{}
 $ui.Styles.Sent = @('title', 22, ''); $ui.Styles.Word = @('title', 15, 'Bold'); $ui.Styles.Body = @('text', 12, ''); $ui.Styles.Small = @('text', 10, '')
@@ -107,9 +134,27 @@ $ui.Styles.SmallB = @('strong', 10, ''); $ui.Styles.Link = @('strong', 10, 'Unde
 $ui.HighOn = { try { return [bool][System.Windows.Forms.SystemInformation]::HighContrast } catch { return $false } }   # no answer (an old host): the own colors
 # The color of one token: its own color, or while $ui.High is on the system color of its role. Takes the token name; gives
 # back a Color (WindowText for a name that is not a token, so no text is ever lost).
-$ui.Color = { param([string]$Role)
+$ui.Color = {
+  <#
+  .SYNOPSIS
+  Resolves a UI color token name to a System.Drawing.Color for the active theme.
+  .DESCRIPTION
+  Returns the system color matching the token role when HighContrast is active, or the dark/light RGB color.
+  .PARAMETER Role
+  Token name from $ui.Tok (e.g. Navy, Blue, Red, White).
+  .OUTPUTS
+  System.Drawing.Color for the token, or Black if unknown.
+  #>
+  param([string]$Role)
   $t = $ui.Tok[$Role]
-  if ($ui.High) { $r = $(if ($t) { [string]$t[3] } else { 'WindowText' }); try { $sc = [System.Drawing.SystemColors]::$r; if ($null -eq $sc) { $sc = [System.Drawing.SystemColors]::WindowText }; return $sc } catch { return [System.Drawing.Color]::Black } }   # a role with no color: WindowText; no system colors: black
+  if ($ui.High) {
+    $r = $(if ($t) { [string]$t[3] } else { 'WindowText' })
+    try {
+      $sc = [System.Drawing.SystemColors]::$r
+      if ($null -eq $sc) { $sc = [System.Drawing.SystemColors]::WindowText }
+      return $sc
+    } catch { return [System.Drawing.Color]::Black }   # no system colors: black
+  }
   if (-not $t) { return [System.Drawing.Color]::Black }
   if ($ui.Dark -and $ui.TokDark[$Role]) { $t = $ui.TokDark[$Role] }   # the dark set (plan engine-v48 D6)
   return [System.Drawing.Color]::FromArgb([int]$t[0], [int]$t[1], [int]$t[2]) }
@@ -124,16 +169,27 @@ $ui.Dark = [bool]$ui.Dark; $ui.C = @{}; & $ui.UseColors (& $ui.HighOn)
 # style and size, and the window font when a font cannot be made.
 $ui.Bold = [Enum]::Parse(('System.Drawing.FontStyle' -as [type]), 'Bold')
 # $Pt is the size at 100 % scaling; $ui.FontK (R28: text scales with the controls) makes it as much bigger as the controls are.
-$ui.Font = { param([string]$Fam, [double]$Pt, $Style) try { $pk = [single]($Pt * $ui.FontK); if ($null -ne $Style) { return (New-Object System.Drawing.Font($Fam, $pk, $Style)) }; return (New-Object System.Drawing.Font($Fam, $pk)) } catch { return $ui.Form.Font } }
+$ui.Font = { param([string]$Fam, [double]$Pt, $Style)
+  try {
+    $pk = [single]($Pt * $ui.FontK)
+    if ($null -ne $Style) { return (New-Object System.Drawing.Font($Fam, $pk, $Style)) }
+    return (New-Object System.Drawing.Font($Fam, $pk))
+  } catch { return $ui.Form.Font }
+}
 # FontScale: how much bigger than the screen's own text scaling the fonts must be, so that text follows the controls. A probe
 # font of 100 pt Segoe UI is 177 px tall when the screen draws text at 96 dpi; its real height gives the dpi the text is drawn
 # at. On the R25 device (autoScale 144, text at 96) the answer is 1.5; where Windows scales both, it is 1. The factor is
 # kept to steps of 0.25 (the Windows scales); anything odd gives 1.
 $ui.FontScale = { $ui.FontK = 1.0; $ui.FontDpi = 96.0
   try { $pf = New-Object System.Drawing.Font('Segoe UI', [single]100); $r = [double]$pf.Height / 177.3; try { $pf.Dispose() } catch { $null = $_ }
-    if ($r -gt 0.6 -and $r -lt 4) { $k = [math]::Round(($ui.Dpi / 96.0) / $r * 4) / 4; if ($k -ge 0.5 -and $k -le 4) { $ui.FontK = [double]$k }; $ui.FontDpi = 96.0 * [math]::Max(1.0, [math]::Round($r * 4) / 4) } } catch { $null = $_ } }
+    if ($r -gt 0.6 -and $r -lt 4) {
+      $k = [math]::Round(($ui.Dpi / 96.0) / $r * 4) / 4
+      if ($k -ge 0.5 -and $k -le 4) { $ui.FontK = [double]$k }
+      $ui.FontDpi = 96.0 * [math]::Max(1.0, [math]::Round($r * 4) / 4)
+    } } catch { $null = $_ } }
 # Native Windows fonts (Segoe UI / Segoe UI Semibold / Consolas): no embedded TTFs and no Add-Type P/Invoke (DEC-NIPR).
 $ui.FontFam = @{}; $ui.FontNote = 'native (Segoe UI / Consolas)'
+# Builds the Font object for a named style token from $ui.Styles.
 $ui.StyleFont = { param([string]$Name)
   $s = $ui.Styles[$Name]; $face = $ui.Faces[[string]$s[0]]; $pt = [double]$s[1]
   $st = $(if ([string]$s[2]) { [Enum]::Parse(('System.Drawing.FontStyle' -as [type]), [string]$s[2]) } else { $null })
@@ -146,7 +202,10 @@ $ui.StyleFont = { param([string]$Name)
 $ui.F = @{}; foreach ($k in @($ui.Styles.Keys)) { $ui.F[$k] = & $ui.StyleFont $k }; $ui.F.Small = $ui.Form.Font
 # Sizes: the UI tokens above (gaps 4, 8, 12, 16, 24; a 4 px margin around a button or link for its focus ring).
 $ui.Pad = { param([int]$L, [int]$T, [int]$R, [int]$B) New-Object System.Windows.Forms.Padding($L, $T, $R, $B) }
-$ui.Label = { param($Font, $Color, [int]$Top) $l = New-Object System.Windows.Forms.Label; $l.AutoSize = $true; $l.Font = $Font; $l.ForeColor = $Color; $l.BackColor = $ui.C.White; $l.UseMnemonic = $false; $l.Margin = (& $ui.Pad 0 $Top 0 0); $l.Visible = $false; $l }
+# Creates an auto-sized, hidden Label with the given font, color, and top margin.
+$ui.Label = { param($Font, $Color, [int]$Top)
+  $l = New-Object System.Windows.Forms.Label; $l.AutoSize = $true; $l.Font = $Font; $l.ForeColor = $Color
+  $l.BackColor = $ui.C.White; $l.UseMnemonic = $false; $l.Margin = (& $ui.Pad 0 $Top 0 0); $l.Visible = $false; $l }
 # ---- Card text that can be selected (R28, the Administrator, 2026-11-17)
 # The headline, the lines, the help, the notes and the questions of a card are read-only, borderless text boxes: the same look as
 # a label, but the text can be highlighted and copied (Ctrl+C, or right-click: Copy, Select All). No tab stop, no caret shown.
@@ -165,13 +224,31 @@ $ui.MinLines = @{}
 # wide and as tall as the largest of them, so a new value never moves or resizes a part of the card (the Administrator,
 # 2026-11-19: "values cause fluttering and distortion as things fly around").
 $ui.Range = @{}
+# Gets the wrap width of a card text box or label.
 $ui.GetWrap = { param($C) if ($C -is [System.Windows.Forms.TextBox]) { return [int]$ui.Wrap[$C] }; return [int]$C.MaximumSize.Width }
-$ui.SetWrap = { param($C, [int]$W) if ($C -is [System.Windows.Forms.TextBox]) { $ui.Wrap[$C] = $W; & $ui.Reflow $C } else { $C.MaximumSize = New-Object System.Drawing.Size($W, 0) } }
-$ui.Reflow = { param($T)
+# Sets the wrap width of a card text box or label and reflows text boxes.
+$ui.SetWrap = { param($C, [int]$W)
+  if ($C -is [System.Windows.Forms.TextBox]) { $ui.Wrap[$C] = $W; & $ui.Reflow $C }
+  else { $C.MaximumSize = New-Object System.Drawing.Size($W, 0) } }
+# Resizes a card text box to fit its text, fixed hold lines, range, or minimum lines.
+$ui.Reflow = {
+  <#
+  .SYNOPSIS
+  Resizes a card text box to fit its text, fixed line count, value range, or minimum line count.
+  .DESCRIPTION
+  Computes size using $ui.Hold, $ui.Range, $ui.MinLines, and $ui.Wrap without altering unrelated controls.
+  .PARAMETER T
+  The TextBox control to measure and resize.
+  .OUTPUTS
+  None.
+  #>
+  param($T)
   try { $txt = [string]$T.Text; $n = [int]$ui.Hold[$T]
     if ($n -gt 0) {   # a fixed number of lines: as wide as its wrap width, n lines tall
       $w = [int]$ui.Wrap[$T]; $one = & $ui.Meas 'Ag' $T.Font 100000
-      $ns = New-Object System.Drawing.Size($(if ($w -gt 0) { $w + (& $ui.Sc 4) } else { $one.Width }), ($n * $one.Height + (& $ui.Sc 2))); if ($T.Width -ne $ns.Width -or $T.Height -ne $ns.Height) { $T.Size = $ns }; return }
+      $nw = $(if ($w -gt 0) { $w + (& $ui.Sc 4) } else { $one.Width })
+      $ns = New-Object System.Drawing.Size($nw, ($n * $one.Height + (& $ui.Sc 2)))
+      if ($T.Width -ne $ns.Width -or $T.Height -ne $ns.Height) { $T.Size = $ns }; return }
     $all = @(@($ui.Range[$T]) + @($txt) | Where-Object { $_ }); $m = [int]$ui.MinLines[$T]; if (-not $all.Count -and $m -le 0) { return }   # its text and its range
     $w = [int]$ui.Wrap[$T]; $bw = 0; $bh = 0
     foreach ($x in $all) { $s = & $ui.TextSize ([string]$x) $T.Font $w; $bw = [math]::Max($bw, $s.Width); $bh = [math]::Max($bh, $s.Height) }
@@ -188,42 +265,100 @@ $ui.Menu = New-Object System.Windows.Forms.ContextMenuStrip; $ui.Menu.Accessible
 # than the room, it is cut and the gray line under the box says how many characters did not fit (R7, the Administrator,
 # 2026-11-19; docs/window-design.md "Cards"). Takes the box; gives back $true when it pasted (the key is then handled),
 # $false when the clipboard has no text or the box is multi-line.
-$ui.PasteLine = { param($Tb)
+$ui.PasteLine = {
+  <#
+  .SYNOPSIS
+  Pastes clipboard text as a single line into a writable single-line TextBox, truncating overflow.
+  .DESCRIPTION
+  Flattens newlines and tabs via $ui.OneLine, inserts into SelectedText within MaxLength, and displays a note if characters were truncated.
+  .PARAMETER Tb
+  Target TextBox control.
+  .OUTPUTS
+  Boolean indicating whether clipboard text was pasted.
+  #>
+  param($Tb)
   try { if ($Tb.Multiline -or $Tb.ReadOnly -or -not [System.Windows.Forms.Clipboard]::ContainsText()) { return $false }
     $room = [int]$Tb.MaxLength - ([string]$Tb.Text).Length + [int]$Tb.SelectionLength
     $whole = & $ui.OneLine ([System.Windows.Forms.Clipboard]::GetText()) ([int]::MaxValue)
     $Tb.SelectedText = & $ui.OneLine $whole $room
     $lost = $whole.Length - [math]::Max(0, $room)
-    $msg = $(if ($lost -gt 0) { 'The paste was too long: ' + $lost.ToString('N0', [System.Globalization.CultureInfo]::InvariantCulture) + $(if ($lost -eq 1) { ' character did' } else { ' characters did' }) + ' not fit.' } else { '' })
-    if ($msg) { & $ui.Say1 $msg; $ui.PasteNote = $msg } elseif ($ui.PasteNote -and [string]$ui.Note.Text -ceq [string]$ui.PasteNote) { & $ui.Say1 ''; $ui.PasteNote = '' }   # clear only a note this paste wrote
+    $lostStr = $lost.ToString('N0', [System.Globalization.CultureInfo]::InvariantCulture)
+    $unit = $(if ($lost -eq 1) { ' character did' } else { ' characters did' })
+    $msg = $(if ($lost -gt 0) { 'The paste was too long: ' + $lostStr + $unit + ' not fit.' } else { '' })
+    if ($msg) { & $ui.Say1 $msg; $ui.PasteNote = $msg }
+    elseif ($ui.PasteNote -and [string]$ui.Note.Text -ceq [string]$ui.PasteNote) { & $ui.Say1 ''; $ui.PasteNote = '' }   # clear only a note this paste wrote
     return $true } catch { return $false } }
 $ui.MenuCopy.Add_Click({ $null = & $ui.CopyText $ui.Menu.SourceControl })
 $ui.MenuAll.Add_Click({ try { $ui.Menu.SourceControl.SelectAll() } catch { $null = $_ } })
 $ui.Menu.Add_Opening({ try { $ui.MenuCopy.Enabled = [bool]($ui.Menu.SourceControl.SelectionLength -gt 0) } catch { $null = $_ } })
+# Placeholder handler for suppressing caret feedback on read-only card text boxes.
 $ui.NoCaret = { param($C) $null = $C }
+# Creates a read-only, selectable, borderless multiline TextBox for card text.
 $ui.Text = { param($Font, $Color, [int]$Top, [string]$Name)
-  $t = New-Object System.Windows.Forms.TextBox; $t.Multiline = $true; $t.ReadOnly = $true; $t.WordWrap = $true; $t.ScrollBars = 'None'; $t.BorderStyle = 'None'; $t.TabStop = $false; $t.AutoSize = $false
+  $t = New-Object System.Windows.Forms.TextBox; $t.Multiline = $true; $t.ReadOnly = $true; $t.WordWrap = $true
+  $t.ScrollBars = 'None'; $t.BorderStyle = 'None'; $t.TabStop = $false; $t.AutoSize = $false
   $t.Font = $Font; $t.ForeColor = $Color; $t.BackColor = $ui.C.White; $t.Margin = (& $ui.Pad 0 $Top 0 0); $t.Visible = $false; $t.ContextMenuStrip = $ui.Menu; $t.AccessibleName = $Name
   $ui.Wrap[$t] = 0; $t.Add_TextChanged({ & $ui.Reflow $this }); $t.Add_FontChanged({ & $ui.Reflow $this })
   $t.Add_GotFocus({ & $ui.NoCaret $this }); $t.Add_MouseUp({ & $ui.NoCaret $this }); $t.Add_KeyUp({ & $ui.NoCaret $this }); $t }
+# Returns $true when the active control is an editable TextBox.
 $ui.InField = { $a = $ui.Form.ActiveControl; return [bool](($a -is [System.Windows.Forms.TextBox]) -and $a.TabStop) }   # a box the user types in (card text is not one)
-$ui.Flow = { param([int]$Top) $f = New-Object System.Windows.Forms.FlowLayoutPanel; $f.AutoSize = $true; $f.WrapContents = $false; $f.BackColor = $ui.C.White; $f.Margin = (& $ui.Pad 0 $Top 0 0); $f.Visible = $false; $f }
+# Creates an auto-sized, hidden FlowLayoutPanel with white background and top margin.
+$ui.Flow = { param([int]$Top)
+  $f = New-Object System.Windows.Forms.FlowLayoutPanel; $f.AutoSize = $true; $f.WrapContents = $false
+  $f.BackColor = $ui.C.White; $f.Margin = (& $ui.Pad 0 $Top 0 0); $f.Visible = $false; $f }
 # Focus is always visible: a 2 px navy ring around the control that has it, drawn by its parent ($ui.Ring), also after a
 # mouse click. Each focusable control tells its parent to repaint ($ui.Cue) and keeps a 4 px margin for the ring.
 $ui.Cue = { param($C) $C.Add_GotFocus({ try { $this.Parent.Invalidate() } catch { $null = $_ } }); $C.Add_LostFocus({ try { $this.Parent.Invalidate() } catch { $null = $_ } }) }
-$ui.Ring = { param($P) $P.Add_Paint({ try { foreach ($c in $this.Controls) { if (($c.Focused -or ($ui.Boxes -contains $c -and $c.ContainsFocus)) -and $c.Visible) {
-          $pn = New-Object System.Drawing.Pen($ui.C.Focus, [single](& $ui.Sc 2)); $b = $c.Bounds; $o = & $ui.Sc 2; $_.Graphics.DrawRectangle($pn, ($b.Left - $o), ($b.Top - $o), ($b.Width + 2 * $o - 1), ($b.Height + 2 * $o - 1)); $pn.Dispose() } } } catch { $null = $_ } }) }
-$ui.Style = { param($B, [string]$Kind)
-  # primary = Air Force blue (dark: ember); danger = dark red (dark: an outline); dangerline = an outline in the error color; off = not available (gray, text 6.3:1); dangeroff = the destructive
-  # action while it is not available (gray, dark red text and edge, 8:1); else white with a gray edge. The colors under
-  # the pointer and while pressed are set here too (Windows picks its own otherwise): a white button goes to the hair
-  # and the off gray, a blue or dark red button keeps its color.
+# Paints a 2 px focus ring around any focused visible child control inside container $P.
+$ui.Ring = {
+  <#
+  .SYNOPSIS
+  Attaches a Paint handler to container $P that draws a 2 px focus ring around the focused child control.
+  .DESCRIPTION
+  Iterates visible child controls on Paint and outlines focused controls or active input box containers.
+  .PARAMETER P
+  The parent container Control.
+  .OUTPUTS
+  None.
+  #>
+  param($P)
+  $P.Add_Paint({
+    try {
+      foreach ($c in $this.Controls) {
+        if (($c.Focused -or ($ui.Boxes -contains $c -and $c.ContainsFocus)) -and $c.Visible) {
+          $pn = New-Object System.Drawing.Pen($ui.C.Focus, [single](& $ui.Sc 2)); $b = $c.Bounds; $o = & $ui.Sc 2
+          $_.Graphics.DrawRectangle($pn, ($b.Left - $o), ($b.Top - $o), ($b.Width + 2 * $o - 1), ($b.Height + 2 * $o - 1))
+          $pn.Dispose()
+        }
+      }
+    } catch { $null = $_ }
+  }) }
+$ui.Style = {
+  <#
+  .SYNOPSIS
+  Applies visual colors, border, font, and enabled state to a button for the specified kind.
+  .DESCRIPTION
+  Sets $ui.Kinds[$B], enables or disables the button, configures flat appearance colors (including hover and pressed
+  states) for primary, danger, dangerline, off, dangeroff, or default secondary buttons.
+  .PARAMETER B
+  The Button control to style.
+  .PARAMETER Kind
+  Button style kind ('primary', 'danger', 'dangerline', 'off', 'dangeroff', or '').
+  .OUTPUTS
+  None.
+  #>
+  param($B, [string]$Kind)
+  # primary = Air Force blue (dark: ember); danger = dark red (dark: an outline); dangerline = error outline;
+  # off = not available (gray, text 6.3:1); dangeroff = destructive action unavailable; else white with gray edge.
   $ui.Kinds[$B] = $Kind; $B.Enabled = ($Kind -notin 'off', 'dangeroff'); $B.FlatStyle = 'Flat'; $B.FlatAppearance.BorderSize = 1; $B.Font = $ui.F.SmallB; $over = $null; $down = $null
   if ($Kind -eq 'off') { $B.BackColor = $ui.C.Off; $B.ForeColor = $ui.C.OffInk; $B.FlatAppearance.BorderColor = $ui.C.Track }
   elseif ($Kind -eq 'dangeroff') { $B.BackColor = $ui.C.Off; $B.ForeColor = $ui.C.OffRed; $B.FlatAppearance.BorderColor = $ui.C.OffRed }
   elseif ($Kind -eq 'primary') { $B.BackColor = $ui.C.Blue; $B.ForeColor = $ui.C.OnBlue; $B.FlatAppearance.BorderColor = $ui.C.Blue }
   elseif ($Kind -eq 'danger' -and -not $ui.Dark) { $B.BackColor = $ui.C.Red; $B.ForeColor = $ui.C.White; $B.FlatAppearance.BorderColor = $ui.C.Red }
-  elseif ($Kind -in 'danger', 'dangerline') { $B.BackColor = $ui.C.Face; $B.ForeColor = $ui.C.Red; $B.FlatAppearance.BorderColor = $ui.C.Red }   # the error color as text and edge (Cards v2: "Stop the install"; dark: every danger button)
+  elseif ($Kind -in 'danger', 'dangerline') {
+    # the error color as text and edge (Cards v2: "Stop the install"; dark: every danger button)
+    $B.BackColor = $ui.C.Face; $B.ForeColor = $ui.C.Red; $B.FlatAppearance.BorderColor = $ui.C.Red
+  }
   else { $B.BackColor = $ui.C.Face; $B.ForeColor = $ui.C.FaceInk; $B.FlatAppearance.BorderColor = $ui.C.Edge; $over = $ui.C.Hair; $down = $ui.C.Off }
   if (-not $over) { $over = $B.BackColor; $down = $B.BackColor }
   try { $B.FlatAppearance.MouseOverBackColor = $over; $B.FlatAppearance.MouseDownBackColor = $down } catch { $null = $_ } }
@@ -235,15 +370,43 @@ $ui.Hot = $null; $ui.Down = $null
 # click of a double-click on Done answered the first question unseen). Enter and Space click the same buttons: same guard.
 # Monotonic time (a Stopwatch, not the wall clock: M1 review); a negative elapsed time never blocks a click.
 $ui.Settled = { $e = $ui.Clock.Elapsed.TotalMilliseconds - [double]$ui.CardAt; ($e -ge $ui.GuardMs -or $e -lt 0) }
-$ui.Face = { param($B, $G) try { if (-not $B.Text) { return }
+# Owner-draws a button's background, border, and label text across normal, hover, pressed, and busy states.
+$ui.Face = {
+  <#
+  .SYNOPSIS
+  Owner-draws a button or link label's background, border, and centered or left-aligned text.
+  .DESCRIPTION
+  Accounts for $ui.Busy (respecting Always flags), enabled, down, and hover states, then renders text via $ui.Word.
+  .PARAMETER B
+  The Button control being painted.
+  .PARAMETER G
+  Graphics surface for the Paint event.
+  .OUTPUTS
+  None.
+  #>
+  param($B, $G)
+  try {
+    if (-not $B.Text) { return }
     $w = $B.ClientSize.Width; $h = $B.ClientSize.Height; $fa = $B.FlatAppearance
-    # While RADE is busy a button does nothing, so it looks like one that is not available (R28), except the ones marked to work then (Cancel).
+    # While RADE is busy a button does nothing, so it looks unavailable (R28), except buttons marked Always (Cancel).
     $busy = [bool]($ui.Busy -and -not (($B.Tag -is [int]) -and $ui.Always[[int]$B.Tag]))
-    $bg = $(if ($busy -and [int]$fa.BorderSize -gt 0) { $ui.C.Off } elseif (-not $B.Enabled) { $B.BackColor } elseif ([object]::ReferenceEquals($ui.Down, $B)) { $fa.MouseDownBackColor } elseif ([object]::ReferenceEquals($ui.Hot, $B)) { $fa.MouseOverBackColor } else { $B.BackColor })
+    $bg = $(
+      if ($busy -and [int]$fa.BorderSize -gt 0) { $ui.C.Off }
+      elseif (-not $B.Enabled) { $B.BackColor }
+      elseif ([object]::ReferenceEquals($ui.Down, $B)) { $fa.MouseDownBackColor }
+      elseif ([object]::ReferenceEquals($ui.Hot, $B)) { $fa.MouseOverBackColor }
+      else { $B.BackColor }
+    )
     $G.Clear($bg)
-    if ([int]$fa.BorderSize -gt 0) { $pn = New-Object System.Drawing.Pen($(if ($busy) { $ui.C.Track } else { $fa.BorderColor })); $G.DrawRectangle($pn, 0, 0, ($w - 1), ($h - 1)); $pn.Dispose() }
+    if ([int]$fa.BorderSize -gt 0) {
+      $pn = New-Object System.Drawing.Pen($(if ($busy) { $ui.C.Track } else { $fa.BorderColor }))
+      $G.DrawRectangle($pn, 0, 0, ($w - 1), ($h - 1)); $pn.Dispose()
+    }
     # A link (no edge) draws its text at the left, a button in the middle (R28: a link in a wide box started 38 px right of the card edge).
-    & $ui.Word $G ([string]$B.Text) $B.Font $(if ($busy) { $ui.C.OffInk } else { $B.ForeColor }) 0 0 $w $h $(if ([int]$fa.BorderSize -gt 0) { 'HorizontalCenter, VerticalCenter, NoPrefix, SingleLine' } else { 'Left, VerticalCenter, NoPrefix, SingleLine' }) } catch { $null = $_ } }
+    $flags = $(if ([int]$fa.BorderSize -gt 0) { 'HorizontalCenter, VerticalCenter, NoPrefix, SingleLine' } else { 'Left, VerticalCenter, NoPrefix, SingleLine' })
+    & $ui.Word $G ([string]$B.Text) $B.Font $(if ($busy) { $ui.C.OffInk } else { $B.ForeColor }) 0 0 $w $h $flags
+  } catch { $null = $_ } }
+# Attaches custom paint, hover, press, and visibility handlers to button $B.
 $ui.Own = { param($B) $B.UseVisualStyleBackColor = $false; $B.Add_Paint({ & $ui.Face $this $_.Graphics })
   $B.Add_MouseEnter({ $ui.Hot = $this; $this.Invalidate() }); $B.Add_MouseLeave({ if ([object]::ReferenceEquals($ui.Hot, $this)) { $ui.Hot = $null }; $this.Invalidate() })
   $B.Add_MouseDown({ if ([string]$_.Button -eq 'Left') { $ui.Down = $this; $this.Invalidate() } }); $B.Add_MouseUp({ $ui.Down = $null; $this.Invalidate() })
@@ -257,7 +420,10 @@ $ui.BtnKind = @{}; $ui.Wide = @{}
 $ui.BtnSize = { param($B)
   $k = [string]$ui.BtnKind[$B]; $s = $(if ($ui.Scaled) { $ui.Sc } else { { param([double]$Px) [int]$Px } })
   $h = $(if ($k -eq 'compact') { $ui.Z.CompactH } else { $ui.Z.ActionH }); $ws = $(if ($k -eq 'compact') { @($ui.Z.CompactW, $ui.Z.ActionW) } else { @($ui.Z.ActionW, $ui.Z.WideW) })
-  $need = 0; try { if ($B.Text) { $need = [int][System.Windows.Forms.TextRenderer]::MeasureText([string]$B.Text, $B.Font).Width + (& $ui.Sc (2 * $ui.Z.G2)) } } catch { $null = $_ }   # no measure: the first width
+  $need = 0
+  try {
+    if ($B.Text) { $need = [int][System.Windows.Forms.TextRenderer]::MeasureText([string]$B.Text, $B.Font).Width + (& $ui.Sc (2 * $ui.Z.G2)) }
+  } catch { $null = $_ }   # no measure: the first width
   $w = $(if ($need -le (& $ui.Sc $ws[0]) -and -not $ui.Wide[$B]) { $ws[0] } else { $ws[1] })   # $ui.Wide: the wide size for every text (a stack of buttons)
   return (New-Object System.Drawing.Size((& $s $w), (& $s $h))) }
 # Gives a button the size of its kind for its text ($ui.BtnSize). Takes the button.
@@ -271,13 +437,26 @@ $ui.AutoName = { param($B) if (-not [string]$B.AccessibleName -or [string]$ui.Au
 $ui.Btn = { param([string]$Kind) $b = New-Object System.Windows.Forms.Button; $b.AutoSize = $false; $ui.BtnKind[$b] = $(if ($Kind -eq 'compact') { 'compact' } else { 'action' })
   $b.Padding = (& $ui.Pad $ui.Z.G2 0 $ui.Z.G2 0); $b.Margin = (& $ui.Pad $ui.Z.M $ui.Z.M $ui.Z.M $ui.Z.M); $b.UseMnemonic = $false; & $ui.Style $b ''; & $ui.Cue $b; & $ui.Own $b
   & $ui.FitBtn $b; $b.Add_TextChanged({ & $ui.FitBtn $this; & $ui.AutoName $this }); $b }   # gives back the button
-$ui.LinkBtn = { param([string]$Text) $b = New-Object System.Windows.Forms.Button; $b.Text = $Text; $b.AutoSize = $true; $b.AutoSizeMode = 'GrowAndShrink'; $b.MinimumSize = New-Object System.Drawing.Size(0, $ui.Z.LinkH); $b.Margin = (& $ui.Pad $ui.Z.M $ui.Z.M $ui.Z.M $ui.Z.M); $b.UseMnemonic = $false
-  $b.FlatStyle = 'Flat'; $b.FlatAppearance.BorderSize = 0; $b.BackColor = $ui.C.White; $b.ForeColor = $ui.C.Link; $b.Font = $ui.F.Link; $ui.Links += $b; try { $b.FlatAppearance.MouseOverBackColor = $ui.C.White; $b.FlatAppearance.MouseDownBackColor = $ui.C.Hair } catch { $null = $_ }; & $ui.Cue $b; & $ui.Own $b   # no hover colors: the link still works
-  & $ui.AutoName $b; $b.Add_TextChanged({ & $ui.AutoName $this }); $b }   # a link: Air Force blue, semibold and underlined (not color alone), 28 high
+# Creates an underlined flat link button with accessible name tracking and focus ring.
+$ui.LinkBtn = { param([string]$Text)
+  $b = New-Object System.Windows.Forms.Button; $b.Text = $Text; $b.AutoSize = $true; $b.AutoSizeMode = 'GrowAndShrink'
+  $b.MinimumSize = New-Object System.Drawing.Size(0, $ui.Z.LinkH); $b.Margin = (& $ui.Pad $ui.Z.M $ui.Z.M $ui.Z.M $ui.Z.M)
+  $b.UseMnemonic = $false; $b.FlatStyle = 'Flat'; $b.FlatAppearance.BorderSize = 0
+  $b.BackColor = $ui.C.White; $b.ForeColor = $ui.C.Link; $b.Font = $ui.F.Link; $ui.Links += $b
+  try { $b.FlatAppearance.MouseOverBackColor = $ui.C.White; $b.FlatAppearance.MouseDownBackColor = $ui.C.Hair } catch { $null = $_ }   # no hover colors: the link still works
+  & $ui.Cue $b; & $ui.Own $b; & $ui.AutoName $b; $b.Add_TextChanged({ & $ui.AutoName $this }); $b }   # a link: Air Force blue, semibold and underlined (not color alone), 28 high
 $ui.Kinds = @{}; $ui.Links = @()   # the kind each button was last styled with; every link ($ui.Recolor styles them again)
 # Bars: RADE draws them (R17). A 30 ms timer eases the fill to its value; with Windows animations off it jumps. No bar
 # moves back inside a run (all) or a step (step). The bar on the bottom edge is all steps; the short one is this step.
-$ui.DrawBar = { param($P, $G) try { $b = $ui.Bars[[string]$P.Tag]; $G.Clear($(if ($b.On) { $ui.C.Track } else { $ui.C.White })); $fw = [int][math]::Round($P.ClientSize.Width * $b.Shown); if ($b.On -and $fw -gt 0) { $br = New-Object System.Drawing.SolidBrush($b.Fill); $G.FillRectangle($br, 0, 0, $fw, $P.ClientSize.Height); $br.Dispose() } } catch { $null = $_ } }
+$ui.DrawBar = { param($P, $G)
+  try {
+    $b = $ui.Bars[[string]$P.Tag]; $G.Clear($(if ($b.On) { $ui.C.Track } else { $ui.C.White }))
+    $fw = [int][math]::Round($P.ClientSize.Width * $b.Shown)
+    if ($b.On -and $fw -gt 0) {
+      $br = New-Object System.Drawing.SolidBrush($b.Fill)
+      $G.FillRectangle($br, 0, 0, $fw, $P.ClientSize.Height); $br.Dispose()
+    }
+  } catch { $null = $_ } }
 # Makes one thin progress bar (a panel the engine draws itself) and registers it in $ui.Bars. Takes the bar name and its
 # screen-reader label; gives back the panel.
 $ui.MkBar = { param([string]$Name, [string]$Label)
@@ -317,17 +496,35 @@ $ui.Roles = @{}; $ui.Recolor = {
           if (-not ($t0 -and $ui.C[$t0].ToArgb() -eq $a)) { $t = $rev[$a]; if ($t) { $r[$pp] = $t } } } catch { $null = $_ } } }   # a color that is no token stays as it is
     & $ui.UseColors $hi
     foreach ($c in $all) { $r = $ui.Roles[$c]; foreach ($pp in @($r.Keys)) { try { $c.$pp = $ui.C[[string]$r[$pp]] } catch { $null = $_ } } }   # a property that cannot be set keeps its color
-    foreach ($b in @($ui.Kinds.Keys)) { try { $en = $b.Enabled; & $ui.Style $b ([string]$ui.Kinds[$b]); if ([string]$ui.Kinds[$b] -notin 'off', 'dangeroff') { $b.Enabled = $en } } catch { $null = $_ } }   # a button that is gone: nothing to paint
-    foreach ($b in @($ui.Links)) { try { $b.BackColor = $ui.C.White; $b.ForeColor = $ui.C.Link; $b.FlatAppearance.MouseOverBackColor = $ui.C.White; $b.FlatAppearance.MouseDownBackColor = $ui.C.Hair } catch { $null = $_ } }   # same: a link that is gone
-    if ($ui.CardNow -and -not $ui.RecOn -and -not $ui.Busy -and -not $ui.Running) { $k = @([string]$ui.Field.Text, [string]$ui.ErrBox.Text, [string]$ui.Note.Text); $on = $ui.LayOn; $ui.LayOn = $false
-      try { & $ui.SetCard $ui.CardNow } finally { $ui.LayOn = $on }; $ui.Field.Text = $k[0]; $ui.ErrBox.Text = $k[1]; & $ui.Say1 $k[2] }; $ui.Form.Invalidate($true) } catch { $null = $_ } }   # the card's own colors, typed text kept; never stops the window
+    foreach ($b in @($ui.Kinds.Keys)) {
+      try {
+        $en = $b.Enabled; & $ui.Style $b ([string]$ui.Kinds[$b])
+        if ([string]$ui.Kinds[$b] -notin 'off', 'dangeroff') { $b.Enabled = $en }
+      } catch { $null = $_ }   # a button that is gone: nothing to paint
+    }
+    foreach ($b in @($ui.Links)) {
+      try {
+        $b.BackColor = $ui.C.White; $b.ForeColor = $ui.C.Link
+        $b.FlatAppearance.MouseOverBackColor = $ui.C.White; $b.FlatAppearance.MouseDownBackColor = $ui.C.Hair
+      } catch { $null = $_ }   # same: a link that is gone
+    }
+    if ($ui.CardNow -and -not $ui.RecOn -and -not $ui.Busy -and -not $ui.Running) {
+      $k = @([string]$ui.Field.Text, [string]$ui.ErrBox.Text, [string]$ui.Note.Text); $on = $ui.LayOn; $ui.LayOn = $false
+      try { & $ui.SetCard $ui.CardNow } finally { $ui.LayOn = $on }
+      $ui.Field.Text = $k[0]; $ui.ErrBox.Text = $k[1]; & $ui.Say1 $k[2]
+    }; $ui.Form.Invalidate($true) } catch { $null = $_ } }   # the card's own colors, typed text kept; never stops the window
 # Where ink starts, ink-tight text, long words, shortened text, drawing and measuring ($ui.Ink to $ui.Meas): engine/rade_ui_text.ps1.
 # ---- The layout self-check (docs/window-design.md "Proof"): in a test round, and in the Windows job, RADE measures each
 # card it showed: a text that needs more room than its control has, a control that a parent cuts, two parts that
 # overlap. The result is one line under "Window: OK" in the results e-mail draft ("PASS layout" or the defects), so a
 # cut text is found by a measure, not by a person's eye. A deploy does not run it. It reads sizes only.
 $ui.LayOn = $false; $ui.LayBad = New-Object System.Collections.Generic.List[string]; $ui.LaySeen = @{}; $ui.LayCards = @{}; $ui.LayScroll = @{}
-try { $ui.LayOn = [bool]([System.Windows.Forms.Application].GetMethod('SetCompatibleTextRenderingDefault') -and ($env:RADE_LAYOUT -eq '1' -or @($apps | Where-Object { [string]$_.Mode -ne 'deploy' }).Count)) } catch { $null = $_ }   # the real Windows Forms only: the test stand-ins have no layout
+try {
+  $hasRender = [System.Windows.Forms.Application].GetMethod('SetCompatibleTextRenderingDefault')
+  $hasTest = ($env:RADE_LAYOUT -eq '1' -or @($apps | Where-Object { [string]$_.Mode -ne 'deploy' }).Count)
+  $ui.LayOn = [bool]($hasRender -and $hasTest)
+} catch { $null = $_ }   # the real Windows Forms only: the test stand-ins have no layout
+# Returns the $ui key name (or control type name) for a WinForms control.
 $ui.NameOf = { param($C)
   foreach ($k in @($ui.Keys)) { if ([object]::ReferenceEquals($ui[$k], $C)) { return [string]$k } }
   foreach ($k in 'B', 'P') { for ($i = 0; $ui[$k] -and $i -lt @($ui[$k]).Count; $i++) { if ([object]::ReferenceEquals($ui[$k][$i], $C)) { return ($k + $i) } } }
@@ -336,7 +533,22 @@ $ui.NameOf = { param($C)
 # The alignment rules (docs/window-design.md "Sizes"), on measured numbers so the tests can give them a layout:
 # RowBad: the parts of an aligned row (@{ N; Top; H; Kind }) share one midpoint within 1 px, and a box and a button in
 # it are as tall as each other. EdgeBad: the visible left edges of a card's parts (@{ N; X }) are within 1 px.
-$ui.RowBad = { param([string]$Card, [string]$Row, $Parts)
+$ui.RowBad = {
+  <#
+  .SYNOPSIS
+  Checks alignment midpoints and box-to-button height parity for parts in a layout row.
+  .DESCRIPTION
+  Groups wrapping parts by margin top and reports layout defects when midpoints or box/button heights differ beyond 1 px.
+  .PARAMETER Card
+  Card view name used as the defect message prefix.
+  .PARAMETER Row
+  Row name used in defect messages.
+  .PARAMETER Parts
+  Array of part metric hashtables (N, Top, H, Line, Kind).
+  .OUTPUTS
+  Array of layout defect strings.
+  #>
+  param([string]$Card, [string]$Row, $Parts)
   # A row that wraps (the test extras in a small window) has a midpoint on each line: Line = the top of a part's margin box.
   $out = @(); $byLine = [ordered]@{}; foreach ($q in @($Parts | Where-Object { $_ })) { $k = [string][int]$q.Line; if (-not $byLine.Contains($k)) { $byLine[$k] = @() }; $byLine[$k] += $q }
   if ($byLine.Count -gt 1) { foreach ($k in @($byLine.Keys)) { $out += & $ui.RowBad $Card $Row @($byLine[$k] | ForEach-Object { $c = $_.Clone(); $c.Line = 0; $c }) }; return $out }
@@ -344,11 +556,21 @@ $ui.RowBad = { param([string]$Card, [string]$Row, $Parts)
   $m0 = $ps[0].Top + $ps[0].H / 2.0
   foreach ($q in $ps) { $m = $q.Top + $q.H / 2.0; if ([math]::Abs($m - $m0) -gt $tol) { $out += ('LAYOUT ' + $Card + ' ' + $Row + ' ' + $q.N + ' midpoint: ' + $m + ', the row midpoint is ' + $m0) } }
   $bx = @($ps | Where-Object { $_.Kind -eq 'box' }); $bt = @($ps | Where-Object { $_.Kind -eq 'button' })
-  foreach ($a in $bx) { foreach ($b in $bt) { if ([math]::Abs($a.H - $b.H) -gt $tol) { $out += ('LAYOUT ' + $Card + ' ' + $Row + ' heights: box ' + $a.N + ' ' + $a.H + ', button ' + $b.N + ' ' + $b.H) } } }
+  foreach ($a in $bx) {
+    foreach ($b in $bt) {
+      if ([math]::Abs($a.H - $b.H) -gt $tol) { $out += ('LAYOUT ' + $Card + ' ' + $Row + ' heights: box ' + $a.N + ' ' + $a.H + ', button ' + $b.N + ' ' + $b.H) }
+    }
+  }
   return $out }
+# Checks that all visible left ink edges on a card align within 1 scaled px.
 $ui.EdgeBad = { param([string]$Card, $Edges)
   $out = @(); $tol = [math]::Max(1, (& $ui.Sc 1)); $es = @($Edges | Where-Object { $_ }); if ($es.Count -lt 2) { return $out }
-  foreach ($e in $es) { if ([math]::Abs($e.X - $es[0].X) -gt $tol) { $out += ('LAYOUT ' + $Card + ' ' + $e.N + ' edge: starts at ' + $e.X + ', the card edge is ' + $es[0].X + ' (' + $es[0].N + ')' + $(if ($e.D) { ' [' + $e.D + ']' } else { '' })) } }
+  foreach ($e in $es) {
+    if ([math]::Abs($e.X - $es[0].X) -gt $tol) {
+      $extra = $(if ($e.D) { ' [' + $e.D + ']' } else { '' })
+      $out += ('LAYOUT ' + $Card + ' ' + $e.N + ' edge: starts at ' + $e.X + ', the card edge is ' + $es[0].X + ' (' + $es[0].N + ')' + $extra)
+    }
+  }
   return $out }
 # AboveBad (L3, the Administrator, 2026-11-19): a label above its box. The label's bottom is not under the box's top, the
 # box starts on the card's edge and it is as wide as the card's text (from the edge to the end of the text column), each
@@ -375,15 +597,25 @@ $ui.TickBad = { param([string]$Card, $Bar, $Tick)
   if ([math]::Abs($mt - $mb) -le 1) { return @() }
   return @('LAYOUT ' + $Card + ' StepRow ' + $Tick.N + ' midpoint: ' + $mt + ', the bar midpoint is ' + $mb) }
 # ---- The self-check walk
+# Returns $true when control $C is a read-only selectable card text box.
 $ui.IsCardText = { param($C) return [bool](($C -is [System.Windows.Forms.TextBox]) -and $C.ReadOnly -and -not $C.TabStop -and $ui.Wrap.ContainsKey($C)) }
 # What a card text box needs, as its edit control wraps the text now (the line count it reports), else as measured.
 $ui.TextNeed = { param($C)
   $w = [int](& $ui.GetWrap $C); $s = & $ui.Meas ([string]$C.Text) $C.Font $(if ($w -gt 0) { $w } else { 100000 }); $h = [int]$s.Height + (& $ui.Sc 2)
-  try { $n = [int]$C.GetLineFromCharIndex([math]::Max(0, $C.Text.Length - 1)) + 1; $lh = [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $C.Font).Height; if ($n -gt 0 -and $lh -gt 0) { $h = [math]::Max($h, $n * $lh) } } catch { $null = $_ }
+  try {
+    $n = [int]$C.GetLineFromCharIndex([math]::Max(0, $C.Text.Length - 1)) + 1
+    $lh = [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $C.Font).Height
+    if ($n -gt 0 -and $lh -gt 0) { $h = [math]::Max($h, $n * $lh) }
+  } catch { $null = $_ }
   return (New-Object System.Drawing.Size($s.Width, $h)) }
 # ---- UI standard v1 rules of the self-check (the Administrator, 2026-11-20; docs/ui-standard.md, each rule's check)
 # The WCAG relative luminance of a color (0 to 1). Takes the color; gives back a number.
-$ui.Lum = { param($C) $v = foreach ($x in @($C.R, $C.G, $C.B)) { $f = [double]$x / 255.0; if ($f -le 0.04045) { $f / 12.92 } else { [math]::Pow(($f + 0.055) / 1.055, 2.4) } }; 0.2126 * $v[0] + 0.7152 * $v[1] + 0.0722 * $v[2] }
+$ui.Lum = { param($C)
+  $v = foreach ($x in @($C.R, $C.G, $C.B)) {
+    $f = [double]$x / 255.0
+    if ($f -le 0.04045) { $f / 12.92 } else { [math]::Pow(($f + 0.055) / 1.055, 2.4) }
+  }
+  0.2126 * $v[0] + 0.7152 * $v[1] + 0.0722 * $v[2] }
 # The WCAG contrast ratio of two colors (1 to 21). Takes the two colors; gives back a number.
 $ui.Ratio = { param($A, $B) $x = & $ui.Lum $A; $y = & $ui.Lum $B; ([math]::Max($x, $y) + 0.05) / ([math]::Min($x, $y) + 0.05) }
 # B1 (fixed sizes) for one button with an edge: no AutoSize, a size of the set, and a label that fits. Takes the card,
@@ -412,13 +644,78 @@ $ui.InvLine = { param([string]$Card, $C, $R)
       x = [int]$R.Left; y = [int]$R.Top; w = [int]$R.Width; h = [int]$R.Height; fore = '#{0:X6}' -f ($C.ForeColor.ToArgb() -band 0xFFFFFF); back = '#{0:X6}' -f ($C.BackColor.ToArgb() -band 0xFFFFFF)
       access = [string]$C.AccessibleName; button = [string]$ui.Kinds[$C] }
     Add-Content -LiteralPath $ui.InvFile -Value (ConvertTo-Json $o -Compress) -Encoding UTF8 -ErrorAction Stop } catch { $null = $_ } }   # the inventory is a test aid: never stop the check
+# Checks a single visible control inside a container for layout, contrast, clipping, and text fit defects.
+$ui.CheckControl = {
+  <#
+  .SYNOPSIS
+  Checks a single visible control inside a card or Details view for layout and contrast defects.
+  .DESCRIPTION
+  Verifies accessible names, box scaling, button sizing, contrast ratio, clipping, wrapping labels,
+  card text boxes, checkboxes, RichTextBox guide height, and label preferred size fit.
+  .PARAMETER Card
+  Card or Details view identifier for defect messages.
+  .PARAMETER C
+  Control instance being inspected.
+  .PARAMETER R
+  Screen rectangle of the control.
+  .PARAMETER Clip
+  Parent clipping rectangle in screen coordinates.
+  .PARAMETER Scroll
+  Whether the control lies inside a scrollable region.
+  .OUTPUTS
+  None.
+  #>
+  param([string]$Card, $C, $R, $Clip, [bool]$Scroll)
+  $nm = & $ui.NameOf $C; if ($ui.InvFile) { & $ui.InvLine $Card $C $R }
+  if ($C.CanSelect -and $C.TabStop -and -not [string]$C.AccessibleName) { $ui.LayBad.Add('LAYOUT ' + $Card + ' ' + $nm + ': no accessible name') }
+  $minBoxH = & $ui.Sc $ui.Z.CompactH
+  if ($ui.Boxes -contains $C -and [int]$C.Height + 1 -lt $minBoxH) {
+    $ui.LayBad.Add('LAYOUT ' + $Card + ' ' + $nm + ' box: ' + $C.Height + ' high, the rule is ' + $minBoxH + ' (B1; R36: a frame that did not scale cut its line at 150 %)') }
+  if ($C -is [System.Windows.Forms.Button] -and [int]$C.FlatAppearance.BorderSize -gt 0 -and $ui.BtnKind.ContainsKey($C)) {
+    foreach ($l in @(& $ui.BtnBad $Card $nm $C)) { $ui.LayBad.Add([string]$l) } }
+  if ($C.Text -and $C.Enabled -and ($C -is [System.Windows.Forms.Label] -or $C -is [System.Windows.Forms.ButtonBase] -or (& $ui.IsCardText $C))) {
+    $cr = & $ui.Ratio $C.ForeColor $C.BackColor
+    if ($cr -lt 4.5) { $ui.LayBad.Add('LAYOUT ' + $Card + ' ' + $nm + ' contrast: ' + [math]::Round($cr, 2) + ':1, the rule is 4.5:1 (B10)') } }
+  if (-not $Scroll -and -not $Clip.Contains($R)) {
+    $pos = ($R.Left - $Clip.Left).ToString() + ',' + ($R.Top - $Clip.Top).ToString()
+    $ui.LayBad.Add('LAYOUT ' + $Card + ' ' + $nm + ' cut: needs ' + $R.Width + 'x' + $R.Height + ' at ' + $pos + ' in ' + $Clip.Width + 'x' + $Clip.Height) }
+  if ($C -is [System.Windows.Forms.Label] -and $C.AutoSize -and $C.MaximumSize.Width -gt 0 -and $C.Text) {
+    $wb = & $ui.WordBad $Card $nm ([string]$C.Text) $C.Font $C.MaximumSize.Width; if ($wb) { $ui.LayBad.Add($wb) } }
+  if (& $ui.IsCardText $C) {
+    if ([int](& $ui.GetWrap $C) -gt 0 -and $C.Text) { $wb = & $ui.WordBad $Card $nm ([string]$C.Text) $C.Font ([int](& $ui.GetWrap $C)); if ($wb) { $ui.LayBad.Add($wb) } }
+    $nd = & $ui.TextNeed $C; $lh1 = [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $C.Font).Height
+    if ($C.Text -and ($nd.Height -gt $C.ClientSize.Height + 1 -or $nd.Width -gt $C.ClientSize.Width + 1)) {
+      $ui.LayBad.Add('LAYOUT ' + $Card + ' ' + $nm + ' text: needs ' + $nd.Width + 'x' + $nd.Height + ' has ' + $C.ClientSize.Width + 'x' + $C.ClientSize.Height) }
+    if ($C.Text -and -not $ui.Hold.ContainsKey($C) -and $C.ClientSize.Height -gt $nd.Height + $lh1) {
+      $ui.LayBad.Add('LAYOUT ' + $Card + ' ' + $nm + ' dead space: has ' + $C.ClientSize.Height + ' high, the text needs ' + $nd.Height) } }
+  if ($C -is [System.Windows.Forms.CheckBox] -and $C.Text -and -not $C.AutoEllipsis) {
+    $tw = [System.Windows.Forms.TextRenderer]::MeasureText([string]$C.Text, $C.Font).Width
+    if ($tw -gt $C.ClientSize.Width + 1) { $ui.LayBad.Add('LAYOUT ' + $Card + ' ' + $nm + ' text cut: needs ' + $tw + ' has ' + $C.ClientSize.Width) } }
+  if ($C.Text -and ($C -is [System.Windows.Forms.Label] -or $C -is [System.Windows.Forms.ButtonBase] -or $C -is [System.Windows.Forms.TextBoxBase])) {
+    $lh = [int](& $ui.LineH $C.Font); if ($C -is [System.Windows.Forms.TextBoxBase]) { $lh = [int][math]::Floor($lh * 0.8) }
+    if ($C.ClientSize.Height + 1 -lt $lh) { $ui.LayBad.Add('LAYOUT ' + $Card + ' ' + $nm + ' line cut: one line needs ' + $lh + ' high, has ' + $C.ClientSize.Height) } }
+  if ($C -is [System.Windows.Forms.RichTextBox] -and $ui.GuideNeed -and [object]::ReferenceEquals($C, $ui.Guide)) {
+    $gn = [int](& $ui.GuideNeed); if ($gn -gt $C.ClientSize.Height + 1) { $ui.LayBad.Add('LAYOUT ' + $Card + ' Guide text: needs ' + $gn + ' high, has ' + $C.ClientSize.Height) } }
+  if (($C -is [System.Windows.Forms.Label] -or $C -is [System.Windows.Forms.ButtonBase]) -and $C.Text -and -not $C.AutoEllipsis -and -not $ui.BtnKind.ContainsKey($C)) {
+    $want = $C.GetPreferredSize((New-Object System.Drawing.Size($C.Width, 0)))
+    if ($want.Width -gt $C.Width + 1 -or $want.Height -gt $C.Height + 1) {
+      $ui.LayBad.Add('LAYOUT ' + $Card + ' ' + $nm + ' text: needs ' + $want.Width + 'x' + $want.Height + ' has ' + $C.Width + 'x' + $C.Height) } } }
+# Runs the layout self-check on the currently visible card and records any defects in $ui.LayBad.
 $ui.Check = {
+  <#
+  .SYNOPSIS
+  Runs the layout self-check on the currently visible card or Details view and appends defects to $ui.LayBad.
+  .DESCRIPTION
+  Walks visible controls once per card/title/size combination to verify layout, clipping, overlap, dead space,
+  button row rules, and alignment rules.
+  .OUTPUTS
+  None.
+  #>
   if (-not $ui.LayOn -or -not $ui.View) { return }
-  if ($ui.Picked -and (Test-Deploy) -and $env:RADE_LAYOUT -ne '1') { return }   # a deploy does not run it, also when the paste has a test application
+  if ($ui.Picked -and (Test-Deploy) -and $env:RADE_LAYOUT -ne '1') { return }
   $card = $(if ($ui.RecOn) { 'record' } else { [string]$ui.View })
   try {
     if (-not $ui.Form.Visible -or [string]$ui.Form.WindowState -eq 'Minimized') { return }
-    # One check for each card at each window size (R28: the check runs again after a resize).
     $key = $card + '|' + $ui.View + '|' + $ui.Sent.Text + '|' + $ui.Kick.Text; $ui.LayCards[$key] = 1
     $key += '|' + $ui.Form.ClientSize.Width + 'x' + $ui.Form.ClientSize.Height; if ($ui.LaySeen.ContainsKey($key)) { return }; $ui.LaySeen[$key] = 1
     if ($ui.Scrolls -and -not $ui.RecOn) { $ui.LayScroll[$card] = 1 }
@@ -428,38 +725,18 @@ $ui.Check = {
       $kids = @($par.Controls | Where-Object { $_.Visible })
       for ($i = 0; $i -lt $kids.Count; $i++) {
         $c = $kids[$i]; $r = $c.RectangleToScreen($c.ClientRectangle); if ($r.Width -le 0 -or $r.Height -le 0) { continue }
-        if ($ui.InvFile) { & $ui.InvLine $card $c $r }
-        if ($c.CanSelect -and $c.TabStop -and -not [string]$c.AccessibleName) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ': no accessible name') }
-        if ($ui.Boxes -contains $c -and [int]$c.Height + 1 -lt (& $ui.Sc $ui.Z.CompactH)) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' box: ' + $c.Height + ' high, the rule is ' + (& $ui.Sc $ui.Z.CompactH) + ' (B1; R36: a frame that did not scale cut its line at 150 %)') }
-        if ($c -is [System.Windows.Forms.Button] -and [int]$c.FlatAppearance.BorderSize -gt 0 -and $ui.BtnKind.ContainsKey($c)) { foreach ($l in @(& $ui.BtnBad $card (& $ui.NameOf $c) $c)) { $ui.LayBad.Add([string]$l) } }
-        if ($c.Text -and $c.Enabled -and ($c -is [System.Windows.Forms.Label] -or $c -is [System.Windows.Forms.ButtonBase] -or (& $ui.IsCardText $c))) {   # B10: text at least 4.5:1 on its own background
-          $cr = & $ui.Ratio $c.ForeColor $c.BackColor; if ($cr -lt 4.5) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' contrast: ' + [math]::Round($cr, 2) + ':1, the rule is 4.5:1 (B10)') } }
-        if (-not $scroll -and -not $clip.Contains($r)) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' cut: needs ' + $r.Width + 'x' + $r.Height + ' at ' + ($r.Left - $clip.Left) + ',' + ($r.Top - $clip.Top) + ' in ' + $clip.Width + 'x' + $clip.Height) }
-        if ($c -is [System.Windows.Forms.Label] -and $c.AutoSize -and $c.MaximumSize.Width -gt 0 -and $c.Text) { $wb = & $ui.WordBad $card (& $ui.NameOf $c) ([string]$c.Text) $c.Font $c.MaximumSize.Width; if ($wb) { $ui.LayBad.Add($wb) } }
-        if (& $ui.IsCardText $c) {   # card text boxes are measured as labels are: a word wider than the line, and text that needs more room than the box has
-          if ([int](& $ui.GetWrap $c) -gt 0 -and $c.Text) { $wb = & $ui.WordBad $card (& $ui.NameOf $c) ([string]$c.Text) $c.Font ([int](& $ui.GetWrap $c)); if ($wb) { $ui.LayBad.Add($wb) } }
-          $nd = & $ui.TextNeed $c; if ($c.Text -and ($nd.Height -gt $c.ClientSize.Height + 1 -or $nd.Width -gt $c.ClientSize.Width + 1)) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' text: needs ' + $nd.Width + 'x' + $nd.Height + ' has ' + $c.ClientSize.Width + 'x' + $c.ClientSize.Height) }
-          $lh1 = [int][System.Windows.Forms.TextRenderer]::MeasureText('Ag', $c.Font).Height; if ($c.Text -and -not $ui.Hold.ContainsKey($c) -and $c.ClientSize.Height -gt $nd.Height + $lh1) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' dead space: has ' + $c.ClientSize.Height + ' high, the text needs ' + $nd.Height) } }   # more than one empty line under its text (a box with fixed lines keeps its room)
-        if ($c -is [System.Windows.Forms.CheckBox] -and $c.Text -and -not $c.AutoEllipsis) {   # a one-line check box whose text alone is wider than it is cut (the Record's step boxes before R24 fix round 3)
-          $tw = [System.Windows.Forms.TextRenderer]::MeasureText([string]$c.Text, $c.Font).Width; if ($tw -gt $c.ClientSize.Width + 1) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' text cut: needs ' + $tw + ' has ' + $c.ClientSize.Width) } }
-        # A cut line (R28 N9: the run card's status line was cut through its middle): a control with text is at least one line of its
-        # font tall, also a label that ends with "..." by rule. A rich text box (the lines of a hand step) is as tall as its text.
-        if ($c.Text -and ($c -is [System.Windows.Forms.Label] -or $c -is [System.Windows.Forms.ButtonBase] -or $c -is [System.Windows.Forms.TextBoxBase])) {
-          $lh = [int](& $ui.LineH $c.Font); if ($c -is [System.Windows.Forms.TextBoxBase]) { $lh = [int][math]::Floor($lh * 0.8) }   # an edit control draws a line with less padding
-          if ($c.ClientSize.Height + 1 -lt $lh) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' line cut: one line needs ' + $lh + ' high, has ' + $c.ClientSize.Height) } }
-        if ($c -is [System.Windows.Forms.RichTextBox] -and $ui.GuideNeed -and [object]::ReferenceEquals($c, $ui.Guide)) { $gn = [int](& $ui.GuideNeed); if ($gn -gt $c.ClientSize.Height + 1) { $ui.LayBad.Add('LAYOUT ' + $card + ' Guide text: needs ' + $gn + ' high, has ' + $c.ClientSize.Height) } }
-        $isText = ($c -is [System.Windows.Forms.Label] -or $c -is [System.Windows.Forms.ButtonBase])
-        if ($isText -and $c.Text -and -not $c.AutoEllipsis -and -not $ui.BtnKind.ContainsKey($c)) {   # a label or box that ends with "..." by rule is not a defect; a button of fixed size: B1
-          $want = $c.GetPreferredSize((New-Object System.Drawing.Size($c.Width, 0)))
-          if ($want.Width -gt $c.Width + 1 -or $want.Height -gt $c.Height + 1) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' text: needs ' + $want.Width + 'x' + $want.Height + ' has ' + $c.Width + 'x' + $c.Height) }
+        & $ui.CheckControl $card $c $r $clip $scroll
+        for ($j = $i + 1; $j -lt $kids.Count; $j++) {
+          if ($c.Bounds.IntersectsWith($kids[$j].Bounds)) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' overlaps ' + (& $ui.NameOf $kids[$j])) }
         }
-        for ($j = $i + 1; $j -lt $kids.Count; $j++) { if ($c.Bounds.IntersectsWith($kids[$j].Bounds)) { $ui.LayBad.Add('LAYOUT ' + $card + ' ' + (& $ui.NameOf $c) + ' overlaps ' + (& $ui.NameOf $kids[$j])) } }
-        $sc2 = [bool]$c.AutoScroll; if ([object]::ReferenceEquals($c, $ui.Scroll)) { $sc2 = [bool]$ui.Scrolls }   # the card's text scrolls only when $ui.Squeeze says so
+        $sc2 = [bool]$c.AutoScroll; if ([object]::ReferenceEquals($c, $ui.Scroll)) { $sc2 = [bool]$ui.Scrolls }
         if ($c.Controls.Count) { $todo.Push(@($c, [System.Drawing.Rectangle]::Intersect($clip, $r), ($scroll -or $sc2))) }
       }
     }
-    # Dead space (R28 N9: a large empty area under the run card's text): the card's text panel is as tall as its text when it does not scroll.
-    if ($ui.Scroll -and $ui.Body -and -not $ui.RecOn -and -not $ui.Scrolls -and $ui.Scroll.Visible) { $dead = [int]$ui.Scroll.ClientSize.Height - [int]$ui.Body.Height; if ($dead -gt (& $ui.Sc 2)) { $ui.LayBad.Add('LAYOUT ' + $card + ' Scroll dead space: ' + $dead + ' px under the text') } }
+    if ($ui.Scroll -and $ui.Body -and -not $ui.RecOn -and -not $ui.Scrolls -and $ui.Scroll.Visible) {
+      $dead = [int]$ui.Scroll.ClientSize.Height - [int]$ui.Body.Height
+      if ($dead -gt (& $ui.Sc 2)) { $ui.LayBad.Add('LAYOUT ' + $card + ' Scroll dead space: ' + $dead + ' px under the text') }
+    }
     if (-not $ui.RecOn) { foreach ($l in @(& $ui.RowRuleBad $card @($ui.B | Where-Object { $_.Visible } | ForEach-Object { [string]$ui.Kinds[$_] }))) { $ui.LayBad.Add([string]$l) } }
     foreach ($l in @(& $ui.Measure $card)) { $ui.LayBad.Add([string]$l) }
   } catch { $ui.LayBad.Add('LAYOUT ' + $card + ' the self-check stopped: ' + (ConvertTo-Masked ([string]$_.Exception.Message))) } }

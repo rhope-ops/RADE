@@ -20,7 +20,7 @@ It reports:
     DENYLIST        the repo has the settings file .check but this session has no name denylist, so pushes will be blocked.
     RESUMED         the hook input says source "resume" or "compact" (a restart or a compaction, not a new session):
                     this line (plus DENYLIST when it applies) instead of KIT and FIRST USE: the agent runs the check-in and
-                    continues the approved plan, without a new plan review (the owner, 2026-11-18).
+                    continues the approved plan, without a new plan review (the Administrator, 2026-11-18).
 The kit repo itself keeps its placeholders on purpose: it gets the KIT line, never FIRST USE.
 Exit 0 always: a session-start hook informs, it never blocks. Standard library only.
 Network: none (it runs local git read commands).
@@ -84,7 +84,7 @@ def messages(root):
                    "(docs/FIRST_USE.md, recommended) or to work on the kit.")
     if first_use:
         out.append("FIRST USE: this repo was made from the template and is not set up yet. Before any other work, "
-                   "follow docs/FIRST_USE.md: ask the Maintainer its questions (in Claude Code, with the clickable "
+                   "follow docs/FIRST_USE.md: ask the Administrator its questions (in Claude Code, with the clickable "
                    "question dialog), then run scripts/bootstrap.sh with the answers.")
     try:
         guard_without_list = ((root / ".check").is_file() or (root / ".pii-guard").is_file()) and not has_denylist()
@@ -100,7 +100,7 @@ def messages(root):
             warn = False
         effect = ("names are not checked (starter tier: pushes only warn)" if warn else "pushes will be blocked")
         out.append("DENYLIST: this repo has the personal-data guard on, but this session has no name denylist, so "
-                   + effect + ". Ask the Maintainer to add the environment variable PII_GUARD_DENYLIST to this "
+                   + effect + ". Ask the Administrator to add the environment variable PII_GUARD_DENYLIST to this "
                    "cloud environment (environment menu in the session title bar > Edit > Environment variables; "
                    "names comma separated; a new session picks it up), or, on their own computer, the file "
                    "~/.config/pii-guard/denylist.txt. Never ask for the names in chat. Details: docs/FIRST_USE.md.")
@@ -110,7 +110,7 @@ def messages(root):
 RESUMED = ("RESUMED: this session restarted or its context was compacted; it is not a new session. Run "
            "scripts/session_checkin.sh for the git state, then continue the approved plan in docs/NEXT_PROMPT.md (in the kit: "
            "docs/KIT_HANDOFF.md; or the plan in the summary above) from the first step that is not done. Do not review the "
-           "plan again and do not ask questions the Maintainer already answered; code reviews and checks still apply.")
+           "plan again and do not ask questions the Administrator already answered; code reviews and checks still apply.")
 
 
 def hook_source(raw):
@@ -134,7 +134,8 @@ def read_hook_input():
         import select
         import time
         fd, chunks, wait, size, end = sys.stdin.fileno(), [], 2.0, 0, time.monotonic() + 5
-        while size < 1_000_000 and time.monotonic() < end and select.select([fd], [], [], wait)[0]:  # read only what arrives: never wait for an EOF that may not come
+        # read only what arrives: never wait for an EOF that may not come
+        while size < 1_000_000 and time.monotonic() < end and select.select([fd], [], [], wait)[0]:
             chunk = os.read(fd, 65536)
             if not chunk:
                 break
@@ -157,13 +158,64 @@ def hook_cases(d, expect):
                       ('{"source": "startup"}', "startup"), ("", ""), ("not json", ""), ("[1]", "")):
         expect(f"hook source of {raw!r}", hook_source(raw), want)
     os.environ["PII_GUARD_DENYLIST"] = "Sam"
-    run_hook = lambda data: subprocess.run([sys.executable, os.path.abspath(__file__)], cwd=d, input=data,
-                                           capture_output=True, timeout=20)
-    hook = lambda data: run_hook(data).stdout
-    expect("hook run with source resume: RESUMED only", [l.split(b":")[0] for l in
+
+    def run_hook(data):
+        """Run the hook script on data."""
+        return subprocess.run([sys.executable, os.path.abspath(__file__)], cwd=d, input=data,
+                              capture_output=True, timeout=20)
+
+    def hook(data):
+        """Return the stdout of the hook run."""
+        return run_hook(data).stdout
+
+    expect("hook run with source resume: RESUMED only", [line.split(b":")[0] for line in
            hook(b'{"source": "resume"}').splitlines()], [b"RESUMED"])
     expect("hook run with invalid UTF-8: a new session", hook(b"\xff\xfe").startswith(b"RESUMED"), False)
     expect("hook run with 3 MB of input: ends, exit 0", run_hook(b"x" * 3_000_000).returncode, 0)
+
+
+def project_cases(d, expect):
+    """Check the messages on a temporary repo through project setup and guard states.
+
+    Args:
+        d: a temporary directory path.
+        expect: checks one case (label, got, want).
+    """
+    def run(*a):
+        """Run a git command in d."""
+        return subprocess.run(["git", *a], cwd=d, check=True, capture_output=True)
+
+    run("init", "-q", "-b", "main")
+    agents = pathlib.Path(d, "AGENTS.md")
+    agents.write_text("# {{PROJECT_NAME}}: agent instructions\n")
+    run("remote", "add", "origin", "https://github.com/someone/new-project.git")
+
+    def kinds():
+        """Return the message kinds for d."""
+        return [m.split(":")[0] for m in messages(d)]
+
+    expect("new project with placeholders", kinds(), ["FIRST USE"])
+    run("remote", "set-url", "origin", "https://github.com/someone/Archimedes_Lever.git")
+    expect("kit clone: KIT, not FIRST USE", kinds(), ["KIT"])
+    good = any(m.startswith("KIT") and "ask in one question" in m for m in messages(d))
+    print(("ok   " if good else "FAIL ") + "KIT: project work or an unclear request is asked about, not taken as kit work")
+    pathlib.Path(d, ".check").write_text("# on\n")
+    expect("guard on, no denylist", kinds(), ["KIT", "DENYLIST"])
+    os.environ["PII_GUARD_DENYLIST"] = "Sam"
+    expect("guard on, denylist in environment", kinds(), ["KIT"])
+    run("remote", "rename", "origin", "kit")
+    expect("kit clone after 'git remote rename origin kit': FIRST USE", kinds(), ["FIRST USE"])
+    run("remote", "add", "origin", "https://github.com/someone/Archimedes_Lever.git")
+    os.environ.pop("PII_GUARD_DENYLIST")
+    agents.write_text("# Demo: agent instructions\n")
+    run("remote", "set-url", "origin", "https://github.com/someone/demo")
+    expect("set-up project, guard on, no denylist", kinds(), ["DENYLIST"])
+    pathlib.Path(d, ".check").write_text("denylist: warn\n")
+    good = any("pushes only warn" in m for m in messages(d))
+    print(("ok   " if good else "FAIL ") + "starter warn mode: DENYLIST says pushes only warn")
+    pathlib.Path(d, ".check").unlink()
+    expect("set-up project, guard off", kinds(), [])
+    hook_cases(d, expect)
 
 
 def self_test():
@@ -185,36 +237,7 @@ def self_test():
     os.environ["PII_GUARD_DENYLIST_FILE"] = os.devnull + ".missing"
     try:
         with tempfile.TemporaryDirectory() as d:
-            run = lambda *a: subprocess.run(["git", *a], cwd=d, check=True, capture_output=True)
-            run("init", "-q", "-b", "main")
-            agents = pathlib.Path(d, "AGENTS.md")
-            agents.write_text("# {{PROJECT_NAME}}: agent instructions\n")
-            run("remote", "add", "origin", "https://github.com/someone/new-project.git")
-            kinds = lambda: [m.split(":")[0] for m in messages(d)]
-            expect("new project with placeholders", kinds(), ["FIRST USE"])
-            run("remote", "set-url", "origin", "https://github.com/someone/Archimedes_Lever.git")
-            expect("kit clone: KIT, not FIRST USE", kinds(), ["KIT"])
-            good = any(m.startswith("KIT") and "ask in one question" in m for m in messages(d))
-            print(("ok   " if good else "FAIL ") + "KIT: project work or an unclear request is asked about, not taken as kit work")
-            ok = ok and good
-            pathlib.Path(d, ".check").write_text("# on\n")
-            expect("guard on, no denylist", kinds(), ["KIT", "DENYLIST"])
-            os.environ["PII_GUARD_DENYLIST"] = "Sam"
-            expect("guard on, denylist in environment", kinds(), ["KIT"])
-            run("remote", "rename", "origin", "kit")
-            expect("kit clone after 'git remote rename origin kit': FIRST USE", kinds(), ["FIRST USE"])
-            run("remote", "add", "origin", "https://github.com/someone/Archimedes_Lever.git")
-            os.environ.pop("PII_GUARD_DENYLIST")
-            agents.write_text("# Demo: agent instructions\n")
-            run("remote", "set-url", "origin", "https://github.com/someone/demo")
-            expect("set-up project, guard on, no denylist", kinds(), ["DENYLIST"])
-            pathlib.Path(d, ".check").write_text("denylist: warn\n")
-            good = any("pushes only warn" in m for m in messages(d))
-            print(("ok   " if good else "FAIL ") + "starter warn mode: DENYLIST says pushes only warn")
-            ok = ok and good
-            pathlib.Path(d, ".check").unlink()
-            expect("set-up project, guard off", kinds(), [])
-            hook_cases(d, expect)
+            project_cases(d, expect)
     finally:
         for k, v in saved.items():
             os.environ.pop(k, None)

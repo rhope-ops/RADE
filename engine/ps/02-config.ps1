@@ -133,6 +133,16 @@ $helpRules = @(
 # Gives a "What to do: ..." help line for a log line that matches a known problem, once for each problem in a round;
 # else an empty text. Checks app-declared $appHelpRules first, then generic $helpRules.
 function Get-WhatToDo([string]$Line) {
+  <#
+  .SYNOPSIS
+  Matches a failure line against manifest-declared help rules.
+  .DESCRIPTION
+  Iterates $appHelpRules and returns the guidance string for the first matching regex pattern, or empty string.
+  .PARAMETER Line
+  The error or status line to match.
+  .OUTPUTS
+  Guidance string or ''.
+  #>
   $allRules = @()
   if ($appHelpRules) { $allRules += $appHelpRules }
   $allRules += $helpRules

@@ -18,6 +18,14 @@ function ConvertTo-Masked([string]$Text) {
 function Get-ProfileLeaf { if ($env:USERPROFILE) { return (Split-Path -Leaf $env:USERPROFILE) }; return '' }
 # Gives the path of the user's OneDrive folder from $env:OneDriveCommercial, $env:OneDrive, or $env:USERPROFILE\OneDrive.
 function Get-OneDrivePath {
+  <#
+  .SYNOPSIS
+  Returns the current user's OneDrive root path dynamically.
+  .DESCRIPTION
+  Checks OneDriveCommercial, then OneDrive, then falls back to USERPROFILE\OneDrive.
+  .OUTPUTS
+  Full path string to the OneDrive folder.
+  #>
   foreach ($cand in @($env:OneDriveCommercial, $env:OneDrive)) {
     if ($cand -and (Test-Path -LiteralPath $cand -PathType Container)) { return $cand }
   }

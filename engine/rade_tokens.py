@@ -86,9 +86,12 @@ def ui_token_block(t):
     dk = ['$ui.TokDark.%s = @(%d, %d, %d)' % ((name,) + tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))) for name, h in t['dark']['colors'].items()]
     out += ['; '.join(dk[i:i + 4]) for i in range(0, len(dk), 4)]
     out += ['# Sizes, gaps and field widths, in pixels at 100 % (every size set after the form has scaled goes through $ui.Sc).',
-            '$ui.Z = @{ %s' % ints('sizes'), '  %s' % ints('gaps'), '  %s }' % ints('fields'),
+            '$ui.Z = @{', '  %s' % ints('sizes'),
+            '  %s' % ints('gaps'), '  %s }' % ints('fields'),
             "# Faces: name = @(family, the font file's name in the bundle ('' = none), the family used when the font cannot be loaded)."]
-    out.append('$ui.Faces = @{ %s }' % '; '.join('%s = @(%s, %s, %s)' % (n, q(f['family']), q(Path(f['file']).name if f['file'] else ''), q(f['fallback'])) for n, f in t['faces'].items()))
+    faces = ['%s = @(%s, %s, %s)' % (n, q(f['family']), q(Path(f['file']).name if f['file'] else ''), q(f['fallback'])) for n, f in t['faces'].items()]
+    out.append('$ui.Faces = @{ %s; %s' % (faces[0], faces[1]))
+    out.append('  %s }' % '; '.join(faces[2:]))
     out += ["# Text styles: name = @(face, size in points at 100 %, font style ('' = regular)); uses: the file.", '$ui.Styles = [ordered]@{}']
     sty = ['$ui.Styles.%s = @(%s, %s, %s)' % (n, q(x['face']), repr(float(x['pt'])).rstrip('0').rstrip('.'), q(x['style'])) for n, x in t['styles'].items()]
     out += ['; '.join(sty[i:i + 4]) for i in range(0, len(sty), 4)]
