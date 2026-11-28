@@ -9,7 +9,8 @@ characters in UNICODES and loses its OpenType layout tables (GDI, which draws Wi
 about 43 KB in place of about 190 KB, so a bundle carries about 170 KB of base64, not 770 KB.
 
 Usage: python3 scripts/build_fonts.py SOURCE_DIR   (SOURCE_DIR holds the files of SOURCES, downloaded by hand)
-Needs: fontTools 4.55.3 from PyPI (pinned with its hash in requirements.txt: pip install --require-hashes -r requirements.txt), only to make the files again; no check needs it.
+Needs: fontTools 4.55.3 from PyPI (pinned with its hash in requirements.txt: pip install --require-hashes -r requirements.txt),
+       only to make the files again; no check needs it.
 Run target: Python 3 on Linux or Windows.
 Network: none (the source files are downloaded by hand from raw.githubusercontent.com, checked by SHA-256 here).
 Writes: engine/fonts/*.ttf (then name each in engine/ui-tokens.json "faces" and run python3 engine/rade_tokens.py --write).
@@ -25,7 +26,10 @@ SOURCE_COMMIT = '185877d082cebb40facd65143326147431863688'
 SOURCES = {
     'fonts/ttf/Normal/SofiaSans-Regular.ttf': ('8b9b68e14433b29223bfa761c48fff29bef07e56b30cc94519f130a4d9604f25', 'SofiaSans-Regular.ttf'),
     'fonts/ttf/Normal/SofiaSans-SemiBold.ttf': ('cdf0f41907190aced199fd508c5b277e430e5cf42305d8608904bf9e5e22dc65', 'SofiaSans-SemiBold.ttf'),
-    'fonts/ttf/Condensed/SofiaSansCondensed-SemiBold.ttf': ('8c7b151f8d891493e510acaec96d9df57b20f939600665a0a1910e92fa248999', 'SofiaSansCondensed-SemiBold.ttf'),
+    'fonts/ttf/Condensed/SofiaSansCondensed-SemiBold.ttf': (
+        '8c7b151f8d891493e510acaec96d9df57b20f939600665a0a1910e92fa248999',
+        'SofiaSansCondensed-SemiBold.ttf',
+    ),
 }
 # Basic Latin, Latin-1 and Latin Extended-A, dashes, quotes, bullet and ellipsis, per mille and angle quotes, arrows,
 # minus, euro, trade mark.

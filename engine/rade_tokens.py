@@ -11,7 +11,10 @@ Network: none.
 Writes: engine/rade_ui.ps1 (write_tokens only).
 Credentials: none.
 """
-import base64, json, re, textwrap
+import base64
+import json
+import re
+import textwrap
 from pathlib import Path
 
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
@@ -136,7 +139,10 @@ def font_lines():
     """Return the bundle text that holds the fonts of engine/ui-tokens.json as base64, one here-string per file wrapped at
     100 characters as the other embedded files are (Convert.FromBase64String skips the line ends): $fontTtf = @{ ... }."""
     files = sorted({f['file'] for f in ui_tokens()['faces'].values() if f['file']})
-    parts = ["%s = @'\n%s\n'@" % (q(Path(p).name), '\n'.join(textwrap.wrap(base64.b64encode((ENGINE_ROOT / p).read_bytes()).decode('ascii'), 100))) for p in files]
+    parts = [
+        "%s = @'\n%s\n'@" % (q(Path(p).name), '\n'.join(textwrap.wrap(base64.b64encode((ENGINE_ROOT / p).read_bytes()).decode('ascii'), 100)))
+        for p in files
+    ]
     return '$fontTtf = @{\n' + '\n'.join(parts) + '\n}'
 
 

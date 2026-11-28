@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """Rules of the app canary (scripts/check_apps.py) for content from an app repository: no path leaves its folder, a lock
-names an engine among its own files, a symbolic link is found, and a no-reconnaissance word in a built bundle gives a NOTE line. No network. Pass = last line "CANARY rules ok ...".
+names an engine among its own files, a symbolic link is found, and a no-reconnaissance word in a built bundle gives
+a NOTE line. No network. Pass = last line "CANARY rules ok ...".
 Run by scripts/check.local.sh."""
-import copy, json, os, sys, tempfile
+import copy
+import json
+import os
+import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
@@ -22,17 +27,23 @@ muts = [lambda x: x['application']['knownDirs'].append(['../x', '*']),
         lambda x: x['bundles'][0]['steps'][0]['default']['paths'].append('../k'),
         lambda x: x['bundles'][0]['files'].append({'src': 'C:\\x'})]
 for mut in muts:
-    y = copy.deepcopy(m); mut(y)
+    y = copy.deepcopy(m)
+    mut(y)
     assert len(c.unsafe_paths(y)) == 1, y
 
 with tempfile.TemporaryDirectory() as t:
-    t = Path(t); (t / 'scripts').mkdir(); lk = t / 'scripts/rade.lock.json'
+    t = Path(t)
+    (t / 'scripts').mkdir()
+    lk = t / 'scripts/rade.lock.json'
     assert c.read_lock(t, 'scripts/m.json') is None
     good = {'commit': 'a' * 40, 'engine': 'engine/rade_build.py', 'files': {'engine/rade_build.py': 'x'}}
     lk.write_text(json.dumps(good))
     assert c.read_lock(t, 'scripts/m.json') == ('a' * 40, 'engine/rade_build.py', ['engine/rade_build.py'])
-    bads = [{**good, 'engine': '../evil.py'}, {**good, 'engine': '/tmp/evil.py'}, {**good, 'engine': 'other.py'}, {**good, 'engine': 'scripts/check.sh', 'files': {'scripts/check.sh': 'x'}},
-            {**good, 'files': {'engine/rade_build.py': 'x', '../y': 'z'}}, {**good, 'commit': 'main'}, {'x': 1}]
+    bads = [
+        {**good, 'engine': '../evil.py'}, {**good, 'engine': '/tmp/evil.py'}, {**good, 'engine': 'other.py'},
+        {**good, 'engine': 'scripts/check.sh', 'files': {'scripts/check.sh': 'x'}},
+        {**good, 'files': {'engine/rade_build.py': 'x', '../y': 'z'}}, {**good, 'commit': 'main'}, {'x': 1},
+    ]
     for bad in bads:
         lk.write_text(json.dumps(bad))
         try:
@@ -51,7 +62,8 @@ with tempfile.TemporaryDirectory() as t:
     # Fonts an app's build copies from the engine (the Administrator, 2026-11-21): put in from the engine, nothing else.
     fm = {'bundles': [{'files': [{'src': 'assets/fonts/build/90161Z-OFL.txt'}, {'src': 'assets/fonts/build/90161Z-Nope.ttf'},
                                  {'src': 'assets/fonts/build/90161Z-Here.ttf'}, {'src': '../fonts/build/X-OFL.txt'}, {'src': 'docs/OFL.txt'}]}]}
-    (t / 'assets/fonts/build').mkdir(parents=True); (t / 'assets/fonts/build/90161Z-Here.ttf').write_bytes(b'app')
+    (t / 'assets/fonts/build').mkdir(parents=True)
+    (t / 'assets/fonts/build/90161Z-Here.ttf').write_bytes(b'app')
     fake = {'OFL.txt': b'licence', 'Here.ttf': b'engine'}
     got = c.stage_fonts(t, fm, fake.get)
     assert got == ['assets/fonts/build/90161Z-OFL.txt'], got
@@ -65,14 +77,21 @@ with tempfile.TemporaryDirectory() as t:
     # passes outside a .git checkout (a release archive; fleet v2).
     real_root = c.ROOT
     with tempfile.TemporaryDirectory() as g:
-        g = Path(g); (g / 'engine/fonts').mkdir(parents=True); (g / 'engine/fonts/OFL.txt').write_bytes(b'licence')
+        g = Path(g)
+        (g / 'engine/fonts').mkdir(parents=True)
+        (g / 'engine/fonts/OFL.txt').write_bytes(b'licence')
         for cmd in (['git', 'init', '-q'], ['git', 'add', '-A'], ['git', '-c', 'user.name=test', '-c', 'user.email=fixture', 'commit', '-q', '-m', 'fixture']):
             assert c.run(cmd, g)[0] == 0, cmd
         c.ROOT = g
         try:
             head = c.run(['git', 'rev-parse', 'HEAD'], g)[1].strip()
-            assert c.locked_font(head, 'OFL.txt') == c.this_font('OFL.txt') == b'licence' and c.locked_font(head, 'none.ttf') is None and c.locked_font(head, '../rade_build.py') is None
-            real = c.git_type; c.git_type = lambda commit, rel: 'tree'   # a folder at that path: never read as a font
+            assert (
+                c.locked_font(head, 'OFL.txt') == c.this_font('OFL.txt') == b'licence'
+                and c.locked_font(head, 'none.ttf') is None
+                and c.locked_font(head, '../rade_build.py') is None
+            )
+            real = c.git_type
+            c.git_type = lambda commit, rel: 'tree'   # a folder at that path: never read as a font
             try:
                 assert c.locked_font(head, 'OFL.txt') is None
             finally:
@@ -82,7 +101,8 @@ with tempfile.TemporaryDirectory() as t:
             c.ROOT = real_root
     assert not list((t / 'assets/fonts/build').glob('.rade-font-*'))   # no temporary file left after a copy
     # A move that fails: no font and no temporary file stay; an app file with a similar name is not touched.
-    (t / 'assets/fonts/build/90161Z-OFL.txt').unlink(); (t / 'assets/fonts/build/90161Z-OFL.txt.part').write_bytes(b'APPFILE')
+    (t / 'assets/fonts/build/90161Z-OFL.txt').unlink()
+    (t / 'assets/fonts/build/90161Z-OFL.txt.part').write_bytes(b'APPFILE')
     real_replace = c.os.replace
     def no_replace(a, b):
         raise OSError('disk full')

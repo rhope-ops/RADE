@@ -80,6 +80,31 @@ def contrast_problems(page):
     return out
 
 
+def _csp_problems(page):
+    """Return CSP meta problems for the page text.
+
+    Args:
+        page: the text of the page.
+
+    Returns:
+        List of plain-text error strings for missing or invalid Content-Security-Policy meta tags.
+    """
+    csp = re.search(r'<meta http-equiv="Content-Security-Policy" content="([^"]*)">', page)
+    if not csp:
+        return ['no Content-Security-Policy meta']
+    out = []
+    src = re.search(r'script-src ([^;]*)', csp.group(1))
+    have = src.group(1).split() if src else []
+    if "'unsafe-inline'" in have:
+        out.append("script-src has 'unsafe-inline'")
+    for want in script_hashes(page):
+        if want not in have:
+            out.append('script-src lacks the inline script hash: put %s in the CSP meta' % want)
+    if "default-src 'none'" not in csp.group(1):
+        out.append("CSP has no default-src 'none'")
+    return out
+
+
 def problems(page, help_name=None):
     """Return the list of broken rules of the page text (empty when every rule holds).
 
@@ -100,19 +125,7 @@ def problems(page, help_name=None):
             out.append('new-tab link without rel="noopener noreferrer": ' + tag[:80])
     if re.search(r"target:'_blank'(?![^}]*rel:'noopener noreferrer')", scripts):
         out.append("script link with target '_blank' and no rel 'noopener noreferrer'")
-    csp = re.search(r'<meta http-equiv="Content-Security-Policy" content="([^"]*)">', page)
-    if not csp:
-        out.append('no Content-Security-Policy meta')
-    else:
-        src = re.search(r'script-src ([^;]*)', csp.group(1))
-        have = src.group(1).split() if src else []
-        if "'unsafe-inline'" in have:
-            out.append("script-src has 'unsafe-inline'")
-        for want in script_hashes(page):
-            if want not in have:
-                out.append('script-src lacks the inline script hash: put %s in the CSP meta' % want)
-        if "default-src 'none'" not in csp.group(1):
-            out.append("CSP has no default-src 'none'")
+    out += _csp_problems(page)
     if '<meta name="referrer" content="no-referrer">' not in page:
         out.append('no referrer meta with no-referrer')
     hand = re.sub(r'<!-- >>> site:.*?<!-- <<< site:[\w-]+ -->', '', page, flags=re.S)   # the parts not made from README.md

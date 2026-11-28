@@ -3,7 +3,8 @@
 Usage: python3 scripts/check_manifest.py [manifest.json ...]   (default: schemas/examples/*.json)
 Pass = last line "MANIFEST files=N fail=0". Needs jsonschema (PyPI) 4.x: pip install --require-hashes -r requirements.txt (hash-pinned).
 """
-import json, sys
+import json
+import sys
 from pathlib import Path
 try:
     from jsonschema import Draft202012Validator
@@ -14,6 +15,45 @@ ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = json.loads((ROOT / 'schemas/rade-manifest.schema.json').read_text())
 Draft202012Validator.check_schema(SCHEMA)
 VALIDATOR = Draft202012Validator(SCHEMA)
+
+
+def _answer_ref_errors(r, s):
+    """Return cross-reference error strings for a step's `answers` list.
+
+    Args:
+        r: round label string for error messages.
+        s: step configuration dict from manifest.
+
+    Returns:
+        List of formatted error strings for invalid answer keys, choices, failOn, or showIf.
+    """
+    out = []
+    qs = s.get('answers') if isinstance(s.get('answers'), list) else []
+    keys = [a['key'] for a in qs if isinstance(a, dict) and isinstance(a.get('key'), str)]
+    for k in sorted({k for k in keys if keys.count(k) > 1}):
+        out.append('%s: step %r: answers: the key %r is used twice' % (r, s['name'], k))
+    words = {}   # key -> the button words of each earlier yes/no or pick question (for failOn and showIf)
+    for a in qs:
+        cs = a.get('choices') if isinstance(a, dict) and isinstance(a.get('choices'), list) else []
+        low = [c.strip().lower() for c in cs if isinstance(c, str)]
+        if len(set(low)) != len(low):
+            out.append('%s: step %r: answers: the choices of %r must differ (case and spaces ignored)' % (r, s['name'], a.get('key')))
+        if not isinstance(a, dict):
+            continue
+        mine = ['Yes', 'No'] if a.get('kind') == 'yesno' else [c.strip() for c in cs if isinstance(c, str)] if a.get('kind') == 'pick' else []
+        if 'failOn' in a and not s.get('answersOnly'):
+            out.append('%s: step %r: answers: failOn of %r is only for a step with "answersOnly": true' % (r, s['name'], a.get('key')))
+        if 'failOn' in a and not named(a['failOn'], mine):
+            out.append('%s: step %r: answers: failOn of %r must name answers of this yes/no or pick question' % (r, s['name'], a.get('key')))
+        dep = a.get('showIf') if isinstance(a.get('showIf'), dict) else None
+        if dep is not None and not named(dep.get('in'), words.get(dep.get('key'), [])):
+            out.append(
+                '%s: step %r: answers: showIf of %r must name an earlier yes/no or pick question and answers of it'
+                % (r, s['name'], a.get('key'))
+            )
+        if isinstance(a.get('key'), str):
+            words[a['key']] = mine
+    return out
 
 
 def refs(m):
@@ -33,30 +73,9 @@ def refs(m):
                 out.append('%s: step %r: %s/%s is not in files' % (r, s['name'], s['dir'], s['file']))
             if 'answers' in s and s.get('kind') != 'guide':
                 out.append('%s: step %r: answers: only a guide step (kind "guide") can ask questions' % (r, s['name']))
-            qs = s.get('answers') if isinstance(s.get('answers'), list) else []
-            keys = [a['key'] for a in qs if isinstance(a, dict) and isinstance(a.get('key'), str)]
-            for k in sorted({k for k in keys if keys.count(k) > 1}):
-                out.append('%s: step %r: answers: the key %r is used twice' % (r, s['name'], k))
             if isinstance(s.get('hide'), list) and 'done' in s['hide'] and s.get('answers'):
                 out.append('%s: step %r: hide: a step with answers cannot hide done (its questions come after Done)' % (r, s['name']))
-            words = {}   # key -> the button words of each earlier yes/no or pick question (for failOn and showIf)
-            for a in qs:
-                cs = a.get('choices') if isinstance(a, dict) and isinstance(a.get('choices'), list) else []
-                low = [c.strip().lower() for c in cs if isinstance(c, str)]
-                if len(set(low)) != len(low):
-                    out.append('%s: step %r: answers: the choices of %r must differ (case and spaces ignored)' % (r, s['name'], a.get('key')))
-                if not isinstance(a, dict):
-                    continue
-                mine = ['Yes', 'No'] if a.get('kind') == 'yesno' else [c.strip() for c in cs if isinstance(c, str)] if a.get('kind') == 'pick' else []
-                if 'failOn' in a and not s.get('answersOnly'):
-                    out.append('%s: step %r: answers: failOn of %r is only for a step with "answersOnly": true' % (r, s['name'], a.get('key')))
-                if 'failOn' in a and not named(a['failOn'], mine):
-                    out.append('%s: step %r: answers: failOn of %r must name answers of this yes/no or pick question' % (r, s['name'], a.get('key')))
-                dep = a.get('showIf') if isinstance(a.get('showIf'), dict) else None
-                if dep is not None and not named(dep.get('in'), words.get(dep.get('key'), [])):
-                    out.append('%s: step %r: answers: showIf of %r must name an earlier yes/no or pick question and answers of it' % (r, s['name'], a.get('key')))
-                if isinstance(a.get('key'), str):
-                    words[a['key']] = mine
+            out += _answer_ref_errors(r, s)
         for a in b.get('apps', []):
             for n in a['steps']:
                 if n not in names:

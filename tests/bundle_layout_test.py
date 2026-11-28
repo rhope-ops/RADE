@@ -27,8 +27,9 @@ RESULTS = []
 DISCARD = 'catch { $null = $_ }'   # the discarded-error form that rule X7 counts
 # Engine PowerShell sources that rule X7 covers (the files the bundle is made of).
 ENGINE_PS = ('engine/ps/*.ps1', 'engine/ps/window/*.ps1')
-# Standards plan Stage 5 (the Administrator approved the plan, 2026-11-17; this count is an agent's work under it). Discarded-error catches with no reason on their line (106 of 129
-# on 2026-11-17). This number may only go down: lower it when you add reasons; never raise it.
+# Standards plan Stage 5 (the Administrator approved the plan, 2026-11-17; this count is an agent's work under it).
+# Discarded-error catches with no reason on their line (106 of 129 on 2026-11-17).
+# This number may only go down: lower it when you add reasons; never raise it.
 SILENT_CATCHES = 99
 
 
@@ -71,7 +72,7 @@ def check_run_steps(text):
     check(lines[1] == '<#' and lines[3].strip() == 'HOW TO RUN THIS SCRIPT (on a work computer):' and lines[4].strip().startswith('1. '),
           'run steps: the first lines after the hash line and the GENERATED line')
     # engine-v41 (90-161.Z R43): the kit code standard C6 needs GENERATED and its source in the first 15 lines of a generated file.
-    check(any('GENERATED' in l and ' from ' in l for l in lines[:15]), 'run steps: a GENERATED line with its source is in the first 15 lines')
+    check(any('GENERATED' in line and ' from ' in line for line in lines[:15]), 'run steps: a GENERATED line with its source is in the first 15 lines')
     check(head.isascii() and '#>' not in head[3:], 'run steps: ASCII, and no "#>" inside the header')
     check('\n         . $script:PasteBody\n' in head and lines[-2] == '. $script:PasteBody', 'run steps: step 5 names the real last line of the bundle')
 

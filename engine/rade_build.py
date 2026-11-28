@@ -348,8 +348,16 @@ def hand_part(s):
         raise SystemExit('step %r: %s' % (s['name'], why))
     out, guide, hide = '', s.get('kind', 'script') == 'guide', s.get('hide')
     if 'hide' in s:
-        if not guide or not isinstance(hide, list) or not 1 <= len(hide) <= 2 or len(set(hide)) != len(hide) or set(hide) - {'done', 'failed', 'skip'} or ('done' in hide and s.get('answers')):
-            no('hide: only for a guide step (kind "guide"): 1 or 2 of done, failed and skip, each one time (one button stays); not done when the step has answers')
+        bad_hide = (
+            not guide or not isinstance(hide, list) or not 1 <= len(hide) <= 2
+            or len(set(hide)) != len(hide) or set(hide) - {'done', 'failed', 'skip'}
+            or ('done' in hide and s.get('answers'))
+        )
+        if bad_hide:
+            no(
+                'hide: only for a guide step (kind "guide"): 1 or 2 of done, failed and skip, each one time '
+                '(one button stays); not done when the step has answers'
+            )
         out += '; Hide = @(%s)' % ', '.join(q(h) for h in hide)
     if 'answersOnly' in s:
         used = [f for f in ('hide', 'doneText', 'doneLog', 'marker', 'url', 'urlConfig', 'file', 'guide') if s.get(f)]
@@ -401,11 +409,17 @@ def uninstall_part(a, b):
     if not un:
         return '@()'
     assert len(set(un)) == len(un) and all(n in names for n in un), 'app %r: uninstall: unique names of steps of this bundle' % a['name']
-    assert not set(un) & set(a['steps']), 'app %r: uninstall: a step is an install step too (%s); give Uninstall its own steps' % (a['name'], ', '.join(sorted(set(un) & set(a['steps']))))
-    assert a.get('mode') == 'deploy' and a.get('restore'), 'app %r: uninstall needs mode deploy and "restore" (its test sites; Uninstall backs up first)' % a['name']
+    both = sorted(set(un) & set(a['steps']))
+    assert not both, 'app %r: uninstall: a step is an install step too (%s); give Uninstall its own steps' % (a['name'], ', '.join(both))
+    assert a.get('mode') == 'deploy' and a.get('restore'), (
+        'app %r: uninstall needs mode deploy and "restore" (its test sites; Uninstall backs up first)' % a['name']
+    )
     for n in un:
         s = b['steps'][names.index(n)]
-        assert not s.get('after') and not s.get('ask'), 'app %r: uninstall step %r: no "after" or "ask" (Uninstall runs its steps in order and stops at the first that is not done)' % (a['name'], n)
+        assert not s.get('after') and not s.get('ask'), (
+            'app %r: uninstall step %r: no "after" or "ask" (Uninstall runs its steps in order and stops at the first that is not done)'
+            % (a['name'], n)
+        )
     return '@(%s)' % ', '.join(str(names.index(n)) for n in un)
 
 
@@ -436,6 +450,52 @@ def here(text):
     return "@'\n" + text + "\n'@"
 
 
+def _app_checks(a, b, idx, names, mode):
+    """Collect required check IDs and validate step dependency order for one application.
+
+    Args:
+        a: application dict from manifest.
+        b: bundle dict from manifest.
+        idx: list of step indices in `b['steps']` for this application.
+        names: ordered list of all step names in bundle `b`.
+        mode: application mode ('test' or 'deploy').
+
+    Returns:
+        Tuple of (ordered check IDs list, set of required check IDs).
+    """
+    need = set(BASE_CHECKS) - ({'outlook'} if mode == 'deploy' else set())
+    for i in idx:
+        for n in b['steps'][i].get('needs', []):
+            assert n in CHECK_IDS, 'unknown check %r in step %r' % (n, names[i])
+            need.add(n)
+    checks = [c for c in CHECK_IDS if c in need]
+    byname = {names[i]: b['steps'][i] for i in idx}
+
+    def reach(n, seen=None, byname=byname):
+        """Collect all transitive step dependencies for step `n`."""
+        seen = seen if seen is not None else set()
+        for d in byname[n].get('after', []):
+            if d not in seen:
+                seen.add(d)
+                reach(d, seen, byname)
+        return seen
+
+    hand = []
+    for i in sorted(idx):
+        s = b['steps'][i]
+        for d in s.get('after', []):
+            if d not in byname or names.index(d) >= i:
+                raise SystemExit('app %r: step %r needs %r (after), which is not an earlier step of this app' % (a['name'], names[i], d))
+        if s.get('kind') == 'guide':
+            hand.append(names[i])
+        elif mode == 'deploy' and hand and not (reach(names[i]) & set(hand)):
+            raise SystemExit(
+                'app %r: automatic step %r comes after the hand step %r but does not need it: move it before, or name the step it needs in "after"'
+                % (a['name'], names[i], hand[0])
+            )
+    return checks, need
+
+
 def app_lines(b):
     """Return the $apps catalog lines for bundle `b`.
 
@@ -452,31 +512,7 @@ def app_lines(b):
         idx = [names.index(n) for n in a['steps']]
         mode, version = a.get('mode', 'test'), a.get('version', '')
         assert mode != 'deploy' or version, 'app %r: a deploy needs a version' % a['name']
-        need = set(BASE_CHECKS) - ({'outlook'} if mode == 'deploy' else set())
-        for i in idx:
-            for n in b['steps'][i].get('needs', []):
-                assert n in CHECK_IDS, 'unknown check %r in step %r' % (n, names[i])
-                need.add(n)
-        checks = [c for c in CHECK_IDS if c in need]
-        byname = {names[i]: b['steps'][i] for i in idx}
-        def reach(n, seen=None):
-            """Collect all transitive step dependencies for step `n`."""
-            seen = seen if seen is not None else set()
-            for d in byname[n].get('after', []):
-                if d not in seen:
-                    seen.add(d)
-                    reach(d, seen)
-            return seen
-        hand = []
-        for i in sorted(idx):
-            s = b['steps'][i]
-            for d in s.get('after', []):
-                if d not in byname or names.index(d) >= i:
-                    raise SystemExit('app %r: step %r needs %r (after), which is not an earlier step of this app' % (a['name'], names[i], d))
-            if s.get('kind') == 'guide':
-                hand.append(names[i])
-            elif mode == 'deploy' and hand and not (reach(names[i]) & set(hand)):
-                raise SystemExit('app %r: automatic step %r comes after the hand step %r but does not need it: move it before, or name the step it needs in "after"' % (a['name'], names[i], hand[0]))
+        checks, need = _app_checks(a, b, idx, names, mode)
         mk = a.get('marker')
         marker = '$null'
         if mk:
@@ -489,10 +525,63 @@ def app_lines(b):
         backup = a.get('backup', [])
         ok = all(re.fullmatch(BACKUP_RE, n) for n in backup) and not {n.upper() for n in backup} & WIN_RESERVED
         assert ok and len({n.lower() for n in backup}) == len(backup), 'app %r: backup: unique plain titles, not a name Windows reserves' % a['name']
-        out.append('$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s; Marker = %s; Start = %s; Backup = @(%s); Restore = %s; Uninstall = %s }'
-                   % (q(a['name']), q(a['summary']), ', '.join(map(str, idx)), ', '.join(map(q, checks)), q(mode), q(version), marker, q(start),
-                      ', '.join(map(q, backup)), restore_part(a), uninstall_part(a, b)))
+        out.append(
+            '$apps += @{ Name = %s; Summary = %s; Steps = @(%s); Checks = @(%s); Mode = %s; Version = %s; '
+            'Marker = %s; Start = %s; Backup = @(%s); Restore = %s; Uninstall = %s }'
+            % (q(a['name']), q(a['summary']), ', '.join(map(str, idx)), ', '.join(map(q, checks)), q(mode), q(version),
+               marker, q(start), ', '.join(map(q, backup)), restore_part(a), uninstall_part(a, b))
+        )
     return out
+
+
+def _answer_item(s, i, a, words, no):
+    """Validate one answer entry and return its PowerShell hashtable fragment.
+
+    Args:
+        s: step configuration dict from manifest.
+        i: 1-based question index within `s['answers']`.
+        a: single answer dict to validate and format.
+        words: mapping of earlier question keys to their allowed answer strings (updated in place).
+        no: error-reporting callback taking a failure reason string.
+
+    Returns:
+        PowerShell hashtable fragment string for this answer item.
+    """
+    if not isinstance(a, dict) or set(a) - {'key', 'prompt', 'kind', 'choices', 'failOn', 'showIf'}:
+        no('question %d: only key, prompt, kind, choices, failOn and showIf' % i)
+    key, prompt, kind, choices = a.get('key'), a.get('prompt'), a.get('kind'), a.get('choices')
+    if not isinstance(key, str) or not re.fullmatch(r'[a-z][a-z0-9-]{0,23}', key):
+        no('question %d: the key must be 1 to 24 lowercase letters, digits or "-", starting with a letter' % i)
+    if key in words:
+        no('question %d: the key %r is used twice' % (i, key))
+    if not isinstance(prompt, str) or not 1 <= len(prompt) <= TEXT_LIMITS['answer prompt']:
+        no('question %r: the prompt must have 1 to %d characters' % (key, TEXT_LIMITS['answer prompt']))
+    if kind not in ('yesno', 'pick', 'text'):
+        no('question %r: the kind must be yesno, pick or text' % key)
+    if kind == 'pick':
+        bad_choices = (
+            not isinstance(choices, list) or not 2 <= len(choices) <= 4
+            or not all(isinstance(c, str) and 1 <= len(c) <= TEXT_LIMITS['answer choice'] for c in choices)
+        )
+        if bad_choices:
+            no('question %r: a pick needs 2 to 4 choices of 1 to %d characters' % (key, TEXT_LIMITS['answer choice']))
+        if len({c.strip().lower() for c in choices}) != len(choices):
+            no('question %r: the choices of a pick must differ (case and spaces ignored)' % key)
+    elif 'choices' in a:
+        no('question %r: only a pick has choices' % key)
+    mine = [] if kind == 'text' else ['Yes', 'No'] if kind == 'yesno' else [c.strip() for c in choices]
+    fail, dep = a.get('failOn'), a.get('showIf')
+    if 'failOn' in a and not (s.get('answersOnly') and mine and word_list(fail, mine)):
+        no('question %r: failOn (only in a step with "answersOnly": true) names 1 or more answers of this yes/no or pick question, each one time' % key)
+    dep_ok = isinstance(dep, dict) and set(dep) == {'key', 'in'} and isinstance(dep['key'], str) and word_list(dep['in'], words.get(dep['key'], []))
+    if 'showIf' in a and not dep_ok:
+        no('question %r: showIf needs "key" (an earlier yes/no or pick question of this step) and "in" (1 or more of its answers, each one time)' % key)
+    more = ('; FailOn = @(%s)' % ', '.join(q(w.strip()) for w in fail)) if fail else ''
+    more += ('; ShowKey = %s; ShowIn = @(%s)' % (q(dep['key']), ', '.join(q(w.strip()) for w in dep['in']))) if dep else ''
+    words[key] = mine
+    return '@{ Key = %s; Prompt = %s; Kind = %s; Choices = @(%s)%s }' % (
+        q(key), q(prompt.strip()), q(kind), ', '.join(q(c.strip()) for c in choices or []), more
+    )
 
 
 def answers_part(s):
@@ -516,35 +605,7 @@ def answers_part(s):
         no('1 to 4 questions, not %s' % (len(qs) if isinstance(qs, list) else type(qs).__name__))
     words, out = {}, []
     for i, a in enumerate(qs, 1):
-        if not isinstance(a, dict) or set(a) - {'key', 'prompt', 'kind', 'choices', 'failOn', 'showIf'}:
-            no('question %d: only key, prompt, kind, choices, failOn and showIf' % i)
-        key, prompt, kind, choices = a.get('key'), a.get('prompt'), a.get('kind'), a.get('choices')
-        if not isinstance(key, str) or not re.fullmatch(r'[a-z][a-z0-9-]{0,23}', key):
-            no('question %d: the key must be 1 to 24 lowercase letters, digits or "-", starting with a letter' % i)
-        if key in words:
-            no('question %d: the key %r is used twice' % (i, key))
-        if not isinstance(prompt, str) or not 1 <= len(prompt) <= TEXT_LIMITS['answer prompt']:
-            no('question %r: the prompt must have 1 to %d characters' % (key, TEXT_LIMITS['answer prompt']))
-        if kind not in ('yesno', 'pick', 'text'):
-            no('question %r: the kind must be yesno, pick or text' % key)
-        if kind == 'pick':
-            if not isinstance(choices, list) or not 2 <= len(choices) <= 4 or not all(isinstance(c, str) and 1 <= len(c) <= TEXT_LIMITS['answer choice'] for c in choices):
-                no('question %r: a pick needs 2 to 4 choices of 1 to %d characters' % (key, TEXT_LIMITS['answer choice']))
-            if len({c.strip().lower() for c in choices}) != len(choices):
-                no('question %r: the choices of a pick must differ (case and spaces ignored)' % key)
-        elif 'choices' in a:
-            no('question %r: only a pick has choices' % key)
-        mine = [] if kind == 'text' else ['Yes', 'No'] if kind == 'yesno' else [c.strip() for c in choices]
-        fail, dep = a.get('failOn'), a.get('showIf')
-        if 'failOn' in a and not (s.get('answersOnly') and mine and word_list(fail, mine)):
-            no('question %r: failOn (only in a step with "answersOnly": true) names 1 or more answers of this yes/no or pick question, each one time' % key)
-        dep_ok = isinstance(dep, dict) and set(dep) == {'key', 'in'} and isinstance(dep['key'], str) and word_list(dep['in'], words.get(dep['key'], []))
-        if 'showIf' in a and not dep_ok:
-            no('question %r: showIf needs "key" (an earlier yes/no or pick question of this step) and "in" (1 or more of its answers, each one time)' % key)
-        more = ('; FailOn = @(%s)' % ', '.join(q(w.strip()) for w in fail)) if fail else ''
-        more += ('; ShowKey = %s; ShowIn = @(%s)' % (q(dep['key']), ', '.join(q(w.strip()) for w in dep['in']))) if dep else ''
-        words[key] = mine
-        out.append('@{ Key = %s; Prompt = %s; Kind = %s; Choices = @(%s)%s }' % (q(key), q(prompt.strip()), q(kind), ', '.join(q(c.strip()) for c in choices or []), more))
+        out.append(_answer_item(s, i, a, words, no))
     return '; Answers = @(%s)' % ', '.join(out)
 
 
@@ -552,8 +613,8 @@ def source_text(rel):
     """Return an app text file decoded as UTF-8."""
     try:
         return (ROOT / rel).read_bytes().decode('utf-8')
-    except UnicodeDecodeError:
-        raise SystemExit('cannot embed %s: invalid UTF-8 text' % rel)
+    except UnicodeDecodeError as err:
+        raise SystemExit('cannot embed %s: invalid UTF-8 text' % rel) from err
 
 
 def use_shared(text, shared):
@@ -607,7 +668,8 @@ def step_lines(b):
     """
     steps = [
         '$steps += @{ Name = %s; Title = %s; Dir = %s; File = %s; Default = $%s; AskParam = %s; AskPrompt = %s; ScreenOnly = %s; Minutes = %d; Args = %s; '
-        'Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; DoneText = %s; DoneLog = %s; Makes = @(%s); After = @(%s); Optional = $%s; Help = %s }'
+        'Note = %s; Kind = %s; Guide = @(%s); Url = %s; UrlConfig = %s; Marker = %s; Estimate = %d; '
+        'DoneText = %s; DoneLog = %s; Makes = @(%s); After = @(%s); Optional = $%s; Help = %s }'
         % (q(s['name']), q(s.get('title', '')), q(s['dir']), q(s['file']), 'true' if step_default(s) else 'false',
            q(s.get('ask', {}).get('param', '')), q(s.get('ask', {}).get('prompt', '')), q(s.get('screenOnly', '')),
            int(s.get('minutes', 30)), q(s.get('args', '')), q(s.get('note', '')), q(s.get('kind', 'script')),
@@ -623,7 +685,7 @@ def step_lines(b):
     def doing(s):
         """Return Doing field string if present."""
         return ('; Doing = %s' % q(s['doing'].strip())) if s.get('doing') else ''
-    return [line[:-2] + doing(s) + hand_part(s) + answers_part(s) + ' }' for line, s in zip(steps, b['steps'])]
+    return [line[:-2] + doing(s) + hand_part(s) + answers_part(s) + ' }' for line, s in zip(steps, b['steps'], strict=True)]
 
 
 def fetch_lines(b):

@@ -97,11 +97,15 @@ def main():
         whole = tmp / 'whole.ps1'
         whole.write_text('\n'.join(lines) + '\n', encoding='ascii')
         r = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-File', str(ps), str(whole), str(lst)], capture_output=True, text=True, timeout=600)
-        got = dict(l.split() for l in r.stdout.split('\n') if l.strip())
+        got = dict(line.split() for line in r.stdout.split('\n') if line.strip())
         clean = sorted(int(n) for n, v in got.items() if v == 'ok')
         inside = [n for n in clean if opens <= n < closes]
         check('every cut was parsed (%d cuts)' % len(cuts), len(got) == len(cuts), r.stderr[-300:])
-        check('no parse-clean cut holds a line of the body (%d parse-clean, all before line %d or from line %d)' % (len(clean), opens, closes), not inside, str(inside[:5]))
+        check(
+            'no parse-clean cut holds a line of the body (%d parse-clean, all before line %d or from line %d)' % (len(clean), opens, closes),
+            not inside,
+            str(inside[:5]),
+        )
         # The runs: a test copy with one marker line as the body's first statement (the line numbers above are of the real bundle).
         marked = lines[:opens] + ["Write-Host 'BODY RAN'"] + lines[opens:]
         code, out = run_cut(tmp, marked, len(marked) // 2)
@@ -115,7 +119,8 @@ def main():
         # Script check read the whole text through $script:PasteOuter (engine/ps/05-installed.ps1).
         f = tmp / 'whole-text.ps1'
         f.write_text('\n'.join(lines) + '\n', encoding='ascii')
-        r = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', ". ([scriptblock]::Create([IO.File]::ReadAllText('%s'))); Write-Output $script:scriptCheck.Line" % f],
+        cmd = ". ([scriptblock]::Create([IO.File]::ReadAllText('%s'))); Write-Output $script:scriptCheck.Line" % f
+        r = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', cmd],
                            capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=120)
         check('a run with no file reads its whole text (Script check says checked)', '(checked)' in r.stdout, (r.stdout + r.stderr)[-300:])
     finally:
