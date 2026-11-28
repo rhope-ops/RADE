@@ -352,16 +352,16 @@ def main():
             why.append("%d layout defects" % len(layout))
         why += ui_why(lines, d, name)
         why += ["a card scrolls at a size where none may: " + scrolls[0][12:]] if scrolls and size != SMALLEST and not name.startswith("device200-") else []
-        if not any(l.startswith("WIN line Layout self-check: ") for l in lines):
+        if not any(line.startswith("WIN line Layout self-check: ") for line in lines):
             why.append("no line of the layout self-check")
-        if not any(l.startswith("WIN SCALE ") for l in lines):
+        if not any(line.startswith("WIN SCALE ") for line in lines):
             why.append("no SCALE line of the layout self-check")
         got = {re.sub(r"^\d+-", "", p.stem) for p in d.glob("*-answer-*.png")}
         if first and got != {"answer-yesno", "answer-pick", "answer-text"}:
             why.append("the question cards (answer-yesno, answer-pick, answer-text) were not all drawn: %s" % sorted(got))
         if size == SMALLEST and hand == "done" and "answer-text" not in got:
             why.append("the text question (answer-text) was not drawn in the smallest window")
-        broken = [l for l in lines if l.startswith(("WIN PNG-FAILED", "WIN DRIVER-ERROR", "WIN TIMEOUT", "WIN BAD"))]
+        broken = [line for line in lines if line.startswith(("WIN PNG-FAILED", "WIN DRIVER-ERROR", "WIN TIMEOUT", "WIN BAD"))]
         if broken:
             why.append(broken[0][:120])
         flat = [line for line in lines if line.startswith("WIN png=") and int(line.rsplit("=", 1)[1]) < 20]
