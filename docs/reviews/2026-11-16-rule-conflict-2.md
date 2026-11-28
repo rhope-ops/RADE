@@ -1,6 +1,6 @@
 # Rule conflict check: 2026-11-16, the guard bullet names the hook (kit port of archimedes_lever#27)
 
-Fresh-context check of the rule line that changed against origin/main (`.claude/skills/rule-change/SKILL.md`, "Conflict check"). The owner approved the new text on 2026-11-16 in the kit decision (rhope-ops/archimedes_lever docs/DECISIONS.md, scope "the kit, then icf-source, RADE, 90-161.Z"); RADE's row: docs/DECISIONS.md, "Kit port by hand of rhope-ops/archimedes_lever#27".
+Fresh-context check of the rule line that changed against origin/main (`.claude/skills/rule-change/SKILL.md`, "Conflict check"). The Administrator approved the new text on 2026-11-16 in the kit decision (rhope-ops/archimedes_lever docs/DECISIONS.md, scope "the kit, then icf-source, RADE, 90-161.Z"); RADE's row: docs/DECISIONS.md, "Kit port by hand of rhope-ops/archimedes_lever#27".
 
 ## Changed line
 

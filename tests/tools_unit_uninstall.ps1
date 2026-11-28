@@ -208,8 +208,8 @@ Start-Sleep -Seconds 1; $script:app.Backup = @('Sample Tasks'); $b5 = Invoke-Bac
 Assert-Case 'back up (R44 E4): a site check that fails is named as the site check' ($b5.State -eq 'failed' -and
   $b5.Lines[0] -eq 'Back up saved nothing: RADE could not read which site the sign-in connected to.')
 $fk.PSObject.Properties.Remove('webError'); Set-Fake $fk
-# R44 E2 (the PFM's Q1 answer, 2026-11-26): opened from a runner copy (the shortcut), the title has no round; engine-v46
-# (the PFM, 2026-11-26): the shortcut is the app's word, with no version; engine-v43 L1: the subtitle comes from
+# R44 E2 (the Administrator's Q1 answer, 2026-11-26): opened from a runner copy (the shortcut), the title has no round; engine-v46
+# (the Administrator, 2026-11-26): the shortcut is the app's word, with no version; engine-v43 L1: the subtitle comes from
 # application.subtitle.
 $appDisplay = 'Sample - Kanon'; $keepVer = $script:app.Version; $script:app.Version = '0.1.0'; $keepStart = $script:startFile
 $script:startFile = Join-Path (Join-Path (Join-Path $Dir 'RADE') 'runners') 'aaaaaaaaaaaa.ps1'; $r1 = Test-RunnerStart
@@ -218,7 +218,7 @@ $appProduct = 'Kanon'; $dv = Get-ShortcutName; $appProduct = ''; $dn = Get-Short
 $appSubtitle = 'Kanon ' + [char]0x2022 + ' Forms'; $sb = Get-AppSubtitle; $appSubtitle = ''; $s0 = Get-AppSubtitle
 Assert-Case 'title and names (R44 E2, L1, engine-v46): a runner copy start is known; a paste or another file is not; the shortcut is the word; the subtitle' ($r1 -and -not $r2 -and -not $r3 -and
   $dv -eq 'Kanon' -and $dn -eq [string]$script:app.Name -and $sb -eq ('Kanon ' + [char]0x2022 + ' Forms') -and $s0 -eq '')
-# Name spot L3 (engine-v46, the PFM, 2026-11-26): the word is productName, else the app name; under the line "<name>
+# Name spot L3 (engine-v46, the Administrator, 2026-11-26): the word is productName, else the app name; under the line "<name>
 # <bullet> <subtitle>" with a productName; no version text (Get-AppVersionText of engine-v45 is gone).
 $appProduct = 'Kanon'; $appSubtitle = 'Forms'
 $w1 = Get-AppWord; $u1 = Get-AppSubtitle; $appSubtitle = ''; $u2 = Get-AppSubtitle

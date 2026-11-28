@@ -13,7 +13,7 @@ For round R41 of 90-161.Z (test site only). Decisions: [plan](2026-11-21-plan-re
 
 1. Manifest: add the 12th list to `backup`; add `restore`: `testSites` (the test site's name) and `pause` (the settings list, the row title, the field and the "on" value).
 2. Each flow that writes rows reads the pause-switch row and skips while it is on.
-3. Move the lock to engine-v31 (scripts/bump_lock.py) only on the PFM's request.
+3. Move the lock to engine-v31 (scripts/bump_lock.py) only on the Administrator's request.
 
 ## R41: what the round clicks (test site)
 

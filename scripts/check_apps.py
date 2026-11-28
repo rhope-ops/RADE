@@ -25,12 +25,19 @@ manifest or lock with a path that leaves its folder, is not built (NOTE or FAIL 
 An app repository that cannot be fetched is a FAIL (no skip): the check needs network access to github.com.
 Usage: python3 scripts/check_apps.py     Pass = last line "APPS apps=N fail=0".
 """
-import json, os, re, shutil, subprocess, sys, tempfile
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / 'scripts'))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import no_recon   # the word search of the "No reconnaissance" rule (scripts/no_recon.py)
+
+ROOT = Path(__file__).resolve().parent.parent
 ENGINE = ROOT / 'engine/rade_build.py'
 SCHEMA = 'schemas/rade-manifest.schema.json'
 FONT_RE = re.compile(r'(?:[A-Za-z0-9_-]+/)*fonts/build/[A-Za-z0-9]+-([A-Za-z0-9][A-Za-z0-9.-]*)')   # a bundle file an app's build copies from engine/fonts
@@ -45,7 +52,7 @@ def run(cmd, cwd=None):
 
 
 def tail(text, n=6):
-    return '\n'.join('    ' + l[:220] for l in text.splitlines()[-n:])
+    return '\n'.join('    ' + line[:220] for line in text.splitlines()[-n:])
 
 
 def leaves(p):
@@ -87,7 +94,7 @@ def read_lock(app_dir, manifest_rel):
         lock = json.loads(lock_file.read_text())
         commit, engine, files = lock['commit'], lock['engine'], list(lock['files'])
     except (ValueError, KeyError, TypeError, OSError) as e:
-        raise LookupError('the lock cannot be read (%s)' % type(e).__name__)
+        raise LookupError('the lock cannot be read (%s)' % type(e).__name__) from e
     if not (isinstance(commit, str) and len(commit) == 40 and all(c in '0123456789abcdef' for c in commit)):
         raise LookupError('the lock names no commit id')
     if engine != 'engine/rade_build.py' or engine not in files or any(leaves(f) for f in files):
@@ -249,7 +256,7 @@ def check(app, tmp):
         problems.append('engine/rade_build.py: built %d of %d bundles' % (out.count('BUILT '), count))
     if not problems:
         # A text longer than its limit (docs/window-design.md "Text lengths") is a note for the app's own session, not a FAIL.
-        long = sorted(set(l.replace('WARNING text length: ', 'text length: ') for l in out.splitlines() if l.startswith('WARNING text length: ')))
+        long = sorted(set(line.replace('WARNING text length: ', 'text length: ') for line in out.splitlines() if line.startswith('WARNING text length: ')))
         staged = ['%d font file(s) put in from this engine before the build (the app\'s own build copies them)' % len(fonts)] if fonts else []
         return 'ok', ['%d bundle(s) built with this engine' % count] + staged + long + recon_notes(d, manifest)
     try:
@@ -274,8 +281,8 @@ def main():
             except Exception as e:   # a fault in this check is never a pass
                 status, lines = 'fail', ['the check itself stopped (%s: %s)' % (type(e).__name__, str(e)[:200])]
             print('%s %s (%s)' % ({'ok': 'PASS', 'fail': 'FAIL', 'note': 'NOTE'}[status], app.get('repo'), app.get('manifest')))
-            for l in lines:
-                print('  ' + l if not l.startswith('    ') else l)
+            for line in lines:
+                print('  ' + line if not line.startswith('    ') else line)
             fails += status == 'fail'
     print('APPS apps=%d fail=%d' % (len(apps), fails))
     sys.exit(1 if fails or not apps else 0)

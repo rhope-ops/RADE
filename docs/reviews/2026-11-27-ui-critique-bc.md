@@ -20,7 +20,7 @@ Nielsen heuristics: 23 of 36 (64 %, acceptable); heuristic 9 (errors) not scored
 6. Half size: the button stack goes under the text of the card, not at the bottom of the window.
 7. Text that is too long wraps to 2 lines; it is never cut with "...".
 8. Done: the light line turns green, and the card shows a one-line summary (steps, checks, time).
-9. Maintenance, not installed (conflicts with decision D1 of the PFM, which keeps the list): keep the list, but say "Kanon is not installed." once above it, not on each row, and draw the Uninstall row gray.
+9. Maintenance, not installed (conflicts with decision D1 of the Administrator, which keeps the list): keep the list, but say "Kanon is not installed." once above it, not on each row, and draw the Uninstall row gray.
 10. Draw next: the failure card, the screen after "It failed", the focus ring, and the Cancel question.
 
 ## Dark mode (Kanon in Fulcrum): colors to add

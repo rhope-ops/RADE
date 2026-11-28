@@ -1,5 +1,5 @@
 # RADE engine tests, part of tests/engine_test.sh (sourced there; uses its $t, ok, bad, go, psrun and the built sample).
-# Pause and resume (docs/engine.md "Pause and resume"; the PFM, 2026-11-20) and no scripts in results (the PFM,
+# Pause and resume (docs/engine.md "Pause and resume"; the Administrator, 2026-11-20) and no scripts in results (the Administrator,
 # 2026-11-20): the engine parts on their own (tests/resume_unit.ps1), a text-mode round that resumes, and the build
 # check of collect names; and the Maintenance tools (tests/tools_unit.ps1). Group R runs in the background in its own users folder ($t/ru).
 # Network: none.

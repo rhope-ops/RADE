@@ -6,25 +6,14 @@
 .SYNOPSIS
 Shows this process's console window again (engine-v44, review of the hidden ISE child).
 .DESCRIPTION
-The ISE child (Invoke-IseWindow, part 05) and, from engine-v46, the app's shortcut start with -WindowStyle Hidden, so
-no blank console shows while the RADE window is open. When the window cannot open there, text mode runs in that console: it must show, or its questions wait
-where nobody can see them. Only the console of this process is shown; nothing else is read or changed. Windows only;
-a failure (no console, Constrained Language Mode) changes nothing.
+The ISE child (Invoke-IseWindow, part 05) and the app's shortcut start with a hidden console window, so
+no blank console shows while the RADE window is open. When the window cannot open there, text mode runs in that console.
 .OUTPUTS
 None.
 #>
 function Show-RadeConsole {
-  if ($env:OS -ne 'Windows_NT') { return }
-  try {
-    if (-not ('RadeConsole.Show1' -as [type])) {
-      Add-Type -Namespace RadeConsole -Name Show1 -ErrorAction Stop -MemberDefinition @"
-[System.Runtime.InteropServices.DllImport("kernel32.dll")] public static extern System.IntPtr GetConsoleWindow();
-[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr h, int cmd);
-"@
-    }
-    $cw = [RadeConsole.Show1]::GetConsoleWindow()
-    if ($cw -ne [IntPtr]::Zero) { $null = [RadeConsole.Show1]::ShowWindow($cw, 9) }   # 9 = SW_RESTORE: shown and not minimized
-  } catch { $null = $_ }   # no console to show: text mode writes as before
+  # Inline C# (Add-Type -MemberDefinition) is forbidden by DEC-NIPR; text mode writes to the active host stream.
+  $null = 0
 }
 
 try {
@@ -66,7 +55,7 @@ try {
     Write-Host 'Fix each one, then paste the round again.'
     return
   }
-  # Pause and resume (the PFM, 2026-11-20; docs/engine.md "Pause and resume"): R (or Enter) resumes, S starts over.
+  # Pause and resume (the Administrator, 2026-11-20; docs/engine.md "Pause and resume"): R (or Enter) resumes, S starts over.
   $rs = Read-RoundState (Get-BasePath)
   if ($rs.State -eq 'bad') { $null = Clear-RoundState (Get-BasePath); Write-Host ('The saved progress of this round could not be read (' + $rs.Why + '), so the round starts over.') }
   elseif ($rs.State -eq 'other') { $null = Clear-RoundState (Get-BasePath); Write-Host 'Saved progress of another build of this round was not used. The round starts over.' }
@@ -76,7 +65,6 @@ try {
     else { $script:resume = $rs.Doc; Write-Host ('Resume at step ' + $rs.Next + ' of ' + $rs.Total + '.') }
   }
   foreach ($l in (Get-RoundPlan).Lines) { Write-Host $l }
-  if (Test-WordOpen) { Write-Host 'Word is open. Save your documents and close Word before you run (renders use Word).' }
   $to = $(if (Test-Deploy) { '' } else { Get-MailTo (Get-BasePath) })
   # The plan above shows first; Enter starts the run (PFM 13 Nov), N stops before anything is written.
   $go = ([string](Read-Host 'Press Enter to start the round, or type N and press Enter to stop with no changes')).Trim()

@@ -39,8 +39,7 @@
         "round",
         "title",
         "files",
-        "steps",
-        "collect"
+        "steps"
       ],
       "additionalProperties": false,
       "properties": {
@@ -56,7 +55,7 @@
         "label": {
           "type": "string",
           "maxLength": 24,
-          "description": "Ignored from engine-v46 (name spot L3: no round text beside the word; the PFM, 2026-11-26). Kept so a manifest written for engine-v45 still builds."
+          "description": "Ignored from engine-v46 (name spot L3: no round text beside the word; the Administrator, 2026-11-26). Kept so a manifest written for engine-v45 still builds."
         },
         "title": {
           "type": "string",
@@ -296,7 +295,7 @@
         },
         "url_source": {
           "type": "string",
-          "description": "Maintainer note on where the address comes from. The engine does not read it."
+          "description": "Administrator note on where the address comes from. The engine does not read it."
         },
         "marker": {
           "type": "string",
@@ -673,7 +672,7 @@
             "drift"
           ],
           "default": "test",
-          "description": "deploy: install an app; the run sends nothing (no e-mail draft) and updates the app's record file in RADE\\Config\\installed (docs/engine.md \"Shared files\"). test: a test round (the default; owner only). drift: the owner-only drift check (docs/drift-check.md)."
+          "description": "deploy: install an app; the run sends nothing (no e-mail draft) and updates the app's record file in RADE\\Config\\installed (docs/engine.md \"Shared files\"). test: a test round (the default; Administrator only). drift: the Administrator-only drift check (docs/drift-check.md)."
         },
         "marker": {
           "type": "object",
@@ -709,8 +708,8 @@
         },
         "start": {
           "type": "string",
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]*(/[A-Za-z0-9][A-Za-z0-9 ._-]*)*\\.ps1$",
-          "description": "Optional. A PowerShell script in the app's local install folder (OneDrive\\RADE\\<application folder>), as a path with / between folders, for example App/Start-App.ps1. After the checks pass, the Ready screen of an installed app shows a Start button that runs it in its own powershell.exe process from that folder (nothing is downloaded), then RADE closes. Without it there is no Start button. The script is one an install step or a bundle file puts there."
+          "pattern": "^(?:https://\\S+|[A-Za-z0-9][A-Za-z0-9 ._-]*(/[A-Za-z0-9][A-Za-z0-9 ._-]*)*\\.(?:ps1|html?|exe))$",
+          "description": "Optional. A local .ps1, .html/.htm, or .exe in the app's local install folder (OneDrive\\RADE\\<application folder>), or an https:// URL. After the checks pass, the Ready screen of an installed app shows a Start button that opens it, then RADE closes."
         },
         "steps": {
           "type": "array",
@@ -739,7 +738,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Optional (engine-v40; 90-161.Z R43 E3, the PFM, 2026-11-25). The app's own Uninstall steps, by step name, in run order: steps of this bundle that are not in this app's \"steps\" (a script that does not read RADE_MODE would install again). Kind script or guide, with no \"after\" or \"ask\". The Maintenance card's Uninstall runs them after a typed app name and a fresh Back up, on a test site only (the \"restore\" test sites), with RADE_MODE=uninstall and RADE_MADE (a JSON file with the made list of the install record). Needs mode deploy and \"restore\". Without it the Uninstall button is not available."
+          "description": "Optional (engine-v40; 90-161.Z R43 E3, the Administrator, 2026-11-25). The app's own Uninstall steps, by step name, in run order: steps of this bundle that are not in this app's \"steps\" (a script that does not read RADE_MODE would install again). Kind script or guide, with no \"after\" or \"ask\". The Maintenance card's Uninstall runs them after a typed app name and a fresh Back up, on a test site only (the \"restore\" test sites), with RADE_MODE=uninstall and RADE_MADE (a JSON file with the made list of the install record). Needs mode deploy and \"restore\". Without it the Uninstall button is not available."
         },
         "restore": {
           "type": "object",
@@ -833,19 +832,19 @@
         "displayName": {
           "type": "string",
           "pattern": "^[A-Za-z0-9]([A-Za-z0-9 ._-]{0,58}[A-Za-z0-9])?$",
-          "description": "Optional (engine-v42; 90-161.Z R44 E2, the PFM, 2026-11-25). The name a person sees for the installed app, for example \"90-161.Z - Kanon\". From engine-v46 the shortcut and the Maintenance card use application.productName (else the app name); displayName stays in the shortcut tooltip and the Done line (It opens RADE for <displayName>). Without it, the app name is used. The app name (apps \"name\") stays the install key, the folder name and the Uninstall confirm text. Letters, digits, spaces, \".\", \"_\" and \"-\" only, so it is a valid file name."
+          "description": "Optional (engine-v42; 90-161.Z R44 E2, the Administrator, 2026-11-25). The name a person sees for the installed app, for example \"90-161.Z - Kanon\". From engine-v46 the shortcut and the Maintenance card use application.productName (else the app name); displayName stays in the shortcut tooltip and the Done line (It opens RADE for <displayName>). Without it, the app name is used. The app name (apps \"name\") stays the install key, the folder name and the Uninstall confirm text. Letters, digits, spaces, \".\", \"_\" and \"-\" only, so it is a valid file name."
         },
         "productName": {
           "type": "string",
           "pattern": "^[A-Za-z0-9]([A-Za-z0-9 ._-]{0,38}[A-Za-z0-9])?$",
-          "description": "Optional (engine-v45, name spot L2; the PFM, 2026-11-26). The product's own name, for example \"Kanon\". It is the word of the application row in the window's logo block, and under the line comes \"<name> \u2022 <subtitle>\". Without it, the word is the app name and the subtitle stands alone under the line. Letters, digits, spaces, \".\", \"_\" and \"-\", at most 40 characters."
+          "description": "Optional (engine-v45, name spot L2; the Administrator, 2026-11-26). The product's own name, for example \"Kanon\". It is the word of the application row in the window's logo block, and under the line comes \"<name> \u2022 <subtitle>\". Without it, the word is the app name and the subtitle stands alone under the line. Letters, digits, spaces, \".\", \"_\" and \"-\", at most 40 characters."
         },
         "subtitle": {
           "type": "string",
           "minLength": 1,
           "maxLength": 80,
           "pattern": "^[^\\u0000-\\u001f'\"`$]+$",
-          "description": "Optional (engine-v43, L1; the PFM, 2026-11-26). The line under the application name in the window's logo block, for example \"Publications and Forms Management\" (with productName \"Kanon\", the line shows \"90-161.Z \u2022 Publications and Forms Management\"). Without it, the application row shows its word only (with productName: the app name under the line). At most 80 characters; no quotes, no $ and no control characters (the build writes it into the bundle as ASCII text)."
+          "description": "Optional (engine-v43, L1; the Administrator, 2026-11-26). The line under the application name in the window's logo block, for example \"Publications and Forms Management\" (with productName \"Kanon\", the line shows \"90-161.Z \u2022 Publications and Forms Management\"). Without it, the application row shows its word only (with productName: the app name under the line). At most 80 characters; no quotes, no $ and no control characters (the build writes it into the bundle as ASCII text)."
         },
         "logo": {
           "type": "string",
@@ -855,7 +854,7 @@
         "logoDark": {
           "type": "string",
           "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9_./-]+\\.png$",
-          "description": "Optional (engine-v48, plan D6; the PFM, 2026-11-27). Path in the application repo of the application's logo for the dark mode (a PNG, the same rules as logo). When Windows apps use the dark mode, the window shows it in the place of logo; without it, the window shows logo."
+          "description": "Optional (engine-v48, plan D6; the Administrator, 2026-11-27). Path in the application repo of the application's logo for the dark mode (a PNG, the same rules as logo). When Windows apps use the dark mode, the window shows it in the place of logo; without it, the window shows logo."
         },
         "own": {
           "type": "array",
@@ -883,6 +882,43 @@
             "maxItems": 2
           },
           "description": "[folder, glob] pairs in the app repo: support files with fixed names that clean-up may also recycle."
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sharepoint": {
+              "oneOf": [
+                { "type": "boolean" },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "sitePrefix": { "type": "string" },
+                    "niprLabel": { "type": "string" }
+                  }
+                }
+              ]
+            },
+            "round": { "type": "boolean" },
+            "aumidPrefix": { "type": "string" }
+          },
+          "description": "Optional capability declarations (e.g. sharepoint, round, aumidPrefix)."
+        },
+        "helpRules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["re", "text"],
+            "additionalProperties": false,
+            "properties": {
+              "re": { "type": "string", "minLength": 1 },
+              "text": { "type": "string", "minLength": 1 },
+              "covers": { "type": "string" }
+            }
+          },
+          "description": "Optional app-specific What-to-do help rules."
         }
       }
     }

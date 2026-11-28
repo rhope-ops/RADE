@@ -86,7 +86,7 @@ def make_test_copy(t, bundle, users):
     s = bundle.read_text(encoding="utf-8")
     swaps = [
         (r"(?m)^function Get-OwnFqdn .*", "function Get-OwnFqdn { return '%s' }" % NIPR_NAME),   # the NIPR guard (the engine has no switch)
-        (r"(?m)^\$usersRoot = 'C:\\Users'", "$usersRoot = '%s'" % users),                          # the user folder stays in t
+        (r"(?m)^\$usersRoot = .*", "$usersRoot = '%s'" % users),                          # the user folder stays in t
         (r"(?m)^\$goUrl = '.*'", "$goUrl = '%s'" % go),                                         # no network address
         (r"(?m)^\$releaseUrl = '.*'", "$releaseUrl = '%s'" % rel),
         (r"\$checkGate = \$true", "$checkGate = $false"),
@@ -124,8 +124,8 @@ def run_text(script, users):
         users: the users root (pathlib.Path); USERPROFILE points to the fake user inside it.
 
     Returns:
-        The exit code of the child, its output lines (the error stream last), and the lines of its error stream alone. On a timeout the last 30 lines are printed and the
-        process ends with FAIL (the child is stopped by subprocess.run).
+        The exit code of the child, its output lines (the error stream last), and the lines of its error stream alone.
+        On a timeout the last 30 lines are printed and the process ends with FAIL (the child is stopped by subprocess.run).
     """
     env = dict(os.environ, USERPROFILE=str(users / FAKE_USER))
     try:
@@ -134,8 +134,10 @@ def run_text(script, users):
         lines = ((e.stdout or b"") + (e.stderr or b"")).decode("utf-8", "replace").splitlines()
         print("\n".join(lines[-30:]))
         sys.exit("FAIL the run did not end in %d seconds (the last 30 lines are above)" % TIME_LIMIT)
-    text = lambda b: b.decode("utf-8", "replace").splitlines()
-    return r.returncode, text(r.stdout + r.stderr), [l for l in text(r.stderr) if l.strip()]
+    def text(b):
+        """Decode UTF-8 bytes with replacement and split into lines."""
+        return b.decode("utf-8", "replace").splitlines()
+    return r.returncode, text(r.stdout + r.stderr), [line for line in text(r.stderr) if line.strip()]
 
 
 def read_record(users):
@@ -155,7 +157,7 @@ ERROR_TEXT = re.compile(r"FullyQualifiedErrorId|CategoryInfo\s*:|\bAt .+:\d+ cha
 
 def starts(lines, prefix):
     """True when one of the output lines starts with prefix."""
-    return any(l.startswith(prefix) for l in lines)
+    return any(line.startswith(prefix) for line in lines)
 
 
 def checks(code, lines, record, errors):
@@ -170,16 +172,19 @@ def checks(code, lines, record, errors):
     Returns:
         A list of (name, passed) pairs.
     """
-    bad = [l for l in lines if ERROR_TEXT.search(l)]
+    bad = [line for line in lines if ERROR_TEXT.search(line)]
     return [
         ("exit code 0 (got %s)" % code, code == 0),
         ("nothing on the error stream (%d lines%s)" % (len(errors), ": " + errors[0][:120] if errors else ""), not errors),
         ("the NIPR guard let the run start", not starts(lines, "This application cannot be installed in your environment")),
-        ("skipped step: version not recorded as installed", starts(lines, "Note: some steps were off or skipped, so version 1.0.0 is not recorded as installed")),
+        (
+            "skipped step: version not recorded as installed",
+            starts(lines, "Note: some steps were off or skipped, so version 1.0.0 is not recorded as installed"),
+        ),
         ("a file downloaded from the (local) release", starts(lines, "  Downloaded   T02\\SAMPLE-data-r1.txt")),
         ("newer-version notice of a deploy", starts(lines, "A newer version, 9.0.0, of Sample app (deploy) is on the RADE page")),
         ("the step that needs the skipped step is skipped", starts(lines, "  Result: SKIPPED (it needs ")),
-        ("the finished line says nothing was sent", any(re.match(r"DONE in .*Nothing was sent\.$", l) for l in lines)),
+        ("the finished line says nothing was sent", any(re.match(r"DONE in .*Nothing was sent\.$", line) for line in lines)),
         ("install record: PASSED, not installed, last version 1.0.0 (got %s)" % (record,), record == ("PASSED", None, "1.0.0")),
         ("no ERROR or exception text (%s)" % (bad[:1],), not bad),
     ]
@@ -187,7 +192,10 @@ def checks(code, lines, record, errors):
 
 def powershell_version():
     """Windows only: the PowerShell version the child reports, as text (a tiny separate call)."""
-    r = subprocess.run(POWERSHELL + ["-Command", "$PSVersionTable.PSVersion.ToString()"], capture_output=True, text=True, timeout=TIME_LIMIT, stdin=subprocess.DEVNULL)
+    r = subprocess.run(
+        POWERSHELL + ["-Command", "$PSVersionTable.PSVersion.ToString()"],
+        capture_output=True, text=True, timeout=TIME_LIMIT, stdin=subprocess.DEVNULL,
+    )
     return r.stdout.strip()
 
 

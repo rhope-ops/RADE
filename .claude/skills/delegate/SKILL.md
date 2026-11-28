@@ -5,7 +5,7 @@ description: Use before you delegate, run more than one agent, write a brief, pi
 
 # Orchestration: more than one agent
 
-AGENTS.md "Agents" points here. Ask each agent for concise findings with evidence paths. The Maintainer's decisions (2026-11-10): the orchestrator stays on the strongest model; models are chosen per task with the routing table below. Routing names tiers; the table below maps them to Claude models.
+AGENTS.md "Agents" points here. Ask each agent for concise findings with evidence paths. The Administrator's decisions (2026-11-10): the orchestrator stays on the strongest model; models are chosen per task with the routing table below. Routing names tiers; the table below maps them to Claude models.
 
 ## Agents (.claude/agents/)
 
@@ -19,7 +19,7 @@ AGENTS.md "Agents" points here. Ask each agent for concise findings with evidenc
 
 ## Model routing
 
-Route by tier. Pass a model on the call only where this table says "strong" for a role whose default is lower.
+Route by tier. Pass a model on the call only where this table says "strong" or "fast" for a role whose default is not that tier.
 
 | Work | Role | Tier |
 |---|---|---|
@@ -27,6 +27,7 @@ Route by tier. Pass a model on the call only where this table says "strong" for 
 | Task from a brief | `worker` | standard |
 | Worker task that failed its checks 2 times, a refactor over 5+ files, a performance fix | `worker` | strong (model on the call) |
 | Fresh review of a routine diff | `reviewer` | the author's tier (inherit) |
+| Fresh review of a small change (deliver "Small change") | `reviewer` | fast (model `haiku` on the call) |
 | Fresh review of data or save migrations, git or hook tools, security, or a refactor that must not change behavior | `reviewer` | strong (model on the call) |
 | Merges, conflict choices, design, artifacts, deploys | orchestrator | strong |
 
@@ -73,7 +74,7 @@ Branch per worker: the branch the host requires (Claude cloud sessions: `claude/
 ## Review and merge
 
 1. Scope: `git diff --stat origin/main...origin/<branch>`. Flag files outside the brief.
-2. Update by merge (AGENTS.md "Git history"): `git checkout -B review/<branch> origin/<branch> && git merge origin/main`. When intents conflict, stop and list the choice for the Maintainer.
+2. Update by merge (AGENTS.md "Git history"): `git checkout -B review/<branch> origin/<branch> && git merge origin/main`. When intents conflict, stop and list the choice for the Administrator.
 3. Fresh review: `reviewer` with only the diff and the brief. Verify each finding before you report it. Before the review, run `python3 scripts/worker_guard.py --scan origin/main...origin/<branch> <scratch folder>` on the worker's branch and scratch folder, and give its findings to the reviewer. Any workaround of a guard (a string rebuilt to pass the content check, a command wrapped in a file to pass the worker guard), in the diff or in scratch output, is a MAJOR finding.
 4. Checks: the commands in AGENTS.md "Commands". Report before and after numbers.
 5. Merge: the steps of `.claude/skills/deliver/SKILL.md`.

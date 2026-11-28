@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Paste guard test (engine/rade_hash.py GUARD_START, GUARD_END; tool retirement plan P4a, the Maintainer, 2026-11-23).
+"""Paste guard test (engine/rade_hash.py GUARD_START, GUARD_END; tool retirement plan P4a, the Administrator, 2026-11-23).
 Run by scripts/check.local.sh when an engine file changed.
 
 Builds the sample app (schemas/examples/sample-manifest.json + tests/fixture-app, in a temporary copy) and cuts the
@@ -27,7 +27,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'engine'))
-import rade_hash  # noqa: E402
+import rade_build  # noqa: E402
 RESULTS = []
 # One pwsh process parses every cut: it reads the bundle and a list of line counts, and prints "N ok" or "N error".
 PARSE = r'''param($f, $list)
@@ -81,8 +81,8 @@ def main():
         lines = build(tmp)
         if lines and lines[-1] == '':
             lines = lines[:-1]
-        start = rade_hash.GUARD_START.rstrip('\n').split('\n')
-        end = rade_hash.GUARD_END.rstrip('\n').split('\n')
+        start = rade_build.GUARD_START.rstrip('\n').split('\n')
+        end = rade_build.GUARD_END.rstrip('\n').split('\n')
         at = lines.index(start[0]) if start[0] in lines else -1
         check('guard start right after the header comment', at > 0 and lines[at - 1] == '#>' and lines[at:at + len(start)] == start)
         check('guard end as the last lines', lines[-len(end):] == end)
@@ -97,11 +97,15 @@ def main():
         whole = tmp / 'whole.ps1'
         whole.write_text('\n'.join(lines) + '\n', encoding='ascii')
         r = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-File', str(ps), str(whole), str(lst)], capture_output=True, text=True, timeout=600)
-        got = dict(l.split() for l in r.stdout.split('\n') if l.strip())
+        got = dict(line.split() for line in r.stdout.split('\n') if line.strip())
         clean = sorted(int(n) for n, v in got.items() if v == 'ok')
         inside = [n for n in clean if opens <= n < closes]
         check('every cut was parsed (%d cuts)' % len(cuts), len(got) == len(cuts), r.stderr[-300:])
-        check('no parse-clean cut holds a line of the body (%d parse-clean, all before line %d or from line %d)' % (len(clean), opens, closes), not inside, str(inside[:5]))
+        check(
+            'no parse-clean cut holds a line of the body (%d parse-clean, all before line %d or from line %d)' % (len(clean), opens, closes),
+            not inside,
+            str(inside[:5]),
+        )
         # The runs: a test copy with one marker line as the body's first statement (the line numbers above are of the real bundle).
         marked = lines[:opens] + ["Write-Host 'BODY RAN'"] + lines[opens:]
         code, out = run_cut(tmp, marked, len(marked) // 2)
@@ -115,7 +119,8 @@ def main():
         # Script check read the whole text through $script:PasteOuter (engine/ps/05-installed.ps1).
         f = tmp / 'whole-text.ps1'
         f.write_text('\n'.join(lines) + '\n', encoding='ascii')
-        r = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', ". ([scriptblock]::Create([IO.File]::ReadAllText('%s'))); Write-Output $script:scriptCheck.Line" % f],
+        cmd = ". ([scriptblock]::Create([IO.File]::ReadAllText('%s'))); Write-Output $script:scriptCheck.Line" % f
+        r = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', cmd],
                            capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=120)
         check('a run with no file reads its whole text (Script check says checked)', '(checked)' in r.stdout, (r.stdout + r.stderr)[-300:])
     finally:

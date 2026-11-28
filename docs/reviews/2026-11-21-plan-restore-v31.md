@@ -1,6 +1,6 @@
 # Plan: Restore in engine-v31 (2026-11-21)
 
-Status: the Administrator (as PFM) answered the design questions on 2026-11-21 (brief from the 90-161.Z session, 2026-11-20): rows below. Stage 3 of [2026-11-20-plan-maintenance-tools.md](2026-11-20-plan-maintenance-tools.md). Test sites only (2026-11-20). For round R41 of 90-161.Z.
+Status: the Administrator  answered the design questions on 2026-11-21 (brief from the 90-161.Z session, 2026-11-20): rows below. Stage 3 of [2026-11-20-plan-maintenance-tools.md](2026-11-20-plan-maintenance-tools.md). Test sites only (2026-11-20). For round R41 of 90-161.Z.
 
 ## Decisions (the Administrator, 2026-11-21)
 

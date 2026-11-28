@@ -7,7 +7,7 @@
 //   rho-usaf     Rho, USAF version (Logo Studies canvas, the Administrator, 2026-11-19); its SVG is copied from the canvas,
 //                not built here. Not used from 2026-11-20 (kept as a master).
 //   rho-fulcrum  Rho, Fulcrum version (same canvas and source): the RADE page in both themes, the window and its icon
-//                ("Fulcrum everywhere for now, as this is not an endorsed product", the PFM, 2026-11-20).
+//                ("Fulcrum everywhere for now, as this is not an endorsed product", the Administrator, 2026-11-20).
 // Sizes: 512 site logo and thumbnail; 128 the window (shown at 64 px) and the page at 2x; 64 the page at 1x; 32 and 16 icons.
 const {chromium} = require('playwright'); const fs = require('fs'); const path = require('path');
 const dir = path.join(__dirname, '..', 'assets', 'logo');

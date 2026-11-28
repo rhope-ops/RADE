@@ -26,7 +26,7 @@ Mockups: https://claude.ai/artifact/M2EKZCrkUtYshuFGq746Ld, page "Redesign: One 
 
 Confidence in the size and work estimates: low (no code written). All three build the base checks before Choose and R21 notes W3, W6, W8, W9 and W10; W1, W2, W5 and W7 name parts that no longer exist.
 
-Same in all three (agent choices, not decided): no Exit button (Esc or the window X; the question shows only while a step runs); the step bar is not green, so green means "passed" only; the owner's test extras are one dashed box on Done.
+Same in all three (agent choices, not decided): no Exit button (Esc or the window X; the question shows only while a step runs); the step bar is not green, so green means "passed" only; the Administrator's test extras are one dashed box on Done.
 
 Decided by the Administrator, 14 Nov 26 ([DECISIONS.md](../DECISIONS.md)): FAILED and NEEDS REVIEW are dark red #8B1A1A, so yellow means "your turn" only; the redesign has no Exit button. Concept 1 is the one to mock up further; its logo is 40 px and the word RADE 15 pt (was 24 px and 10.5 pt).
 

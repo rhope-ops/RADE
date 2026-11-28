@@ -11,15 +11,16 @@ Network: none.
 Writes: engine/rade_ui.ps1 (write_tokens only).
 Credentials: none.
 """
-import base64, json, re, textwrap
+import base64
+import json
+import re
+import textwrap
 from pathlib import Path
 
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
-UI_FILE = ENGINE_ROOT / 'engine/rade_ui.ps1'
-# The font files and their licence (engine/fonts): engine files, as the logo is.
-FONT_FILES = sorted(str(p.relative_to(ENGINE_ROOT)) for p in (ENGINE_ROOT / 'engine/fonts').glob('*') if p.is_file() and (p.suffix == '.ttf' or p.name == 'OFL.txt'))
+UI_FILE = ENGINE_ROOT / 'engine/ps/window/ui-theme.ps1'
 # The engine files this module adds (engine/rade_build.py puts them into the engine's hash, ENGINE_SHA).
-FILES = ['engine/rade_tokens.py', 'engine/ui-tokens.json'] + FONT_FILES
+FILES = ['engine/rade_tokens.py', 'engine/ui-tokens.json']
 
 
 def q(s):
@@ -88,9 +89,12 @@ def ui_token_block(t):
     dk = ['$ui.TokDark.%s = @(%d, %d, %d)' % ((name,) + tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))) for name, h in t['dark']['colors'].items()]
     out += ['; '.join(dk[i:i + 4]) for i in range(0, len(dk), 4)]
     out += ['# Sizes, gaps and field widths, in pixels at 100 % (every size set after the form has scaled goes through $ui.Sc).',
-            '$ui.Z = @{ %s' % ints('sizes'), '  %s' % ints('gaps'), '  %s }' % ints('fields'),
+            '$ui.Z = @{', '  %s' % ints('sizes'),
+            '  %s' % ints('gaps'), '  %s }' % ints('fields'),
             "# Faces: name = @(family, the font file's name in the bundle ('' = none), the family used when the font cannot be loaded)."]
-    out.append('$ui.Faces = @{ %s }' % '; '.join('%s = @(%s, %s, %s)' % (n, q(f['family']), q(Path(f['file']).name if f['file'] else ''), q(f['fallback'])) for n, f in t['faces'].items()))
+    faces = ['%s = @(%s, %s, %s)' % (n, q(f['family']), q(Path(f['file']).name if f['file'] else ''), q(f['fallback'])) for n, f in t['faces'].items()]
+    out.append('$ui.Faces = @{ %s; %s' % (faces[0], faces[1]))
+    out.append('  %s }' % '; '.join(faces[2:]))
     out += ["# Text styles: name = @(face, size in points at 100 %, font style ('' = regular)); uses: the file.", '$ui.Styles = [ordered]@{}']
     sty = ['$ui.Styles.%s = @(%s, %s, %s)' % (n, q(x['face']), repr(float(x['pt'])).rstrip('0').rstrip('.'), q(x['style'])) for n, x in t['styles'].items()]
     out += ['; '.join(sty[i:i + 4]) for i in range(0, len(sty), 4)]
@@ -135,7 +139,10 @@ def font_lines():
     """Return the bundle text that holds the fonts of engine/ui-tokens.json as base64, one here-string per file wrapped at
     100 characters as the other embedded files are (Convert.FromBase64String skips the line ends): $fontTtf = @{ ... }."""
     files = sorted({f['file'] for f in ui_tokens()['faces'].values() if f['file']})
-    parts = ["%s = @'\n%s\n'@" % (q(Path(p).name), '\n'.join(textwrap.wrap(base64.b64encode((ENGINE_ROOT / p).read_bytes()).decode('ascii'), 100))) for p in files]
+    parts = [
+        "%s = @'\n%s\n'@" % (q(Path(p).name), '\n'.join(textwrap.wrap(base64.b64encode((ENGINE_ROOT / p).read_bytes()).decode('ascii'), 100)))
+        for p in files
+    ]
     return '$fontTtf = @{\n' + '\n'.join(parts) + '\n}'
 
 

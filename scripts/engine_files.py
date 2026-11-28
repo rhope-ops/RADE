@@ -9,7 +9,14 @@ on its own build. Hashes are of the files in this checkout: run it on a clean ch
 Usage: python3 scripts/engine_files.py           lines "<sha256>  <path>" (shasum format, sorted by path)
        python3 scripts/engine_files.py --lock    JSON: repo, commit, engine and files, the fields an app lock needs
 """
-import hashlib, json, os, runpy, shutil, subprocess, sys, tempfile
+import hashlib
+import json
+import os
+import runpy
+import shutil
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent

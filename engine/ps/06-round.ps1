@@ -50,7 +50,6 @@ function Invoke-RoundSetup($run, [bool]$Clean, [string]$To, [scriptblock]$OnStat
   if ($run.ModeLine) { & $speak $run.ModeLine; $nv = Get-NewerVersionText; if ($nv) { & $speak $nv; $run.Summary += $nv } }
   if ($run.Deploy) { $blk = Get-InstalledBlock $script:app; if ($blk) { throw ($blk + '. No step ran') } }   # S1, S2: before any step
   if ($script:noWindowWhy) { & $speak ('Note: no window could open, so the round runs in text mode. Reason: ' + (ConvertTo-Masked $script:noWindowWhy)) }
-  if (Test-WordOpen) { & $speak 'Note: Word is open. Renders use Word: save your documents and close Word if a step stops.' }
   & $speak ''
   Write-BundleFile $base $speak
   if ($script:closing) { throw 'the window was closed (Exit) while the round ran; no step ran' }

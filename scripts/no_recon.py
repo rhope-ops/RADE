@@ -20,7 +20,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 # What the plain run reads: every file the bundle is made of, the build, and the sample app's scripts.
-SOURCES = ('engine/ps/*.ps1', 'engine/ps/window/*.ps1', 'engine/*.ps1', 'engine/*.py', 'tests/fixture-app/**/*.ps1')   # every engine file (fleet v2: the 450-line splits made new ones)
+SOURCES = (   # every engine file (fleet v2: the 450-line splits made new ones)
+    'engine/ps/*.ps1', 'engine/ps/window/*.ps1', 'engine/*.ps1', 'engine/*.py', 'tests/fixture-app/**/*.ps1',
+)
 # Kind and pattern, matched in any letter case. Add a word here when a review finds a new way to do the same thing.
 # Allowed on purpose, so no pattern names them: NetworkInformation.IPGlobalProperties (the NIPR guardrail reads this
 # computer's own domain name) and Sockets.SocketException (an error kind the reach check names in its detail).
@@ -28,7 +30,9 @@ RULES = (
     ('host or port test', r'\b(Test-Connection|Test-NetConnection|Test-WSMan)\b'),
     ('ping', r'\bping(\.exe)?\b|\bWin32_PingStatus\b'),
     ('name lookup', r'\b(Resolve-DnsName|nslookup|GetHostEntry|GetHostAddresses|GetHostByName)\b|\[(System\.)?Net\.Dns\]'),
-    ('network map', r'\b(Get-NetNeighbor|Get-NetRoute|Find-NetRoute|Get-NetTCPConnection|tracert|pathping|nbtstat|netstat|arp|nmap|portqry|nltest)\b|\bnet(\.exe)?\s+view\b|\bqwinsta\b'),
+    ('network map',
+     r'\b(Get-NetNeighbor|Get-NetRoute|Find-NetRoute|Get-NetTCPConnection|tracert|pathping|nbtstat|netstat|arp|nmap|portqry|nltest)\b'
+     r'|\bnet(\.exe)?\s+view\b|\bqwinsta\b'),
     ('raw socket', r'\bSockets\.(TcpClient|UdpClient|TcpListener|Socket)\b'),
     ('directory search', r'\bGet-AD[A-Za-z]+\b|\bDirectory(Searcher|Entry)\b|\[adsi(searcher)?\]'),
     ('other computer', r'\b(New-PSSession|Enter-PSSession|New-CimSession)\b|(?<!\w)-ComputerName\b'),

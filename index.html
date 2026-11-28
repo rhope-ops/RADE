@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>RADE</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1xNS9y9iWJ1jcP0MdL0vv9VJfx98UyOIbAqFsUHx1M8='; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://raw.githubusercontent.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1xNS9y9iWJ1jcP0MdL0vv9VJfx98UyOIbAqFsUHx1M8='; style-src 'self' 'sha256-NCzeEPJ6CwaQ0qKPixhn/6QtKatO3o7dn9osIuxpYw0='; img-src 'self'; connect-src 'self' https://raw.githubusercontent.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0e141c" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#15171d" media="(prefers-color-scheme: dark)">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png">
 <link rel="icon" href="assets/logo/rho-fulcrum-32.png" media="(prefers-color-scheme:light)">
@@ -15,15 +15,15 @@
    TEAMS at the right on the row of RADE with the channel name under it; the Administrator, 18 Nov 26), one card and a bottom line in the same centered 860 px column, and a 4 px bar on the bottom edge.
    Colors, one meaning each: navy = text and focus; blue = the action and progress; yellow = the line under the band;
    dark red = failed; green = done; gray = second lines. The light colors, the fonts and the contrast blocks come from
-   engine/ui-tokens.json (UI standard v1, docs/ui-standard.md); the dark scheme is the page's own. A link is underlined. */
+   engine/ui-tokens.json (UI standard v1, docs/ui-standard.md); the dark scheme uses Fulcrum Dark v2.1.1. A link is underlined. */
 /* >>> ui-tokens: generated from engine/ui-tokens.json by scripts/ui_tokens.py --write (do not edit) */
 :root{--bg:#ffffff;--navy:#0b2545;--text:#1b2430;--gray:#5a6573;--action:#00539f;--action-fg:#ffffff;--link:#00539f;--turn:#ffcd00;--fail:#8b1a1a;--pass:#2e8540;--edge:#7a8794;--track:#e3e8ee;--btn:#ffffff;
 --ui:"Sofia Sans","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;--title:"Sofia Sans Condensed","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;--mono:Consolas,"Cascadia Mono",ui-monospace,monospace}
 /* <<< ui-tokens */
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e141c;--navy:#dde8f3;--text:#e6ebf1;--gray:#a5b1c0;--action:#00539f;--action-fg:#ffffff;--link:#8db4ec;
---turn:#ffd520;--fail:#f0a3a3;--pass:#6cc487;--edge:#8794a6;--track:#243143;--btn:#172130;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#0e141c;--navy:#dde8f3;--text:#e6ebf1;--gray:#a5b1c0;--action:#00539f;--action-fg:#ffffff;--link:#8db4ec;
---turn:#ffd520;--fail:#f0a3a3;--pass:#6cc487;--edge:#8794a6;--track:#243143;--btn:#172130;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15171d;--navy:#f3eee4;--text:#f3eee4;--gray:#a9acb5;--action:#eb653b;--action-fg:#15171d;--link:#8db8f0;
+--turn:#d4af37;--fail:#f49b91;--pass:#5fd08e;--edge:#7a7f8c;--track:#3a3f4a;--btn:#222631;--focus:#ff8c66;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#15171d;--navy:#f3eee4;--text:#f3eee4;--gray:#a9acb5;--action:#eb653b;--action-fg:#15171d;--link:#8db8f0;
+--turn:#d4af37;--fail:#f49b91;--pass:#5fd08e;--edge:#7a7f8c;--track:#3a3f4a;--btn:#222631;--focus:#ff8c66;color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{height:100%}
@@ -36,7 +36,7 @@ body{margin:0;background:var(--bg);color:var(--text);font:1rem/1.5 var(--ui)}
 .band-in,.stage,.bottom{width:100%;max-width:860px;margin-inline:auto}
 .band-in{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:1fr auto auto 1fr;column-gap:14px;align-items:center;padding-block:18px}
 .band img{grid-row:1/-1;grid-column:1;width:64px;height:64px}
-/* Logo (the PFM, 20 Nov 26: "Fulcrum everywhere for now, as this is not an endorsed product"): Rho Fulcrum in the light and the dark theme; the band keeps its fixed colors in both. */
+/* Logo (the Administrator, 20 Nov 26: "Fulcrum everywhere for now, as this is not an endorsed product"): Rho Fulcrum in the light and the dark theme; the band keeps its fixed colors in both. */
 /* Right side: TEAMS in the style and on the row of RADE, the channel name in the style and on the row of the tagline (the Administrator, 18 Nov 26). */
 .band .name,.band .team{grid-row:2;margin:0;font-size:1.375rem;line-height:1.2;font-weight:650;color:#fff}
 .band .sub,.band .chan{grid-row:3;margin:2px 0 0;color:#dde8f3;font-size:.875rem}
@@ -62,7 +62,7 @@ ol{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:6px;max-wi
 .btn.app{display:block;text-align:left;width:100%;padding:10px 16px}
 .btn.app b{display:block;color:var(--navy)}
 a{color:var(--link);font-weight:700;text-decoration:underline;text-underline-offset:3px}
-:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+:focus-visible{outline:2px solid var(--focus, var(--navy));outline-offset:2px}
 .help{font-size:1.0625rem}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}   /* for screen readers only */
 .bottom{display:flex;flex-wrap:wrap;gap:6px 20px;align-items:center;padding-block:10px;font-size:.875rem}

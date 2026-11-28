@@ -8,7 +8,7 @@ docs/DECISIONS.md (rows of 17 Nov 26). This file lists what is merged, what prov
 | Stage | Pull request | What | Proof |
 |---|---|---|---|
 | 1 Engine security fixes | 87 | No Windows sign-in to any address the engine asks; host rule with port; build stops on a missing part | Full lane; `NETRULES pass`; Windows job; released as engine-v14 (783dee4) |
-| 3 Checker | 88 | Safety labels at line start with a value; owner-row gate; no debt for new files; line cap 200 | Full lane; five fresh reviews of the gate |
+| 3 Checker | 88 | Safety labels at line start with a value; Administrator-row gate; no debt for new files; line cap 200 | Full lane; five fresh reviews of the gate |
 | 4 Repo baseline | 88 | .gitattributes, .editorconfig, SECURITY.md, Dependabot, lint settings file, pinned checkout in pii-guard.yml | Full lane; `--sha` unchanged |
 | 5 Error handling | 94 | Rule X7; count of discarded-error catches with no reason (106 of 129) | Full lane; `LAYOUT pass=10 fail=0` |
 | 6 Windows PowerShell 5.1 | 95 | Job text51: a text-mode run of the sample bundle | Green on 5.1.26100: `TEXT51 pass=10 fail=0` |
@@ -34,8 +34,8 @@ Engine (for the next release, engine-v15):
 
 Checker gate (scripts/code_standard_gate.py):
 - An old decision row edited in place passes when its old line is kept elsewhere in the file (for example in an HTML comment).
-- A stale local origin/main can hide a missing owner row; CI is the backstop.
-- Tests do not kill three changes: the file named outside the decision cell, an empty owner, the working file read as text.
+- A stale local origin/main can hide a missing Administrator row; CI is the backstop.
+- Tests do not kill three changes: the file named outside the decision cell, an empty Administrator, the working file read as text.
 - The gate reads what a row says, not who wrote it (the accepted limit, in docs/code-standard.md).
 - The kit (archimedes_lever) must take the four checker files at its next port.
 

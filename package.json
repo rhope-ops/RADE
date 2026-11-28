@@ -1,0 +1,11 @@
+{
+  "name": "rade-tools",
+  "private": true,
+  "description": "Local build/logo rendering helpers for RADE",
+  "scripts": {
+    "render-logo": "node scripts/render_logo.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

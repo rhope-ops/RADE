@@ -54,13 +54,13 @@ if (-not (Test-NiprDevice)) {
 }
 $gui = $true
 try { Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing } catch { $gui = $false; $script:noWindowWhy = 'Windows Forms not available: ' + $_.Exception.Message }
-# R44 E3 (the PFM, 2026-11-25): from Windows PowerShell ISE, the window runs in a child powershell.exe -STA, the host of
+# R44 E3 (the Administrator, 2026-11-25): from Windows PowerShell ISE, the window runs in a child powershell.exe -STA, the host of
 # the shortcut, so both use one dpi path (Get-IseHandoff, Invoke-IseWindow in part 05). If the child cannot run, the
 # window runs in ISE as before, and the ISE console says why.
-# engine-v43 S3 (the PFM, 2026-11-26): the host of this RADE run, for the sign-in lines of the run log; the child scripts
+# engine-v43 S3 (the Administrator, 2026-11-26): the host of this RADE run, for the sign-in lines of the run log; the child scripts
 # and steps get it too (RADE_HOST): ise (inside ISE), child (the ISE handoff, R44 E3), shortcut (a runner copy), console.
 $env:RADE_HOST = $(if ([string]$Host.Name -eq 'Windows PowerShell ISE Host') { 'ise' } elseif ($env:RADE_FROM_ISE) { 'child' } elseif (Test-RunnerStart) { 'shortcut' } else { 'console' })
-# engine-v47 (the PFM, 2026-11-26): no DPI-aware sign-in. Steps and checks get RADE_SIGNIN_DPI=0, so an app's older copy of
+# engine-v47 (the Administrator, 2026-11-26): no DPI-aware sign-in. Steps and checks get RADE_SIGNIN_DPI=0, so an app's older copy of
 # the sign-in block (engine-v46, which turns the DPI call off only on '0') does not make the sign-in wait about 90 s.
 # A person who sets '1' before the paste keeps it on (the R47 test of the setting).
 if ($env:RADE_SIGNIN_DPI -ne '1') { $env:RADE_SIGNIN_DPI = '0' }

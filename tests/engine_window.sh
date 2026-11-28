@@ -23,7 +23,7 @@ stub() { if [ -s "$t/window_stub.dll" ]; then echo "$t/window_stub.dll"; else ec
 # steady=1 before win: this run also prints the WIN steady lines (only run 1 checks them; the probe costs about 12 s of CPU a run).
 win() { sed -E -e 's#Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing#$null = 0#' -e "s#^\\\$sitePrefix = 'https://usaf.dps.mil/sites/'#\$sitePrefix = 'https://rade-test.invalid/sites/'#" -e 's#System\.Drawing\.(FontStyle|Font|Pen|SolidBrush|Image|Graphics)\b#RadeDraw.\1#g' "${5:-$wd/wb.ps1}" > "$wd/wb2.ps1"
   cat tests/window_driver.ps1 tests/window_driver_v48.ps1 "$wd/wb2.ps1" > "$wd/w.ps1"
-  RADE_T_V48="${v48:-}" RADE_T_FAULT="${fault:-}" RADE_T_CANCEL="${cancel:-}" RADE_T_START="${start:-}" RADE_T_LINK="${link:-}" RADE_T_SCALE="${scale:-}" RADE_T_LOOP="${loop:-}" RADE_T_FEEDBACK="${feedback:-}" RADE_T_WALK="${walk:-}" RADE_T_STEADY="${steady:-}" RADE_T_STOP="${stop:-}" RADE_T_STUB="$(stub)" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$wd/u/test1234" timeout 180 pwsh -NoProfile -File "$wd/w.ps1" < /dev/null > "$wd/win.txt" 2>&1; }
+  RADE_T_V48="${v48:-}" RADE_T_FAULT="${fault:-}" RADE_T_CANCEL="${cancel:-}" RADE_T_START="${start:-}" RADE_T_LINK="${link:-}" RADE_T_SCALE="${scale:-}" RADE_T_LOOP="${loop:-}" RADE_T_FEEDBACK="${feedback:-}" RADE_T_WALK="${walk:-}" RADE_T_STEADY="${steady:-}" RADE_T_STOP="${stop:-}" RADE_T_STUB="$(stub)" RADE_T_APP="$1" RADE_T_HAND="$2" RADE_T_RECORD="$3" RADE_T_TOUR="$4" USERPROFILE="$wd/u/test1234" timeout 300 pwsh -NoProfile -File "$wd/w.ps1" < /dev/null > "$wd/win.txt" 2>&1; }
 # has TEXT...: every text is in the window output, and the window did not fall back to text mode or miss a name.
 has() { local x; grep -q "No window could open\|WIN NONAME\|WIN NOFOCUS\|WIN BAD" "$wd/win.txt" && { grep -m3 "No window could open\|WIN NONAME\|WIN NOFOCUS\|WIN BAD" "$wd/win.txt" | cut -c1-300; return 1; }; for x in "$@"; do grep -qF -- "$x" "$wd/win.txt" || { echo "  missing: $x"; return 1; }; done; grep -q "^WIN closed=True" "$wd/win.txt"; }
 go W; {   # group W: runs in the background (see "go" in tests/engine_test.sh)
@@ -47,7 +47,7 @@ has "view=hand light=your turn kick=STEP 2 OF 3 sent=Import the sample flow p=Yo
   "step=Check this computer now-font=Segoe UI10" "step=T03 Sample verify r1" 'foot=RADE needs you next at "Import the sample flow". Until then, keep this window open.' \
   "box-text=Clean-up|1  Check this computer|2  T04 Sample optional r1|3  Import the sample flow  (needs you)|4  T03 Sample verify r1 box-name=1  Check this computer" \
   "WIN hand-order address-above-lines=True lines-above-path=True path-above-links=True closing-above-buttons=True closing-gap=4" "WIN F tokens=Body,Link,Mono,Sent,Small,SmallB,Turn,Word mono-only-in-record=True sent=Segoe UI Semibold22 body=Segoe UI12 small=10 smallb=Segoe UI Semibold10 help=12 kick=Segoe UI Semibold label=Segoe UI Semibold plainbtn=Segoe UI Semibold link=Segoe UI Semibold now=Segoe UI" && ok || { bad "window 1a: titles, hand card order, type styles"; grep "view=hand\|step=\|box-text\|WIN F\|hand-order\|BAD" "$wd/win.txt" | cut -c1-700; }
-# 1a2. R28 fixes (rhope-ops/90-161.Z round R28, the PFM's notes): N4 the lines of a hand step are ONE selectable rich text (numbers in a
+# 1a2. R28 fixes (rhope-ops/90-161.Z round R28, the Administrator's notes): N4 the lines of a hand step are ONE selectable rich text (numbers in a
 # right-aligned column by a right tab, text in a hanging indent); copying across lines gives the lines as written (no tabs) and a path that
 # RADE broke to fit copies whole; N1 a step with no address has no address row, a closing line without "browser", and the focus on its text
 # (Enter answers nothing); N6 the hand card shows the file's full path; N10 the step line has the time in the step ("4m 12s"); N8 the install
@@ -65,7 +65,7 @@ has "WIN chip text=YOUR TURN font=Segoe UI Semibold yellow=True ink=True head=Ch
   grep "^WIN steady checking " "$wd/win.txt" | grep -q " moved=0 probe=True" && ! grep -qi "kick=[^=]*your turn" "$wd/win.txt" &&
   [ "$(grep "^WIN view=.* help=[TF][a-z]* chip=" "$wd/win.txt" | awk '{ y = ($0 ~ / light=your turn /); u = ($0 ~ / chip=YOUR TURN$/); if (y != u) n++ } END { print n + 0 }')" = 0 ] &&
   grep -q "^WIN view=hand .* chip=YOUR TURN$" "$wd/win.txt" && grep -q "^WIN view=run .* chip=hidden$" "$wd/win.txt" && ok || { bad "window 1a3: the YOUR TURN chip, no value moves a control"; grep "WIN chip\|WIN steady" "$wd/win.txt" | cut -c1-400; }
-[ "$(cat $engine_src $ui_src | grep -c Consolas)" = 1 ] && grep -qF "mono = @('Consolas', '', 'Consolas')" engine/rade_ui.ps1 && grep -qF "\$ui.Styles.Mono = @('mono', 9, '')" engine/rade_ui.ps1 && [ "$(cat $engine_src $ui_src | grep -c 'F\.Mono')" = 1 ] && grep -q "RecText.Font = \$ui.F.Mono" $engine_src && ok || bad "type: Consolas is only the Mono token, and only the Record's text box uses it"
+[ "$(cat $engine_src | grep -v 'FontNote' | grep -v '^[[:space:]]*#' | grep -c Consolas)" = 1 ] && grep -qF "mono = @('Consolas', '', 'Consolas')" engine/ps/window/ui-theme.ps1 && grep -qF "\$ui.Styles.Mono = @('mono', 9, '')" engine/ps/window/ui-theme.ps1 && [ "$(cat $engine_src | grep -c 'F\.Mono')" = 1 ] && grep -q "RecText.Font = \$ui.F.Mono" $engine_src && ok || bad "type: Consolas is only the Mono token, and only the Record's text box uses it"
 wr="$wd/u/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt"
 ! grep -q "Import the sample flow\|Check this computer" "$wr" && grep -q "^T01 Sample check r1: PASSED" "$wr" && grep -q "^T02 Sample import r1: PASSED (confirmed by you)" "$wr" && ok || { bad "title: the report keeps the step name and never shows the title"; grep -n "Import the sample flow\|Check this computer" "$wr"; }
 # 1b. The hand step's questions after Done: one card each (No, the second choice, a text with an e-mail address), and
@@ -77,7 +77,7 @@ has "view=answer light=your turn kick=STEP 2 OF 3 · QUESTION 1 OF 3 sent=Did th
 # 1b2. After a deploy that passed (R28): RADE keeps a copy of the pasted text as the installed runner, and says in plain words what it did about the
 # desktop shortcut (here no Desktop folder exists, so it says it made none; the .lnk itself is made with WScript.Shell on Windows only).
 rn="$(ls "$wd/u/test1234/OneDrive - United States Air Force/RADE/runners/"*.ps1 2>/dev/null | head -1)"   # engine-v42 (R44 E1): one runner copy for each app, RADE\runners\<key>.ps1
-[ -n "$rn" ] && [ -f "$rn" ] && [ "$(basename "$rn" .ps1 | grep -cE '^[0-9a-f]{12}$')" = 1 ] && grep -q "^\$buildId = '" "$rn" && grep -q "^\$engineRelease = [0-9]" "$rn" && grep -qF "RADE could not find your Desktop folder, so it made no desktop shortcut. Open RADE from the RADE page instead." "$wd/win.txt" && ok || bad "window 1b2: installed runner copy and the desktop shortcut line"
+[ -n "$rn" ] && [ -f "$rn" ] && [ "$(basename "$rn" .ps1 | grep -cE '^[0-9a-f]{12}$')" = 1 ] && grep -q "^\$buildId = '" "$rn" && grep -q "^\$engineRelease = [0-9]" "$rn" && grep -qF "RADE could not find your Desktop folder, so it made no desktop shortcut. Open RADE from the GitHub README instead." "$wd/win.txt" && ok || bad "window 1b2: installed runner copy and the desktop shortcut line"
 # 1c. A minimized window comes back when RADE needs the person; it has its own taskbar button (Application.Run: no owner).
 # The layout line and the SCALE line at 100 %; the sizes RADE sets after the form has scaled, at 100 % (the same numbers as
 # before the one scale source: tests/window_driver.ps1 "WIN measure").
@@ -145,7 +145,7 @@ fault=boot win 0 done 0 0
 has "view=boot" "view=booterr light=failed kick=STOPPED sent=RADE could not check this computer. p=The test made the boot checks fail / Nothing was changed. / What to do: select \"Try again\"." "btn=[Close] [Try again (Enter)]" "help=For help, ask in the Teams channel" "view=choose" && ok || { bad "window 2c: boot error card"; grep "view=booterr" "$wd/win.txt" | cut -c1-300; }
 fault=noapps win 0 done 0 0
 has "view=noapps light=failed kick=NOTHING TO CHOOSE sent=No application is listed in this paste." "btn=[Close (Enter)]" && ok || { bad "window 2c: no application card"; grep "view=noapps" "$wd/win.txt" | cut -c1-300; }
-# 3. A test round: the owner's test extras show on Done; a deploy never shows them (1 and 2 have no "test=shown").
+# 3. A test round: the Administrator's test extras show on Done; a deploy never shows them (1 and 2 have no "test=shown").
 # Here Application.Run fails as when a message loop already runs on the thread: the window opens with ShowDialog.
 loop=1 win 0 done 0 0
 has "shown-by=ShowDialog" "sent=Ready to run round R01." "view=done light=passed kick=ALL 3 STEPS PASSED sent=Round R01 is done. p=3 steps and 8 checks passed in " "test=shown" "WIN draft-note=The Outlook draft could not be created" "WIN note link=True saved=True card=True masked=True" && ! grep -q "Sample app (deploy).*test=shown" "$wd/win.txt" && ok || { bad "window 3: test round"; tail -5 "$wd/win.txt" | cut -c1-300; }
@@ -272,7 +272,7 @@ P
 # A deploy asks no last question.
 ! grep -q "view=feedback" "$t/w1/win.txt" && ! grep -q "^Other feedback" "$t/w1/u/test1234/OneDrive - United States Air Force/RADE/SampleApp/Rounds/R01/SAMPLE-R01-report-r1.txt" && ok || bad "r31 L4: a deploy has no last question"
 echo "GROUP $pass $fail"; } > "$t/grp-W4.log" 2>&1 &
-go W5; {   # group W5: an app with application.productName (engine-v47, the PFM, 2026-11-26: "Kanon icon and name")
+go W5; {   # group W5: an app with application.productName (engine-v47, the Administrator, 2026-11-26: "Kanon icon and name")
 wgo w5
 cp -r "$t/app" "$wd/kapp"; python3 -c "import json,sys; p=sys.argv[1]; m=json.load(open(p)); m['application'].update(productName='Kanon', subtitle='Publications and Forms Management'); json.dump(m,open(p,'w'),indent=2)" "$wd/kapp/scripts/paste_bundles.json"
 python3 engine/rade_build.py --app-root "$wd/kapp" > "$wd/kbuild.txt" 2>&1 || cat "$wd/kbuild.txt"

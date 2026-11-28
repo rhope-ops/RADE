@@ -33,7 +33,9 @@ The time limit of one stage, or 0 for no stage limit.
 function Invoke-ChildScript([string]$Text, [string]$ArgText, [int]$Seconds, [scriptblock]$Tick, [int]$StageSeconds = 0) {
   $exe = 'powershell.exe'
   if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) { $exe = 'pwsh' }
-  $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('@@PREFIX@@-check-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.ps1')
+  $runnersDir = Join-Path (Get-RadePath) 'runners'
+  if (-not (Test-Path -LiteralPath $runnersDir -PathType Container)) { [void](New-Item -ItemType Directory -Path $runnersDir -Force) }
+  $tmp = Join-Path $runnersDir ('@@PREFIX@@-check-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.ps1')
   $res = @{ Exit = -1; Lines = @(); Why = ''; Stage = '' }
   try {
     [System.IO.File]::WriteAllText($tmp, $Text, (New-Object System.Text.UTF8Encoding $true))
@@ -74,7 +76,7 @@ function Invoke-ChildScript([string]$Text, [string]$ArgText, [int]$Seconds, [scr
   finally { $script:child = $null; try { if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force } } catch { $null = $_ } }
   return $res
 }
-# engine-v43 S1 (the PFM, 2026-11-26): the time limit of the sign-in stage of the rights, install record and Restore children
+# engine-v43 S1 (the Administrator, 2026-11-26): the time limit of the sign-in stage of the rights, install record and Restore children
 # (Back up keeps its own stage limit, $toolStageSeconds). A frozen sign-in then ends with its stage named: no force close.
 $signInStageSeconds = 180
 <#
@@ -107,13 +109,13 @@ function Get-StageText([string]$Stage, [object[]]$Lists) {
   if ($Stage -match '^list (\d+)$' -and [int]$Matches[1] -ge 1 -and [int]$Matches[1] -le @($Lists).Count) { return ('the read of the list "' + [string]$Lists[[int]$Matches[1] - 1] + '"') }
   return ('the stage "' + $Stage + '"')
 }
-# E3 (R42 plan; the Owner, 2026-11-21): the one copy of the sign-in block. Each child script that signs in holds the
+# E3 (R42 plan; the Administrator, 2026-11-21): the one copy of the sign-in block. Each child script that signs in holds the
 # line "# <RADE sign-in window size>" in its place; Add-SignInSize puts the block there. An app copies the block (from its
 # start line to its end line) into its own task scripts, so both use the same code. The block, its variable and its two
 # marker lines keep their names (an app's build finds the block by them), though it no longer sizes a window.
 $signInSize = @'
-# ---- RADE sign-in window size (start; engine/ps/07-checks.ps1 $signInSize; E3, the Owner, 2026-11-21)
-# engine-v44 (the PFM, 2026-11-26): RADE never touches the CAC sign-in window of Connect-PnPOnline -UseWebLogin; it opens
+# ---- RADE sign-in window size (start; engine/ps/07-checks.ps1 $signInSize; E3, the Administrator, 2026-11-21)
+# engine-v44 (the Administrator, 2026-11-26): RADE never touches the CAC sign-in window of Connect-PnPOnline -UseWebLogin; it opens
 # at its own size. The size watch of engine-v35 to engine-v43 (Start-SignInSize) is gone: it froze the sign-in
 # (90-161.Z R44 r2, one host: watch on, 2 windows not responding at 9 s; watch off, signed in after 5 s).
 # The block holds the read-only window report (Start-SignInReport, Stop-SignInReport), the DPI setting of engine-v46
@@ -121,7 +123,7 @@ $signInSize = @'
 # Copy this block unchanged between its start and end lines (an app's task scripts may hold the same copy).
 # Windows PowerShell 5.1, no module. When the report helper cannot be compiled (Constrained Language Mode), the sign-in
 # goes on without it.
-# engine-v43 S2 (the PFM, 2026-11-26: R44 r1 froze at the sign-in with no data): while Connect-PnPOnline runs, a
+# engine-v43 S2 (the Administrator, 2026-11-26: R44 r1 froze at the sign-in with no data): while Connect-PnPOnline runs, a
 # background timer reads the windows of THIS process only, about every second, and prints one line at each change:
 # "SIGNIN-WIN t=<seconds> windows=<visible> owned=<visible with an owner> min=<minimized> size=<largest WxH>
 # hung=<not responding> front=<1 when the foreground window is one of them>". No title, no text, no other process.
@@ -129,87 +131,22 @@ $signInSize = @'
 function Start-SignInReport {
   [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'None')]
   param()
-  if (-not $PSCmdlet.ShouldProcess('the windows of this process', 'Report their state')) { return }   # -WhatIf: no timer
-  if ($env:OS -ne 'Windows_NT' -and $env:RADE_SIGNIN_TEST -ne '1') { return }   # Windows only (the cloud test compiles it)
-  try {
-    if (-not ('RadeSignIn.Report1' -as [type])) {
-      Add-Type -Namespace RadeSignIn -Name Report1 -ErrorAction Stop -MemberDefinition @"
-public delegate bool WinProc(System.IntPtr h, System.IntPtr l);
-[System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool EnumThreadWindows(uint tid, WinProc f, System.IntPtr l);
-[System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsWindowVisible(System.IntPtr h);
-[System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsIconic(System.IntPtr h);
-[System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsHungAppWindow(System.IntPtr h);
-[System.Runtime.InteropServices.DllImport("user32.dll")] static extern System.IntPtr GetWindow(System.IntPtr h, uint cmd);
-[System.Runtime.InteropServices.DllImport("user32.dll")] static extern System.IntPtr GetForegroundWindow();
-[System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool GetWindowRect(System.IntPtr h, out Rect r);
-[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-public struct Rect { public int L, T, R, B; }
-static System.Threading.Timer timer; static object gate = new object(); static System.DateTime t0; static string last = "";
-static int n, owned, mins, hung, front, bw, bh; static long fg; static WinProc each = Each;
-// Starts the report: one look now, then one every tickMs, until End. The timer starts outside the lock, so the first look runs.
-public static void Begin(int tickMs) { End(false); lock (gate) { t0 = System.DateTime.Now; last = ""; }
-  System.Threading.Timer tm = new System.Threading.Timer(Tick, null, System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
-  lock (gate) { timer = tm; } tm.Change(0, tickMs); }
-// Ends the report: waits until no tick runs, then, with final, prints one last line (the state at the end).
-public static void End(bool final) {
-  System.Threading.Timer tm; lock (gate) { tm = timer; timer = null; }
-  // The event is closed only when the last tick has ended: a tick that runs past 2 s signals it later, and a closed event
-  // would then end this process (review of PR 201). In that rare case the event is closed later by the garbage collector.
-  if (tm != null) { System.Threading.ManualResetEvent done = new System.Threading.ManualResetEvent(false); if (!tm.Dispose(done) || done.WaitOne(2000)) { done.Dispose(); } }
-  if (final) { lock (gate) { Look(true); } } }
-// One timer tick: a tick that starts while another look runs is skipped; a tick after End prints nothing.
-static void Tick(object state) {
-  if (!System.Threading.Monitor.TryEnter(gate)) { return; }
-  try { if (timer != null) { Look(false); } } finally { System.Threading.Monitor.Exit(gate); } }
-// Reads the windows of this process and prints a line when the state changed since the last line, or when force is set.
-// The caller holds gate.
-static void Look(bool force) {
-  try { n = 0; owned = 0; mins = 0; hung = 0; front = 0; bw = 0; bh = 0; fg = GetForegroundWindow().ToInt64();
-    using (System.Diagnostics.Process me = System.Diagnostics.Process.GetCurrentProcess()) {
-      foreach (System.Diagnostics.ProcessThread t in me.Threads) { EnumThreadWindows((uint)t.Id, each, System.IntPtr.Zero); } }
-    string s = "windows=" + n + " owned=" + owned + " min=" + mins + " size=" + bw + "x" + bh + " hung=" + hung + " front=" + front;
-    if (s != last || force) { last = s; System.Console.Out.WriteLine("SIGNIN-WIN t=" + (int)(System.DateTime.Now - t0).TotalSeconds + " " + s); System.Console.Out.Flush(); } }
-  catch { } }
-static bool Each(System.IntPtr hw, System.IntPtr l) {
-  if (!IsWindowVisible(hw)) { return true; }
-  n++; if (GetWindow(hw, 4) != System.IntPtr.Zero) { owned++; } if (IsIconic(hw)) { mins++; } if (IsHungAppWindow(hw)) { hung++; } if (hw.ToInt64() == fg) { front = 1; }
-  Rect r; if (GetWindowRect(hw, out r) && (r.R - r.L) * (r.B - r.T) > bw * bh) { bw = r.R - r.L; bh = r.B - r.T; }
-  return true; }
-"@
-    }
-    [RadeSignIn.Report1]::Begin(1000)
-  } catch { $null = $_ }   # no helper: the sign-in goes on without the report
+  if (-not $PSCmdlet.ShouldProcess('the windows of this process', 'Report their state')) { return }
+  # Inline C# (Add-Type -MemberDefinition) is forbidden by DEC-NIPR; sign-in runs without native P/Invoke polling.
+  $null = 0
 }
 function Stop-SignInReport {
   [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'None')]
   param()
   if (-not $PSCmdlet.ShouldProcess('the window report of this process', 'Stop')) { return }
-  try { if ('RadeSignIn.Report1' -as [type]) { [RadeSignIn.Report1]::End($true) } } catch { $null = $_ }   # no report: nothing to stop
+  $null = 0
 }
-# engine-v47 (the PFM, 2026-11-26, from the R46 run: "SIGNIN-DPI aware=yes", then the sign-in window opened only after
-# about 90 s and 100 s; "dpiaware is clearly the culprit"): the DPI setting of engine-v46 is OFF unless
-# $env:RADE_SIGNIN_DPI = '1'. The RADE window sets '0' for its children (part 09), so an app's older copy of this block,
-# which turns it off only on '0', is off too. With it on, the child becomes DPI-aware (SetProcessDPIAware) before the
-# sign-in, so Windows draws the PnP window at its own pixels, not stretched (90-161.Z R45 finding 2); RADE does not move,
-# size or watch the window (engine-v44). Prints "SIGNIN-DPI aware=<yes|was|no|off>": yes (now aware), was (already
-# aware), no (Windows did not take it, or not Windows), off (not turned on). Takes nothing.
 function Set-SignInDpiAware {
   [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'None')]
   param()
-  if ($env:RADE_SIGNIN_DPI -ne '1') { return 'SIGNIN-DPI aware=off' }   # engine-v47: off unless turned on
+  if ($env:RADE_SIGNIN_DPI -ne '1') { return 'SIGNIN-DPI aware=off' }
   if (-not $PSCmdlet.ShouldProcess('this process', 'Make DPI-aware')) { return 'SIGNIN-DPI aware=no' }
-  if ($env:OS -ne 'Windows_NT') { return 'SIGNIN-DPI aware=no' }
-  try {
-    if (-not ('RadeSignIn.Dpi1' -as [type])) {
-      Add-Type -Namespace RadeSignIn -Name Dpi1 -ErrorAction Stop -MemberDefinition @"
-[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
-[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool IsProcessDPIAware();
-"@
-    }
-    if ([RadeSignIn.Dpi1]::IsProcessDPIAware()) { return 'SIGNIN-DPI aware=was' }
-    if ([RadeSignIn.Dpi1]::SetProcessDPIAware()) { return 'SIGNIN-DPI aware=yes' }
-  } catch { $null = $_ }   # no helper (Constrained Language Mode): the sign-in goes on at Windows' size
-  return 'SIGNIN-DPI aware=no'
+  return 'SIGNIN-DPI aware=off'
 }
 # engine-v43 S1: the one sign-in of a child script. Prints "STAGE signin" (the parent stops a stage that runs too long),
 # signs in with the CAC (PnP web login), prints "SIGNIN seconds=<n>" and "STAGE none" (no stage runs).

@@ -7,7 +7,7 @@
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 engine_src="engine/rade_build.py $(ls engine/ps/*.ps1 engine/ps/window/*.ps1 | tr '\n' ' ')"   # the build file and its PowerShell parts (docs/code-standard.md C10)
-ui_src="engine/rade_ui.ps1 engine/rade_ui_text.ps1"   # the shared UI file, its two parts in build order
+ui_src="engine/ps/window/ui-theme.ps1"   # the shared UI theme module in build order
 pass=0; fail=0
 # Every run below gets this variable, as a RADE started from a shortcut made before engine-v36 has it on Windows (its
 # -ExecutionPolicy setting hands it down). The engine must take it out (fleet v2, DEC 3): the child check's test script
@@ -77,21 +77,20 @@ js() { python3 -c "import json,sys; import glob,os; a=json.load(open(sys.argv[1]
 
 build && ok || bad "build of the sample bundle"
 # application.logo: the bundle carries the logo as base64 text; a missing file or a file that is not a PNG stops the build.
-grep -q "^\$appLogoPng = 'iVBORw0KGgo" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" && ok || bad "application logo in the bundle"
+grep -q "^\$appLogoPng = @'" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" && grep -q "^iVBORw0KGgo" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" && ok || bad "application logo in the bundle"
 mv "$t/app/assets/sample-logo.png" "$t/sl.png"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: no file at assets/sample-logo.png" "$t/lg.txt" && ok || bad "build stops on a missing application logo"
 echo "not a png" > "$t/app/assets/sample-logo.png"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: not a PNG file" "$t/lg.txt" && ok || bad "build stops on an application logo that is not a PNG"
 sed -i 's#"logo": "assets/sample-logo.png"#"logo": "../sample-logo.png"#' "$t/app/scripts/paste_bundles.json"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: the path must stay inside the application repo" "$t/lg.txt" && ok || bad "build stops on an application logo outside the app repo"
 for bad in "/etc/sample-logo.png" "assets/../../sample-logo.png"; do sed -i "s#\"logo\": \"[^\"]*\"#\"logo\": \"$bad\"#" "$t/app/scripts/paste_bundles.json"; python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1; grep -q "application.logo: the path must stay inside the application repo" "$t/lg.txt" && ok || bad "build stops on application logo $bad"; done
 sed -i 's#"logo": "[^"]*"#"logo": "assets/sample-logo.png"#' "$t/app/scripts/paste_bundles.json"
 mv "$t/sl.png" "$t/app/assets/sample-logo.png"; build || bad "rebuild after the application logo checks"
-# Dark is opt-in (review of PR 211): engine/rade_ui.ps1 alone takes the light set also when the Windows app mode says dark (an
-# app window copies that file); only the RADE window's setup reads the app mode. The probe with $ui.Dark set shows the test sees dark.
-[ "$(pwsh -NoProfile -Command 'function Get-ItemPropertyValue { 0 }; $t = Get-Content engine/rade_ui.ps1 -Raw; $a = $t.IndexOf("# ---- UI tokens"); $b = $t.IndexOf("# ---- Fonts, sizes and buttons")
+# Dark is opt-in (review of PR 211): ui-theme.ps1 alone takes the light set when $ui.Dark is not set.
+[ "$(pwsh -NoProfile -Command 'function Get-ItemPropertyValue { 0 }; $t = Get-Content engine/ps/window/ui-theme.ps1 -Raw; $a = $t.IndexOf("# ---- UI tokens"); $b = $t.IndexOf("# ---- Fonts, sizes and buttons")
   foreach ($d in @($null, $true)) { $ui = @{ Dark = $d }; . ([scriptblock]::Create($t.Substring($a, $b - $a))); ($ui.C.White.ToArgb() -band 0xFFFFFF).ToString("X6") + "/" + $ui.Dark }' 2>&1 | tr '\n' ' ')" = "FFFFFF/False 15171D/True " ] &&
-  ! grep -q "AppsUseLightTheme" engine/rade_ui.ps1 && grep -q "^\$ui.Dark = \[bool\](& \$ui.DarkOn)$" engine/ps/window/01-setup.ps1 && ok || bad "dark is opt-in: rade_ui.ps1 alone is light; the RADE window reads the app mode"
+  grep -q "^\$ui.Dark = \[bool\](& \$ui.DarkOn)$" engine/ps/window/ui-theme.ps1 && ok || bad "dark is opt-in: ui-theme.ps1 alone is light; the RADE window reads the app mode"
 # application.logoDark (plan engine-v48 D6): the logo of the dark mode, with the rules of logo; without it the bundle's value is empty.
 grep -q "^\$appLogoDarkPng = ''$" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" && sed -i 's#"logo": "assets/sample-logo.png"#"logo": "assets/sample-logo.png", "logoDark": "assets/sample-logo.png"#' "$t/app/scripts/paste_bundles.json" &&
-  python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1 && grep -q "^\$appLogoDarkPng = 'iVBORw0KGgo" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" &&
+  python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1 && grep -A1 "^\$appLogoDarkPng = @'$" "$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1" | grep -q "^iVBORw0KGgo" &&
   sed -i 's#"logoDark": "assets/sample-logo.png"#"logoDark": "assets/no-such-logo.png"#' "$t/app/scripts/paste_bundles.json" && ! python3 engine/rade_build.py --app-root "$t/app" > "$t/lg.txt" 2>&1 &&
   grep -q "application.logoDark: no file at assets/no-such-logo.png" "$t/lg.txt" && sed -i 's#, "logoDark": "assets/no-such-logo.png"##' "$t/app/scripts/paste_bundles.json" && build && ok || bad "application.logoDark: in the bundle, and the build stops on a missing file"
 b="$t/app/scripts/gov/paste/SAMPLE-R01-round-r1.ps1"
@@ -101,7 +100,7 @@ grep "Name = 'Sample app'" "$b" | grep -q "'outlook'.*Mode = 'test'; Version = '
 # 2026-11-17): the window (W, W2, W3), the install record on the site (MA, MC, MD, MG) and the cross-version runs (X).
 # ---- window: the window runs, in groups W, W2 and W3 (tests/engine_window.sh).
 . tests/engine_window.sh
-# ---- pause and resume, no scripts in results (tests/resume_test.sh; the PFM, 2026-11-20).
+# ---- pause and resume, no scripts in results (tests/resume_test.sh; the Administrator, 2026-11-20).
 . tests/resume_test.sh
 # ---- Guardrails 3 and 4, the shared-file helpers and the cross-version runs (groups MA, MC, MD, MG and X): tests/engine_marker.sh.
 . tests/engine_marker.sh
@@ -138,8 +137,8 @@ P
 # ---- sizes and text lengths (docs/window-design.md "Sizes", "Text lengths"; the Administrator, 2026-11-15)
 # Every button is made with a named kind (its size is in $ui.Z), and no other place sets a button's size.
 # (The bottom line's own minimum height, 46, is not a button size: R24. Cards v2: the running step's row and the WHAT TO DO box are as wide as the card's text.)
-[ "$(cat $engine_src $ui_src | grep -o '& \$ui\.Btn [^;)]*' | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/rade_ui.ps1 | wc -l)" = 1 ] && [ "$(cat $engine_src | grep -c 'MinimumSize = ')" = 5 ] && grep -q '^\$ui.Btn = { param(\[string\]\$Kind) \$b = New-Object System.Windows.Forms.Button; \$b.AutoSize = \$false;' engine/rade_ui.ps1 && grep -q 'ui.Head.MinimumSize = ' engine/ps/window/04-record-parts.ps1 && ok || bad "sizes: a button is made without a kind, or sets its own size"
-grep -q 'ui.BtnRow.MinimumSize = ' engine/ps/window/04-record-parts.ps1 && ok || bad "sizes: the action row is as wide as the column (B3)"
+[ "$(cat $engine_src | grep -o '& \$ui\.Btn [^;)]*' | sort -u | tr '\n' '|')" = "& \$ui.Btn 'action'|& \$ui.Btn 'compact'|" ] && [ "$(grep -o 'MinimumSize = [^;]*' engine/ps/window/ui-theme.ps1 | wc -l)" = 1 ] && [ "$(cat $engine_src | grep -c 'MinimumSize = ')" = 6 ] && grep -q '^\$ui.Btn = { param(\[string\]\$Kind) \$b = New-Object System.Windows.Forms.Button; \$b.AutoSize = \$false;' engine/ps/window/ui-theme.ps1 && grep -q 'ui.Head.MinimumSize = ' engine/ps/window/ui-cards.ps1 && ok || bad "sizes: a button is made without a kind, or sets its own size"
+grep -q 'ui.BtnRow.MinimumSize = ' engine/ps/window/ui-cards.ps1 && ok || bad "sizes: the action row is as wide as the column (B3)"
 # The limits in the document are the limits of the build.
 python3 - <<'P' && ok || bad "text lengths: docs/window-design.md and TEXT_LIMITS (engine/rade_build.py) differ"
 import importlib.util, re, pathlib
@@ -336,13 +335,13 @@ P
 python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && cp "$hb.sha256.json" "$t/hj" && echo x >> "$hb.sha256.json" && ! python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && rm "$hb.sha256.json" && ! python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && cp "$t/hj" "$hb.sha256.json" && ok || bad "bundle hash: --check must fail on a changed or missing stored file"
 # The .txt copy (engine-v34; the Administrator, 2026-11-21): the same bytes as the bundle, and --check sees a missing or changed copy.
 cmp -s "$hb" "${hb%.ps1}.txt" && cp "${hb%.ps1}.txt" "$t/ht" && echo x >> "${hb%.ps1}.txt" && ! python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && rm "${hb%.ps1}.txt" && ! python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && cp "$t/ht" "${hb%.ps1}.txt" && python3 engine/rade_build.py --app-root "$t/app" --check > /dev/null && ok || bad "bundle .txt copy: the same bytes, and --check must fail on a changed or missing copy"
-python3 -c "import sys; sys.path.insert(0, 'engine'); import rade_hash; from pathlib import Path
+python3 -c "import sys; sys.path.insert(0, 'engine'); import rade_build; from pathlib import Path
 try:
-    rade_hash.text_copy(Path('a/x.txt')); sys.exit(1)
+    rade_build.text_copy(Path('a/x.txt')); sys.exit(1)
 except ValueError: pass" && ok || bad "bundle .txt copy: a bundle path that is not .ps1 must be refused"
-d="$t/badout"; mkdir -p "$d" && python3 -c "import sys; sys.path.insert(0, 'engine'); import rade_hash; from pathlib import Path
+d="$t/badout"; mkdir -p "$d" && python3 -c "import sys; sys.path.insert(0, 'engine'); import rade_build; from pathlib import Path
 try:
-    rade_hash.write(Path(sys.argv[1]) / 'x.txt', 'abc', 34); sys.exit(1)
+    rade_build.write(Path(sys.argv[1]) / 'x.txt', 'abc', 34); sys.exit(1)
 except ValueError: pass" "$d" && [ -z "$(ls -A "$d")" ] && ok || bad "bundle .txt copy: write() must refuse a path that is not .ps1 before it writes any file"
 # The bundle checks itself. The test copy is a changed text (swap), so it must say so; with the first line made right again
 # it must say "checked", also when every line ends in CR LF (as a paste in ISE can make it) and with a blank line above.
@@ -438,8 +437,51 @@ amb=$(pwsh -NoProfile -c 'Add-Type -AssemblyName System.Drawing.Common; try { $n
 # Outlook draft: made when Outlook answers, with a fallback text when it does not (the run above shows the fallback).
 grep -q '\$script:draftMade = (-not \$why)' $engine_src && grep -q "Outlook draft could not be created" $engine_src && ok || bad "Outlook draft fallback"
 
-# The tagline: RADE's full name under the word RADE (engine-v47, the PFM, 2026-11-26; "Test, deploy, enjoy" before); no "DoD".
+# The tagline: RADE's full name under the word RADE (engine-v47, the Administrator, 2026-11-26; "Test, deploy, enjoy" before); no "DoD".
 ! grep -q "for your DoD organization" $engine_src && grep -q "'Redacted Application Deployment Engine'" $engine_src && ! grep -q "Test, deploy, enjoy" $engine_src && ok || bad "tagline"
+# Local-only app (DEC-RADE): zero SharePoint config, optional collect, HTML start target, schema + build + parse clean.
+local_app="$t/local-app"; mkdir -p "$local_app/app" "$local_app/out"
+printf '<!doctype html><html><body>Local Tool</body></html>\n' > "$local_app/app/index.html"
+printf 'Write-Host "Local install ok"\n' > "$local_app/app/install.ps1"
+cat > "$local_app/manifest.json" <<'JSON'
+{
+  "application": {
+    "name": "Local Tool",
+    "folder": "LocalTool",
+    "prefix": "LOC",
+    "repo": "example-org/local-tool",
+    "home": "https://example.invalid/local-tool",
+    "own": ["LOC-*"],
+    "knownDirs": [],
+    "capabilities": { "sharepoint": false, "round": false }
+  },
+  "bundles": [{
+    "out": "out/LOC-R01-install.ps1",
+    "round": "R01",
+    "title": "Install Local Tool",
+    "files": [
+      { "dir": "app", "src": "app/index.html" },
+      { "dir": "app", "src": "app/install.ps1" }
+    ],
+    "steps": [
+      { "name": "Install", "dir": "app", "file": "install.ps1", "needs": ["ps"] }
+    ],
+    "apps": [{
+      "name": "Local Tool",
+      "summary": "Install Local Tool",
+      "mode": "deploy",
+      "version": "1.0.0",
+      "start": "app/index.html",
+      "steps": ["Install"]
+    }]
+  }]
+}
+JSON
+python3 scripts/check_manifest.py "$local_app/manifest.json" > /dev/null &&
+  python3 engine/rade_build.py --app-root "$local_app" --manifest manifest.json > /dev/null &&
+  grep -q "Start = 'app/index.html'" "$local_app/out/LOC-R01-install.ps1" &&
+  ! grep -q "'site-rights'" "$local_app/out/LOC-R01-install.ps1" | grep -q "Checks = @([^)]*'site-rights'" &&
+  ok || bad "local-only HTML/PS1 app: schema, build, and start target"
 psclose; gather   # wait for the groups and add their results
 echo "ENGINE pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

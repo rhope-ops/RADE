@@ -9,10 +9,10 @@
 #   of RADE sends the Windows sign-in to the address it asks (Get-WebRequest; the Administrator, 2026-11-17).
 
 # ---- Checks (PFM 14 Nov 26: RADE checks, from its window, that this computer can install the chosen app and
-# that the PFM has the rights to see it done end to end). Read-only except: one test file in the OneDrive folder and one
-# temporary script in the Windows temp folder, each deleted at once, the site address in Config when the PFM enters it,
+# that the Administrator has the rights to see it done end to end). Read-only except: one test file in the OneDrive folder and one
+# temporary script in the Windows temp folder, each deleted at once, the site address in Config when the Administrator enters it,
 # and the install record row on the site (the marker script of part 16, after a deploy step).
-# Kind: auto = runs on its own when the Check screen opens; signin = needs a CAC sign-in (button); guide = the PFM looks
+# Kind: auto = runs on its own when the Check screen opens; signin = needs a CAC sign-in (button); guide = the Administrator looks
 # in another program and answers (button). Advisory: a problem is a WARNING, never a FAILED.
 $checkDefs = @(
   @{ Id = 'nipr'; Group = 'Local'; Name = 'This computer is on NIPR (area52 domain)'; Kind = 'auto' },
@@ -69,7 +69,16 @@ function Get-FlowPortal([string]$Base) {
   foreach ($k in $script:appSteps) {
     $s = $steps[$k]
     if ($s.Url) {
-      if ($s.UrlConfig) { $p = Get-ConfigFile $Base $s.UrlConfig; if (Test-Path -LiteralPath $p -PathType Leaf) { try { $v = ([string](Get-Content -LiteralPath $p -TotalCount 1)).Trim(); if ((Test-SameHost $v $s.Url)) { return @{ Url = $v; Config = $p } } elseif ($v) { return @{ Url = $s.Url; Config = $p; Refused = $true } } } catch { $null = $_ } } }
+      if ($s.UrlConfig) {
+        $p = Get-ConfigFile $Base $s.UrlConfig
+        if (Test-Path -LiteralPath $p -PathType Leaf) {
+          try {
+            $v = ([string](Get-Content -LiteralPath $p -TotalCount 1)).Trim()
+            if ((Test-SameHost $v $s.Url)) { return @{ Url = $v; Config = $p } }
+            elseif ($v) { return @{ Url = $s.Url; Config = $p; Refused = $true } }
+          } catch { $null = $_ }
+        }
+      }
       return @{ Url = $s.Url; Config = $(if ($s.UrlConfig) { Get-ConfigFile $Base $s.UrlConfig } else { '' }) }
     }
   }
@@ -137,12 +146,22 @@ function Test-WebReach([string]$Url) {
       return @{ Ok = $true; Code = $code }
     }
     if ($e -is [System.Net.WebException]) {
-      $why = @{ Timeout = 'no reply in time'; NameResolutionFailure = 'address not found'; ConnectFailure = 'could not connect'; ProxyNameResolutionFailure = 'network proxy not found'; TrustFailure = 'the security certificate was not trusted'; SecureChannelFailure = 'secure connection failed' }[[string]$e.Status]
+      $whyMap = @{
+        Timeout = 'no reply in time'; NameResolutionFailure = 'address not found'
+        ConnectFailure = 'could not connect'; ProxyNameResolutionFailure = 'network proxy not found'
+        TrustFailure = 'the security certificate was not trusted'; SecureChannelFailure = 'secure connection failed'
+      }
+      $why = $whyMap[[string]$e.Status]
       if (-not $why) { $why = 'network error' }
       $why += ' [' + [string]$e.Status + ']'
       # R21 diagnostics: the inner error kinds, a socket error code and the TLS setting (names and numbers only, no address).
       $kinds = @(); $x = $e.InnerException
-      while ($x) { $k = $x.GetType().Name; if ($x -is [System.Net.Sockets.SocketException]) { $k += ' ' + [int]$x.ErrorCode } elseif ($x.HResult) { $k += ' 0x' + ('{0:X8}' -f $x.HResult) }; $kinds += $k; $x = $x.InnerException }
+      while ($x) {
+        $k = $x.GetType().Name
+        if ($x -is [System.Net.Sockets.SocketException]) { $k += ' ' + [int]$x.ErrorCode }
+        elseif ($x.HResult) { $k += ' 0x' + ('{0:X8}' -f $x.HResult) }
+        $kinds += $k; $x = $x.InnerException
+      }
       $tls = ''; try { $tls = [string][Net.ServicePointManager]::SecurityProtocol } catch { $null = $_ }
       if ($kinds.Count -or $tls) { $why += ' (' + (@($kinds) + @('TLS ' + $tls) -join '; ') + ')' }
       return @{ Ok = $false; Why = $why }
@@ -152,7 +171,10 @@ function Test-WebReach([string]$Url) {
 }
 # Invoke-ChildScript (runs an embedded child script; R44 E4 stage limits): part 16, engine/ps/16-site-scripts.ps1.
 # The sign-in window size block, the rights check script and the install record on the site: part 16, engine/ps/16-site-scripts.ps1.
-$rightWords = @{ ViewListItems = 'read items'; AddListItems = 'add items'; EditListItems = 'edit items'; ManageLists = 'manage lists'; ManageWeb = 'manage the site'; ManagePermissions = 'manage permissions' }
+$rightWords = @{
+  ViewListItems = 'read items'; AddListItems = 'add items'; EditListItems = 'edit items'
+  ManageLists = 'manage lists'; ManageWeb = 'manage the site'; ManagePermissions = 'manage permissions'
+}
 $rightsNeeded = @('ManageLists', 'ManageWeb', 'ManagePermissions')   # what T16 site setup and list set-up use
 function Write-SiteMarker([string]$Base, [bool]$Whole) {
   # After a deploy that ran a step: a part install is recorded too (its flows may be imported already), with the word
@@ -165,8 +187,18 @@ function Write-SiteMarker([string]$Base, [bool]$Whole) {
   $r = Invoke-ChildScript $markerScript ('-Site "' + $site + '"' + (Get-MarkerArg) + ' -Value "' + $val + '"') 300 $null $signInStageSeconds
   $null = Get-SignInNote 'Install record' $r.Lines   # engine-v43 S2, S3: the sign-in lines in the run log
   $w = ''; foreach ($l in $r.Lines) { if ($l -match '^RESULT (\S+)') { $w = $Matches[1] } }
-  if ($w -in 'added', 'updated') { return ('Install record on the site: ' + $where + ' now holds version ' + $script:app.Version + ' and the date' + $(if ($Whole) { '' } else { ', marked partial' }) + ' (' + $w + ').') }
-  $why = $(switch ($w) { 'no-list' { 'the list was not found' } 'no-pnp' { 'the SharePoint tool is not installed' } default { $(if ($r.Stage -eq 'signin') { 'the sign-in did not finish in ' + [int]($signInStageSeconds / 60) + ' minutes, so RADE stopped it' } else { 'the sign-in or the write did not finish' }) } })   # engine-v43 S1
+  if ($w -in 'added', 'updated') {
+    $part = $(if ($Whole) { '' } else { ', marked partial' })
+    return ('Install record on the site: ' + $where + ' now holds version ' + $script:app.Version + ' and the date' + $part + ' (' + $w + ').')
+  }
+  $why = $(switch ($w) {
+    'no-list' { 'the list was not found' }
+    'no-pnp' { 'the SharePoint tool is not installed' }
+    default {
+      $(if ($r.Stage -eq 'signin') { 'the sign-in did not finish in ' + [int]($signInStageSeconds / 60) + ' minutes, so RADE stopped it' }
+        else { 'the sign-in or the write did not finish' })
+    }
+  })   # engine-v43 S1
   return ('NOTE: the install record on the site (' + $where + ') was not written: ' + $why + '.' + $again)
 }
 function Split-Sentence([string]$Text) {
@@ -208,34 +240,34 @@ function Get-ComputerCheck([string]$Id, [scriptblock]$Tick) {
     else { $one = Format-CheckResult 'FAILED' 'not found' 'Sign in to OneDrive, wait until it is up to date, then select "Run checks again"' }
   }
   'disk' {
-    $od = Get-OneDrivePath
-    $root = [System.IO.Path]::GetPathRoot($od); if (-not $root) { $root = [System.IO.Path]::GetPathRoot([System.IO.Path]::GetTempPath()) }
+    $od = Get-OneDrivePath; $root = [System.IO.Path]::GetPathRoot($od)
+    if (-not $root) { $root = [System.IO.Path]::GetPathRoot([System.IO.Path]::GetTempPath()) }
     $free = (New-Object System.IO.DriveInfo($root)).AvailableFreeSpace
-    $need = 200MB; foreach ($f in $files) { $need += 2 * $f.Data.Length }
-    $mb = [math]::Floor($free / 1MB)
-    if ($free -lt $need) { $one = Format-CheckResult 'FAILED' ('{0:N0} MB free, {1:N0} MB needed' -f $mb, [math]::Ceiling($need / 1MB)) 'Free up space (for example, empty the Recycle Bin), then select "Run checks again"' }
+    $need = 200MB; foreach ($f in $files) { $need += 2 * $f.Data.Length }; $mb = [math]::Floor($free / 1MB)
+    $fix = 'Free up space (for example, empty the Recycle Bin), then select "Run checks again"'
+    if ($free -lt $need) { $one = Format-CheckResult 'FAILED' ('{0:N0} MB free, {1:N0} MB needed' -f $mb, [math]::Ceiling($need / 1MB)) $fix }
     elseif ($free -lt 1GB) { $one = Format-CheckResult 'WARNING' ('{0:N0} MB free' -f $mb) 'Enough for this deployment. Free up space soon' }
-    else { $one = Format-CheckResult 'PASSED' ('{0:N0} MB free' -f $mb) '' }
-  }
+    else { $one = Format-CheckResult 'PASSED' ('{0:N0} MB free' -f $mb) '' } }
   'write' {
     $od = Get-OneDrivePath
     if (-not (Test-Path -LiteralPath $od -PathType Container)) { $one = Format-CheckResult 'NOT RUN' 'No OneDrive folder' 'Resolve the OneDrive check first' }
     else {
       $t = Join-Path $od ('@@PREFIX@@-write-test-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.tmp')
       [System.IO.File]::WriteAllText($t, 'test'); Remove-Item -LiteralPath $t -Force
-      $one = Format-CheckResult 'PASSED' 'Test file saved and deleted' ''
-    }
-  }
+      $one = Format-CheckResult 'PASSED' 'Test file saved and deleted' '' } }
   'child' {
-    # Steps run as child scripts with no -ExecutionPolicy setting (DEC 3); a Group Policy can block them. The test script
-    # ends with code 8 if a Bypass setting was handed down to it, so "ran" proves a step runs without one.
     $r = Invoke-ChildScript "if (`$env:PSExecutionPolicyPreference -ceq 'Bypass') { exit 8 }`r`n'child ok'`r`nexit 7`r`n" '' 60 $Tick
-    # The policy of each scope that sets one: on a pass the Group Policy scopes only; on a failure every scope, for the ISSM.
-    $all = @(); try { $all = @(Get-ExecutionPolicy -List | Where-Object { [string]$_.ExecutionPolicy -ne 'Undefined' } | ForEach-Object { [string]$_.Scope + '=' + [string]$_.ExecutionPolicy }) } catch { $null = $_ }   # no scope list: the detail says none set
+    $all = @()
+    try {
+      $all = @(Get-ExecutionPolicy -List | Where-Object { [string]$_.ExecutionPolicy -ne 'Undefined' } |
+        ForEach-Object { [string]$_.Scope + '=' + [string]$_.ExecutionPolicy })
+    } catch { $null = $_ }   # no scope list: the detail says none set
     $pol = (@($all | Where-Object { $_ -match '^\w*Policy=' }) -join ', ')
     if ($r.Exit -eq 7) { $one = Format-CheckResult 'PASSED' ('Test script ran' + $(if ($pol) { ', policy [' + $pol + ']' } else { '' })) '' }
-    else { $one = Format-CheckResult 'FAILED' ('Test script did not run, exit code [' + $r.Exit + ']' + $(if ($r.Why) { ', ' + $r.Why } else { '' }) + ', scopes [' + $(if ($all.Count) { $all -join ', ' } else { 'none set' }) + ']') 'This computer blocks RADE scripts. Contact your ISSM and send the results e-mail as is' }
-  }
+    else {
+      $det = ('Test script did not run, exit code [' + $r.Exit + ']' + $(if ($r.Why) { ', ' + $r.Why } else { '' }) +
+        ', scopes [' + $(if ($all.Count) { $all -join ', ' } else { 'none set' }) + ']')
+      $one = Format-CheckResult 'FAILED' $det 'This computer blocks RADE scripts. Contact your ISSM and send the results e-mail as is' } }
   }
   return $one
 }
@@ -252,7 +284,9 @@ function Get-ProgramCheck([string]$Id) {
   }
   'word' {
     if ($env:OS -eq 'Windows_NT' -and [type]::GetTypeFromProgID('Word.Application')) {
-      if (Test-WordOpen) { $one = Format-CheckResult 'FAILED' 'Installed, but open now' 'Save your work, close Word, then select "Run checks again"' }   # PFM 14 Nov 26: blocks (1B)
+      if (Get-Process -Name WINWORD -ErrorAction SilentlyContinue) {
+        $one = Format-CheckResult 'FAILED' 'Installed, but open now' 'Save your work, close Word, then select "Run checks again"'   # PFM 14 Nov 26: blocks (1B)
+      }
       else { $one = Format-CheckResult 'PASSED' 'Installed' '' }
     } else { $one = Format-CheckResult 'FAILED' 'Not found' 'This application requires Microsoft Word' }
   }
@@ -281,7 +315,10 @@ function Get-NetworkCheck([string]$Id, [string]$Base, [string]$Site) {
     if (-not (Test-SiteUrl $Site)) { $one = Format-CheckResult 'NOT RUN' 'No site address' ('Complete the "Site address" box (it starts with ' + $sitePrefix + '), then select "Run checks again"') }
     else {
       $w = Test-WebReach $Site
-      if ($w.Ok) { $one = Format-CheckResult 'PASSED' ('Reached' + $(if ($w.Code -in 401, 403) { ', code [' + $w.Code + '] (sign-in required, as expected)' } elseif ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
+      if ($w.Ok) {
+        $note = $(if ($w.Code -in 401, 403) { ', code [' + $w.Code + '] (sign-in required, as expected)' } elseif ($w.Code) { ', code [' + $w.Code + ']' } else { '' })
+        $one = Format-CheckResult 'PASSED' ('Reached' + $note) ''
+      }
       else { $one = Format-CheckResult 'FAILED' ('Not reached: ' + $w.Why) 'Verify the address opens in Edge, then select "Run checks again"' }
     }
   }
@@ -290,7 +327,10 @@ function Get-NetworkCheck([string]$Id, [string]$Base, [string]$Site) {
     if (-not $fp.Url) { $one = Format-CheckResult 'NOT RUN' 'No Power Automate address' '' }
     else {
       $w = Test-WebReach $fp.Url
-      if ($w.Ok -and $fp.Refused) { $one = Format-CheckResult 'WARNING' ('reached the app''s own address; the saved address is not on ' + ([uri]$fp.Url).Host + ' and was not used') 'Enter an address on that host in the Power Automate step, or leave it as it is' }
+      if ($w.Ok -and $fp.Refused) {
+        $det = 'reached the app''s own address; the saved address is not on ' + ([uri]$fp.Url).Host + ' and was not used'
+        $one = Format-CheckResult 'WARNING' $det 'Enter an address on that host in the Power Automate step, or leave it as it is'
+      }
       elseif ($w.Ok) { $one = Format-CheckResult 'PASSED' ('reached' + $(if ($w.Code) { ', code [' + $w.Code + ']' } else { '' })) '' }
       else { $one = Format-CheckResult 'FAILED' ('Not reached: ' + $w.Why) 'If Power Automate opens in Edge, select "Check Power Automate"' }
     }
@@ -323,7 +363,11 @@ function Get-SiteRightsCheck([string]$Base, [string]$Site, [scriptblock]$Tick) {
       $miss = @($rightsNeeded | Where-Object { -not $have[$_] } | ForEach-Object { $rightWords[$_] })
       $got = @($have.Keys | Sort-Object | Where-Object { $have[$_] } | ForEach-Object { $rightWords[$_] })
       if ($miss.Count) { $one = Format-CheckResult 'FAILED' ('Missing: ' + ($miss -join ', ')) 'Ask a site owner to add you to the site Owners group' }
-      elseif ((Test-FirstInstall) -and $mk -like 'found *') { $one = Format-CheckResult 'FAILED' ('This site already has an install of this application [version ' + $(if ($mk -eq 'found 0') { 'not readable' } else { $mk.Substring(6) }) + '], made from another account or for another site') 'Do not install again: every flow would run twice. Ask the person who installed it to run RADE' }
+      elseif ((Test-FirstInstall) -and $mk -like 'found *') {
+        $ver = $(if ($mk -eq 'found 0') { 'not readable' } else { $mk.Substring(6) })
+        $det = 'This site already has an install of this application [version ' + $ver + '], made from another account or for another site'
+        $one = Format-CheckResult 'FAILED' $det 'Do not install again: every flow would run twice. Ask the person who installed it to run RADE'
+      }
       elseif ((Test-FirstInstall) -and $mk -ne 'none') { $one = Format-CheckResult 'FAILED' 'The install record on the site could not be read' 'Select "Sign in and check site rights" again' }
       else { $one = Format-CheckResult 'PASSED' ('Rights: ' + ($got -join ', ') + '. ' + $admText) '' }
     }
@@ -388,11 +432,195 @@ function Get-CheckSummary($Results) {
     if ($r.State -ne 'PASSED') { $rest += ('  ' + $r.State + ': ' + $d.Name + '. ' + $r.Detail) }
   }
   $savedText = $(if ($saved) { ' (' + $saved + ' from saved results)' } else { '' })
-  return @(@(('Checks. Passed: ' + $c.PASSED + $savedText + '. Warnings: ' + $c.WARNING + '. Failed: ' + $c.FAILED + '. Not run: ' + $c['NOT RUN'] + '.')) + $rest) | ForEach-Object { ConvertTo-Masked $_ }
+  $headLine = 'Checks. Passed: ' + $c.PASSED + $savedText + '. Warnings: ' + $c.WARNING + '. Failed: ' + $c.FAILED + '. Not run: ' + $c['NOT RUN'] + '.'
+  return @(@($headLine) + $rest) | ForEach-Object { ConvertTo-Masked $_ }
 }
 function Get-CheckBlock($Results) {
   # PFM 14 Nov 26: no deploy unless every check passes (a half-done deploy is hard to undo). FAILED or NOT RUN blocks;
   # a WARNING (an advisory check, or a problem the deploy can live with) does not. No "deploy anyway".
   foreach ($id in $script:appChecks) { $r = $Results[$id]; if (-not $r -or $r.State -in 'FAILED', 'NOT RUN', 'RUNNING') { return $true } }
   return $false
+}
+
+# RADE engine part 08, saved checks: keeps each check that passed in RADE\Config\rade-checks.json and
+# decides whether a later run may skip it (age, computer, PowerShell and PnP versions, scope). Uses 07-checks.ps1.
+# Joined into every bundle by engine/rade_build.py; Windows PowerShell 5.1.
+
+# ---- Saved checks (PFM 14 Nov 26, R17): RADE\Config\rade-checks.json keeps each check that PASSED, so a later run (of
+# any app on this computer) can skip it. A saved result is used only when it is at most $checkMaxDays days old, the
+# PowerShell and PnP versions and the computer are the same, and its scope (the site or the Power Automate address, as a
+# hash) matches. A check that did not pass is never saved. No DODID, name or address is in the file (details are masked).
+$checkMaxDays = 7
+# Checks whose answer can change between two runs on the same day always run (review R17 MAJOR 2: "Word is open" blocks a
+# deploy, PFM 14 Nov 26 1B; free space; a test file in OneDrive).
+$checkNoSave = @('nipr', 'word', 'disk', 'write')
+# Fast checks that are not saved in the file either, so each run of RADE makes them once (docs/engine.md "Results": fast
+# checks run fresh; from engine-v21, before it they were reused for 7 days). Their answer holds for one run of RADE, so the
+# window does not make them a second time after Choose, as it does for $checkNoSave (window/06-open.ps1).
+$checkEachRun = @('ps', 'lang', 'child')
+# Gives the first 6 bytes (12 hex characters) of the SHA-256 of the text, lower case and without a trailing "/". Takes
+# the text; gives back the hash, or an empty text for no text.
+function Get-ShortHash([string]$Text) {
+  if (-not $Text) { return '' }
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Text.ToLowerInvariant().TrimEnd('/'))
+    return (-join ($sha.ComputeHash($bytes) | Select-Object -First 6 | ForEach-Object { $_.ToString('x2') }))
+  } finally { $sha.Dispose() }
+}
+function Get-CheckHost {
+  # What makes a saved result stale when it changes: PowerShell, the PnP module, the computer (hashed).
+  if ($script:checkHost) { return $script:checkHost }
+  $pnp = ''; try { $m = @(Get-Module -ListAvailable -Name PnP.PowerShell | Sort-Object Version -Descending); if ($m.Count) { $pnp = [string]$m[0].Version } } catch { $null = $_ }
+  $script:checkHost = @{ powershell = [string]$PSVersionTable.PSVersion; pnp = $pnp; computer = (Get-ShortHash ([string]$env:COMPUTERNAME)) }
+  return $script:checkHost
+}
+function Get-CheckScope([string]$Id, [string]$Base, [string]$Site) {
+  # A result about one site or one address is good only for that site or address.
+  if ($Id -in 'net-site', 'site-rights') { return ('site:' + (Get-ShortHash $Site)) }
+  if ($Id -in 'net-flow', 'flow-guide') { return ('flow:' + (Get-ShortHash (Get-FlowPortal $Base).Url)) }
+  return ''
+}
+# Reads the saved checks from RADE\Config\rade-checks.json. Takes nothing; gives back a table of saved results, empty
+# when the file is missing or was made on another computer, PowerShell or PnP version.
+function Read-CheckCache {
+  <#
+  .SYNOPSIS
+  Reads the saved PASSED check results from RADE\Config\rade-checks.json.
+  .DESCRIPTION
+  Returns an empty hashtable if the cache file is missing, unreadable, or recorded under a different PowerShell, PnP, or computer host signature.
+  .OUTPUTS
+  Hashtable mapping check id to cached result hashtable (State, Detail, Fix, At, Scope).
+  #>
+  $p = Get-RadeConfigFile 'rade-checks.json'
+  $res = @{}
+  if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { return $res }
+  try {
+    $j = [System.IO.File]::ReadAllText($p) | ConvertFrom-Json
+    $h = Get-CheckHost
+    if ([string]$j.host.powershell -ne $h.powershell -or [string]$j.host.pnp -ne $h.pnp -or [string]$j.host.computer -ne $h.computer) { return $res }
+    foreach ($c in @($j.checks.PSObject.Properties)) {
+      $v = $c.Value
+      $at = $v.at; if ($at -is [datetime]) { $at = $at.ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture) }   # PowerShell 7 reads it as a date
+      $res[$c.Name] = @{ State = [string]$v.state; Detail = [string]$v.detail; Fix = ''; At = [string]$at; Scope = [string]$v.scope }
+    }
+  } catch { $null = $_ }   # a damaged file is ignored: every check runs
+  return $res
+}
+function Get-CheckAge([string]$At) {
+  # Days since a saved result (fractional); -1 when the date cannot be read.
+  $d = [datetime]::MinValue
+  if ([datetime]::TryParseExact($At, 'yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture, 'None', [ref]$d)) { return ((Get-Date) - $d).TotalDays }
+  return 99999   # unreadable: too old
+}
+function Get-SavedCheck($Cache, [string]$Id, [string]$Scope) {
+  <#
+  .SYNOPSIS
+  Returns a reusable cached check result if still fresh and matching scope, or $null.
+  .DESCRIPTION
+  Skips volatile checks ($checkNoSave, $checkEachRun), rejects non-PASSED or mismatched scope entries, and records staleness reasons in $script:savedWhy.
+  .PARAMETER Cache
+  Hashtable returned by Read-CheckCache.
+  .PARAMETER Id
+  Check identifier.
+  .PARAMETER Scope
+  Scope key (from Get-CheckScope) that the cached entry must match.
+  .OUTPUTS
+  Formatted saved-check result hashtable, or $null if the check must run fresh.
+  #>
+  # The saved result to use, or $null (with the reason in $script:savedWhy[$Id] when one was found but is too old).
+  if (($checkNoSave + $checkEachRun) -contains $Id) { return $null }
+  $c = $Cache[$Id]
+  if (-not $c -or $c.State -ne 'PASSED' -or $c.Scope -ne $Scope) { return $null }
+  $age = Get-CheckAge $c.At
+  if ($age -lt -0.01) { $script:savedWhy[$Id] = 'Last check date is in the future (clock changed)'; return $null }
+  if ($age -gt $checkMaxDays) { $script:savedWhy[$Id] = ('Last check ' + [int][math]::Floor([math]::Max(0, $age)) + ' days ago, older than ' + $checkMaxDays + ' days'); return $null }
+  # Two lines (the Administrator, 2026-11-14): "Last check: 17 Nov 26", then what that check found; no full stops.
+  $d0 = [datetime]::ParseExact($c.At, 'yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
+  $found = ([string]$c.Detail) -replace '\.$', ''; if ($found) { $found = $found.Substring(0, 1).ToUpperInvariant() + $found.Substring(1) }
+  return @{ State = 'PASSED'; Detail = ('Last check: ' + $d0.ToString('d MMM yy', [System.Globalization.CultureInfo]::InvariantCulture)); Fix = $found; Saved = $true; Found = $found }
+}
+function Save-CheckCache($Results, [string]$Base, [string]$Site) {
+  <#
+  .SYNOPSIS
+  Saves PASSED check results to RADE\Config\rade-checks.json and writes full details to rade-checks-last.txt.
+  .DESCRIPTION
+  Preserves entries for other apps when host matches, updates or removes entries for this run, and ignores write errors so saving never stops a run.
+  .PARAMETER Results
+  Hashtable of check results keyed by check id.
+  .PARAMETER Base
+  Base app folder path.
+  .PARAMETER Site
+  SharePoint site URL.
+  .OUTPUTS
+  None.
+  #>
+  # Keeps the old file's other entries (other apps' checks), replaces this run's: PASSED is saved, anything else removed.
+  try {
+    $p = Get-RadeConfigFile 'rade-checks.json'
+    $keep = @{}
+    if (Test-Path -LiteralPath $p -PathType Leaf) {
+      try { $j = [System.IO.File]::ReadAllText($p) | ConvertFrom-Json; foreach ($c in @($j.checks.PSObject.Properties)) { $keep[$c.Name] = $c.Value } } catch { $null = $_ }
+      try {
+        $h0 = Get-CheckHost
+        if ([string]$j.host.powershell -ne $h0.powershell -or [string]$j.host.pnp -ne $h0.pnp -or [string]$j.host.computer -ne $h0.computer) { $keep = @{} }
+      } catch { $null = $_ }
+    }
+    foreach ($id in @($Results.Keys)) {
+      $r = $Results[$id]
+      if ($r.Saved) { continue }   # a saved result keeps its first date
+      if (($checkNoSave + $checkEachRun) -contains $id) { if ($keep.ContainsKey($id)) { $keep.Remove($id) }; continue }
+      if ($r.State -eq 'PASSED') {
+        $keep[$id] = [ordered]@{
+          state = 'PASSED'; detail = (ConvertTo-Masked ([string]$r.Detail))
+          at = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
+          scope = (Get-CheckScope $id $Base $Site)
+        }
+      } elseif ($keep.ContainsKey($id) -and $r.State -ne 'RUNNING') { $keep.Remove($id) }
+    }
+    $sorted = [ordered]@{}; foreach ($k in @($keep.Keys | Sort-Object)) { $sorted[$k] = $keep[$k] }
+    $about = ('Saved RADE checks. Any app may read this file: use an entry only when its state is PASSED, its "at" is at most ' +
+      $checkMaxDays + ' days old, "host" equals this computer (PowerShell, PnP and the hashed computer name), and "scope" ' +
+      'matches (site: or flow: plus the first 12 hex of the SHA-256 of the lower-case address). Write only PASSED results; ' +
+      'remove an entry when the check does not pass.')
+    $doc = [ordered]@{
+      schema = 'rade-checks/1'
+      about = $about
+      maxAgeDays = $checkMaxDays
+      host = (Get-CheckHost)
+      checks = $sorted
+    }
+    Write-FileWhole $p ($doc | ConvertTo-Json -Depth 5)
+  } catch { $null = $_ }   # saving is a convenience: never stop for it
+  Save-CheckDetail $Results   # every check's detail, in a file beside the saved checks
+}
+<#
+.SYNOPSIS
+Writes each check of this run, with its result and its detail, to the file RADE\Config\rade-checks-last.txt.
+.DESCRIPTION
+The Administrator, 2026-11-18: a round's report and e-mail hold the check counts and only the detail of a check that did
+not pass, so a detail such as the child check's policy scopes was only in the window's Record. This file holds every detail and
+is not sent: it is in RADE\Config (the user's OneDrive), not in the results folder, so no e-mail draft attaches it (the detail of the child check
+names an execution policy, a setting of this computer). The newest run replaces it. Never an error: it is a convenience.
+.PARAMETER Results
+The check results of this run, by check id.
+#>
+function Save-CheckDetail($Results) {
+  try {
+    $hdr = 'RADE checks of ' + (Get-Date -Format 'yyyy-MM-dd HH:mm') + ', round ' + $round + ', build ' + $buildId + ', engine release ' + $engineRelease
+    $note = 'RADE does not send this file: no e-mail draft attaches it. It is in your OneDrive folder, as all of RADE\Config. The newest run replaces it.'
+    $lines = @($hdr, $note, '')
+    foreach ($id in $script:appChecks) {
+      $r = $Results[$id]; if (-not $r) { continue }
+      $d = Get-CheckDef $id
+      $lines += ConvertTo-Masked ([string]$r.State + ': ' + $d.Name + '. ' + [string]$r.Detail + $(if ($r.Saved -and $r.Found) { ' | ' + [string]$r.Found } else { '' }))
+    }
+    Write-FileWhole (Get-RadeConfigFile 'rade-checks-last.txt') (($lines -join "`r`n") + "`r`n")
+  } catch { $null = $_ }   # a convenience file: a run never stops for it
+}
+function Get-CheckToRun($Def, $Cache, [string]$Base, [string]$Site, [bool]$Force) {
+  # $null = run it now; else the saved result to show.
+  if ($Force) { return $null }
+  if ($Def.Id -eq 'site-rights' -and (Test-FirstInstall)) { return $null }   # a first install always reads the site's install record fresh
+  return (Get-SavedCheck $Cache $Def.Id (Get-CheckScope $Def.Id $Base $Site))
 }

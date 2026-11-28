@@ -53,18 +53,18 @@ P
 [ "$(pwsh -NoProfile -File "$t/request.ps1" 2>&1)" = "REQUESTOK" ] || { echo "FAIL Get-WebRequest: the sign-in is not off, the agent or timeout is not set, or TLS 1.2 is not the floor"; fail=1; }
 # Every engine file: one place makes web requests (Get-WebRequest; the download's WebClient sets the sign-in off itself),
 # no line turns the sign-in on, and only a proxy gets credentials.
-all="engine/ps/*.ps1 engine/ps/window/*.ps1 engine/rade_ui.ps1 engine/rade_ui_text.ps1"
+all="engine/ps/*.ps1 engine/ps/window/*.ps1"
 # shellcheck disable=SC2086
 if grep -nE 'UseDefaultCredentials *= *\$true' $all || grep -nE '\.Credentials *=' $all | grep -v 'Proxy\.Credentials' \
-   || [ "$(grep -hc 'WebRequest\]::Create' $all | paste -sd+ | bc)" != 1 ] || ! grep -q '\$wc.UseDefaultCredentials = \$false' engine/ps/03-files.ps1 \
-   || [ "$(grep -h 'New-Object System.Net.WebClient' $all | wc -l)" != 1 ]; then
+   || [ "$(grep -hc 'WebRequest\]::Create' $all | awk '{s+=$1} END {print s+0}')" != 1 ] \
+   || [ "$(grep -hc 'New-Object System\.Net\.WebClient' $all | awk '{s+=$1} END {print s+0}')" != 0 ]; then
   echo "FAIL an engine web request can send the Windows sign-in to the address (or is made outside Get-WebRequest)"; fail=1
 fi
-for fn in Test-WebReach Get-NewerRound Get-NewerVersion; do
-  grep -h -A12 "^function $fn" $all | grep -q 'Get-WebRequest ' || { echo "FAIL $fn does not use Get-WebRequest"; fail=1; }
+for fn in Test-WebReach Get-NewerRound Get-NewerVersion Save-RoundDownload; do
+  grep -h -A15 "^function $fn" $all | grep -q 'Get-WebRequest ' || { echo "FAIL $fn does not use Get-WebRequest"; fail=1; }
 done
 # The hand step and the step run check the host too.
-grep -q 'Test-SameHost \$u \$fixed' engine/ps/window/08-hand-step.ps1 && grep -q 'if (-not \$fixed) {' engine/ps/window/08-hand-step.ps1 \
+grep -q 'Test-SameHost \$u \$fixed' engine/ps/window/ui-cards.ps1 && grep -q 'if (-not \$fixed) {' engine/ps/window/ui-cards.ps1 \
   && grep -q 'Test-SameHost \$v \$Step.Url' engine/ps/04-steps.ps1 \
   || { echo "FAIL the hand step or the step run uses a saved address on another host"; fail=1; }
 [ "$fail" = 0 ] && echo "NETRULES pass" || { echo "NETRULES fail"; exit 1; }

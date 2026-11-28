@@ -34,9 +34,9 @@ RUNS = [
     # Maintenance card shows, with "Uninstall" at the right end (1020 wide) and on its own row (811 wide)
     ("deploy-616", 1, "done", "1", "1020x616", False),
     ("deploy-tour-small", 1, "fail", "1", "811x469", False),
-    # the Maintenance card and its tools screen at 150 % and with a contrast theme (the PFM's preview, 2026-11-20)
+    # the Maintenance card and its tools screen at 150 % and with a contrast theme (the Administrator's preview, 2026-11-20)
     ("device150-maint", 1, "done", "0", "956x1081", False),
-    ("contrast-maint", 1, "done", "0", "", False),
+    ("contrast-maint", 1, "done", "0", "1020x616", False),
     ("test-small", 0, "done", "0", "811x469", False),
     # the same bundle with every text at its limit (docs/window-design.md "Text lengths")
     ("long-616", 1, "fail", "1", "1020x616", True),
@@ -49,11 +49,11 @@ RUNS = [
     # (scaled as the 150 % run is: device()), and once with a Windows contrast theme on (CONTRAST: the window takes the
     # system colors from its first frame; the job's theme itself stays as it is).
     ("device125-full", 0, "done", "0", "", False),
-    ("device175-full", 0, "done", "0", "", False),   # 175 % (tool retirement plan P4a, the Maintainer, 2026-11-23)
+    ("device175-full", 0, "done", "0", "", False),   # 175 % (tool retirement plan P4a, the Administrator, 2026-11-23)
     ("device200-full", 0, "done", "0", "", False),
     ("device150-logo", 0, "done", "0", "956x1081", False),   # engine-v43 L1: an application logo and a subtitle (the 90-161.Z case)
     ("contrast-full", 0, "done", "0", "", False),
-    # plan engine-v48 D6 (the PFM, 2026-11-27): the dark theme (Kanon in Fulcrum colors), at 100 % and at the PFM's half size
+    # plan engine-v48 D6 (the Administrator, 2026-11-27): the dark theme (Kanon in Fulcrum colors), at 100 % and at the Administrator's half size
     # at 150 % (956 x 1081: under 700 px at 100 %, so the band shows its half-size parts and the buttons stack)
     ("dark-full", 0, "done", "0", "", False),
     ("device150-dark", 0, "done", "0", "956x1081", False),
@@ -72,7 +72,10 @@ CONTRAST = [(r"\$ui\.HighOn = \{ try \{ return \[bool\]\[System\.Windows\.Forms\
 # The swap of a dark run (a name that starts with "dark-" or holds "-dark"): the window reads the Windows app mode as dark.
 DARK = [(r"\$ui\.Dark = \[bool\]\(& \$ui\.DarkOn\)", "$ui.Dark = $true")]
 DEVICE_150 = [
-    (r"\$ui\.Form\.AutoScaleDimensions = New-Object System\.Drawing\.SizeF\(96, 96\)", "$ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(64, 64)"),
+    (
+        r"\$ui\.Form\.AutoScaleDimensions = New-Object System\.Drawing\.SizeF\(96, 96\)",
+        "$ui.Form.AutoScaleDimensions = New-Object System.Drawing.SizeF(64, 64)",
+    ),
     (r"if \(\$d -gt 0\) \{ \$ui\.Dpi = \$d \}", "if ($d -gt 0) { $ui.Dpi = $d * 1.5 }"),
     # the step title of R32 that left no room for the bar beside it: the bar must stay on the title's line ($ui.FitBar)
     (r"'Check this computer'", "'Make the test list and library'"),
@@ -132,7 +135,7 @@ def bundle(t, long, keep=None, swaps=(), logo=False):
     if logo:   # engine-v43 L1: the application row with its own logo and a subtitle, as 90-161.Z has them
         shutil.copy(ROOT / "assets" / "logo" / "rho-fulcrum-128.png", app / "app-logo.png")
         m["application"]["logo"] = "app-logo.png"
-        # engine-v46 name spot L3 (the PFM, 2026-11-26): the 90-161.Z case: the word "KANON", the app row in the RADE row's place.
+        # engine-v46 name spot L3 (the Administrator, 2026-11-26): the 90-161.Z case: the word "KANON", the app row in the RADE row's place.
         m["application"]["productName"] = "Kanon"
         m["application"]["subtitle"] = "Publications and Forms Management"
     qa = json.loads((ROOT / "tests" / "fixture-app" / "answers.json").read_text(encoding="utf-8"))   # the hand step's questions, as in tests/engine_test.sh
@@ -170,7 +173,7 @@ def bundle(t, long, keep=None, swaps=(), logo=False):
     for pat, new in [
         # the NIPR guard: the test copy gives a computer name with the NIPR label, as tests/engine_test.sh does (the engine has no switch)
         (r"(?m)^function Get-OwnFqdn .*", "function Get-OwnFqdn { return 'pc01.area52.example.invalid' }"),
-        (r"(?m)^\$usersRoot = 'C:\\Users'", "$usersRoot = '%s'" % users),
+        (r"(?m)^\$usersRoot = .*", "$usersRoot = '%s'" % users),
         (r"(?m)^\$goUrl = '.*'", "$goUrl = '%s'" % go),
         (r"(?m)^\$releaseUrl = '.*'", "$releaseUrl = '%s'" % file_url(t / "rel.json")),
         (r"\$checkGate = \$true", "$checkGate = $false"),
@@ -197,14 +200,18 @@ def r32_why(lines, name):
         A list of texts, one for each fault (empty = nothing is missing).
     """
     why = []
-    wheel = [l for l in lines if l.startswith("WIN wheel ")]
-    scrolls = [l for l in lines if l.startswith("WIN scrolls ")]
-    if any(not l.rstrip().endswith("moved=True") for l in wheel) or len(wheel) != len(scrolls):
+    wheel = [line for line in lines if line.startswith("WIN wheel ")]
+    scrolls = [line for line in lines if line.startswith("WIN scrolls ")]
+    if any(not line.rstrip().endswith("moved=True") for line in wheel) or len(wheel) != len(scrolls):
         why.append("the mouse wheel did not move the text of each card that scrolls (%d of %d)" % (len(wheel), len(scrolls)))
-    if any(l.startswith("WIN r32 ") and " error=" in l for l in lines):
+    if any(line.startswith("WIN r32 ") and " error=" in line for line in lines):
         why.append("an r32 measure line has an error")
     if name.startswith("device150-"):
-        rows = [re.search(r" name=(\d+)/(\d+) bar=(\d+)/(\d+)/.* frac=(\d+)/(\d+)", l) for l in lines if l.startswith("WIN r32 ") and "-run " in l]
+        rows = [
+            re.search(r" name=(\d+)/(\d+) bar=(\d+)/(\d+)/.* frac=(\d+)/(\d+)", line)
+            for line in lines
+            if line.startswith("WIN r32 ") and "-run " in line
+        ]
         rows = [tuple(int(x) for x in m.groups()) for m in rows if m]
         # Cards v2 (plan engine-v48 step 3): the bar is under the title, and the count's middle is within 1 px of the bar's
         if len(rows) < 3 or any(not (bar >= top + high - 1 and abs((frac + fh / 2) - (bar + bh / 2)) <= 1) for top, high, bar, bh, frac, fh in rows):
@@ -224,7 +231,7 @@ def r31_why(lines, app, fresh):
         A list of reasons (empty when nothing is missing): a first window draws the 5 tour cards; a test round draws
         the error card of an answer that means a failure and its last card.
     """
-    views = [re.sub(r"^WIN card=\d+-(\S+) .*$", r"\1", l) for l in lines if l.startswith("WIN card=")]
+    views = [re.sub(r"^WIN card=\d+-(\S+) .*$", r"\1", line) for line in lines if line.startswith("WIN card=")]
     why = []
     if fresh and views.count("tour") != 5:
         why.append("the tour drew %d cards, not 5" % views.count("tour"))
@@ -243,13 +250,13 @@ def restore_why(lines):
     Returns:
         A list of reasons (empty when nothing is missing).
     """
-    cards = [l for l in lines if l.startswith("WIN card=")]
-    drawn = {v for v in ("restmark", "restpick", "restconfirm") if any((" view=%s " % v) in l for l in cards)}
-    if any(" view=maint " in l for l in cards) and drawn != {"restmark", "restpick", "restconfirm"}:   # engine-v47: one Maintenance card
+    cards = [line for line in lines if line.startswith("WIN card=")]
+    drawn = {v for v in ("restmark", "restpick", "restconfirm") if any((" view=%s " % v) in line for line in cards)}
+    if any(" view=maint " in line for line in cards) and drawn != {"restmark", "restpick", "restconfirm"}:   # engine-v47: one Maintenance card
         return ["the Maintenance card showed, but the Restore cards were not all drawn: %s" % sorted(drawn)]
     if drawn and "WIN restore-mark saved=True view=restpick" not in lines:
         return ["the Restore mark card did not save the mark and go on to the backup list"]
-    if drawn and not any(" view=restpick " in l and "[Remove test-site mark]" in l for l in cards):
+    if drawn and not any(" view=restpick " in line and "[Remove test-site mark]" in line for line in cards):
         return ["the Restore backup card of a marked site did not show \"Remove test-site mark\""]
     if drawn and "WIN restore-unmark-button shown=True focused=False row-focused=True" not in lines:
         return ["\"Remove test-site mark\" was not on the backup card, or the focus was not on the newest backup row"]
@@ -257,16 +264,16 @@ def restore_why(lines):
         return ["after the removal the mark card did not show, or the no-backup card of a marked site had no button"]
     if drawn and "WIN restore-unmark gone=True view=toolres" not in lines:
         return ["\"Remove test-site mark\" did not remove the mark and show the result card"]
-    if drawn and not any(" view=restconfirm " in l and " p=Test site: " in l for l in cards):
+    if drawn and not any(" view=restconfirm " in line and " p=Test site: " in line for line in cards):
         return ["the Restore confirm card did not show \"Test site: <name>\" as its first line"]
-    if drawn and not (any(l.startswith("WIN uninstall-backups view=unbackups main=Keep the Backups folder") and l.endswith(" back=True")
-                          for l in lines) and "WIN uninstall-remove view=unconfirm keep=False choice=True" in lines
+    if drawn and not (any(line.startswith("WIN uninstall-backups view=unbackups main=Keep the Backups folder") and line.endswith(" back=True")
+                          for line in lines) and "WIN uninstall-remove view=unconfirm keep=False choice=True" in lines
                       and "WIN uninstall-keep view=unconfirm keep=True choice=True" in lines):
         return ["the Uninstall Backups card (engine-v48) did not show with \"Keep the Backups folder\" as its main button, "
                 "or a Backups button did not reach the confirm card with that choice in its text"]
     if drawn and "WIN uninstall-confirm view=unconfirm danger=True" not in lines:
         return ["the Uninstall confirm card (engine-v40) did not show, or its button \"Uninstall\" was not dark red"]
-    got = [int(m.group(1)) for m in (re.match(r"WIN restore-lines (\d+) visible=True", l) for l in lines) if m]
+    got = [int(m.group(1)) for m in (re.match(r"WIN restore-lines (\d+) visible=True", line) for line in lines) if m]
     if drawn and not (got and min(got) >= 2):
         return ["the Restore confirm card did not show its 2 count lines"]
     return []
@@ -298,9 +305,9 @@ def ui_why(lines, d, name):
     print("   INVENTORY lines=%d" % (len(inv.read_text(encoding="utf-8-sig").splitlines()) if inv.exists() else 0))
     if not inv.exists():
         why.append("no inventory (RADE_INVENTORY)")
-    if name.startswith("contrast-") and not any(l.startswith("WIN high=True") for l in lines):
+    if name.startswith("contrast-") and not any(line.startswith("WIN high=True") for line in lines):
         why.append("the contrast run did not take the system colors (no WIN high=True line)")
-    if (name.startswith("dark-") or "-dark" in name) and not any(l.startswith("WIN high=") and " dark=True " in l for l in lines):
+    if (name.startswith("dark-") or "-dark" in name) and not any(line.startswith("WIN high=") and " dark=True " in line for line in lines):
         why.append("the dark run did not take the dark colors (no dark=True on the WIN high= line)")
     return why
 
@@ -313,65 +320,111 @@ def screen():
     return "SCREEN " + " ".join((rs.stdout + rs.stderr).split())[:160]
 
 
+def _run_window(run, out, home):
+    """Build and run one window test script, log its output, and return (out_dir, lines, shared).
+
+    Args:
+        run: tuple (name, app, hand, tour, size, long) from RUNS.
+        out: root output directory (pathlib.Path).
+        home: shared temporary user folder for deploy/-maint runs.
+
+    Returns:
+        Tuple of (run output dir Path, output lines list, shared bool).
+    """
+    name, app, hand, tour, size, long = run
+    t = pathlib.Path(tempfile.mkdtemp())
+    shared = name.startswith("deploy-") or name.endswith("-maint")
+    users = bundle(t, long, home if shared else None, swaps_for(name), name.endswith("-logo"))   # -maint: the installed app
+    d = out / name
+    d.mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ, RADE_T_OUT=str(d), RADE_T_APP=str(app), RADE_T_HAND=hand, RADE_T_TOUR=tour, RADE_T_SIZE=size,
+               USERPROFILE=str(users / "test1234"), RADE_INVENTORY=str(d / "inventory.jsonl"))
+    try:
+        r = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-File", str(t / "w.ps1")],
+            env=env, capture_output=True, text=True, timeout=420, stdin=subprocess.DEVNULL, errors="replace",
+        )
+        text = r.stdout + r.stderr
+    except subprocess.TimeoutExpired as e:
+        text = (e.stdout or b"").decode("utf-8", "replace") + "\nWIN HARNESS-TIMEOUT"
+    shutil.rmtree(t, ignore_errors=True)
+    (d / "out.txt").write_text(text, encoding="utf-8")
+    lines = text.splitlines()
+    layout = [line for line in lines if line.startswith("LAYOUT ")]
+    closed = any(line.startswith("WIN closed=True") for line in lines)
+    cards = sum(1 for line in lines if line.startswith("WIN card="))
+    print("== %s: cards=%d layout-lines=%d closed=%s png=%d" % (name, cards, len(layout), closed, len(list(d.glob("*.png")))))
+    first = name == RUNS[0][0]
+    for line in lines:
+        if line.startswith(("WIN", "LAYOUT ", "No window could open", "Layout self-check")) or (first and line.startswith("MEASURE")):
+            print("   " + line[:170])
+    if not closed:
+        print("   --- last lines ---")
+        for line in lines[-25:]:
+            print("   " + line[:300])
+    return d, lines, shared
+
+
+def _check_run(run, out, home):
+    """Execute one window test run and return (failure reasons list, maintenance card count).
+
+    Args:
+        run: tuple (name, app, hand, tour, size, long) from RUNS.
+        out: root output directory (pathlib.Path).
+        home: shared temporary user folder for deploy/-maint runs.
+
+    Returns:
+        Tuple of (why list of failure reason strings, maintenance card count).
+    """
+    name, app, hand, _, size, _ = run
+    d, lines, shared = _run_window(run, out, home)
+    first = name == RUNS[0][0]
+    # a hand card ("Your turn") may scroll at any size (the Administrator, 2026-11-17); every other card only at the smallest
+    scrolls = [line for line in lines if line.startswith("WIN scrolls ") and not line.rstrip().endswith("-hand")]
+    # R31: tour and test-round cards; R32: wheel, step row; engine-v31: Restore cards
+    why = r31_why(lines, app, first or not shared) + r32_why(lines, name) + restore_why(lines)
+    if not any(line.startswith("WIN closed=True") for line in lines):
+        why.append("the window did not reach its end")
+    layout = [line for line in lines if line.startswith("LAYOUT ")]
+    if layout:
+        why.append("%d layout defects" % len(layout))
+    why += ui_why(lines, d, name)
+    why += ["a card scrolls at a size where none may: " + scrolls[0][12:]] if scrolls and size != SMALLEST and not name.startswith("device200-") else []
+    if not any(line.startswith("WIN line Layout self-check: ") for line in lines):
+        why.append("no line of the layout self-check")
+    if not any(line.startswith("WIN SCALE ") for line in lines):
+        why.append("no SCALE line of the layout self-check")
+    got = {re.sub(r"^\d+-", "", p.stem) for p in d.glob("*-answer-*.png")}
+    if first and got != {"answer-yesno", "answer-pick", "answer-text"}:
+        why.append("the question cards (answer-yesno, answer-pick, answer-text) were not all drawn: %s" % sorted(got))
+    if size == SMALLEST and hand == "done" and "answer-text" not in got:
+        why.append("the text question (answer-text) was not drawn in the smallest window")
+    broken = [line for line in lines if line.startswith(("WIN PNG-FAILED", "WIN DRIVER-ERROR", "WIN TIMEOUT", "WIN BAD"))]
+    if broken:
+        why.append(broken[0][:120])
+    flat = [line for line in lines if line.startswith("WIN png=") and int(line.rsplit("=", 1)[1]) < 20]
+    if flat:
+        why.append("a picture with fewer than 20 colors (the window was not drawn): " + flat[0])
+    maint_count = sum(1 for line in lines if line.startswith("WIN card=") and " view=maint " in line)
+    return why, maint_count
+
+
 def main():
+    """Run all window checks across RUNS and return exit code 0 on pass or 1 on failure.
+
+    Returns:
+        Exit code integer (0 when every run passes and >= 2 maintenance cards show, else 1).
+    """
     out = pathlib.Path(sys.argv[1]).resolve()
     bad = 0
     home = pathlib.Path(tempfile.mkdtemp())   # the user folder the "deploy" and "-maint" runs share
     maint = 0
-    for name, app, hand, tour, size, long in RUNS:
-        t = pathlib.Path(tempfile.mkdtemp())
-        users = bundle(t, long, home if (shared := name.startswith("deploy-") or name.endswith("-maint")) else None, swaps_for(name), name.endswith("-logo"))   # -maint: the installed app
-        d = out / name; d.mkdir(parents=True, exist_ok=True)
-        env = dict(os.environ, RADE_T_OUT=str(d), RADE_T_APP=str(app), RADE_T_HAND=hand, RADE_T_TOUR=tour, RADE_T_SIZE=size,
-                   USERPROFILE=str(users / "test1234"), RADE_INVENTORY=str(d / "inventory.jsonl"))
-        try:
-            r = subprocess.run(["powershell.exe", "-NoProfile", "-File", str(t / "w.ps1")], env=env, capture_output=True, text=True, timeout=420, stdin=subprocess.DEVNULL, errors="replace")
-            text = r.stdout + r.stderr
-        except subprocess.TimeoutExpired as e:
-            text = (e.stdout or b"").decode("utf-8", "replace") + "\nWIN HARNESS-TIMEOUT"
-        (d / "out.txt").write_text(text, encoding="utf-8")
-        lines = text.splitlines()
-        layout = [l for l in lines if l.startswith("LAYOUT ")]
-        closed = any(l.startswith("WIN closed=True") for l in lines)
-        cards = sum(1 for l in lines if l.startswith("WIN card="))
-        print("== %s: cards=%d layout-lines=%d closed=%s png=%d" % (name, cards, len(layout), closed, len(list(d.glob("*.png")))))
-        first = name == RUNS[0][0]
-        for l in lines:
-            if l.startswith(("WIN", "LAYOUT ", "No window could open", "Layout self-check")) or (first and l.startswith("MEASURE")):
-                print("   " + l[:170])
-        if not closed:
-            print("   --- last lines ---")
-            for l in lines[-25:]:
-                print("   " + l[:300])
-        # a hand card ("Your turn") may scroll at any size (the Administrator, 2026-11-17); every other card only at the smallest
-        scrolls = [l for l in lines if l.startswith("WIN scrolls ") and not l.rstrip().endswith("-hand")]
-        why = r31_why(lines, app, name == RUNS[0][0] or not shared) + r32_why(lines, name) + restore_why(lines)   # R31: tour and test-round cards; R32: wheel, step row; engine-v31: Restore cards
-        if not closed:
-            why.append("the window did not reach its end")
-        if layout:
-            why.append("%d layout defects" % len(layout))
-        why += ui_why(lines, d, name)
-        why += ["a card scrolls at a size where none may: " + scrolls[0][12:]] if scrolls and size != SMALLEST and not name.startswith("device200-") else []
-        if not any(l.startswith("WIN line Layout self-check: ") for l in lines):
-            why.append("no line of the layout self-check")
-        if not any(l.startswith("WIN SCALE ") for l in lines):
-            why.append("no SCALE line of the layout self-check")
-        got = {re.sub(r"^\d+-", "", p.stem) for p in d.glob("*-answer-*.png")}
-        if first and got != {"answer-yesno", "answer-pick", "answer-text"}:
-            why.append("the question cards (answer-yesno, answer-pick, answer-text) were not all drawn: %s" % sorted(got))
-        if size == SMALLEST and hand == "done" and "answer-text" not in got:
-            why.append("the text question (answer-text) was not drawn in the smallest window")
-        broken = [l for l in lines if l.startswith(("WIN PNG-FAILED", "WIN DRIVER-ERROR", "WIN TIMEOUT", "WIN BAD"))]
-        if broken:
-            why.append(broken[0][:120])
-        flat = [l for l in lines if l.startswith("WIN png=") and int(l.rsplit("=", 1)[1]) < 20]
-        if flat:
-            why.append("a picture with fewer than 20 colors (the window was not drawn): " + flat[0])
-        maint += sum(1 for l in lines if l.startswith("WIN card=") and " view=maint " in l)
+    for run in RUNS:
+        why, maint_count = _check_run(run, out, home)
+        maint += maint_count
         if why:
             bad += 1
-            print("   FAIL " + name + ": " + "; ".join(why))
-        shutil.rmtree(t, ignore_errors=True)
+            print("   FAIL " + run[0] + ": " + "; ".join(why))
     if maint < 2:
         bad += 1
         print("   FAIL the Maintenance card showed %d times, 2 at least are needed (1020 and 811 wide)" % maint)
