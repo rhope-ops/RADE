@@ -6,7 +6,7 @@
 # Covers deploy v1 (docs/engine.md): a deploy sends nothing and keeps one record file for each app in RADE\Config\installed (docs/engine.md "Shared files"); a test round is unchanged.
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
-engine_src="engine/rade_build.py $(ls engine/ps/*.ps1 engine/ps/window/*.ps1 | tr '\n' ' ')"   # the build file and its PowerShell parts (docs/code-standard.md C10)
+engine_src="engine/rade_build.py engine/rade_ui.ps1 $(ls engine/ps/*.ps1 engine/ps/window/*.ps1 | tr '\n' ' ')"   # the build file and its PowerShell parts (docs/code-standard.md C10)
 ui_src="engine/rade_ui.ps1"   # the shared UI theme module in build order
 pass=0; fail=0
 # Every run below gets this variable, as a RADE started from a shortcut made before engine-v36 has it on Windows (its
