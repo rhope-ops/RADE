@@ -256,6 +256,9 @@ None; sets Made, Failed, Skipped and Unlinked on the state.
 #>
 function Add-MissingRows($State) {
   $State.Made = 0; $State.Failed = 0; $State.Skipped = 0; $script:unlinked = 0
+  if (@($State.Missing).Count -gt 0) {
+    try { Save-RestoreRecord } catch { $script:mapStop = $true; return }
+  }
   try {
     foreach ($row in @($State.Missing | Sort-Object { [int]$_.ID })) {
       if ($null -ne (Get-OnList $State ([int]$row.ID))) { continue }   # back from the Recycle Bin, or another saved ID of the same row was made
